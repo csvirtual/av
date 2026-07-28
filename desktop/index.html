@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows 11 — Área de Trabalho</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Tela de boot -->
+<div id="boot-screen" class="screen">
+  <div class="boot-logo">⊞</div>
+  <div class="boot-spinner"></div>
+</div>
+
+<!-- Tela de configuração inicial de senha -->
+<div id="setup-screen" class="screen hidden">
+  <div class="auth-card">
+    <div class="auth-avatar">🙂</div>
+    <h1>Bem-vindo</h1>
+    <p class="auth-sub">Crie uma senha para proteger sua área de trabalho.</p>
+    <form id="setup-form" autocomplete="off">
+      <input type="text" id="setup-name" placeholder="Seu nome" maxlength="40" required>
+      <input type="password" id="setup-pass" placeholder="Nova senha" minlength="4" required>
+      <input type="password" id="setup-pass2" placeholder="Confirmar senha" minlength="4" required>
+      <input type="text" id="setup-hint" placeholder="Dica de senha (opcional)" maxlength="80">
+      <p id="setup-error" class="auth-error hidden"></p>
+      <button type="submit" class="auth-btn">Criar senha →</button>
+    </form>
+  </div>
+</div>
+
+<!-- Tela de bloqueio / login -->
+<div id="lock-screen" class="screen hidden">
+  <div class="lock-clock">
+    <div class="lock-time" id="lock-time">00:00</div>
+    <div class="lock-date" id="lock-date">segunda-feira, 1 de janeiro</div>
+  </div>
+  <div class="auth-card">
+    <div class="auth-avatar">🙂</div>
+    <h1 id="lock-username">Usuário</h1>
+    <form id="lock-form" autocomplete="off">
+      <input type="password" id="lock-pass" placeholder="Senha" required>
+      <p id="lock-error" class="auth-error hidden">Senha incorreta. Tente novamente.</p>
+      <button type="submit" class="auth-btn">Entrar →</button>
+      <button type="button" id="lock-hint-btn" class="auth-link">Esqueci minha senha</button>
+    </form>
+  </div>
+</div>
+
+<!-- Área de trabalho -->
+<div id="desktop" class="screen hidden">
+  <div id="wallpaper"></div>
+  <div id="desktop-icons"></div>
+  <div id="windows-layer"></div>
+
+  <!-- Menu Iniciar -->
+  <div id="start-menu" class="panel hidden">
+    <input type="text" id="start-search" placeholder="Pesquisar" autocomplete="off">
+    <div class="start-section-label">Fixados</div>
+    <div id="start-pinned" class="start-grid"></div>
+    <div class="start-footer">
+      <div class="start-user">
+        <span class="avatar-sm">🙂</span>
+        <span id="start-username">Usuário</span>
+      </div>
+      <button id="start-power" class="icon-btn" title="Energia">⏻</button>
+    </div>
+  </div>
+
+  <!-- Menu de energia -->
+  <div id="power-menu" class="panel small hidden">
+    <button data-action="lock">🔒 Bloquear</button>
+    <button data-action="reload">↻ Reiniciar sessão</button>
+  </div>
+
+  <!-- Menu de contexto -->
+  <div id="context-menu" class="panel small hidden"></div>
+
+  <!-- Barra de tarefas -->
+  <div id="taskbar">
+    <button id="start-btn" class="taskbar-btn" title="Iniciar">⊞</button>
+    <button class="taskbar-btn" data-app="explorer" title="Explorador de Arquivos">📁</button>
+    <button class="taskbar-btn" data-app="notepad" title="Bloco de Notas">📝</button>
+    <button class="taskbar-btn" data-app="settings" title="Configurações">⚙️</button>
+    <div id="taskbar-running" class="taskbar-running"></div>
+    <div id="tray" class="tray">
+      <span id="tray-clock" class="tray-clock"></span>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
