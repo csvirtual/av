@@ -176,5 +176,15 @@ body.sleeping #desktop { filter: brightness(0); }
 .volume-panel input[type="range"] { flex: 1; }
 #volume-value { font-size: 12px; color: var(--text-dim); width: 24px; text-align: right; }
 
+/* ---------- Calendário da bandeja ---------- */
+.calendar-flyout { width: 280px; padding: var(--space-4); }
+.calendar-flyout-date { font-size: 15px; margin-bottom: var(--space-3); text-transform: capitalize; }
+.calendar-flyout-open {
+  width: 100%; margin-top: var(--space-3); padding: var(--space-2);
+  border: none; border-radius: var(--radius-md); background: var(--hover);
+  color: var(--text); cursor: pointer; font-size: 13px;
+}
+.calendar-flyout-open:hover { background: var(--border); }
+
 /* ---------- Context menu ---------- */
 #context-menu { min-width: 200px; }

@@ -468,6 +468,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#power-menu') && !e.target.closest('#start-power')) hidePanel($('#power-menu'));
   if (!e.target.closest('#account-menu') && !e.target.closest('#start-user-btn')) hidePanel($('#account-menu'));
   if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hidePanel($('#volume-menu'));
+  if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
 });
 
 // ---------------- Taskbar / Start menu ----------------
@@ -579,6 +580,70 @@ $('#volume-mute-btn').addEventListener('click', async () => {
   const muted = await volumeControl.getMuted();
   await volumeControl.setMuted(!muted);
   await refreshVolumeUI();
+});
+
+// ---------------- Calendário da bandeja ----------------
+const CAL_WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const CAL_MONTHS = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+let calFlyoutMonth = new Date().getMonth();
+let calFlyoutYear = new Date().getFullYear();
+
+function renderCalendarFlyout() {
+  const today = new Date();
+  const panel = $('#calendar-flyout');
+  panel.querySelector('[data-role="full-date"]').textContent = today.toLocaleDateString('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+  panel.querySelector('[data-role="month-label"]').textContent = `${CAL_MONTHS[calFlyoutMonth]} ${calFlyoutYear}`;
+
+  const weekdaysEl = panel.querySelector('[data-role="weekdays"]');
+  weekdaysEl.innerHTML = CAL_WEEKDAYS.map((w) => `<div class="calendar-weekday">${w}</div>`).join('');
+
+  const daysEl = panel.querySelector('[data-role="days"]');
+  daysEl.innerHTML = '';
+  const firstDay = new Date(calFlyoutYear, calFlyoutMonth, 1);
+  const daysInMonth = new Date(calFlyoutYear, calFlyoutMonth + 1, 0).getDate();
+  for (let i = 0; i < firstDay.getDay(); i++) daysEl.appendChild(document.createElement('div'));
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = new Date(calFlyoutYear, calFlyoutMonth, day);
+    const cell = document.createElement('div');
+    cell.className = 'calendar-day' + (cellDate.toDateString() === today.toDateString() ? ' today' : '');
+    cell.textContent = day;
+    daysEl.appendChild(cell);
+  }
+}
+
+$('#tray-clock').addEventListener('click', (e) => {
+  e.stopPropagation();
+  hidePanel($('#account-menu'));
+  hidePanel($('#power-menu'));
+  hidePanel($('#volume-menu'));
+  const panel = $('#calendar-flyout');
+  if (panel.classList.contains('hidden')) {
+    calFlyoutMonth = new Date().getMonth();
+    calFlyoutYear = new Date().getFullYear();
+    renderCalendarFlyout();
+    positionPanelNearButton(panel, $('#tray'));
+  } else {
+    hidePanel(panel);
+  }
+});
+$('#calendar-flyout [data-action="prev-month"]').addEventListener('click', () => {
+  calFlyoutMonth--;
+  if (calFlyoutMonth < 0) { calFlyoutMonth = 11; calFlyoutYear--; }
+  renderCalendarFlyout();
+});
+$('#calendar-flyout [data-action="next-month"]').addEventListener('click', () => {
+  calFlyoutMonth++;
+  if (calFlyoutMonth > 11) { calFlyoutMonth = 0; calFlyoutYear++; }
+  renderCalendarFlyout();
+});
+$('#calendar-flyout [data-action="open-clock"]').addEventListener('click', () => {
+  hidePanel($('#calendar-flyout'));
+  openClock(ctx);
 });
 
 document.querySelectorAll('.taskbar-btn[data-app]').forEach((btn) => {

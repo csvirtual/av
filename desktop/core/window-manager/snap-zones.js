@@ -4,7 +4,7 @@
 const EDGE_THRESHOLD = 24;
 const CORNER_RATIO = 0.4; // 40% superior/inferior da borda conta como "canto"
 
-function taskbarHeight() {
+export function taskbarHeight() {
   const value = getComputedStyle(document.documentElement).getPropertyValue('--taskbar-height').trim();
   return parseFloat(value) || 48;
 }

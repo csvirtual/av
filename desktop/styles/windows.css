@@ -53,7 +53,10 @@
 /* ---------- Snap (encaixe de janelas) ---------- */
 .snap-preview {
   position: absolute;
-  z-index: 3;
+  /* Sempre acima de qualquer janela de app, cujo z-index dinâmico (via
+     foco) começa em 10 e só cresce — um valor baixo aqui ficaria coberto
+     assim que qualquer janela fosse focada. */
+  z-index: 1000;
   background: rgba(76, 194, 255, 0.18);
   border: 2px solid var(--accent);
   border-radius: var(--radius-md);
@@ -62,7 +65,7 @@
 }
 .snap-assist {
   position: absolute;
-  z-index: 4;
+  z-index: 1000;
   pointer-events: auto;
   display: flex; align-items: center; justify-content: center; gap: var(--space-3);
   padding: var(--space-4);
