@@ -647,22 +647,65 @@ $('#calendar-flyout [data-action="open-clock"]').addEventListener('click', () =>
   openClock(ctx);
 });
 
+// Traz para frente (ou minimiza, se já estiver em foco) a janela mais
+// recente de um app — usado tanto pelos ícones fixos da barra de tarefas
+// quanto pelos temporários, para que um app aberto NUNCA ganhe um ícone
+// duplicado ao lado do seu: o mesmo ícone é reutilizado, só muda de estado.
+function focusOrToggleApp(appId) {
+  const windows = WM.listProcesses().filter((w) => w.appId === appId);
+  if (!windows.length) return false;
+  const focused = windows.find((w) => w.focused);
+  if (focused) {
+    WM.toggleMinimize(focused.id);
+  } else {
+    // Nenhuma janela deste app está em foco (pode estar minimizada ou só
+    // atrás de outra) — toggleMinimize já sabe restaurar com a animação
+    // correta e focar em seguida, então reaproveita essa lógica em vez de
+    // chamar focusById direto (que pularia a animação e deixaria a janela
+    // com opacidade travada em 0 quando ela estava minimizada).
+    const mostRecent = windows.reduce((a, b) => (b.openedAt > a.openedAt ? b : a));
+    WM.toggleMinimize(mostRecent.id);
+  }
+  return true;
+}
+
 document.querySelectorAll('.taskbar-btn[data-app]').forEach((btn) => {
   btn.addEventListener('click', () => {
-    const app = PINNED_APPS.find((a) => a.id === btn.dataset.app);
+    const appId = btn.dataset.app;
+    if (focusOrToggleApp(appId)) return;
+    const app = PINNED_APPS.find((a) => a.id === appId);
     if (app) app.onOpen();
   });
 });
 
 WM.onWindowsChange((list) => {
+  const pinnedBtns = document.querySelectorAll('.taskbar-btn[data-app]');
+  const byApp = new Map();
+  list.forEach((w) => {
+    if (!byApp.has(w.appId)) byApp.set(w.appId, []);
+    byApp.get(w.appId).push(w);
+  });
+
+  // Ícones fixos: só refletem o estado (rodando/em foco) do próprio ícone,
+  // nunca criam um segundo ícone ao lado.
+  pinnedBtns.forEach((btn) => {
+    const appWindows = byApp.get(btn.dataset.app) || [];
+    btn.classList.toggle('running', appWindows.length > 0);
+    btn.classList.toggle('active', appWindows.some((w) => w.focused));
+    byApp.delete(btn.dataset.app);
+  });
+
+  // Apps sem ícone fixo (Calculadora, Relógio, Terminal, Gerenciador de
+  // Tarefas...) ganham um ícone temporário só enquanto estiverem abertos —
+  // um por app, mesmo que existam várias janelas dele.
   const holder = $('#taskbar-running');
   holder.innerHTML = '';
-  list.forEach((w) => {
+  byApp.forEach((appWindows, appId) => {
     const btn = document.createElement('button');
-    btn.className = 'taskbar-btn running' + (w.focused ? ' active' : '');
-    btn.textContent = w.icon;
-    btn.title = w.title;
-    btn.addEventListener('click', () => WM.toggleMinimize(w.id));
+    btn.className = 'taskbar-btn running' + (appWindows.some((w) => w.focused) ? ' active' : '');
+    btn.textContent = appWindows[0].icon;
+    btn.title = appWindows.length > 1 ? `${appWindows[0].title} (+${appWindows.length - 1})` : appWindows[0].title;
+    btn.addEventListener('click', () => focusOrToggleApp(appId));
     holder.appendChild(btn);
   });
 });

@@ -1,6 +1,16 @@
 // Explorador de Arquivos: navega pelo sistema de arquivos virtual (IndexedDB),
 // cria/renomeia/exclui itens, importa arquivos do computador real e permite
 // baixar arquivos virtuais de volta para o computador real.
+
+// Ícone de disco (próprio, sem usar o arquivo/ícone proprietário da
+// Microsoft) para diferenciar "Disco Local (C:)" de uma pasta comum.
+const DRIVE_GLYPH = `<svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true">
+  <rect x="3" y="9" width="26" height="16" rx="2.5" fill="#d7dbe0" stroke="#9aa1a9" stroke-width="1"/>
+  <rect x="3" y="9" width="26" height="6" rx="2.5" fill="#aeb4bb"/>
+  <rect x="7" y="18" width="10" height="2" rx="1" fill="#6b7178"/>
+  <circle cx="24" cy="19" r="2" fill="#3f9bff"/>
+</svg>`;
+
 export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   const { fs, seed, windows, openFile } = ctx;
   let currentFolderId = startFolderId || seed.desktopId;
@@ -104,7 +114,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       const item = document.createElement('div');
       item.className = 'file-item';
       item.dataset.id = node.id;
-      const glyph = node.type === 'folder' ? '📁' : '📄';
+      const glyph = node.type !== 'folder' ? '📄' : (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁');
       item.innerHTML = `<div class="glyph">${glyph}</div><div class="name">${escapeHtml(node.name)}</div>`;
       item.addEventListener('click', (e) => {
         e.stopPropagation();

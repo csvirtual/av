@@ -1,6 +1,25 @@
 /* Componentes reutilizáveis: avatar, ícones da área de trabalho, barra de
    tarefas, painéis flutuantes (menu iniciar, menus de contexto, volume). */
 
+/* ---------- Logotipo (4 painéis, estilo bandeira) ----------
+   Reconstrução própria em CSS, sem usar o arquivo/ícone proprietário da
+   Microsoft — usada no botão Iniciar e na tela de boot. */
+.win-logo {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 0.14em;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+.win-logo i {
+  display: block;
+  font-style: normal;
+  background: currentColor;
+  border-radius: 0.05em;
+}
+
 /* ---------- Avatar ---------- */
 .auth-avatar {
   width: 72px; height: 72px;
