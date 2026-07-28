@@ -1,10 +1,11 @@
 // Gerenciador de janelas: cria a "moldura" estilo Windows 11 (barra de
-// título, botões, arrastar, redimensionar, maximizar/minimizar) e mantém a
-// lista de janelas abertas para a taskbar.
-import { windowOpen, windowClose, windowMinimize, windowRestore } from '../motion/motion.js';
+// título, botões, arrastar, redimensionar, maximizar/minimizar, encaixe) e
+// mantém a lista de janelas abertas para a taskbar e o alternador (Alt+Tab).
+import { windowOpen, windowClose, windowMinimize, windowRestore, animateLayoutChange, panelOpen } from '../motion/motion.js';
+import { detectZone, computeZoneRect, opposingZone } from './snap-zones.js';
 
 let zCounter = 10;
-const openWindows = new Map(); // id -> { el, titleBarBtn, appId, state }
+const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped }
 const listeners = new Set();
 
 function notify() {
@@ -40,6 +41,14 @@ export function focusById(id) {
   focusWindow(id);
 }
 
+/** Lista as janelas não minimizadas por ordem de foco mais recente (para o Alt+Tab). */
+export function getWindowsOrder() {
+  return Array.from(openWindows.values())
+    .filter((w) => !w.minimized)
+    .sort((a, b) => parseInt(b.el.style.zIndex || '0', 10) - parseInt(a.el.style.zIndex || '0', 10))
+    .map((w) => ({ id: w.id, title: w.title, icon: w.icon }));
+}
+
 export function toggleMinimize(id) {
   const win = openWindows.get(id);
   if (!win) return;
@@ -62,6 +71,92 @@ export async function closeWindow(id) {
   notify();
   await windowClose(win.el);
   win.el.remove();
+}
+
+function toggleMaximize(win) {
+  animateLayoutChange(win.el, () => win.el.classList.toggle('maximized'));
+  win.snapped = win.el.classList.contains('maximized') ? 'maximize' : null;
+}
+
+// ---------------- Encaixe (Snap) ----------------
+let snapPreviewEl = null;
+function getSnapPreview() {
+  if (!snapPreviewEl) {
+    snapPreviewEl = document.createElement('div');
+    snapPreviewEl.className = 'snap-preview hidden';
+    document.getElementById('windows-layer').appendChild(snapPreviewEl);
+  }
+  return snapPreviewEl;
+}
+function showSnapPreview(zone) {
+  const rect = computeZoneRect(zone);
+  const el = getSnapPreview();
+  Object.assign(el.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  el.classList.remove('hidden');
+}
+function hideSnapPreview() {
+  if (snapPreviewEl) snapPreviewEl.classList.add('hidden');
+}
+
+let snapAssistEl = null;
+let snapAssistTimer = null;
+function getSnapAssist() {
+  if (!snapAssistEl) {
+    snapAssistEl = document.createElement('div');
+    snapAssistEl.className = 'snap-assist hidden';
+    document.getElementById('windows-layer').appendChild(snapAssistEl);
+  }
+  return snapAssistEl;
+}
+function hideSnapAssist() {
+  clearTimeout(snapAssistTimer);
+  if (snapAssistEl) snapAssistEl.classList.add('hidden');
+}
+function showSnapAssist(zone, excludeId) {
+  const candidates = Array.from(openWindows.values()).filter((w) => w.id !== excludeId && !w.minimized);
+  if (!candidates.length) return;
+  const rect = computeZoneRect(zone);
+  const el = getSnapAssist();
+  el.innerHTML = '';
+  candidates.forEach((w) => {
+    const btn = document.createElement('button');
+    btn.className = 'snap-assist-item';
+    btn.innerHTML = `<span class="snap-assist-icon">${w.icon}</span><span class="snap-assist-title">${w.title}</span>`;
+    btn.addEventListener('click', () => {
+      applySnap(w.id, zone);
+      hideSnapAssist();
+    });
+    el.appendChild(btn);
+  });
+  Object.assign(el.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  el.classList.remove('hidden');
+  panelOpen(el);
+  clearTimeout(snapAssistTimer);
+  snapAssistTimer = setTimeout(hideSnapAssist, 6000);
+}
+document.addEventListener('pointerdown', (e) => {
+  if (snapAssistEl && !snapAssistEl.classList.contains('hidden') && !e.target.closest('.snap-assist')) hideSnapAssist();
+});
+
+function applySnap(id, zone) {
+  const win = openWindows.get(id);
+  if (!win) return;
+  if (zone === 'maximize') {
+    animateLayoutChange(win.el, () => win.el.classList.add('maximized'));
+    win.snapped = 'maximize';
+  } else {
+    const rect = computeZoneRect(zone);
+    animateLayoutChange(win.el, () => {
+      win.el.classList.remove('maximized');
+      Object.assign(win.el.style, {
+        left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`,
+      });
+    });
+    win.snapped = zone;
+    const opposite = opposingZone(zone);
+    if (opposite) showSnapAssist(opposite, id);
+  }
+  focusWindow(id);
 }
 
 let cascadeOffset = 0;
@@ -99,24 +194,27 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   document.getElementById('windows-layer').appendChild(el);
   windowOpen(el);
 
-  const win = { id, el, title, icon, minimized: false, focused: true };
+  const win = { id, el, title, icon, minimized: false, focused: true, snapped: null };
   openWindows.set(id, win);
   focusWindow(id);
 
   el.addEventListener('pointerdown', () => focusWindow(id));
 
   const titlebar = el.querySelector('[data-role="titlebar"]');
-  let dragging = false, offX = 0, offY = 0;
+  let dragging = false, offX = 0, offY = 0, activeZone = null, dragStartX = 0, dragStartY = 0;
   titlebar.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.win-btn')) return;
     dragging = true;
+    activeZone = null;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
     offX = e.clientX - el.offsetLeft;
     offY = e.clientY - el.offsetTop;
     el.classList.add('dragging');
   });
   titlebar.addEventListener('dblclick', (e) => {
     if (e.target.closest('.win-btn')) return;
-    el.classList.toggle('maximized');
+    toggleMaximize(win);
   });
 
   let resizing = false, resizeStartW = 0, resizeStartH = 0, resizeStartX = 0, resizeStartY = 0;
@@ -131,23 +229,46 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   });
 
   window.addEventListener('pointermove', (e) => {
+    if (dragging && el.classList.contains('maximized')) {
+      // Só restaura a janela maximizada quando o arrasto realmente começa —
+      // um clique duplo não deve disparar isso (senão cancela o toggle).
+      const moved = Math.abs(e.clientX - dragStartX) > 4 || Math.abs(e.clientY - dragStartY) > 4;
+      if (moved) {
+        const restoredWidth = el.offsetWidth * 0.6;
+        el.classList.remove('maximized');
+        el.style.width = `${restoredWidth}px`;
+        offX = restoredWidth / 2;
+        offY = 15;
+        win.snapped = null;
+      }
+    }
     if (dragging && !el.classList.contains('maximized')) {
       el.style.left = `${Math.max(0, e.clientX - offX)}px`;
       el.style.top = `${Math.max(0, e.clientY - offY)}px`;
+      const zone = detectZone(e.clientX, e.clientY);
+      if (zone !== activeZone) {
+        activeZone = zone;
+        if (zone) showSnapPreview(zone);
+        else hideSnapPreview();
+      }
     }
     if (resizing) {
       el.style.width = `${Math.max(320, resizeStartW + (e.clientX - resizeStartX))}px`;
       el.style.height = `${Math.max(200, resizeStartH + (e.clientY - resizeStartY))}px`;
+      win.snapped = null;
     }
   });
   window.addEventListener('pointerup', () => {
+    if (dragging && activeZone) applySnap(id, activeZone);
+    hideSnapPreview();
+    activeZone = null;
     dragging = false;
     resizing = false;
     el.classList.remove('dragging');
   });
 
   el.querySelector('[data-action="min"]').addEventListener('click', () => toggleMinimize(id));
-  el.querySelector('[data-action="max"]').addEventListener('click', () => el.classList.toggle('maximized'));
+  el.querySelector('[data-action="max"]').addEventListener('click', () => toggleMaximize(win));
   el.querySelector('[data-action="close"]').addEventListener('click', () => closeWindow(id));
 
   notify();

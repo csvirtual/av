@@ -44,6 +44,9 @@
   --blur-regular: blur(24px);
   --blur-thick: blur(30px);
 
+  /* Layout */
+  --taskbar-height: 48px;
+
   /* Movimento */
   --duration-fast: 120ms;
   --duration-normal: 200ms;

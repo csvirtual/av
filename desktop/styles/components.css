@@ -41,7 +41,7 @@ body.sleeping #desktop { filter: brightness(0); }
   z-index: 0;
 }
 #desktop-icons {
-  position: absolute; inset: 0 0 48px 0;
+  position: absolute; inset: 0 0 var(--taskbar-height) 0;
   z-index: 1;
   padding: var(--space-3);
 }
@@ -71,7 +71,7 @@ body.sleeping #desktop { filter: brightness(0); }
 /* ---------- Taskbar ---------- */
 #taskbar {
   position: absolute; left: 0; right: 0; bottom: 0;
-  height: 48px;
+  height: var(--taskbar-height);
   z-index: 10;
   background: var(--taskbar-bg);
   backdrop-filter: var(--blur-regular);

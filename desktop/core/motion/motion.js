@@ -105,6 +105,36 @@ export function panelClose(el) {
   );
 }
 
+/**
+ * Anima uma mudança de layout (posição/tamanho) usando a técnica FLIP:
+ * mede o estado "antes", aplica o estado "depois" (um único reflow), e
+ * anima a diferença via transform/scale — assim o layout final só é
+ * calculado uma vez, e a animação em si roda inteira no compositor.
+ * Usado para maximizar/restaurar e encaixar janelas (Snap).
+ */
+export function animateLayoutChange(el, applyNewLayout) {
+  const before = el.getBoundingClientRect();
+  applyNewLayout();
+  if (prefersReducedMotion.matches || !el.animate) return Promise.resolve();
+  const after = el.getBoundingClientRect();
+  if (after.width === 0 || after.height === 0) return Promise.resolve();
+  const dx = before.left - after.left;
+  const dy = before.top - after.top;
+  const sx = before.width / after.width;
+  const sy = before.height / after.height;
+  const anim = el.animate(
+    [
+      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+      { transform: 'translate(0, 0) scale(1, 1)' },
+    ],
+    { duration: DURATION.normal, easing: EASE.decelerate }
+  );
+  el.style.transformOrigin = 'top left';
+  return anim.finished.catch(() => {}).then(() => {
+    el.style.transformOrigin = '';
+  });
+}
+
 /** Fade genérico (telas de bloqueio, sobreposições). */
 export function fadeIn(el, duration = DURATION.normal) {
   return run(el, [{ opacity: 0 }, { opacity: 1 }], { duration, easing: EASE.standard });
