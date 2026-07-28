@@ -96,11 +96,43 @@ export const fs = {
   },
 };
 
+/** Instalações antigas tinham Área de Trabalho/Documentos/Imagens/Downloads/
+ * Lixeira soltas direto em "Este Computador". Reorganiza para o caminho real
+ * do Windows — Este Computador › Disco Local (C:) › Usuários › <nome> › ... —
+ * sem perder nenhum arquivo já criado (só move os nós de lugar). */
+async function migrateToLocalDisk(rootId) {
+  const userName = await kv.get('user.name', 'Usuário');
+  const desktopId = await kv.get('desktopId');
+  const documentsId = await kv.get('documentsId');
+  const picturesId = await kv.get('picturesId');
+  const downloadsId = await kv.get('downloadsId');
+  const trashId = await kv.get('trashId');
+
+  const cDrive = await fs.createNode({ parentId: rootId, name: 'Disco Local (C:)', type: 'folder' });
+  const users = await fs.createNode({ parentId: cDrive.id, name: 'Usuários', type: 'folder' });
+  const userFolder = await fs.createNode({ parentId: users.id, name: userName, type: 'folder' });
+
+  if (desktopId) await fs.move(desktopId, userFolder.id);
+  if (documentsId) await fs.move(documentsId, userFolder.id);
+  if (picturesId) await fs.move(picturesId, userFolder.id);
+  if (downloadsId) await fs.move(downloadsId, userFolder.id);
+  if (trashId) await fs.move(trashId, cDrive.id);
+
+  await kv.set('cDriveId', cDrive.id);
+  await kv.set('usersId', users.id);
+  await kv.set('userFolderId', userFolder.id);
+  return cDrive.id;
+}
+
 export async function ensureSeed() {
   let rootId = await kv.get('rootId');
   if (rootId) {
+    const cDriveId = (await kv.get('cDriveId')) || (await migrateToLocalDisk(rootId));
     return {
       rootId,
+      cDriveId,
+      usersId: await kv.get('usersId'),
+      userFolderId: await kv.get('userFolderId'),
       desktopId: await kv.get('desktopId'),
       documentsId: await kv.get('documentsId'),
       picturesId: await kv.get('picturesId'),
@@ -109,12 +141,16 @@ export async function ensureSeed() {
     };
   }
 
+  const userName = await kv.get('user.name', 'Usuário');
   const root = await fs.createNode({ parentId: null, name: 'Este Computador', type: 'folder' });
-  const desktop = await fs.createNode({ parentId: root.id, name: 'Área de Trabalho', type: 'folder' });
-  const documents = await fs.createNode({ parentId: root.id, name: 'Documentos', type: 'folder' });
-  const pictures = await fs.createNode({ parentId: root.id, name: 'Imagens', type: 'folder' });
-  const downloads = await fs.createNode({ parentId: root.id, name: 'Downloads', type: 'folder' });
-  const trash = await fs.createNode({ parentId: root.id, name: 'Lixeira', type: 'folder' });
+  const cDrive = await fs.createNode({ parentId: root.id, name: 'Disco Local (C:)', type: 'folder' });
+  const users = await fs.createNode({ parentId: cDrive.id, name: 'Usuários', type: 'folder' });
+  const userFolder = await fs.createNode({ parentId: users.id, name: userName, type: 'folder' });
+  const desktop = await fs.createNode({ parentId: userFolder.id, name: 'Área de Trabalho', type: 'folder' });
+  const documents = await fs.createNode({ parentId: userFolder.id, name: 'Documentos', type: 'folder' });
+  const pictures = await fs.createNode({ parentId: userFolder.id, name: 'Imagens', type: 'folder' });
+  const downloads = await fs.createNode({ parentId: userFolder.id, name: 'Downloads', type: 'folder' });
+  const trash = await fs.createNode({ parentId: cDrive.id, name: 'Lixeira', type: 'folder' });
 
   await fs.createNode({
     parentId: desktop.id,
@@ -124,6 +160,9 @@ export async function ensureSeed() {
   });
 
   await kv.set('rootId', root.id);
+  await kv.set('cDriveId', cDrive.id);
+  await kv.set('usersId', users.id);
+  await kv.set('userFolderId', userFolder.id);
   await kv.set('desktopId', desktop.id);
   await kv.set('documentsId', documents.id);
   await kv.set('picturesId', pictures.id);
@@ -132,6 +171,9 @@ export async function ensureSeed() {
 
   return {
     rootId: root.id,
+    cDriveId: cDrive.id,
+    usersId: users.id,
+    userFolderId: userFolder.id,
     desktopId: desktop.id,
     documentsId: documents.id,
     picturesId: pictures.id,
