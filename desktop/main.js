@@ -1,9 +1,11 @@
 import { kv, fs, ensureSeed } from './lib/idb.js';
 import { hasPassword, setPassword, verifyPassword, getHint, setHint } from './lib/crypto.js';
 import * as WM from './lib/windows.js';
+import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './lib/sounds.js';
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openSettings } from './apps/settings.js';
+import { openBrowser } from './apps/browser.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -83,6 +85,7 @@ async function boot() {
 
   setTimeout(async () => {
     hide($('#boot-screen'));
+    playStartupChime();
     if (await hasPassword()) {
       $('#lock-username').textContent = await kv.get('user.name', 'Usuário');
       await refreshAvatars();
@@ -159,15 +162,52 @@ function lockNow() {
   $('#lock-username').textContent = '';
   kv.get('user.name', 'Usuário').then((n) => ($('#lock-username').textContent = n));
   refreshAvatars();
+  playLockChime();
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
+
+function sleepNow() {
+  document.body.classList.add('sleeping');
+  setTimeout(() => {
+    lockNow();
+    document.body.classList.remove('sleeping');
+  }, 420);
+}
+
+function restartNow() {
+  WM.closeAllWindows();
+  hide($('#start-menu'));
+  hide($('#power-menu'));
+  hide($('#desktop'));
+  playShutdownChime();
+  show($('#restart-screen'));
+  setTimeout(() => location.reload(), 1700);
+}
+
+function shutdownNow() {
+  WM.closeAllWindows();
+  hide($('#start-menu'));
+  hide($('#power-menu'));
+  hide($('#desktop'));
+  playShutdownChime();
+  show($('#shutdown-screen'));
+  setTimeout(() => {
+    hide($('#shutdown-spinner'));
+    show($('#shutdown-message'));
+    show($('#power-on-btn'));
+    try { window.close(); } catch {}
+  }, 1600);
+}
+
+$('#power-on-btn').addEventListener('click', () => location.reload());
 
 // ---------------- Desktop ----------------
 async function enterDesktop() {
   show($('#desktop'));
   $('#start-username').textContent = await kv.get('user.name', 'Usuário');
   await refreshAvatars();
+  await refreshVolumeUI();
   await renderDesktopIcons();
   renderStartMenu();
 }
@@ -307,15 +347,35 @@ function showContextMenu(x, y, items) {
   show(menu);
 }
 
+function positionPanelNearButton(panel, btn) {
+  panel.style.left = '-9999px';
+  panel.style.top = '-9999px';
+  panel.style.bottom = 'auto';
+  panel.style.right = 'auto';
+  panel.style.transform = 'none';
+  show(panel);
+  const btnRect = btn.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+  let left = btnRect.right - panelRect.width;
+  left = Math.min(left, window.innerWidth - panelRect.width - 8);
+  left = Math.max(8, left);
+  const top = Math.max(8, btnRect.top - panelRect.height - 8);
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+}
+
 document.addEventListener('click', (e) => {
   if (!e.target.closest('#context-menu')) hide($('#context-menu'));
   if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) hide($('#start-menu'));
   if (!e.target.closest('#power-menu') && !e.target.closest('#start-power')) hide($('#power-menu'));
+  if (!e.target.closest('#account-menu') && !e.target.closest('#start-user-btn')) hide($('#account-menu'));
+  if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hide($('#volume-menu'));
 });
 
 // ---------------- Taskbar / Start menu ----------------
 const PINNED_APPS = [
   { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
+  { id: 'browser', label: 'Navegador', glyph: '🌐', onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'settings', label: 'Configurações', glyph: '⚙️', onOpen: () => openSettings(ctx) },
   { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
@@ -349,14 +409,72 @@ $('#start-search').addEventListener('input', (e) => {
   });
 });
 
+$('#start-user-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  hide($('#power-menu'));
+  const menu = $('#account-menu');
+  if (menu.classList.contains('hidden')) positionPanelNearButton(menu, e.currentTarget);
+  else hide(menu);
+});
+$('#account-menu').addEventListener('click', (e) => {
+  const action = e.target.closest('button')?.dataset.action;
+  if (!action) return;
+  hide($('#start-menu'));
+  if (action === 'lock' || action === 'signout') lockNow();
+});
+
 $('#start-power').addEventListener('click', (e) => {
   e.stopPropagation();
-  $('#power-menu').classList.toggle('hidden');
+  hide($('#account-menu'));
+  const menu = $('#power-menu');
+  if (menu.classList.contains('hidden')) positionPanelNearButton(menu, e.currentTarget);
+  else hide(menu);
 });
 $('#power-menu').addEventListener('click', (e) => {
-  const action = e.target.dataset.action;
-  if (action === 'lock') { hide($('#start-menu')); lockNow(); }
-  if (action === 'reload') location.reload();
+  const action = e.target.closest('button')?.dataset.action;
+  if (!action) return;
+  hide($('#start-menu'));
+  if (action === 'sleep') sleepNow();
+  if (action === 'restart') restartNow();
+  if (action === 'shutdown') shutdownNow();
+});
+
+// ---------------- Volume ----------------
+function volumeGlyph(vol, muted) {
+  if (muted || vol === 0) return '🔇';
+  if (vol < 34) return '🔈';
+  if (vol < 67) return '🔉';
+  return '🔊';
+}
+async function refreshVolumeUI() {
+  const vol = await volumeControl.get();
+  const muted = await volumeControl.getMuted();
+  $('#volume-slider').value = vol;
+  $('#volume-value').textContent = vol;
+  const glyph = volumeGlyph(vol, muted);
+  $('#tray-volume-btn').textContent = glyph;
+  $('#volume-mute-btn').textContent = muted ? '🔇' : '🔊';
+}
+$('#tray-volume-btn').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  hide($('#account-menu'));
+  hide($('#power-menu'));
+  await refreshVolumeUI();
+  const menu = $('#volume-menu');
+  if (menu.classList.contains('hidden')) positionPanelNearButton(menu, btn);
+  else hide(menu);
+});
+$('#volume-slider').addEventListener('input', async (e) => {
+  const v = Number(e.target.value);
+  await volumeControl.set(v);
+  if (v > 0) await volumeControl.setMuted(false);
+  await refreshVolumeUI();
+});
+$('#volume-mute-btn').addEventListener('click', async () => {
+  const muted = await volumeControl.getMuted();
+  await volumeControl.setMuted(!muted);
+  await refreshVolumeUI();
 });
 
 document.querySelectorAll('.taskbar-btn[data-app]').forEach((btn) => {
