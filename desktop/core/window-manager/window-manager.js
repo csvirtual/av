@@ -2,7 +2,7 @@
 // título, botões, arrastar, redimensionar, maximizar/minimizar, encaixe) e
 // mantém a lista de janelas abertas para a taskbar e o alternador (Alt+Tab).
 import { windowOpen, windowClose, windowMinimize, windowRestore, animateLayoutChange, panelOpen } from '../motion/motion.js';
-import { detectZone, computeZoneRect, opposingZone } from './snap-zones.js';
+import { detectZone, computeZoneRect, opposingZone, taskbarHeight } from './snap-zones.js';
 
 let zCounter = 10;
 const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped }
@@ -173,15 +173,30 @@ function applySnap(id, zone) {
   focusWindow(id);
 }
 
-let cascadeOffset = 0;
-
 export function createWindow({ appId, title, icon = '🗔', width = 640, height = 460, content }) {
   const id = `win-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const el = document.createElement('div');
   el.className = 'app-window';
-  const startX = 120 + (cascadeOffset % 6) * 28;
-  const startY = 80 + (cascadeOffset % 6) * 28;
-  cascadeOffset++;
+  // Toda janela nova abre centralizada na área útil da tela (sem tender
+  // para a esquerda/direita como um cascateamento faria). Se outra janela
+  // já estiver bem em cima dessa mesma posição, desloca um pouco — sempre
+  // a partir do centro, nunca acumulando numa única direção — só o
+  // suficiente pra dar pra perceber que há mais de uma janela aberta.
+  const availableHeight = window.innerHeight - taskbarHeight();
+  const baseX = Math.max(0, Math.round((window.innerWidth - width) / 2));
+  const baseY = Math.max(0, Math.round((availableHeight - height) / 2));
+  const existingPositions = Array.from(openWindows.values()).map((w) => ({
+    left: parseFloat(w.el.style.left) || 0,
+    top: parseFloat(w.el.style.top) || 0,
+  }));
+  let startX = baseX;
+  let startY = baseY;
+  for (let step = 1; step <= 4; step++) {
+    const stillOverlapping = existingPositions.some((p) => Math.abs(p.left - startX) < 4 && Math.abs(p.top - startY) < 4);
+    if (!stillOverlapping) break;
+    startX = baseX + step * 24;
+    startY = baseY + step * 24;
+  }
   Object.assign(el.style, {
     width: `${width}px`,
     height: `${height}px`,
