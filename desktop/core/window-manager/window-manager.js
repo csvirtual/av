@@ -13,6 +13,7 @@ function notify() {
     id: w.id,
     title: w.title,
     icon: w.icon,
+    appId: w.appId,
     minimized: w.minimized,
     focused: w.focused,
   }));
