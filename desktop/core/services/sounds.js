@@ -81,3 +81,7 @@ export function playLockChime() {
 export function playErrorChime() {
   return playSequence([[220, 0, 0.22], [196, 0.1, 0.28]]);
 }
+
+export function playNotifyChime() {
+  return playSequence([[660, 0, 0.14], [880, 0.1, 0.18]]);
+}

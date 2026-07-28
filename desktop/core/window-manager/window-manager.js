@@ -49,6 +49,19 @@ export function getWindowsOrder() {
     .map((w) => ({ id: w.id, title: w.title, icon: w.icon }));
 }
 
+/** Lista completa de janelas abertas, para o Gerenciador de Tarefas. */
+export function listProcesses() {
+  return Array.from(openWindows.values()).map((w) => ({
+    id: w.id,
+    title: w.title,
+    icon: w.icon,
+    appId: w.appId,
+    minimized: w.minimized,
+    focused: w.focused,
+    openedAt: w.openedAt,
+  }));
+}
+
 export function toggleMinimize(id) {
   const win = openWindows.get(id);
   if (!win) return;
@@ -69,6 +82,7 @@ export async function closeWindow(id) {
   if (!win) return;
   openWindows.delete(id);
   notify();
+  win.onClose?.();
   await windowClose(win.el);
   win.el.remove();
 }
@@ -194,7 +208,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   document.getElementById('windows-layer').appendChild(el);
   windowOpen(el);
 
-  const win = { id, el, title, icon, minimized: false, focused: true, snapped: null };
+  const win = { id, el, title, icon, appId, minimized: false, focused: true, snapped: null, openedAt: Date.now() };
   openWindows.set(id, win);
   focusWindow(id);
 
@@ -282,6 +296,12 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
       win.title = t;
       el.querySelector('.win-title').textContent = t;
       notify();
+    },
+    /** Registra uma função a ser chamada quando a janela for fechada —
+     * usado pelos apps para remover listeners globais e evitar vazamento
+     * de memória (ex: atalhos de teclado). */
+    onClose: (fn) => {
+      win.onClose = fn;
     },
   };
 }
