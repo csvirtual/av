@@ -1,0 +1,19 @@
+{
+  "name": "Windows 11 Web Desktop",
+  "short_name": "Win11 Web",
+  "description": "Área de trabalho estilo Windows 11, com senha, arquivos e apps, rodando no navegador.",
+  "id": "/desktop/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f3057",
+  "theme_color": "#0f3057",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
