@@ -72,6 +72,8 @@ const ctx = {
     }
   },
   getBootTime: () => bootTime,
+  getAutoArrange,
+  setAutoArrange,
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -290,6 +292,44 @@ function fixedIcons() {
   ];
 }
 
+function gridPosition(idx) {
+  const rowHeight = 100;
+  const maxRows = Math.max(3, Math.floor((window.innerHeight - 100) / rowHeight));
+  return { x: 16 + Math.floor(idx / maxRows) * 100, y: 16 + (idx % maxRows) * rowHeight };
+}
+
+async function getAutoArrange() {
+  return kv.get('desktop.autoArrange', false);
+}
+async function setAutoArrange(value) {
+  await kv.set('desktop.autoArrange', value);
+  renderDesktopIcons();
+}
+
+// Estado do ícone sendo arrastado no momento. Os listeners de ponteiro do
+// arraste são registrados uma única vez (fora de renderDesktopIcons) e
+// reaproveitados a cada renderização — anexá-los de novo a cada chamada
+// (como uma versão anterior fazia) vazava um listener em `window` por
+// ícone, a cada atualização da área de trabalho, para sempre.
+let draggedIcon = null; // { id, el }
+let draggedMoved = false;
+let dragOffX = 0, dragOffY = 0;
+
+document.addEventListener('pointermove', (e) => {
+  if (!draggedIcon) return;
+  draggedMoved = true;
+  draggedIcon.el.style.left = `${Math.max(0, e.clientX - dragOffX)}px`;
+  draggedIcon.el.style.top = `${Math.max(0, e.clientY - dragOffY)}px`;
+});
+document.addEventListener('pointerup', async () => {
+  if (draggedIcon && draggedMoved) {
+    const all = await kv.get('desktop.positions', {});
+    all[draggedIcon.id] = { x: draggedIcon.el.offsetLeft, y: draggedIcon.el.offsetTop };
+    await kv.set('desktop.positions', all);
+  }
+  draggedIcon = null;
+});
+
 async function renderDesktopIcons() {
   const container = $('#desktop-icons');
   container.innerHTML = '';
@@ -304,45 +344,29 @@ async function renderDesktopIcons() {
       onOpen: () => openFile(node),
     })),
   ];
-  const positions = await kv.get('desktop.positions', {});
-  const rowHeight = 100;
-  const maxRows = Math.max(3, Math.floor((window.innerHeight - 100) / rowHeight));
+  const autoArrange = await getAutoArrange();
+  const positions = autoArrange ? {} : await kv.get('desktop.positions', {});
 
   icons.forEach((icon, idx) => {
     const el = document.createElement('div');
     el.className = 'desktop-icon';
     el.innerHTML = `<div class="icon-glyph">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
-    const pos = positions[icon.id] || {
-      x: 16 + Math.floor(idx / maxRows) * 100,
-      y: 16 + (idx % maxRows) * rowHeight,
-    };
+    const pos = positions[icon.id] || gridPosition(idx);
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
 
     el.addEventListener('dblclick', () => icon.onOpen());
 
-    let dragging = false, moved = false, offX = 0, offY = 0;
-    el.addEventListener('pointerdown', (e) => {
-      dragging = true; moved = false;
-      offX = e.clientX - el.offsetLeft;
-      offY = e.clientY - el.offsetTop;
-      document.querySelectorAll('.desktop-icon.selected').forEach((n) => n.classList.remove('selected'));
-      el.classList.add('selected');
-    });
-    window.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      moved = true;
-      el.style.left = `${Math.max(0, e.clientX - offX)}px`;
-      el.style.top = `${Math.max(0, e.clientY - offY)}px`;
-    });
-    window.addEventListener('pointerup', async () => {
-      if (dragging && moved) {
-        const all = await kv.get('desktop.positions', {});
-        all[icon.id] = { x: el.offsetLeft, y: el.offsetTop };
-        await kv.set('desktop.positions', all);
-      }
-      dragging = false;
-    });
+    if (!autoArrange) {
+      el.addEventListener('pointerdown', (e) => {
+        draggedIcon = { id: icon.id, el };
+        draggedMoved = false;
+        dragOffX = e.clientX - el.offsetLeft;
+        dragOffY = e.clientY - el.offsetTop;
+        document.querySelectorAll('.desktop-icon.selected').forEach((n) => n.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+    }
 
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -377,9 +401,10 @@ async function deleteIcon(node) {
   renderDesktopIcons();
 }
 
-$('#desktop-icons').addEventListener('contextmenu', (e) => {
+$('#desktop-icons').addEventListener('contextmenu', async (e) => {
   if (e.target.closest('.desktop-icon')) return;
   e.preventDefault();
+  const autoArrange = await getAutoArrange();
   showContextMenu(e.clientX, e.clientY, [
     {
       label: '📁 Nova pasta',
@@ -395,6 +420,7 @@ $('#desktop-icons').addEventListener('contextmenu', (e) => {
         renderDesktopIcons();
       },
     },
+    { label: `${autoArrange ? '✓ ' : ''}Organizar ícones automaticamente`, onClick: () => setAutoArrange(!autoArrange) },
     { label: '↻ Atualizar', onClick: () => renderDesktopIcons() },
     { label: '🎨 Personalizar', onClick: () => openSettings(ctx, { tab: 'personalization' }) },
   ]);

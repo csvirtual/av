@@ -117,6 +117,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     const currentAccent = await ctx.getAccentColor();
     const currentScale = await ctx.getScale();
     const currentOrientation = await ctx.getOrientation();
+    const autoArrange = await ctx.getAutoArrange();
     content.innerHTML = `
       <h2>Plano de fundo</h2>
       <div class="wallpaper-grid" data-role="wallpapers"></div>
@@ -146,6 +147,12 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         <button data-orientation="portrait">📱 Retrato</button>
         <button data-orientation="auto">🔄 Automática</button>
       </div>
+
+      <h2 style="margin-top:24px">Ícones da área de trabalho</h2>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" data-role="auto-arrange-toggle" ${autoArrange ? 'checked' : ''}>
+        Organizar ícones automaticamente
+      </label>
     `;
     const grid = content.querySelector('[data-role="wallpapers"]');
     WALLPAPERS.forEach((wp) => {
@@ -202,6 +209,10 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         await ctx.setOrientation(btn.dataset.orientation);
         renderPersonalization();
       });
+    });
+
+    content.querySelector('[data-role="auto-arrange-toggle"]').addEventListener('change', async (e) => {
+      await ctx.setAutoArrange(e.target.checked);
     });
   }
 
