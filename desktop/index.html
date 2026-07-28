@@ -69,10 +69,10 @@
     <div class="start-section-label">Fixados</div>
     <div id="start-pinned" class="start-grid"></div>
     <div class="start-footer">
-      <div class="start-user">
+      <button class="start-user" id="start-user-btn">
         <span class="avatar-sm" id="start-avatar"></span>
         <span id="start-username">Usuário</span>
-      </div>
+      </button>
       <button id="start-power" class="icon-btn" title="Energia">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M12 3v8"></path>
@@ -82,10 +82,24 @@
     </div>
   </div>
 
+  <!-- Menu da conta (bloquear / sair) -->
+  <div id="account-menu" class="panel small hidden">
+    <button data-action="lock">🔒 Bloquear</button>
+    <button data-action="signout">🚪 Sair</button>
+  </div>
+
   <!-- Menu de energia -->
   <div id="power-menu" class="panel small hidden">
-    <button data-action="lock">🔒 Bloquear</button>
-    <button data-action="reload">↻ Reiniciar sessão</button>
+    <button data-action="sleep">🌙 Suspender</button>
+    <button data-action="restart">↻ Reiniciar</button>
+    <button data-action="shutdown">⏻ Desligar</button>
+  </div>
+
+  <!-- Menu de volume -->
+  <div id="volume-menu" class="panel small volume-panel hidden">
+    <button id="volume-mute-btn" class="icon-btn" title="Mudo"></button>
+    <input type="range" id="volume-slider" min="0" max="100" value="70">
+    <span id="volume-value">70</span>
   </div>
 
   <!-- Menu de contexto -->
@@ -95,13 +109,28 @@
   <div id="taskbar">
     <button id="start-btn" class="taskbar-btn" title="Iniciar">⊞</button>
     <button class="taskbar-btn" data-app="explorer" title="Explorador de Arquivos">📁</button>
+    <button class="taskbar-btn" data-app="browser" title="Navegador">🌐</button>
     <button class="taskbar-btn" data-app="notepad" title="Bloco de Notas">📝</button>
     <button class="taskbar-btn" data-app="settings" title="Configurações">⚙️</button>
     <div id="taskbar-running" class="taskbar-running"></div>
     <div id="tray" class="tray">
+      <button id="tray-volume-btn" class="icon-btn" title="Volume">🔊</button>
       <span id="tray-clock" class="tray-clock"></span>
     </div>
   </div>
+</div>
+
+<!-- Tela de reinicialização -->
+<div id="restart-screen" class="screen hidden restart-screen">
+  <div class="boot-spinner"></div>
+  <p class="boot-message">Reiniciando…</p>
+</div>
+
+<!-- Tela de desligamento -->
+<div id="shutdown-screen" class="screen hidden shutdown-screen">
+  <div id="shutdown-spinner" class="boot-spinner"></div>
+  <p id="shutdown-message" class="boot-message hidden">O PC foi desligado.<br>Você já pode fechar esta janela.</p>
+  <button id="power-on-btn" class="auth-btn hidden">Ligar</button>
 </div>
 
 <script type="module" src="main.js"></script>
