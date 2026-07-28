@@ -57,6 +57,15 @@ const ctx = {
   setReduceMotion,
   getTimeFormat: () => timeFormat,
   setTimeFormat,
+  getOrientation: () => kv.get('settings.orientation', 'landscape'),
+  setOrientation: async (value) => {
+    await kv.set('settings.orientation', value);
+    if (value !== 'auto' && screen.orientation?.lock) {
+      screen.orientation.lock(value).catch(() => {});
+    } else if (screen.orientation?.unlock) {
+      try { screen.orientation.unlock(); } catch {}
+    }
+  },
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -556,9 +565,32 @@ WM.onWindowsChange((list) => {
   });
 });
 
-if (window.matchMedia('(display-mode: standalone)').matches && screen.orientation?.lock) {
-  screen.orientation.lock('landscape').catch(() => {});
+function isStandaloneDisplay() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.navigator.standalone === true
+  );
 }
+
+async function applyDisplayPreferences() {
+  if (!isStandaloneDisplay()) return;
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Alguns navegadores só permitem tela cheia após um gesto do usuário —
+      // por isso tentamos de novo no primeiro toque, logo abaixo.
+    }
+  }
+  const orientation = await kv.get('settings.orientation', 'landscape');
+  if (orientation !== 'auto' && screen.orientation?.lock) {
+    screen.orientation.lock(orientation).catch(() => {});
+  }
+}
+
+applyDisplayPreferences();
+window.addEventListener('pointerdown', () => applyDisplayPreferences(), { once: true });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
