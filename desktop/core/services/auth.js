@@ -2,7 +2,7 @@
 // interface contra acesso casual, mas não é segurança de nível de sistema
 // operacional: quem acessar os dados do navegador (IndexedDB) pode ver o
 // hash. Não use isto para proteger dados realmente sensíveis.
-import { kv } from './idb.js';
+import { kv } from '../state/kv-store.js';
 
 const ITERATIONS = 150000;
 

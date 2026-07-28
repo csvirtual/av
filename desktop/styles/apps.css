@@ -1,0 +1,117 @@
+/* Estilos específicos de cada aplicativo. */
+
+/* ---------- Explorer ---------- */
+.explorer { display: flex; height: 100%; font-size: 13px; }
+.explorer-sidebar {
+  width: 160px; flex-shrink: 0;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+  padding: var(--space-3) var(--space-2); overflow-y: auto;
+}
+.explorer-sidebar .side-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 7px var(--space-2); border-radius: var(--radius-sm); cursor: pointer;
+}
+.explorer-sidebar .side-item:hover, .explorer-sidebar .side-item.active { background: var(--hover); }
+.explorer-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.explorer-toolbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.explorer-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text);
+}
+.explorer-toolbar button:hover { background: var(--hover); }
+.explorer-breadcrumb { padding: var(--space-2) var(--space-3); font-size: 12px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+.explorer-breadcrumb span { cursor: pointer; }
+.explorer-breadcrumb span:hover { text-decoration: underline; }
+.explorer-grid {
+  flex: 1; overflow-y: auto; padding: var(--space-3);
+  display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: var(--space-2);
+  align-content: start;
+}
+.file-item {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  padding: var(--space-2) var(--space-1); border-radius: var(--radius-sm); cursor: pointer; text-align: center;
+}
+.file-item:hover { background: var(--hover); }
+.file-item.selected { background: rgba(0, 120, 212, 0.18); }
+.file-item .glyph { font-size: 28px; }
+.file-item .name { font-size: 11px; word-break: break-word; max-height: 2.4em; overflow: hidden; }
+.explorer-empty { color: var(--text-dim); padding: 30px; text-align: center; }
+
+/* ---------- Notepad ---------- */
+.notepad { display: flex; flex-direction: column; height: 100%; }
+.notepad-toolbar {
+  display: flex; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.notepad-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text);
+}
+.notepad-toolbar button:hover { background: var(--hover); }
+.notepad textarea {
+  flex: 1; border: none; resize: none; outline: none;
+  padding: 14px; font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 14px; background: var(--win-bg); color: var(--text);
+}
+.notepad-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
+
+/* ---------- Settings ---------- */
+.settings { display: flex; height: 100%; }
+.settings-nav { width: 160px; border-right: 1px solid var(--border); padding: var(--space-3) var(--space-2); }
+.settings-nav button {
+  display: block; width: 100%; text-align: left;
+  padding: var(--space-2) 10px; border-radius: var(--radius-sm); border: none; background: none;
+  color: var(--text); font-size: 13px; cursor: pointer; margin-bottom: 2px;
+}
+.settings-nav button:hover, .settings-nav button.active { background: var(--hover); }
+.settings-content { flex: 1; padding: var(--space-5); overflow-y: auto; }
+.settings-content h2 { margin-top: 0; font-size: 16px; font-weight: 600; }
+.wallpaper-grid { display: flex; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-3) 0; }
+.wallpaper-swatch {
+  width: 90px; height: 56px; border-radius: var(--radius-md); cursor: pointer;
+  border: 2px solid transparent; background-size: cover; background-position: center;
+}
+.wallpaper-swatch.active { border-color: var(--accent-2); }
+.theme-toggle { display: flex; gap: var(--space-3); margin: var(--space-3) 0; }
+.theme-toggle button {
+  padding: var(--space-2) 16px; border-radius: var(--radius-md); border: 1px solid var(--border);
+  background: var(--hover); cursor: pointer; color: var(--text);
+}
+.theme-toggle button.active { border-color: var(--accent-2); color: var(--accent-2); }
+.settings-content input[type="password"], .settings-content input[type="text"] {
+  padding: var(--space-2) 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--hover); color: var(--text); font-size: 13px;
+  display: block; margin-bottom: var(--space-2); width: 240px;
+}
+.settings-content .btn {
+  padding: var(--space-2) 16px; border-radius: var(--radius-sm); border: none;
+  background: var(--accent-2); color: #fff; cursor: pointer; font-size: 13px;
+}
+.settings-msg { font-size: 12px; margin-top: var(--space-2); }
+.settings-msg.ok { color: #2e8b57; }
+.settings-msg.err { color: #e81123; }
+
+/* ---------- Browser ---------- */
+.browser-app { display: flex; flex-direction: column; height: 100%; }
+.browser-toolbar {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.browser-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 14px; color: var(--text); flex-shrink: 0;
+}
+.browser-toolbar button:hover { background: var(--hover); }
+.browser-address {
+  flex: 1; padding: 7px var(--space-3); border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: var(--hover);
+  color: var(--text); font-size: 13px; outline: none; min-width: 0;
+}
+.browser-hint {
+  font-size: 11px; color: var(--text-dim); padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.browser-frame { flex: 1; border: none; width: 100%; background: #fff; }

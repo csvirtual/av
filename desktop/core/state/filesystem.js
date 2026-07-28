@@ -1,58 +1,7 @@
-// Camada de acesso ao IndexedDB: armazena configurações (kv) e o sistema de
-// arquivos virtual (nodes) usado pela área de trabalho, explorador e apps.
-const DB_NAME = 'win11-web-os';
-const DB_VERSION = 1;
-
-let dbPromise = null;
-
-function openDatabase() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains('kv')) {
-        db.createObjectStore('kv', { keyPath: 'key' });
-      }
-      if (!db.objectStoreNames.contains('nodes')) {
-        const store = db.createObjectStore('nodes', { keyPath: 'id' });
-        store.createIndex('byParent', 'parentId');
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-  return dbPromise;
-}
-
-function tx(storeName, mode) {
-  return openDatabase().then(
-    (db) => db.transaction(storeName, mode).objectStore(storeName)
-  );
-}
-
-function reqToPromise(req) {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export const kv = {
-  async get(key, fallback = null) {
-    const store = await tx('kv', 'readonly');
-    const row = await reqToPromise(store.get(key));
-    return row ? row.value : fallback;
-  },
-  async set(key, value) {
-    const store = await tx('kv', 'readwrite');
-    await reqToPromise(store.put({ key, value }));
-  },
-  async remove(key) {
-    const store = await tx('kv', 'readwrite');
-    await reqToPromise(store.delete(key));
-  },
-};
+// Sistema de arquivos virtual (pastas/arquivos) sobre IndexedDB, usado pela
+// área de trabalho, Explorador de Arquivos e demais apps.
+import { tx, reqToPromise } from './database.js';
+import { kv } from './kv-store.js';
 
 function uid() {
   return crypto.randomUUID();
@@ -68,11 +17,10 @@ export const fs = {
     const store = await tx('nodes', 'readonly');
     const idx = store.index('byParent');
     const rows = await reqToPromise(idx.getAll(parentId));
-    return rows
-      .sort((a, b) => {
-        if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-        return a.name.localeCompare(b.name, 'pt-BR');
-      });
+    return rows.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
   },
 
   async createNode({ parentId, name, type, content = '', mimeType = 'text/plain' }) {

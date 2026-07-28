@@ -1,0 +1,31 @@
+/* Movimento compartilhado: keyframes e transições de microinteração usadas
+   em toda a aplicação. Aberturas/fechamentos de janelas e painéis usam a
+   Web Animations API (core/motion/motion.js) para rodar no compositor;
+   aqui ficam só as transições contínuas simples (hover/foco/estado). */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+button,
+.desktop-icon,
+.file-item,
+.side-item,
+.start-app,
+.taskbar-btn,
+.icon-btn,
+.wallpaper-swatch,
+.theme-toggle button {
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+button:active,
+.desktop-icon:active,
+.file-item:active,
+.taskbar-btn:active,
+.icon-btn:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

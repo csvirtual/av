@@ -1,7 +1,9 @@
-import { kv, fs, ensureSeed } from './lib/idb.js';
-import { hasPassword, setPassword, verifyPassword, getHint, setHint } from './lib/crypto.js';
-import * as WM from './lib/windows.js';
-import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './lib/sounds.js';
+import { kv } from './core/state/kv-store.js';
+import { fs, ensureSeed } from './core/state/filesystem.js';
+import { hasPassword, setPassword, verifyPassword, getHint, setHint } from './core/services/auth.js';
+import * as WM from './core/window-manager/window-manager.js';
+import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './core/services/sounds.js';
+import * as motion from './core/motion/motion.js';
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openSettings } from './apps/settings.js';
@@ -10,6 +12,16 @@ import { openBrowser } from './apps/browser.js';
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
 const hide = (el) => el.classList.add('hidden');
+
+// Painéis flutuantes (menus, popups) animam com o motion compartilhado.
+function showPanel(el) {
+  show(el);
+  motion.panelOpen(el);
+}
+function hidePanel(el) {
+  if (el.classList.contains('hidden')) return;
+  motion.panelClose(el).then(() => hide(el));
+}
 
 let seed = null;
 
@@ -337,14 +349,14 @@ function showContextMenu(x, y, items) {
     const btn = document.createElement('button');
     btn.textContent = item.label;
     btn.addEventListener('click', () => {
-      hide(menu);
+      hidePanel(menu);
       item.onClick();
     });
     menu.appendChild(btn);
   });
   menu.style.left = `${Math.min(x, window.innerWidth - 220)}px`;
   menu.style.top = `${Math.min(y, window.innerHeight - items.length * 36 - 60)}px`;
-  show(menu);
+  showPanel(menu);
 }
 
 function positionPanelNearButton(panel, btn) {
@@ -362,14 +374,15 @@ function positionPanelNearButton(panel, btn) {
   const top = Math.max(8, btnRect.top - panelRect.height - 8);
   panel.style.left = `${left}px`;
   panel.style.top = `${top}px`;
+  motion.panelOpen(panel);
 }
 
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('#context-menu')) hide($('#context-menu'));
-  if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) hide($('#start-menu'));
-  if (!e.target.closest('#power-menu') && !e.target.closest('#start-power')) hide($('#power-menu'));
-  if (!e.target.closest('#account-menu') && !e.target.closest('#start-user-btn')) hide($('#account-menu'));
-  if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hide($('#volume-menu'));
+  if (!e.target.closest('#context-menu')) hidePanel($('#context-menu'));
+  if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) hidePanel($('#start-menu'));
+  if (!e.target.closest('#power-menu') && !e.target.closest('#start-power')) hidePanel($('#power-menu'));
+  if (!e.target.closest('#account-menu') && !e.target.closest('#start-user-btn')) hidePanel($('#account-menu'));
+  if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hidePanel($('#volume-menu'));
 });
 
 // ---------------- Taskbar / Start menu ----------------
@@ -389,7 +402,7 @@ function renderStartMenu() {
     btn.className = 'start-app';
     btn.innerHTML = `<span class="glyph">${app.glyph}</span><span>${app.label}</span>`;
     btn.addEventListener('click', () => {
-      hide($('#start-menu'));
+      hidePanel($('#start-menu'));
       app.onOpen();
     });
     grid.appendChild(btn);
@@ -398,8 +411,10 @@ function renderStartMenu() {
 
 $('#start-btn').addEventListener('click', (e) => {
   e.stopPropagation();
-  $('#start-menu').classList.toggle('hidden');
-  hide($('#power-menu'));
+  hidePanel($('#power-menu'));
+  const menu = $('#start-menu');
+  if (menu.classList.contains('hidden')) showPanel(menu);
+  else hidePanel(menu);
 });
 
 $('#start-search').addEventListener('input', (e) => {
@@ -411,29 +426,29 @@ $('#start-search').addEventListener('input', (e) => {
 
 $('#start-user-btn').addEventListener('click', (e) => {
   e.stopPropagation();
-  hide($('#power-menu'));
+  hidePanel($('#power-menu'));
   const menu = $('#account-menu');
   if (menu.classList.contains('hidden')) positionPanelNearButton(menu, e.currentTarget);
-  else hide(menu);
+  else hidePanel(menu);
 });
 $('#account-menu').addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
-  hide($('#start-menu'));
+  hidePanel($('#start-menu'));
   if (action === 'lock' || action === 'signout') lockNow();
 });
 
 $('#start-power').addEventListener('click', (e) => {
   e.stopPropagation();
-  hide($('#account-menu'));
+  hidePanel($('#account-menu'));
   const menu = $('#power-menu');
   if (menu.classList.contains('hidden')) positionPanelNearButton(menu, e.currentTarget);
-  else hide(menu);
+  else hidePanel(menu);
 });
 $('#power-menu').addEventListener('click', (e) => {
   const action = e.target.closest('button')?.dataset.action;
   if (!action) return;
-  hide($('#start-menu'));
+  hidePanel($('#start-menu'));
   if (action === 'sleep') sleepNow();
   if (action === 'restart') restartNow();
   if (action === 'shutdown') shutdownNow();
@@ -458,12 +473,12 @@ async function refreshVolumeUI() {
 $('#tray-volume-btn').addEventListener('click', async (e) => {
   e.stopPropagation();
   const btn = e.currentTarget;
-  hide($('#account-menu'));
-  hide($('#power-menu'));
+  hidePanel($('#account-menu'));
+  hidePanel($('#power-menu'));
   await refreshVolumeUI();
   const menu = $('#volume-menu');
   if (menu.classList.contains('hidden')) positionPanelNearButton(menu, btn);
-  else hide(menu);
+  else hidePanel(menu);
 });
 $('#volume-slider').addEventListener('input', async (e) => {
   const v = Number(e.target.value);
