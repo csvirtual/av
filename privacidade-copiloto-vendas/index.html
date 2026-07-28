@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidade — Copiloto de Vendas | C&amp;S Virtual</title>
+<meta name="description" content="Política de privacidade do Copiloto de Vendas (C&S Virtual): o que é coletado, o que sai do computador e como é protegido.">
+<meta name="robots" content="noindex">
+<style>
+  :root{
+    --navy:#1b2440;
+    --navy-mid:#2e3e6e;
+    --gold:#ab8a48;
+    --paper:#f6f4ee;
+    --paper-raised:#ffffff;
+    --ink:#2c2c2c;
+    --ink-soft:#5b5f6b;
+    --line:rgba(27,36,64,.14);
+    --callout-bg:#efe6d2;
+    --callout-ink:#5c4a1c;
+    --link:#5b4415;
+    --serif:Georgia,'Iowan Old Style','Palatino Linotype','Book Antiqua',serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --navy:#e7e9f2;
+      --navy-mid:#aab4d6;
+      --gold:#cdae74;
+      --paper:#12162a;
+      --paper-raised:#171c33;
+      --ink:#d9dce6;
+      --ink-soft:#9aa0b4;
+      --line:rgba(230,232,245,.14);
+      --callout-bg:#2a2413;
+      --callout-ink:#e6d3a0;
+      --link:#e0c078;
+    }
+  }
+  :root[data-theme="dark"]{
+    --navy:#e7e9f2; --navy-mid:#aab4d6; --gold:#cdae74;
+    --paper:#12162a; --paper-raised:#171c33; --ink:#d9dce6; --ink-soft:#9aa0b4;
+    --line:rgba(230,232,245,.14); --callout-bg:#2a2413; --callout-ink:#e6d3a0; --link:#e0c078;
+  }
+  :root[data-theme="light"]{
+    --navy:#1b2440; --navy-mid:#2e3e6e; --gold:#ab8a48;
+    --paper:#f6f4ee; --paper-raised:#ffffff; --ink:#2c2c2c; --ink-soft:#5b5f6b;
+    --line:rgba(27,36,64,.14); --callout-bg:#efe6d2; --callout-ink:#5c4a1c; --link:#5b4415;
+  }
+
+  *{ box-sizing:border-box; }
+  html{ text-size-adjust:100%; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .page{ max-width:760px; margin:0 auto; padding:56px 24px 96px; }
+
+  header.masthead{
+    display:flex; flex-direction:column; gap:6px;
+    padding-bottom:28px; margin-bottom:28px;
+    border-bottom:1px solid var(--line);
+  }
+  .eyebrow{
+    font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold);
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:400;
+    font-size:clamp(28px,4vw,38px);
+    line-height:1.15;
+    margin:2px 0 4px;
+    color:var(--navy);
+    text-wrap:balance;
+  }
+  .subtitle{ color:var(--ink-soft); font-size:15px; margin:0; }
+  .meta{
+    margin-top:14px; display:flex; flex-wrap:wrap; gap:8px 18px;
+    font-size:12.5px; color:var(--ink-soft);
+  }
+  .meta b{ color:var(--ink); font-weight:600; }
+
+  .plain{
+    background:var(--callout-bg); color:var(--callout-ink);
+    border-radius:3px; padding:16px 18px; font-size:14.5px; line-height:1.6;
+    margin:26px 0 8px;
+  }
+
+  nav.toc{
+    display:flex; flex-wrap:wrap; gap:8px 10px;
+    margin:22px 0 40px;
+    padding:0; list-style:none;
+  }
+  nav.toc a{
+    font-size:12.5px; color:var(--navy-mid); text-decoration:none;
+    border:1px solid var(--line); border-radius:20px; padding:6px 13px;
+    white-space:nowrap;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible{ border-color:var(--gold); color:var(--gold); }
+
+  section{ margin:0 0 40px; scroll-margin-top:20px; }
+  section h2{
+    font-family:var(--serif); font-weight:400; font-size:21px;
+    color:var(--navy); margin:0 0 4px; text-wrap:balance;
+  }
+  .section-index{
+    font-family:var(--sans); font-size:11.5px; letter-spacing:.08em;
+    color:var(--gold); font-weight:600; display:block; margin-bottom:4px;
+  }
+  section > p, section > ul{ max-width:66ch; }
+  p{ margin:12px 0; color:var(--ink); }
+  ul{ margin:12px 0; padding-left:22px; }
+  li{ margin:0 0 10px; max-width:64ch; }
+  li:last-child{ margin-bottom:0; }
+  strong{ color:var(--navy); font-weight:600; }
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.92em; background:var(--paper-raised); border:1px solid var(--line);
+    border-radius:4px; padding:1px 5px;
+  }
+  a{ color:var(--link); }
+
+  .divider{ border:none; border-top:1px solid var(--line); margin:0 0 40px; }
+
+  .contact-card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:6px;
+    padding:22px 24px; display:flex; flex-direction:column; gap:6px;
+  }
+  .contact-card .label{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); }
+  .contact-card .value{ font-size:16px; color:var(--navy); font-weight:600; }
+  .contact-card .value a{ color:inherit; text-decoration:none; }
+  .contact-card .value a:hover{ text-decoration:underline; }
+
+  footer{
+    margin-top:56px; padding-top:22px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--ink-soft); display:flex; flex-wrap:wrap;
+    gap:6px 16px; justify-content:space-between;
+  }
+
+  ::selection{ background:var(--gold); color:#fff; }
+  :focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  @media (max-width:520px){
+    .page{ padding:40px 18px 72px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <span class="eyebrow">C&amp;S Virtual · Copiloto de Vendas</span>
+    <h1>Política de Privacidade</h1>
+    <p class="subtitle">O que a extensão faz com os dados que você cadastra — em linguagem direta, sem juridiquês de gaveta.</p>
+    <div class="meta">
+      <span><b>Última atualização:</b> 28 de julho de 2026</span>
+      <span><b>Aplica-se a:</b> extensão de Chrome "Copiloto de Vendas — C&amp;S Virtual" e à versão web equivalente</span>
+    </div>
+  </header>
+
+  <p class="plain">🔒 Resumo em uma frase: o Copiloto roda inteiramente no seu navegador — não existe servidor nosso guardando ou vendo os dados dos seus leads. As únicas informações que saem do seu computador são as que você manda de propósito para a IA (Claude ou Gemini) gerar uma resposta, usando uma chave de API que você mesmo configura.</p>
+
+  <nav class="toc" aria-label="Seções desta política">
+    <a href="#onde">Onde os dados ficam</a>
+    <a href="#guardamos">O que guardamos</a>
+    <a href="#sai">O que sai do computador</a>
+    <a href="#protecao">Como protegemos</a>
+    <a href="#retencao">Retenção e exclusão</a>
+    <a href="#nao-faz">O que não fazemos</a>
+    <a href="#responsabilidade">Responsabilidade</a>
+    <a href="#contato">Contato</a>
+  </nav>
+
+  <section id="onde">
+    <span class="section-index">1</span>
+    <h2>Onde os dados ficam</h2>
+    <p>Em nenhum lugar além do computador de quem instalou a extensão. Tudo é gravado no armazenamento local do navegador (<code>chrome.storage</code>) — não existe um servidor do Copiloto de Vendas recebendo, centralizando ou fazendo backup desses dados em algum lugar.</p>
+    <p>Se a extensão for desinstalada ou o computador trocado, os dados não acompanham automaticamente: eles simplesmente continuam onde estavam, porque nunca saíram dali. Cada profissional cadastrado tem seus próprios leads, histórico, funil, campanha e configurações, totalmente isolados dos demais.</p>
+  </section>
+
+  <section id="guardamos">
+    <span class="section-index">2</span>
+    <h2>O que guardamos</h2>
+    <p>Só o que é necessário para o atendimento:</p>
+    <ul>
+      <li>Dados de cada lead: nome, telefone, e-mail, CEP, data de nascimento, CPF, objetivo, notas e estágio no funil de vendas.</li>
+      <li>Histórico de mensagens coladas e respostas geradas por lead.</li>
+      <li>Configurações do negócio: atendente, preços, forma de pagamento, funil de vendas e campanha ativa.</li>
+      <li>Chaves de API (Anthropic/Google) configuradas por cada profissional.</li>
+      <li>Usuário/senha de acesso (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação de cada um — nenhum deles em texto puro.</li>
+    </ul>
+  </section>
+
+  <section id="sai">
+    <span class="section-index">3</span>
+    <h2>O que sai do computador — e quando</h2>
+    <p>Sempre por decisão de quem está usando, nunca sozinho. Três ações chamam uma IA externa, cada uma enviando uma quantidade diferente de dado:</p>
+    <ul>
+      <li><strong>"Gerar resposta"</strong> e <strong>"Sugerir abordagem ou follow-up"</strong> enviam o nome do lead (ou da pessoa, na central de mensagens compartilhada), o objetivo/notas dele, o estágio no funil, o texto colado e, se preenchida, a informação adicional daquela resposta — ao provedor de IA escolhido (Claude, da Anthropic, ou Gemini, do Google), usando a chave de API que o próprio negócio configurou.</li>
+      <li><strong>"Sugerir estágio com IA"</strong> envia só o texto colado, nada mais — sempre pelo nível gratuito do Gemini, mesmo que o provedor principal configurado seja outro.</li>
+    </ul>
+    <p><strong>Telefone, e-mail, CEP, data de nascimento e CPF nunca saem do computador</strong> — não fazem parte do que é enviado à IA, em nenhuma hipótese.</p>
+    <p>O conteúdo das conversas do WhatsApp Web não é lido pela extensão além do cabeçalho da conversa aberta (nome/telefone, só para localizar o lead certo). Colar uma mensagem para gerar resposta é sempre um gesto manual, nunca automático.</p>
+  </section>
+
+  <section id="protecao">
+    <span class="section-index">4</span>
+    <h2>Como protegemos esses dados</h2>
+    <ul>
+      <li><strong>Duas camadas de acesso:</strong> uma credencial geral de instalação e, depois, a senha individual de cada perfil.</li>
+      <li><strong>Nenhuma senha em texto puro:</strong> hash PBKDF2-HMAC-SHA256 com 210 mil iterações e valor aleatório único por senha.</li>
+      <li><strong>Bloqueio automático</strong> depois de tentativas erradas seguidas, em qualquer tela que peça senha.</li>
+      <li><strong>Campos sensíveis cifrados</strong> com AES-256-GCM (CPF, e-mail, CEP, nascimento, notas, histórico de conversas e chaves de API) — ilegíveis sem a chave correta, não apenas escondidos da tela.</li>
+      <li><strong>Código de recuperação próprio por perfil</strong>, mostrado uma única vez, no momento da criação ou última troca de senha.</li>
+      <li><strong>Sessão expira sozinha</strong> depois de um período de inatividade.</li>
+      <li><strong>Chaves de API só no computador de quem usa</strong> — nunca trafegam por nenhum servidor nosso, vão direto do navegador ao provedor de IA escolhido.</li>
+    </ul>
+  </section>
+
+  <section id="retencao">
+    <span class="section-index">5</span>
+    <h2>Retenção e exclusão</h2>
+    <ul>
+      <li>Leads e respostas excluídos ficam recuperáveis por 30 dias antes de serem apagados definitivamente.</li>
+      <li>O log de sessões e ações, visível só para o administrador, fica guardado por até 90 dias.</li>
+      <li>Qualquer lead pode ser excluído em definitivo a qualquer momento, sem precisar esperar esse prazo.</li>
+      <li>Quem administra a instalação pode resetá-la por completo (todos os perfis e dados) quando quiser.</li>
+      <li>Backup e restauração permitem exportar ou apagar os próprios dados a qualquer momento — o controle é de quem usa.</li>
+    </ul>
+  </section>
+
+  <section id="nao-faz">
+    <span class="section-index">6</span>
+    <h2>O que não fazemos</h2>
+    <ul>
+      <li>Não vendemos, alugamos nem compartilhamos dados com ninguém além do provedor de IA escolhido pelo próprio usuário — e só o mínimo necessário para gerar a resposta.</li>
+      <li>Não usamos publicidade, rastreamento de navegação nem analytics de uso.</li>
+      <li>Não automatizamos, interceptamos nem enviamos nada dentro do WhatsApp Web — cada envio é decidido por quem está usando.</li>
+      <li>Não usamos código remoto: todo o JavaScript da extensão está empacotado localmente, nada é carregado ou executado a partir de um servidor externo.</li>
+    </ul>
+  </section>
+
+  <section id="responsabilidade">
+    <span class="section-index">7</span>
+    <h2>De quem é a responsabilidade</h2>
+    <p>O Copiloto de Vendas é uma ferramenta local — quem decide quais dados de cada lead cadastrar, e com qual base legal, é o negócio que usa a extensão, não quem a desenvolveu. Este texto descreve o que o software faz com os dados; obrigações legais do negócio que o utiliza (como avisar os próprios clientes sobre o uso de IA no atendimento, quando aplicável) continuam sendo dele, nos termos da LGPD (Lei 13.709/2018).</p>
+  </section>
+
+  <hr class="divider" />
+
+  <section id="contato" style="margin-bottom:0;">
+    <span class="section-index">8</span>
+    <h2>Fale com a gente</h2>
+    <p>Dúvidas sobre esta política ou sobre como os dados são tratados:</p>
+    <div class="contact-card">
+      <span class="label">E-mail de contato</span>
+      <span class="value"><a href="mailto:contato.sdst95@gmail.com">contato.sdst95@gmail.com</a></span>
+    </div>
+  </section>
+
+  <footer>
+    <span>C&amp;S Virtual — Copiloto de Vendas</span>
+    <span>Este texto acompanha, em conteúdo, o aviso de privacidade exibido dentro da própria extensão.</span>
+  </footer>
+
+</div>
+</body>
+</html>
