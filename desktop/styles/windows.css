@@ -6,7 +6,8 @@
   min-width: 320px; min-height: 200px;
   background: var(--win-bg);
   border-radius: var(--radius-lg);
-  box-shadow: var(--elevation-3);
+  box-shadow: var(--elevation-2);
+  transition: box-shadow var(--duration-normal) var(--ease-standard);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -16,7 +17,7 @@
 .app-window.minimized { display: none; }
 .app-window.maximized {
   left: 0 !important; top: 0 !important;
-  width: 100% !important; height: calc(100% - 48px) !important;
+  width: 100% !important; height: calc(100% - var(--taskbar-height)) !important;
   border-radius: 0;
 }
 .app-window.dragging { opacity: 0.92; }
@@ -48,3 +49,58 @@
   touch-action: none;
 }
 .app-window.focused { box-shadow: var(--elevation-4); }
+
+/* ---------- Snap (encaixe de janelas) ---------- */
+.snap-preview {
+  position: absolute;
+  z-index: 3;
+  background: rgba(76, 194, 255, 0.18);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+.snap-assist {
+  position: absolute;
+  z-index: 4;
+  pointer-events: auto;
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-regular);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.snap-assist-item {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-3); border-radius: var(--radius-md); border: none;
+  background: var(--hover); color: var(--text); cursor: pointer;
+  width: 96px;
+}
+.snap-assist-item:hover { background: var(--border); }
+.snap-assist-icon { font-size: 26px; }
+.snap-assist-title { font-size: 11px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---------- Alternador de janelas (Alt+Tab) ---------- */
+.task-switcher {
+  position: fixed;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 50;
+  display: flex; gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-thick);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevation-3);
+  max-width: 90vw;
+  overflow-x: auto;
+}
+.task-switcher-item {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-4); border-radius: var(--radius-md);
+  color: var(--text); width: 120px; flex-shrink: 0;
+}
+.task-switcher-item.selected { background: var(--accent-2); color: #fff; }
+.task-switcher-icon { font-size: 36px; }
+.task-switcher-title { font-size: 12px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

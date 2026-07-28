@@ -4,6 +4,7 @@ import { hasPassword, setPassword, verifyPassword, getHint, setHint } from './co
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './core/services/sounds.js';
 import * as motion from './core/motion/motion.js';
+import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js';
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openSettings } from './apps/settings.js';
@@ -522,4 +523,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+initTaskSwitcher();
 boot();
