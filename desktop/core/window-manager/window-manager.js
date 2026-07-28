@@ -1,6 +1,8 @@
 // Gerenciador de janelas: cria a "moldura" estilo Windows 11 (barra de
 // título, botões, arrastar, redimensionar, maximizar/minimizar) e mantém a
 // lista de janelas abertas para a taskbar.
+import { windowOpen, windowClose, windowMinimize, windowRestore } from '../motion/motion.js';
+
 let zCounter = 10;
 const openWindows = new Map(); // id -> { el, titleBarBtn, appId, state }
 const listeners = new Set();
@@ -42,22 +44,24 @@ export function toggleMinimize(id) {
   const win = openWindows.get(id);
   if (!win) return;
   if (win.minimized || !win.focused) {
+    win.el.classList.remove('minimized');
+    windowRestore(win.el);
     focusWindow(id);
   } else {
-    win.minimized = true;
     win.focused = false;
-    win.el.classList.add('minimized');
     win.el.classList.remove('focused');
+    windowMinimize(win.el).then(() => win.el.classList.add('minimized'));
     notify();
   }
 }
 
-export function closeWindow(id) {
+export async function closeWindow(id) {
   const win = openWindows.get(id);
   if (!win) return;
-  win.el.remove();
   openWindows.delete(id);
   notify();
+  await windowClose(win.el);
+  win.el.remove();
 }
 
 let cascadeOffset = 0;
@@ -93,6 +97,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   const body = el.querySelector('.win-body');
   body.appendChild(content);
   document.getElementById('windows-layer').appendChild(el);
+  windowOpen(el);
 
   const win = { id, el, title, icon, minimized: false, focused: true };
   openWindows.set(id, win);

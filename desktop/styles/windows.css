@@ -1,0 +1,50 @@
+/* Moldura das janelas de aplicativo (gerenciador de janelas). */
+#windows-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.app-window {
+  pointer-events: auto;
+  position: absolute;
+  min-width: 320px; min-height: 200px;
+  background: var(--win-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  will-change: transform, opacity;
+}
+.app-window.minimized { display: none; }
+.app-window.maximized {
+  left: 0 !important; top: 0 !important;
+  width: 100% !important; height: calc(100% - 48px) !important;
+  border-radius: 0;
+}
+.app-window.dragging { opacity: 0.92; }
+.win-titlebar {
+  height: 36px;
+  display: flex; align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  background: var(--win-titlebar);
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+}
+.win-icon { font-size: 15px; }
+.win-title { font-size: 13px; flex: 1; color: var(--text); }
+.win-controls { display: flex; }
+.win-btn {
+  width: 44px; height: 36px;
+  border: none; background: transparent;
+  font-size: 13px; color: var(--text);
+  cursor: pointer;
+}
+.win-btn:hover { background: var(--hover); }
+.win-close:hover { background: #e81123; color: #fff; }
+.win-body { flex: 1; overflow: auto; background: var(--win-bg); color: var(--text); }
+.win-resize {
+  position: absolute; right: 0; bottom: 0;
+  width: 26px; height: 26px; cursor: nwse-resize;
+  touch-action: none;
+}
+.app-window.focused { box-shadow: var(--elevation-4); }

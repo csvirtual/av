@@ -1,17 +1,28 @@
 // Cache básico para permitir instalar como app e abrir mesmo sem internet.
-const CACHE_NAME = 'win11-web-v1';
+const CACHE_NAME = 'win11-web-v2';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
   './main.js',
   './manifest.json',
-  './lib/idb.js',
-  './lib/crypto.js',
-  './lib/windows.js',
+  './styles/tokens.css',
+  './styles/base.css',
+  './styles/motion.css',
+  './styles/screens.css',
+  './styles/components.css',
+  './styles/windows.css',
+  './styles/apps.css',
+  './core/state/database.js',
+  './core/state/kv-store.js',
+  './core/state/filesystem.js',
+  './core/services/auth.js',
+  './core/services/sounds.js',
+  './core/window-manager/window-manager.js',
+  './core/motion/motion.js',
   './apps/explorer.js',
   './apps/notepad.js',
   './apps/settings.js',
+  './apps/browser.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];

@@ -1,0 +1,26 @@
+/* Reset e estrutura base compartilhada por toda a aplicação. */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'DM Sans', system-ui, sans-serif;
+  color: var(--text);
+  user-select: none;
+}
+
+button, input { font-family: inherit; }
+
+.hidden { display: none !important; }
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f3057 0%, #1a5088 45%, #2c7fb8 100%);
+  color: #fff;
+}

@@ -3,7 +3,7 @@
 // volume/mudo configurados nas Configurações. Navegadores só tocam áudio após
 // alguma interação do usuário na página; se ainda não houve nenhuma, o som
 // pode simplesmente não tocar — isso é uma política do próprio navegador.
-import { kv } from './idb.js';
+import { kv } from '../state/kv-store.js';
 
 let audioCtx = null;
 function getCtx() {

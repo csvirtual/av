@@ -1,0 +1,63 @@
+/* Telas de tela cheia: boot, configuração inicial, bloqueio, reiniciar e
+   desligar. */
+
+/* ---------- Boot ---------- */
+#boot-screen { background: #000; gap: var(--space-8); }
+.boot-logo { font-size: 56px; }
+.boot-spinner {
+  width: 32px; height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+/* ---------- Lock / setup ---------- */
+.lock-clock { position: absolute; top: 10%; text-align: center; }
+.lock-time { font-size: 72px; font-weight: 300; }
+.lock-date { font-size: 20px; opacity: 0.9; }
+
+.auth-card {
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: var(--blur-regular);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8) 36px;
+  width: 300px;
+  text-align: center;
+  box-shadow: var(--elevation-3);
+}
+.auth-card h1 { font-size: 20px; font-weight: 500; margin: 0 0 18px; }
+.auth-sub { font-size: 13px; opacity: 0.85; margin: -10px 0 18px; }
+#setup-form, #lock-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.auth-card input {
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+.auth-card input::placeholder { color: rgba(255, 255, 255, 0.65); }
+.auth-card input:focus { border-color: #fff; }
+.auth-btn {
+  margin-top: var(--space-1);
+  padding: 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-2);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+.auth-btn:hover { background: #0078d4; }
+.auth-link {
+  background: none; border: none; color: #cfe8ff;
+  font-size: 12px; cursor: pointer; margin-top: var(--space-1);
+}
+.auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
+
+/* ---------- Restart / shutdown ---------- */
+.restart-screen, .shutdown-screen { background: #000; gap: 22px; }
+.boot-message { font-size: 15px; opacity: 0.85; text-align: center; line-height: 1.6; }
+#power-on-btn { width: 160px; }
