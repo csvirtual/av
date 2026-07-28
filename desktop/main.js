@@ -211,20 +211,20 @@ async function renderDesktopIcons() {
     el.addEventListener('dblclick', () => icon.onOpen());
 
     let dragging = false, moved = false, offX = 0, offY = 0;
-    el.addEventListener('mousedown', (e) => {
+    el.addEventListener('pointerdown', (e) => {
       dragging = true; moved = false;
       offX = e.clientX - el.offsetLeft;
       offY = e.clientY - el.offsetTop;
       document.querySelectorAll('.desktop-icon.selected').forEach((n) => n.classList.remove('selected'));
       el.classList.add('selected');
     });
-    window.addEventListener('mousemove', (e) => {
+    window.addEventListener('pointermove', (e) => {
       if (!dragging) return;
       moved = true;
       el.style.left = `${Math.max(0, e.clientX - offX)}px`;
       el.style.top = `${Math.max(0, e.clientY - offY)}px`;
     });
-    window.addEventListener('mouseup', async () => {
+    window.addEventListener('pointerup', async () => {
       if (dragging && moved) {
         const all = await kv.get('desktop.positions', {});
         all[icon.id] = { x: el.offsetLeft, y: el.offsetTop };

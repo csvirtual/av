@@ -98,11 +98,11 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   openWindows.set(id, win);
   focusWindow(id);
 
-  el.addEventListener('mousedown', () => focusWindow(id));
+  el.addEventListener('pointerdown', () => focusWindow(id));
 
   const titlebar = el.querySelector('[data-role="titlebar"]');
   let dragging = false, offX = 0, offY = 0;
-  titlebar.addEventListener('mousedown', (e) => {
+  titlebar.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.win-btn')) return;
     dragging = true;
     offX = e.clientX - el.offsetLeft;
@@ -115,7 +115,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   });
 
   let resizing = false, resizeStartW = 0, resizeStartH = 0, resizeStartX = 0, resizeStartY = 0;
-  el.querySelector('[data-role="resize"]').addEventListener('mousedown', (e) => {
+  el.querySelector('[data-role="resize"]').addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     resizing = true;
     resizeStartW = el.offsetWidth;
@@ -125,7 +125,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
     focusWindow(id);
   });
 
-  window.addEventListener('mousemove', (e) => {
+  window.addEventListener('pointermove', (e) => {
     if (dragging && !el.classList.contains('maximized')) {
       el.style.left = `${Math.max(0, e.clientX - offX)}px`;
       el.style.top = `${Math.max(0, e.clientY - offY)}px`;
@@ -135,7 +135,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
       el.style.height = `${Math.max(200, resizeStartH + (e.clientY - resizeStartY))}px`;
     }
   });
-  window.addEventListener('mouseup', () => {
+  window.addEventListener('pointerup', () => {
     dragging = false;
     resizing = false;
     el.classList.remove('dragging');
