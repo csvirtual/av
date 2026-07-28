@@ -22,10 +22,21 @@ export const EASE = {
 };
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let reduceMotionOverride = false;
+
+/** Permite que Configurações > Acessibilidade force "reduzir movimento"
+ * independente da preferência do sistema operacional. */
+export function setReducedMotionOverride(value) {
+  reduceMotionOverride = value;
+}
+
+function shouldReduceMotion() {
+  return reduceMotionOverride || prefersReducedMotion.matches;
+}
 
 function run(el, keyframes, options) {
   if (!el || !el.animate) return Promise.resolve();
-  if (prefersReducedMotion.matches) {
+  if (shouldReduceMotion()) {
     Object.assign(el.style, keyframes[keyframes.length - 1]);
     return Promise.resolve();
   }
@@ -115,7 +126,7 @@ export function panelClose(el) {
 export function animateLayoutChange(el, applyNewLayout) {
   const before = el.getBoundingClientRect();
   applyNewLayout();
-  if (prefersReducedMotion.matches || !el.animate) return Promise.resolve();
+  if (shouldReduceMotion() || !el.animate) return Promise.resolve();
   const after = el.getBoundingClientRect();
   if (after.width === 0 || after.height === 0) return Promise.resolve();
   const dx = before.left - after.left;

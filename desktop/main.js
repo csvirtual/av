@@ -49,6 +49,14 @@ const ctx = {
     await kv.set('user.avatar', dataUrl);
     await refreshAvatars();
   },
+  getAccentColor,
+  setAccentColor,
+  getScale,
+  setScale,
+  getReduceMotion,
+  setReduceMotion,
+  getTimeFormat: () => timeFormat,
+  setTimeFormat,
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -89,12 +97,47 @@ function applyWallpaper(value) {
   $('#wallpaper').style.background = isUrl ? `center/cover no-repeat url(${value})` : value;
 }
 
+async function getAccentColor() {
+  return kv.get('settings.accentColor', '#0067c0');
+}
+async function setAccentColor(color) {
+  await kv.set('settings.accentColor', color);
+  document.documentElement.style.setProperty('--accent-2', color);
+}
+
+async function getScale() {
+  return kv.get('settings.scale', 1);
+}
+async function setScale(scale) {
+  await kv.set('settings.scale', scale);
+  document.documentElement.style.zoom = scale;
+}
+
+async function getReduceMotion() {
+  return kv.get('settings.reduceMotion', false);
+}
+async function setReduceMotion(value) {
+  await kv.set('settings.reduceMotion', value);
+  motion.setReducedMotionOverride(value);
+}
+
+let timeFormat = '24h';
+async function setTimeFormat(value) {
+  timeFormat = value;
+  await kv.set('settings.timeFormat', value);
+  updateClocks();
+}
+
 // ---------------- Boot sequence ----------------
 async function boot() {
   seed = await ensureSeed();
   const theme = await getTheme();
   document.documentElement.setAttribute('data-theme', theme);
   applyWallpaper(await getWallpaper());
+  document.documentElement.style.setProperty('--accent-2', await getAccentColor());
+  document.documentElement.style.zoom = await getScale();
+  motion.setReducedMotionOverride(await getReduceMotion());
+  timeFormat = await kv.get('settings.timeFormat', '24h');
 
   setTimeout(async () => {
     hide($('#boot-screen'));
@@ -157,7 +200,7 @@ $('#lock-hint-btn').addEventListener('click', async () => {
 
 function updateClocks() {
   const now = new Date();
-  const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: timeFormat === '12h' });
   const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
   const lockTime = $('#lock-time');
   if (lockTime) lockTime.textContent = time;

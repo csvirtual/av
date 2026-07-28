@@ -67,3 +67,32 @@
   --win-titlebar: rgba(43, 43, 43, 0.7);
   --hover: rgba(255, 255, 255, 0.08);
 }
+
+/* Alto contraste (Acessibilidade): preto/branco puros e bordas fortes,
+   sem transparência/blur, para máxima legibilidade. */
+:root[data-theme='contrast'] {
+  --accent: #1aebff;
+  --accent-2: #ffff00;
+  --bg-solid: #000000;
+  --taskbar-bg: #000000;
+  --panel-bg: #000000;
+  --text: #ffffff;
+  --text-dim: #ffff00;
+  --border: #ffffff;
+  --win-bg: #000000;
+  --win-titlebar: #000000;
+  --hover: #ffffff;
+  --blur-thin: none;
+  --blur-regular: none;
+  --blur-thick: none;
+}
+:root[data-theme='contrast'] .app-window,
+:root[data-theme='contrast'] .panel {
+  border-width: 2px;
+}
+:root[data-theme='contrast'] .taskbar-btn:hover,
+:root[data-theme='contrast'] .icon-btn:hover,
+:root[data-theme='contrast'] .start-app:hover,
+:root[data-theme='contrast'] .panel.small button:hover {
+  color: #000;
+}
