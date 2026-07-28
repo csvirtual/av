@@ -123,8 +123,9 @@ body.sleeping #desktop { filter: brightness(0); }
   color: var(--text);
 }
 #start-menu {
-  left: 50%; bottom: 56px; transform: translateX(-50%);
-  width: 460px; padding: var(--space-5);
+  left: 0; right: 0; margin-inline: auto;
+  bottom: 56px;
+  width: 460px; max-width: calc(100vw - 16px); padding: var(--space-5);
 }
 #start-search {
   width: 100%; padding: 10px var(--space-4);

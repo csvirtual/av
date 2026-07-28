@@ -116,6 +116,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     const currentTheme = await getTheme();
     const currentAccent = await ctx.getAccentColor();
     const currentScale = await ctx.getScale();
+    const currentOrientation = await ctx.getOrientation();
     content.innerHTML = `
       <h2>Plano de fundo</h2>
       <div class="wallpaper-grid" data-role="wallpapers"></div>
@@ -136,6 +137,14 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         <button data-scale="1">100%</button>
         <button data-scale="1.15">115%</button>
         <button data-scale="1.3">130%</button>
+      </div>
+
+      <h2 style="margin-top:24px">Orientação da tela</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin:-6px 0 8px">Ao instalar como aplicativo, a tela gira e trava no modo escolhido.</p>
+      <div class="theme-toggle" data-role="orientation-toggle">
+        <button data-orientation="landscape">🖥️ Paisagem</button>
+        <button data-orientation="portrait">📱 Retrato</button>
+        <button data-orientation="auto">🔄 Automática</button>
       </div>
     `;
     const grid = content.querySelector('[data-role="wallpapers"]');
@@ -183,6 +192,14 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       btn.classList.toggle('active', parseFloat(btn.dataset.scale) === currentScale);
       btn.addEventListener('click', async () => {
         await ctx.setScale(parseFloat(btn.dataset.scale));
+        renderPersonalization();
+      });
+    });
+
+    content.querySelectorAll('[data-orientation]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.orientation === currentOrientation);
+      btn.addEventListener('click', async () => {
+        await ctx.setOrientation(btn.dataset.orientation);
         renderPersonalization();
       });
     });

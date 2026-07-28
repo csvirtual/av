@@ -39,6 +39,7 @@
 .file-item.selected { background: rgba(0, 120, 212, 0.18); }
 .file-item .glyph { font-size: 28px; }
 .file-item .name { font-size: 11px; word-break: break-word; max-height: 2.4em; overflow: hidden; }
+.explorer-grid.is-empty { display: flex; align-items: center; justify-content: center; }
 .explorer-empty { color: var(--text-dim); padding: 30px; text-align: center; }
 
 /* ---------- Notepad ---------- */

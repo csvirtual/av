@@ -94,9 +94,11 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     win.setTitle(path.length ? path[path.length - 1].name : 'Explorador de Arquivos');
 
     if (!children.length) {
+      grid.classList.add('is-empty');
       grid.innerHTML = `<div class="explorer-empty">${trashMode ? 'A Lixeira está vazia.' : 'Esta pasta está vazia.'}</div>`;
       return;
     }
+    grid.classList.remove('is-empty');
 
     children.forEach((node) => {
       const item = document.createElement('div');
