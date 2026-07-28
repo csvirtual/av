@@ -155,6 +155,7 @@ button, input { font-family: inherit; }
   border-radius: 4px;
   cursor: default;
   text-align: center;
+  touch-action: none;
 }
 .desktop-icon:hover, .desktop-icon.selected { background: rgba(255,255,255,0.12); }
 .desktop-icon .icon-glyph { font-size: 32px; }
@@ -197,6 +198,7 @@ button, input { font-family: inherit; }
   background: var(--win-titlebar);
   cursor: grab;
   flex-shrink: 0;
+  touch-action: none;
 }
 .win-icon { font-size: 15px; }
 .win-title { font-size: 13px; flex: 1; color: var(--text); }
@@ -212,7 +214,8 @@ button, input { font-family: inherit; }
 .win-body { flex: 1; overflow: auto; background: var(--win-bg); color: var(--text); }
 .win-resize {
   position: absolute; right: 0; bottom: 0;
-  width: 16px; height: 16px; cursor: nwse-resize;
+  width: 26px; height: 26px; cursor: nwse-resize;
+  touch-action: none;
 }
 .app-window.focused { box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
 
