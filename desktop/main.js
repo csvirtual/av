@@ -190,6 +190,7 @@ $('#setup-form').addEventListener('submit', async (e) => {
   }
   await setPassword(pass);
   await kv.set('user.name', name);
+  if (seed?.userFolderId) await fs.rename(seed.userFolderId, name);
   if (hint) await setHint(hint);
   hide($('#setup-screen'));
   enterDesktop();
