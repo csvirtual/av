@@ -28,7 +28,7 @@
 }
 .auth-card h1 { font-size: 20px; font-weight: 500; margin: 0 0 18px; }
 .auth-sub { font-size: 13px; opacity: 0.85; margin: -10px 0 18px; }
-#setup-form, #lock-form { display: flex; flex-direction: column; gap: var(--space-2); }
+#setup-form, #lock-form, #lock-recovery-form { display: flex; flex-direction: column; gap: var(--space-2); }
 .auth-card input {
   padding: 10px var(--space-3);
   border-radius: var(--radius-sm);
@@ -56,6 +56,43 @@
   font-size: 12px; cursor: pointer; margin-top: var(--space-1);
 }
 .auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
+
+/* ---------- Facilidade de Acesso (configuração inicial / bloqueio) ---------- */
+.ease-of-access-btn {
+  display: none;
+  position: fixed;
+  right: 24px; bottom: 24px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+}
+.ease-of-access-btn:hover { background: rgba(255, 255, 255, 0.26); }
+#ease-of-access-menu { z-index: 31; width: 220px; }
+.eoa-scale-btn.active { background: var(--accent-2); color: #fff; }
+
+body:has(#setup-screen:not(.hidden)) .ease-of-access-btn,
+body:has(#lock-screen:not(.hidden)) .ease-of-access-btn {
+  display: flex;
+}
+
+/* Alto contraste também nas telas cheias de autenticação: elas usam cores
+   fixas (não os tokens de tema) para manter o fundo azul do "Windows", então
+   precisam de uma sobreposição própria para o alto contraste ter efeito
+   real e imediato ali, e não só depois de entrar na área de trabalho. */
+:root[data-theme='contrast'] .screen { background: #000; color: #fff; }
+:root[data-theme='contrast'] .auth-card { background: #000; border: 2px solid #fff; }
+:root[data-theme='contrast'] .auth-card input {
+  background: #000; border: 2px solid #fff; color: #fff;
+}
+:root[data-theme='contrast'] .auth-card input::placeholder { color: #ffff00; }
+:root[data-theme='contrast'] .auth-btn { color: #000; border: 2px solid #fff; }
+:root[data-theme='contrast'] .auth-btn:hover { background: #1aebff; }
+:root[data-theme='contrast'] .auth-link { color: #1aebff; }
 
 /* ---------- Restart / shutdown ---------- */
 .restart-screen, .shutdown-screen { background: #000; gap: 22px; }

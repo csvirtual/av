@@ -55,10 +55,26 @@ export async function changePassword(oldPassword, newPassword) {
   return true;
 }
 
-export async function getHint() {
-  return kv.get('auth.hint', '');
+export async function getEmail() {
+  return kv.get('auth.email', '');
 }
 
-export async function setHint(hint) {
-  await kv.set('auth.hint', hint);
+export async function setEmail(email) {
+  await kv.set('auth.email', (email || '').trim());
+}
+
+/** Confirma que o e-mail informado bate com o cadastrado — só quem sabe
+ * qual e-mail foi usado no cadastro consegue redefinir a senha. Não existe
+ * envio real de e-mail aqui: é só uma verificação local (não há backend). */
+export async function verifyEmail(email) {
+  const stored = await getEmail();
+  if (!stored) return false;
+  return stored.toLowerCase() === (email || '').trim().toLowerCase();
+}
+
+export async function resetPasswordWithEmail(email, newPassword) {
+  const ok = await verifyEmail(email);
+  if (!ok) return false;
+  await setPassword(newPassword);
+  return true;
 }

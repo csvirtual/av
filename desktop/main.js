@@ -1,6 +1,6 @@
 import { kv } from './core/state/kv-store.js';
 import { fs, ensureSeed } from './core/state/filesystem.js';
-import { hasPassword, setPassword, verifyPassword, getHint, setHint } from './core/services/auth.js';
+import { hasPassword, setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './core/services/sounds.js';
 import * as motion from './core/motion/motion.js';
@@ -179,9 +179,9 @@ $('#setup-name').addEventListener('input', (e) => {
 $('#setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#setup-name').value.trim() || 'Usuário';
+  const email = $('#setup-email').value.trim();
   const pass = $('#setup-pass').value;
   const pass2 = $('#setup-pass2').value;
-  const hint = $('#setup-hint').value.trim();
   const err = $('#setup-error');
   if (pass !== pass2) {
     err.textContent = 'As senhas não coincidem.';
@@ -190,8 +190,8 @@ $('#setup-form').addEventListener('submit', async (e) => {
   }
   await setPassword(pass);
   await kv.set('user.name', name);
+  await setEmail(email);
   if (seed?.userFolderId) await fs.rename(seed.userFolderId, name);
-  if (hint) await setHint(hint);
   hide($('#setup-screen'));
   enterDesktop();
 });
@@ -211,9 +211,89 @@ $('#lock-form').addEventListener('submit', async (e) => {
     show(err);
   }
 });
-$('#lock-hint-btn').addEventListener('click', async () => {
-  const hint = await getHint();
-  alert(hint ? `Dica: ${hint}` : 'Nenhuma dica foi cadastrada. Limpe os dados do site no navegador para redefinir.');
+
+// Recuperação de senha: só quem souber o e-mail cadastrado no momento do
+// cadastro consegue definir uma nova senha. Não há envio real de e-mail
+// (não existe backend) — é uma verificação local, deixada clara na tela.
+$('#lock-hint-btn').addEventListener('click', () => {
+  hide($('#lock-form'));
+  $('#recovery-email').value = '';
+  $('#recovery-pass').value = '';
+  $('#recovery-pass2').value = '';
+  hide($('#recovery-error'));
+  show($('#lock-recovery-form'));
+});
+$('#recovery-back-btn').addEventListener('click', () => {
+  hide($('#lock-recovery-form'));
+  show($('#lock-form'));
+});
+$('#lock-recovery-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('#recovery-email').value.trim();
+  const pass = $('#recovery-pass').value;
+  const pass2 = $('#recovery-pass2').value;
+  const err = $('#recovery-error');
+  if (pass !== pass2) {
+    err.textContent = 'As senhas não coincidem.';
+    show(err);
+    return;
+  }
+  const registeredEmail = await getEmail();
+  if (!registeredEmail) {
+    err.textContent = 'Nenhum e-mail foi cadastrado nesta conta — não é possível recuperar a senha.';
+    show(err);
+    return;
+  }
+  const ok = await resetPasswordWithEmail(email, pass);
+  if (!ok) {
+    err.textContent = 'O e-mail informado não corresponde ao cadastrado.';
+    show(err);
+    return;
+  }
+  hide($('#lock-recovery-form'));
+  show($('#lock-form'));
+  $('#lock-pass').value = '';
+  hide($('#lock-error'));
+  alert('Senha redefinida com sucesso. Faça login com a nova senha.');
+});
+
+// ---------------- Facilidade de Acesso (telas de configuração/bloqueio) ----------------
+// Reaproveita as mesmas configurações reais de acessibilidade já usadas no
+// app (alto contraste, reduzir animações, escala de texto), disponíveis
+// também antes de entrar na área de trabalho — como no Windows.
+$('#ease-of-access-btn').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const menu = $('#ease-of-access-menu');
+  if (!menu.classList.contains('hidden')) {
+    hidePanel(menu);
+    return;
+  }
+  const theme = await getTheme();
+  const reduceMotion = await getReduceMotion();
+  const scale = await getScale();
+  $('#eoa-contrast').checked = theme === 'contrast';
+  $('#eoa-motion').checked = reduceMotion;
+  document.querySelectorAll('.eoa-scale-btn').forEach((btn) => {
+    btn.classList.toggle('active', parseFloat(btn.dataset.scale) === scale);
+  });
+  positionPanelNearButton(menu, $('#ease-of-access-btn'));
+});
+$('#eoa-contrast').addEventListener('change', async (e) => {
+  if (e.target.checked) {
+    const current = await getTheme();
+    await kv.set('settings.themeBeforeContrast', current === 'contrast' ? 'light' : current);
+    await setTheme('contrast');
+  } else {
+    const previous = await kv.get('settings.themeBeforeContrast', 'light');
+    await setTheme(previous);
+  }
+});
+$('#eoa-motion').addEventListener('change', (e) => setReduceMotion(e.target.checked));
+document.querySelectorAll('.eoa-scale-btn').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    await setScale(parseFloat(btn.dataset.scale));
+    document.querySelectorAll('.eoa-scale-btn').forEach((b) => b.classList.toggle('active', b === btn));
+  });
 });
 
 function updateClocks() {
@@ -284,6 +364,7 @@ async function enterDesktop() {
   await refreshVolumeUI();
   await renderDesktopIcons();
   renderStartMenu();
+  renderTaskbarApps();
 }
 
 function fixedIcons() {
@@ -470,6 +551,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#account-menu') && !e.target.closest('#start-user-btn')) hidePanel($('#account-menu'));
   if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hidePanel($('#volume-menu'));
   if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
+  if (!e.target.closest('#ease-of-access-menu') && !e.target.closest('#ease-of-access-btn')) hidePanel($('#ease-of-access-menu'));
 });
 
 // ---------------- Taskbar / Start menu ----------------
@@ -669,46 +751,85 @@ function focusOrToggleApp(appId) {
   return true;
 }
 
-document.querySelectorAll('.taskbar-btn[data-app]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const appId = btn.dataset.app;
-    if (focusOrToggleApp(appId)) return;
-    const app = PINNED_APPS.find((a) => a.id === appId);
-    if (app) app.onOpen();
-  });
-});
+const DEFAULT_PINNED_TASKBAR = ['explorer', 'browser', 'notepad', 'settings'];
+async function getPinnedTaskbarApps() {
+  return kv.get('taskbar.pinned', DEFAULT_PINNED_TASKBAR);
+}
+async function setPinnedTaskbarApps(list) {
+  await kv.set('taskbar.pinned', list);
+}
 
-WM.onWindowsChange((list) => {
-  const pinnedBtns = document.querySelectorAll('.taskbar-btn[data-app]');
+// Menu de contexto (botão direito) de um ícone da barra de tarefas: nunca
+// abre outra coisa além de opções reais para manipular aquele ícone — fixar/
+// desafixar da barra de tarefas e fechar a(s) janela(s) do app, como no
+// Windows 11.
+function showTaskbarItemMenu(x, y, appId, appWindows, isPinned) {
+  const items = [];
+  if (appWindows.length) {
+    items.push({
+      label: appWindows.length > 1 ? `✕ Fechar todas as janelas (${appWindows.length})` : '✕ Fechar janela',
+      onClick: () => appWindows.forEach((w) => WM.closeWindow(w.id)),
+    });
+  }
+  items.push({
+    label: isPinned ? '📌 Desafixar da barra de tarefas' : '📌 Fixar na barra de tarefas',
+    onClick: async () => {
+      const pinned = await getPinnedTaskbarApps();
+      const next = isPinned ? pinned.filter((id) => id !== appId) : [...pinned, appId];
+      await setPinnedTaskbarApps(next);
+      renderTaskbarApps();
+    },
+  });
+  showContextMenu(x, y, items);
+}
+
+function buildTaskbarAppButton(app, appWindows, isPinned) {
+  const btn = document.createElement('button');
+  btn.className = 'taskbar-btn' + (appWindows.length ? ' running' : '') + (appWindows.some((w) => w.focused) ? ' active' : '');
+  btn.dataset.app = app.id;
+  btn.title = appWindows.length > 1 ? `${app.label} (+${appWindows.length - 1})` : app.label;
+  btn.textContent = app.glyph;
+  btn.addEventListener('click', () => {
+    if (focusOrToggleApp(app.id)) return;
+    app.onOpen?.();
+  });
+  btn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showTaskbarItemMenu(e.clientX, e.clientY, app.id, appWindows, isPinned);
+  });
+  return btn;
+}
+
+async function renderTaskbarApps() {
+  const pinned = await getPinnedTaskbarApps();
   const byApp = new Map();
-  list.forEach((w) => {
+  WM.listProcesses().forEach((w) => {
     if (!byApp.has(w.appId)) byApp.set(w.appId, []);
     byApp.get(w.appId).push(w);
   });
 
-  // Ícones fixos: só refletem o estado (rodando/em foco) do próprio ícone,
-  // nunca criam um segundo ícone ao lado.
-  pinnedBtns.forEach((btn) => {
-    const appWindows = byApp.get(btn.dataset.app) || [];
-    btn.classList.toggle('running', appWindows.length > 0);
-    btn.classList.toggle('active', appWindows.some((w) => w.focused));
-    byApp.delete(btn.dataset.app);
+  const holder = $('#taskbar-apps');
+  holder.innerHTML = '';
+
+  pinned.forEach((appId) => {
+    const app = PINNED_APPS.find((a) => a.id === appId);
+    if (!app) return;
+    holder.appendChild(buildTaskbarAppButton(app, byApp.get(appId) || [], true));
+    byApp.delete(appId);
   });
 
   // Apps sem ícone fixo (Calculadora, Relógio, Terminal, Gerenciador de
   // Tarefas...) ganham um ícone temporário só enquanto estiverem abertos —
-  // um por app, mesmo que existam várias janelas dele.
-  const holder = $('#taskbar-running');
-  holder.innerHTML = '';
+  // um por app, mesmo que existam várias janelas dele — e some ao fechar.
   byApp.forEach((appWindows, appId) => {
-    const btn = document.createElement('button');
-    btn.className = 'taskbar-btn running' + (appWindows.some((w) => w.focused) ? ' active' : '');
-    btn.textContent = appWindows[0].icon;
-    btn.title = appWindows.length > 1 ? `${appWindows[0].title} (+${appWindows.length - 1})` : appWindows[0].title;
-    btn.addEventListener('click', () => focusOrToggleApp(appId));
-    holder.appendChild(btn);
+    const app = PINNED_APPS.find((a) => a.id === appId);
+    if (!app) return;
+    holder.appendChild(buildTaskbarAppButton(app, appWindows, false));
   });
-});
+}
+
+WM.onWindowsChange(() => renderTaskbarApps());
 
 function isStandaloneDisplay() {
   return (

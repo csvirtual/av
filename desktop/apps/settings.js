@@ -4,6 +4,10 @@
 // Atualizações: como o app roda inteiramente no navegador, sem acesso a
 // hardware real, essas categorias seriam apenas decorativas — preferimos
 // não incluir telas que não fazem nada de verdade.
+function escapeAttr(str) {
+  return (str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function avatarPreviewHTML(name, avatarDataUrl) {
   if (avatarDataUrl) return `<img class="avatar-img" src="${avatarDataUrl}" alt="">`;
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -283,6 +287,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   async function renderAccount() {
     const name = await ctx.kv.get('user.name', 'Usuário');
     const avatar = await ctx.getAvatar();
+    const email = await ctx.kv.get('auth.email', '');
     content.innerHTML = `
       <h2>Conta</h2>
       <div class="settings-avatar-lg" data-role="avatar-preview">${avatarPreviewHTML(name, avatar)}</div>
@@ -292,6 +297,14 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         <button class="btn" data-action="change-photo">Alterar foto</button>
         <button class="btn" style="background:var(--hover);color:var(--text)" data-action="use-initial">Usar inicial</button>
       </div>
+      <h2 style="margin-top:20px">E-mail de recuperação</h2>
+      <p style="font-size:13px;color:var(--text-dim);max-width:380px;line-height:1.5">
+        Usado só para redefinir sua senha localmente neste navegador, caso você a esqueça —
+        não enviamos nenhum e-mail de verdade, é apenas uma confirmação local.
+      </p>
+      <input type="email" placeholder="seu@email.com" data-role="recovery-email" value="${escapeAttr(email)}">
+      <button class="btn" data-action="save-email">Salvar e-mail</button>
+      <p class="settings-msg" data-role="email-msg"></p>
       <h2 style="margin-top:20px">Alterar senha</h2>
       <input type="password" placeholder="Senha atual" data-role="old-pass">
       <input type="password" placeholder="Nova senha" data-role="new-pass">
@@ -299,6 +312,13 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <button class="btn" data-action="change-pass">Alterar senha</button>
       <p class="settings-msg" data-role="pass-msg"></p>
     `;
+    content.querySelector('[data-action="save-email"]').addEventListener('click', async () => {
+      const value = content.querySelector('[data-role="recovery-email"]').value.trim();
+      const msg = content.querySelector('[data-role="email-msg"]');
+      await ctx.kv.set('auth.email', value);
+      msg.textContent = value ? 'E-mail de recuperação salvo.' : 'E-mail de recuperação removido.';
+      msg.className = 'settings-msg ok';
+    });
     content.querySelector('[data-action="change-pass"]').addEventListener('click', async () => {
       const oldPass = content.querySelector('[data-role="old-pass"]').value;
       const newPass = content.querySelector('[data-role="new-pass"]').value;
@@ -379,6 +399,15 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         Interface inspirada no Windows 11, executada inteiramente no seu navegador.
         Todos os arquivos e configurações são salvos localmente (IndexedDB) neste
         dispositivo/navegador — nada é enviado a um servidor.
+      </p>
+
+      <h2 style="margin-top:24px">Desenvolvedor</h2>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.6;max-width:400px">
+        Criado por <strong>Samuel Dos Santos Teixeira</strong> como um projeto pessoal para
+        estudar e demonstrar, na prática, como recriar a experiência de um sistema
+        operacional moderno inteiramente com tecnologias web — HTML, CSS e JavaScript,
+        sem frameworks pesados — com foco em arquitetura, desempenho e fidelidade visual
+        ao Windows 11.
       </p>
     `;
   }
