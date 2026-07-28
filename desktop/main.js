@@ -29,7 +29,25 @@ const ctx = {
     await setPassword(newP);
     return true;
   },
+  getAvatar: () => kv.get('user.avatar', null),
+  setAvatar: async (dataUrl) => {
+    await kv.set('user.avatar', dataUrl);
+    await refreshAvatars();
+  },
 };
+
+function avatarHTML(name, avatarDataUrl) {
+  if (avatarDataUrl) return `<img class="avatar-img" src="${avatarDataUrl}" alt="">`;
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  return `<div class="avatar-initial">${initial}</div>`;
+}
+
+async function refreshAvatars() {
+  const name = await kv.get('user.name', 'Usuário');
+  const avatar = await kv.get('user.avatar', null);
+  const html = avatarHTML(name, avatar);
+  document.querySelectorAll('#lock-avatar, #start-avatar').forEach((el) => (el.innerHTML = html));
+}
 
 function openFile(node) {
   if (!node) return;
@@ -67,15 +85,21 @@ async function boot() {
     hide($('#boot-screen'));
     if (await hasPassword()) {
       $('#lock-username').textContent = await kv.get('user.name', 'Usuário');
+      await refreshAvatars();
       show($('#lock-screen'));
       $('#lock-pass').focus();
     } else {
+      $('#setup-avatar').innerHTML = avatarHTML('', null);
       show($('#setup-screen'));
     }
   }, 900);
 }
 
 // ---------------- Setup ----------------
+$('#setup-name').addEventListener('input', (e) => {
+  $('#setup-avatar').innerHTML = avatarHTML(e.target.value, null);
+});
+
 $('#setup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('#setup-name').value.trim() || 'Usuário';
@@ -134,6 +158,7 @@ function lockNow() {
   hide($('#desktop'));
   $('#lock-username').textContent = '';
   kv.get('user.name', 'Usuário').then((n) => ($('#lock-username').textContent = n));
+  refreshAvatars();
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
@@ -142,6 +167,7 @@ function lockNow() {
 async function enterDesktop() {
   show($('#desktop'));
   $('#start-username').textContent = await kv.get('user.name', 'Usuário');
+  await refreshAvatars();
   await renderDesktopIcons();
   renderStartMenu();
 }
@@ -352,6 +378,10 @@ WM.onWindowsChange((list) => {
     holder.appendChild(btn);
   });
 });
+
+if (window.matchMedia('(display-mode: standalone)').matches && screen.orientation?.lock) {
+  screen.orientation.lock('landscape').catch(() => {});
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

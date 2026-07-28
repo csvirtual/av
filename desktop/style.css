@@ -86,7 +86,21 @@ button, input { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-size: 34px;
   margin: 0 auto 12px;
+  overflow: hidden;
 }
+.avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.avatar-initial {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0078d4, #003b73);
+  color: #fff; font-weight: 600; text-transform: uppercase;
+  font-family: 'Segoe UI', sans-serif;
+}
+.auth-avatar .avatar-initial { font-size: 30px; }
+.avatar-sm .avatar-initial { font-size: 12px; }
+.settings-avatar-lg { width: 88px; height: 88px; border-radius: 50%; overflow: hidden; margin-bottom: 12px; }
+.settings-avatar-lg .avatar-initial { font-size: 36px; }
 .auth-card h1 { font-size: 20px; font-weight: 500; margin: 0 0 18px; }
 .auth-sub { font-size: 13px; opacity: 0.85; margin: -10px 0 18px; }
 #setup-form, #lock-form { display: flex; flex-direction: column; gap: 10px; }
@@ -286,6 +300,7 @@ button, input { font-family: inherit; }
 .avatar-sm {
   width: 28px; height: 28px; border-radius: 50%;
   background: var(--hover); display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
 }
 .icon-btn {
   border: none; background: none; font-size: 16px; cursor: pointer;

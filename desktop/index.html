@@ -25,7 +25,7 @@
 <!-- Tela de configuração inicial de senha -->
 <div id="setup-screen" class="screen hidden">
   <div class="auth-card">
-    <div class="auth-avatar">🙂</div>
+    <div class="auth-avatar" id="setup-avatar"></div>
     <h1>Bem-vindo</h1>
     <p class="auth-sub">Crie uma senha para proteger sua área de trabalho.</p>
     <form id="setup-form" autocomplete="off">
@@ -46,7 +46,7 @@
     <div class="lock-date" id="lock-date">segunda-feira, 1 de janeiro</div>
   </div>
   <div class="auth-card">
-    <div class="auth-avatar">🙂</div>
+    <div class="auth-avatar" id="lock-avatar"></div>
     <h1 id="lock-username">Usuário</h1>
     <form id="lock-form" autocomplete="off">
       <input type="password" id="lock-pass" placeholder="Senha" required>
@@ -70,10 +70,15 @@
     <div id="start-pinned" class="start-grid"></div>
     <div class="start-footer">
       <div class="start-user">
-        <span class="avatar-sm">🙂</span>
+        <span class="avatar-sm" id="start-avatar"></span>
         <span id="start-username">Usuário</span>
       </div>
-      <button id="start-power" class="icon-btn" title="Energia">⏻</button>
+      <button id="start-power" class="icon-btn" title="Energia">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 3v8"></path>
+          <path d="M6.5 6.5a7 7 0 1 0 11 0"></path>
+        </svg>
+      </button>
     </div>
   </div>
 

@@ -1,4 +1,10 @@
 // Configurações: personalização (papel de parede, tema) e conta (trocar senha).
+function avatarPreviewHTML(name, avatarDataUrl) {
+  if (avatarDataUrl) return `<img class="avatar-img" src="${avatarDataUrl}" alt="">`;
+  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
+  return `<div class="avatar-initial">${initial}</div>`;
+}
+
 const WALLPAPERS = [
   { id: 'win11-blue', value: 'linear-gradient(135deg, #0f3057 0%, #1a5088 45%, #2c7fb8 100%)' },
   { id: 'sunset', value: 'linear-gradient(135deg, #ff8a65 0%, #ff5e62 50%, #8e2de2 100%)' },
@@ -78,9 +84,16 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
 
   async function renderAccount() {
     const name = await ctx.kv.get('user.name', 'Usuário');
+    const avatar = await ctx.getAvatar();
     content.innerHTML = `
       <h2>Conta</h2>
+      <div class="settings-avatar-lg" data-role="avatar-preview">${avatarPreviewHTML(name, avatar)}</div>
       <p style="font-size:13px;color:var(--text-dim)">Usuário: <strong>${name}</strong></p>
+      <input type="file" accept="image/*" data-role="avatar-upload" class="hidden">
+      <div style="display:flex;gap:8px;margin:10px 0 4px">
+        <button class="btn" data-action="change-photo">Alterar foto</button>
+        <button class="btn" style="background:var(--hover);color:var(--text)" data-action="use-initial">Usar inicial</button>
+      </div>
       <h2 style="margin-top:20px">Alterar senha</h2>
       <input type="password" placeholder="Senha atual" data-role="old-pass">
       <input type="password" placeholder="Nova senha" data-role="new-pass">
@@ -114,6 +127,24 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         msg.textContent = 'Senha atual incorreta.';
         msg.className = 'settings-msg err';
       }
+    });
+
+    const preview = content.querySelector('[data-role="avatar-preview"]');
+    const uploadInput = content.querySelector('[data-role="avatar-upload"]');
+    content.querySelector('[data-action="change-photo"]').addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', async () => {
+      const file = uploadInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        await ctx.setAvatar(reader.result);
+        preview.innerHTML = avatarPreviewHTML(name, reader.result);
+      };
+      reader.readAsDataURL(file);
+    });
+    content.querySelector('[data-action="use-initial"]').addEventListener('click', async () => {
+      await ctx.setAvatar(null);
+      preview.innerHTML = avatarPreviewHTML(name, null);
     });
   }
 
