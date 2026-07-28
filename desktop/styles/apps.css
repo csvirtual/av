@@ -121,3 +121,120 @@
   border-bottom: 1px solid var(--border);
 }
 .browser-frame { flex: 1; border: none; width: 100%; background: #fff; }
+
+/* ---------- Calculadora ---------- */
+.calculator { display: flex; flex-direction: column; height: 100%; padding: var(--space-3); gap: var(--space-3); }
+.calc-display {
+  flex-shrink: 0;
+  font-size: 40px; font-weight: 300; text-align: right;
+  padding: var(--space-3); color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.calc-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--space-2);
+}
+.calc-grid button {
+  border: none; border-radius: var(--radius-md); cursor: pointer;
+  background: var(--hover); color: var(--text); font-size: 18px;
+}
+.calc-grid button:hover { background: var(--border); }
+.calc-fn { color: var(--accent-2); }
+.calc-op { background: var(--accent-2); color: #fff; }
+.calc-op:hover { filter: brightness(1.1); }
+.calc-eq { background: var(--accent-2); color: #fff; }
+.calc-zero { grid-column: span 2; }
+
+/* ---------- Relógio e Calendário ---------- */
+.clockapp { display: flex; flex-direction: column; height: 100%; }
+.clockapp-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.clockapp-tabs button {
+  flex: 1; padding: var(--space-3); border: none; background: none;
+  color: var(--text-dim); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+}
+.clockapp-tabs button.active { color: var(--text); border-bottom-color: var(--accent-2); }
+.clockapp-content { flex: 1; overflow-y: auto; padding: var(--space-5); }
+.clockapp-content h2 { font-size: 14px; font-weight: 600; margin: var(--space-5) 0 var(--space-2); }
+.clockapp-actions { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
+
+.analog-clock {
+  width: 160px; height: 160px; margin: 0 auto;
+  border-radius: 50%; border: 3px solid var(--border);
+  position: relative; background: var(--hover);
+}
+.analog-clock .hand {
+  position: absolute; left: 50%; bottom: 50%;
+  transform-origin: bottom center; border-radius: 4px;
+  background: var(--text);
+}
+.analog-clock .hour { width: 4px; height: 42px; margin-left: -2px; }
+.analog-clock .minute { width: 3px; height: 60px; margin-left: -1.5px; }
+.analog-clock .second { width: 2px; height: 68px; margin-left: -1px; background: var(--accent-2); }
+.analog-center {
+  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px;
+  background: var(--accent-2); border-radius: 50%; transform: translate(-50%, -50%);
+}
+.digital-clock { text-align: center; font-size: 28px; font-weight: 300; margin-top: var(--space-4); }
+.digital-date { text-align: center; font-size: 13px; color: var(--text-dim); text-transform: capitalize; }
+
+.stopwatch-display { font-size: 26px; font-weight: 300; text-align: center; font-variant-numeric: tabular-nums; }
+.lap-list { list-style: none; padding: 0; margin: var(--space-2) 0; max-height: 90px; overflow-y: auto; font-size: 13px; color: var(--text-dim); }
+.lap-list li { padding: var(--space-1) 0; border-bottom: 1px solid var(--border); text-align: center; }
+
+.calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calendar-weekdays { margin-bottom: var(--space-1); }
+.calendar-weekday { text-align: center; font-size: 11px; color: var(--text-dim); padding: var(--space-1); }
+.calendar-day {
+  aspect-ratio: 1; border: none; background: none; border-radius: var(--radius-sm);
+  cursor: pointer; color: var(--text); font-size: 12px; position: relative;
+}
+.calendar-day:hover { background: var(--hover); }
+.calendar-day.today { font-weight: 700; color: var(--accent-2); }
+.calendar-day.selected { background: var(--accent-2); color: #fff; }
+.calendar-dot {
+  position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--accent-2);
+}
+.calendar-day.selected .calendar-dot { background: #fff; }
+.clockapp-content textarea {
+  width: 100%; padding: var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--hover); color: var(--text); font-size: 13px; font-family: inherit; resize: vertical;
+}
+
+/* ---------- Terminal ---------- */
+.terminal {
+  display: flex; flex-direction: column; height: 100%;
+  background: #0c0c0c; color: #f2f2f2;
+  font-family: 'Cascadia Code', Consolas, monospace; font-size: 13px;
+}
+.terminal-output { flex: 1; overflow-y: auto; padding: var(--space-3); }
+.terminal-line { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.terminal-line.err { color: #ff6b6b; }
+.terminal-line.echo { color: #9cdcfe; }
+.terminal-inputline {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-top: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+.terminal-prompt { color: #4ec9b0; white-space: nowrap; }
+.terminal-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: #f2f2f2; font-family: inherit; font-size: 13px;
+}
+
+/* ---------- Gerenciador de Tarefas ---------- */
+.taskmgr-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.taskmgr-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--hover);
+}
+.taskmgr-icon { font-size: 22px; }
+.taskmgr-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.taskmgr-title { font-size: 13px; }
+.taskmgr-sub { font-size: 11px; color: var(--text-dim); }
+.taskmgr-row .btn { font-size: 12px; padding: 6px 12px; flex-shrink: 0; }
+.taskmgr-current { font-size: 13px; color: var(--text-dim); margin-top: var(--space-2); }

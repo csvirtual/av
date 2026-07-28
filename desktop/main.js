@@ -9,6 +9,10 @@ import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openSettings } from './apps/settings.js';
 import { openBrowser } from './apps/browser.js';
+import { openCalculator } from './apps/calculator.js';
+import { openClock } from './apps/clock.js';
+import { openTerminal } from './apps/terminal.js';
+import { openTaskManager } from './apps/task-manager.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -25,6 +29,7 @@ function hidePanel(el) {
 }
 
 let seed = null;
+let bootTime = Date.now();
 
 const ctx = {
   fs,
@@ -66,6 +71,7 @@ const ctx = {
       try { screen.orientation.unlock(); } catch {}
     }
   },
+  getBootTime: () => bootTime,
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -443,6 +449,10 @@ const PINNED_APPS = [
   { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
   { id: 'browser', label: 'Navegador', glyph: '🌐', onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
+  { id: 'calculator', label: 'Calculadora', glyph: '🧮', onOpen: () => openCalculator(ctx) },
+  { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
+  { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
+  { id: 'taskmanager', label: 'Gerenciador de Tarefas', glyph: '📊', onOpen: () => openTaskManager(ctx) },
   { id: 'settings', label: 'Configurações', glyph: '⚙️', onOpen: () => openSettings(ctx) },
   { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
 ];
