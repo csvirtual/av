@@ -75,6 +75,11 @@
   border: 2px solid transparent; background-size: cover; background-position: center;
 }
 .wallpaper-swatch.active { border-color: var(--accent-2); }
+.accent-swatch {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; box-shadow: 0 0 0 1px var(--border);
+}
+.accent-swatch.active { border-color: var(--text); }
 .theme-toggle { display: flex; gap: var(--space-3); margin: var(--space-3) 0; }
 .theme-toggle button {
   padding: var(--space-2) 16px; border-radius: var(--radius-md); border: 1px solid var(--border);
