@@ -92,9 +92,9 @@ const ctx = {
 };
 
 function avatarHTML(name, avatarDataUrl) {
-  if (avatarDataUrl) return `<img class="avatar-img" src="${avatarDataUrl}" alt="">`;
+  if (avatarDataUrl) return `<img class="avatar-img" src="${escapeHtml(avatarDataUrl)}" alt="">`;
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  return `<div class="avatar-initial">${initial}</div>`;
+  return `<div class="avatar-initial">${escapeHtml(initial)}</div>`;
 }
 
 async function refreshAvatars() {
@@ -253,9 +253,9 @@ async function removeAccountFlow(id) {
 }
 
 function accountAvatarTileHTML(account) {
-  if (account.avatar) return `<img src="${account.avatar}" alt="">`;
+  if (account.avatar) return `<img src="${escapeHtml(account.avatar)}" alt="">`;
   const initial = (account.name || '?').trim().charAt(0).toUpperCase() || '?';
-  return initial;
+  return escapeHtml(initial);
 }
 
 function renderAccountPicker(accounts) {
@@ -805,6 +805,7 @@ function showContextMenu(x, y, items) {
   menu.innerHTML = '';
   items.forEach((item) => {
     const btn = document.createElement('button');
+    btn.setAttribute('role', 'menuitem');
     btn.textContent = item.label;
     btn.addEventListener('click', () => {
       hidePanel(menu);
@@ -844,6 +845,23 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
   if (!e.target.closest('#ease-of-access-menu') && !e.target.closest('#ease-of-access-btn')) hidePanel($('#ease-of-access-menu'));
   if (!e.target.closest('#notification-center') && !e.target.closest('#tray-notif-btn')) hidePanel($('#notification-center'));
+});
+
+// Esc fecha o painel flutuante aberto no momento — um por vez, o mais
+// recente primeiro — mesmo comportamento de teclado do Windows.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const panelSelectors = [
+    '#context-menu', '#notification-center', '#calendar-flyout',
+    '#volume-menu', '#ease-of-access-menu', '#account-menu', '#power-menu', '#start-menu',
+  ];
+  for (const sel of panelSelectors) {
+    const el = $(sel);
+    if (el && !el.classList.contains('hidden')) {
+      hidePanel(el);
+      return;
+    }
+  }
 });
 
 // ---------------- Taskbar / Start menu ----------------
@@ -1239,6 +1257,7 @@ async function renderNotificationCenter() {
     dismiss.className = 'notification-dismiss';
     dismiss.textContent = '✕';
     dismiss.title = 'Dispensar';
+    dismiss.setAttribute('aria-label', 'Dispensar notificação');
     dismiss.addEventListener('click', () => dismissNotification(n.id));
     item.appendChild(dismiss);
     holder.appendChild(item);
@@ -1265,6 +1284,7 @@ function showToast(item) {
   closeBtn.className = 'toast-close';
   closeBtn.textContent = '✕';
   closeBtn.title = 'Fechar';
+  closeBtn.setAttribute('aria-label', 'Fechar notificação');
   el.appendChild(closeBtn);
   stack.appendChild(el);
   motion.panelOpen(el);
@@ -1356,6 +1376,7 @@ function buildTaskbarAppButton(app, appWindows, isPinned) {
   btn.className = 'taskbar-btn' + (appWindows.length ? ' running' : '') + (appWindows.some((w) => w.focused) ? ' active' : '');
   btn.dataset.app = app.id;
   btn.title = appWindows.length > 1 ? `${app.label} (+${appWindows.length - 1})` : app.label;
+  btn.setAttribute('aria-label', app.label);
   btn.textContent = app.glyph;
   btn.addEventListener('click', () => {
     if (focusOrToggleApp(app.id)) return;

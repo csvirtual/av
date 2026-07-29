@@ -9,9 +9,9 @@ function escapeAttr(str) {
 }
 
 function avatarPreviewHTML(name, avatarDataUrl) {
-  if (avatarDataUrl) return `<img class="avatar-img" src="${avatarDataUrl}" alt="">`;
+  if (avatarDataUrl) return `<img class="avatar-img" src="${escapeAttr(avatarDataUrl)}" alt="">`;
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  return `<div class="avatar-initial">${initial}</div>`;
+  return `<div class="avatar-initial">${escapeAttr(initial)}</div>`;
 }
 
 export const WALLPAPERS = [

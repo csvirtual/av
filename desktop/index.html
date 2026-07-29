@@ -53,17 +53,17 @@
       <div class="auth-avatar" id="setup-avatar"></div>
       <h1>Sua conta</h1>
       <p class="auth-sub">Como podemos te chamar?</p>
-      <input type="text" id="setup-name" placeholder="Seu nome" maxlength="40">
-      <input type="file" id="setup-photo" accept="image/*" class="hidden">
+      <input type="text" id="setup-name" placeholder="Seu nome" aria-label="Seu nome" maxlength="40">
+      <input type="file" id="setup-photo" accept="image/*" class="hidden" aria-label="Escolher foto de perfil">
       <button type="button" class="btn" id="setup-photo-btn" style="background:rgba(255,255,255,0.12);color:#fff;margin-top:8px">Escolher foto</button>
     </div>
 
     <div class="oobe-step hidden" data-step="security">
       <h1>Proteja sua conta</h1>
       <p class="auth-sub">Crie uma senha e informe um e-mail para recuperação.</p>
-      <input type="email" id="setup-email" placeholder="E-mail (para recuperar sua senha)">
-      <input type="password" id="setup-pass" placeholder="Nova senha" minlength="4">
-      <input type="password" id="setup-pass2" placeholder="Confirmar senha" minlength="4">
+      <input type="email" id="setup-email" placeholder="E-mail (para recuperar sua senha)" aria-label="E-mail para recuperação de senha">
+      <input type="password" id="setup-pass" placeholder="Nova senha" aria-label="Nova senha" minlength="4">
+      <input type="password" id="setup-pass2" placeholder="Confirmar senha" aria-label="Confirmar senha" minlength="4">
       <p id="setup-error" class="auth-error hidden"></p>
     </div>
 
@@ -95,16 +95,16 @@
     <div class="auth-avatar" id="lock-avatar"></div>
     <h1 id="lock-username">Usuário</h1>
     <form id="lock-form" autocomplete="off">
-      <input type="password" id="lock-pass" placeholder="Senha" required>
+      <input type="password" id="lock-pass" placeholder="Senha" aria-label="Senha" required>
       <p id="lock-error" class="auth-error hidden">Senha incorreta. Tente novamente.</p>
       <button type="submit" class="auth-btn">Entrar →</button>
       <button type="button" id="lock-hint-btn" class="auth-link">Esqueci minha senha</button>
     </form>
     <form id="lock-recovery-form" autocomplete="off" class="hidden">
       <p class="auth-sub" style="margin:0 0 12px">Informe o e-mail cadastrado para redefinir sua senha.</p>
-      <input type="email" id="recovery-email" placeholder="E-mail cadastrado" required>
-      <input type="password" id="recovery-pass" placeholder="Nova senha" minlength="4" required>
-      <input type="password" id="recovery-pass2" placeholder="Confirmar nova senha" minlength="4" required>
+      <input type="email" id="recovery-email" placeholder="E-mail cadastrado" aria-label="E-mail cadastrado" required>
+      <input type="password" id="recovery-pass" placeholder="Nova senha" aria-label="Nova senha" minlength="4" required>
+      <input type="password" id="recovery-pass2" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" minlength="4" required>
       <p id="recovery-error" class="auth-error hidden"></p>
       <button type="submit" class="auth-btn">Redefinir senha →</button>
       <button type="button" id="recovery-back-btn" class="auth-link">Voltar para o login</button>
@@ -148,7 +148,7 @@
 
   <!-- Menu Iniciar -->
   <div id="start-menu" class="panel hidden">
-    <input type="text" id="start-search" placeholder="Pesquisar" autocomplete="off">
+    <input type="text" id="start-search" placeholder="Pesquisar" aria-label="Pesquisar aplicativos, arquivos e configurações" autocomplete="off">
     <div id="start-fixed-label" class="start-section-label">Fixados</div>
     <div id="start-pinned" class="start-grid"></div>
     <div id="start-results" class="start-results hidden"></div>
@@ -157,8 +157,8 @@
         <span class="avatar-sm" id="start-avatar"></span>
         <span id="start-username">Usuário</span>
       </button>
-      <button id="start-power" class="icon-btn" title="Energia">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <button id="start-power" class="icon-btn" title="Energia" aria-label="Energia">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <path d="M12 3v8"></path>
           <path d="M6.5 6.5a7 7 0 1 0 11 0"></path>
         </svg>
@@ -182,8 +182,8 @@
 
   <!-- Menu de volume -->
   <div id="volume-menu" class="panel small volume-panel hidden">
-    <button id="volume-mute-btn" class="icon-btn" title="Mudo"></button>
-    <input type="range" id="volume-slider" min="0" max="100" value="70">
+    <button id="volume-mute-btn" class="icon-btn" title="Mudo" aria-label="Ativar ou desativar o mudo"></button>
+    <input type="range" id="volume-slider" min="0" max="100" value="70" aria-label="Volume">
     <span id="volume-value">70</span>
   </div>
 
@@ -191,9 +191,9 @@
   <div id="calendar-flyout" class="panel calendar-flyout hidden">
     <div class="calendar-flyout-date" data-role="full-date"></div>
     <div class="calendar-header">
-      <button class="icon-btn" data-action="prev-month">‹</button>
+      <button class="icon-btn" data-action="prev-month" aria-label="Mês anterior">‹</button>
       <strong data-role="month-label"></strong>
-      <button class="icon-btn" data-action="next-month">›</button>
+      <button class="icon-btn" data-action="next-month" aria-label="Próximo mês">›</button>
     </div>
     <div class="calendar-grid calendar-weekdays" data-role="weekdays"></div>
     <div class="calendar-grid" data-role="days"></div>
@@ -201,7 +201,7 @@
   </div>
 
   <!-- Menu de contexto -->
-  <div id="context-menu" class="panel small hidden"></div>
+  <div id="context-menu" class="panel small hidden" role="menu"></div>
 
   <!-- Central de notificações -->
   <div id="notification-center" class="panel notification-center hidden">
@@ -217,11 +217,11 @@
 
   <!-- Barra de tarefas -->
   <div id="taskbar">
-    <button id="start-btn" class="taskbar-btn" title="Iniciar"><span class="win-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+    <button id="start-btn" class="taskbar-btn" title="Iniciar" aria-label="Menu Iniciar"><span class="win-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
     <div id="taskbar-apps" class="taskbar-running"></div>
     <div id="tray" class="tray">
-      <button id="tray-volume-btn" class="icon-btn" title="Volume">🔊</button>
-      <span id="tray-clock" class="tray-clock"></span>
+      <button id="tray-volume-btn" class="icon-btn" title="Volume" aria-label="Volume">🔊</button>
+      <button id="tray-clock" class="tray-clock" aria-label="Relógio e calendário"></button>
       <button id="tray-notif-btn" class="icon-btn" title="Notificações">🔔</button>
     </div>
   </div>

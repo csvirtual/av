@@ -85,11 +85,16 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     });
 
     const path = await fs.getPath(currentFolderId);
-    breadcrumb.innerHTML = path
-      .map((n, i) => `<span data-id="${n.id}">${n.name}</span>${i < path.length - 1 ? ' › ' : ''}`)
-      .join('');
-    breadcrumb.querySelectorAll('span').forEach((span) => {
+    breadcrumb.innerHTML = '';
+    // Via textContent: n.name pode conter um nome de arquivo/pasta escolhido
+    // pelo usuário, nunca deve ser interpretado como HTML.
+    path.forEach((n, i) => {
+      const span = document.createElement('span');
+      span.dataset.id = n.id;
+      span.textContent = n.name;
       span.addEventListener('click', () => navigate(span.dataset.id));
+      breadcrumb.appendChild(span);
+      if (i < path.length - 1) breadcrumb.appendChild(document.createTextNode(' › '));
     });
 
     let children;
@@ -170,12 +175,14 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     localMenuEl?.remove();
     const menu = document.createElement('div');
     menu.className = 'panel small';
+    menu.setAttribute('role', 'menu');
     menu.style.position = 'fixed';
     menu.style.left = `${x}px`;
     menu.style.top = `${y}px`;
     menu.style.zIndex = 9999;
     items.forEach((it) => {
       const btn = document.createElement('button');
+      btn.setAttribute('role', 'menuitem');
       btn.textContent = it.label;
       btn.addEventListener('click', () => { it.onClick(); menu.remove(); });
       menu.appendChild(btn);

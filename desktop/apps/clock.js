@@ -216,9 +216,9 @@ export function openClock(ctx) {
 
     content.innerHTML = `
       <div class="calendar-header">
-        <button class="icon-btn" data-action="prev-month">‹</button>
+        <button class="icon-btn" data-action="prev-month" aria-label="Mês anterior">‹</button>
         <strong>${MONTHS[viewMonth]} ${viewYear}</strong>
-        <button class="icon-btn" data-action="next-month">›</button>
+        <button class="icon-btn" data-action="next-month" aria-label="Próximo mês">›</button>
       </div>
       <div class="calendar-grid calendar-weekdays">
         ${WEEKDAYS.map((w) => `<div class="calendar-weekday">${w}</div>`).join('')}
