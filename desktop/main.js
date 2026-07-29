@@ -2,7 +2,7 @@ import { kv } from './core/state/kv-store.js';
 import { fs, ensureSeed } from './core/state/filesystem.js';
 import { hasPassword, setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
 import * as WM from './core/window-manager/window-manager.js';
-import { playStartupChime, playShutdownChime, playLockChime, volumeControl } from './core/services/sounds.js';
+import { playStartupChime, playShutdownChime, playLockChime, playNotifyChime, volumeControl } from './core/services/sounds.js';
 import * as motion from './core/motion/motion.js';
 import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js';
 import { openExplorer } from './apps/explorer.js';
@@ -74,6 +74,7 @@ const ctx = {
   getBootTime: () => bootTime,
   getAutoArrange,
   setAutoArrange,
+  notify: (n) => pushNotification(n),
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -193,7 +194,13 @@ $('#setup-form').addEventListener('submit', async (e) => {
   await setEmail(email);
   if (seed?.userFolderId) await fs.rename(seed.userFolderId, name);
   hide($('#setup-screen'));
-  enterDesktop();
+  await enterDesktop();
+  pushNotification({
+    appId: 'system',
+    icon: '🎉',
+    title: `Bem-vindo, ${name}!`,
+    body: 'Sua conta foi criada. Explore o menu Iniciar para conhecer os aplicativos.',
+  });
 });
 
 // ---------------- Lock screen ----------------
@@ -365,6 +372,48 @@ async function enterDesktop() {
   await renderDesktopIcons();
   renderStartMenu();
   renderTaskbarApps();
+  await updateNotifBadge();
+  checkSystemNotifications();
+}
+
+/** Avisos reais de sistema (nunca inventados): bateria fraca via Battery
+ * Status API e armazenamento quase cheio via Storage API, quando o
+ * navegador expõe esses dados. Cada aviso só repete depois de 30 minutos,
+ * pra não spammar a cada bloqueio/login dentro da mesma sessão. */
+async function checkSystemNotifications() {
+  if (navigator.getBattery) {
+    try {
+      const battery = await navigator.getBattery();
+      if (!battery.charging && battery.level <= 0.2) {
+        const lastShown = await kv.get('notif.batteryLowAt', 0);
+        if (Date.now() - lastShown > 30 * 60 * 1000) {
+          await kv.set('notif.batteryLowAt', Date.now());
+          pushNotification({
+            appId: 'system',
+            icon: '🔋',
+            title: 'Bateria fraca',
+            body: `${Math.round(battery.level * 100)}% restante. Considere conectar o carregador.`,
+          });
+        }
+      }
+    } catch {}
+  }
+  const estimate = (await navigator.storage?.estimate?.()) || null;
+  if (estimate?.quota) {
+    const ratio = estimate.usage / estimate.quota;
+    if (ratio > 0.9) {
+      const lastShown = await kv.get('notif.storageFullAt', 0);
+      if (Date.now() - lastShown > 30 * 60 * 1000) {
+        await kv.set('notif.storageFullAt', Date.now());
+        pushNotification({
+          appId: 'system',
+          icon: '💾',
+          title: 'Armazenamento quase cheio',
+          body: `${Math.round(ratio * 100)}% do espaço disponível neste navegador já foi usado.`,
+        });
+      }
+    }
+  }
 }
 
 function fixedIcons() {
@@ -552,6 +601,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hidePanel($('#volume-menu'));
   if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
   if (!e.target.closest('#ease-of-access-menu') && !e.target.closest('#ease-of-access-btn')) hidePanel($('#ease-of-access-menu'));
+  if (!e.target.closest('#notification-center') && !e.target.closest('#tray-notif-btn')) hidePanel($('#notification-center'));
 });
 
 // ---------------- Taskbar / Start menu ----------------
@@ -586,15 +636,144 @@ $('#start-btn').addEventListener('click', (e) => {
   e.stopPropagation();
   hidePanel($('#power-menu'));
   const menu = $('#start-menu');
-  if (menu.classList.contains('hidden')) showPanel(menu);
-  else hidePanel(menu);
+  if (menu.classList.contains('hidden')) {
+    showPanel(menu);
+  } else {
+    hidePanel(menu);
+    return;
+  }
+  // Toda vez que o menu Iniciar abre, a pesquisa começa limpa — como no
+  // Windows, nunca reabre já filtrado de uma busca anterior.
+  $('#start-search').value = '';
+  showPinnedApps();
 });
 
-$('#start-search').addEventListener('input', (e) => {
-  const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('.start-app').forEach((btn) => {
-    btn.style.display = btn.textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+// ---------------- Pesquisa global (menu Iniciar) ----------------
+// Índice estático das telas de Configurações, para a busca também
+// encontrar preferências (não só apps/arquivos), com atalho direto pra aba.
+const SETTINGS_SEARCH_INDEX = [
+  { label: 'Papel de parede', tab: 'personalization' },
+  { label: 'Tema claro e escuro', tab: 'personalization' },
+  { label: 'Cor de destaque', tab: 'personalization' },
+  { label: 'Escala do texto', tab: 'personalization' },
+  { label: 'Hora e idioma', tab: 'time' },
+  { label: 'Formato de hora', tab: 'time' },
+  { label: 'Acessibilidade', tab: 'accessibility' },
+  { label: 'Alto contraste', tab: 'accessibility' },
+  { label: 'Reduzir animações', tab: 'accessibility' },
+  { label: 'Contas', tab: 'account' },
+  { label: 'Alterar senha', tab: 'account' },
+  { label: 'E-mail de recuperação', tab: 'account' },
+  { label: 'Foto de perfil', tab: 'account' },
+  { label: 'Privacidade', tab: 'privacy' },
+  { label: 'Notificações', tab: 'system' },
+  { label: 'Armazenamento', tab: 'system' },
+  { label: 'Bateria', tab: 'system' },
+  { label: 'Sobre este sistema', tab: 'about' },
+];
+
+function showPinnedApps() {
+  $('#start-fixed-label').classList.remove('hidden');
+  $('#start-pinned').classList.remove('hidden');
+  const results = $('#start-results');
+  results.classList.add('hidden');
+  results.innerHTML = '';
+}
+
+/** Busca arquivos/pastas pelo nome, recursivamente, pulando a Lixeira —
+ * assim como a pesquisa do Windows não traz itens já excluídos. */
+async function searchFiles(query, limit = 8) {
+  const results = [];
+  async function walk(nodeId) {
+    if (results.length >= limit) return;
+    const children = await fs.getChildren(nodeId);
+    for (const child of children) {
+      if (results.length >= limit) return;
+      if (child.id === seed.trashId) continue;
+      if (child.name.toLowerCase().includes(query)) results.push(child);
+      if (child.type === 'folder') await walk(child.id);
+    }
+  }
+  await walk(seed.rootId);
+  return results;
+}
+
+function searchResultRow(glyph, title, subtitle, onClick) {
+  const btn = document.createElement('button');
+  btn.className = 'search-result-row';
+  btn.innerHTML = `<span class="glyph">${glyph}</span>`;
+  const text = document.createElement('span');
+  text.className = 'search-result-text';
+  const strong = document.createElement('strong');
+  strong.textContent = title;
+  text.appendChild(strong);
+  if (subtitle) {
+    const small = document.createElement('small');
+    small.textContent = subtitle;
+    text.appendChild(small);
+  }
+  btn.appendChild(text);
+  btn.addEventListener('click', () => {
+    hidePanel($('#start-menu'));
+    onClick();
   });
+  return btn;
+}
+
+function renderSearchResults({ appMatches, settingMatches, fileMatches }, query) {
+  const container = $('#start-results');
+  container.innerHTML = '';
+
+  function addSection(title, items, buildRow) {
+    if (!items.length) return;
+    const label = document.createElement('div');
+    label.className = 'start-section-label';
+    label.textContent = title;
+    container.appendChild(label);
+    items.forEach((item) => container.appendChild(buildRow(item)));
+  }
+
+  addSection('Aplicativos', appMatches, (app) => searchResultRow(app.glyph, app.label, 'Aplicativo', () => app.onOpen()));
+  addSection('Configurações', settingMatches, (s) => searchResultRow('⚙️', s.label, 'Configuração', () => openSettings(ctx, { tab: s.tab })));
+  addSection('Arquivos e pastas', fileMatches, (node) =>
+    searchResultRow(node.type === 'folder' ? '📁' : '📄', node.name, 'Arquivo/pasta', () => openFile(node))
+  );
+
+  if (!appMatches.length && !settingMatches.length && !fileMatches.length) {
+    const empty = document.createElement('div');
+    empty.className = 'start-search-empty';
+    empty.textContent = `Nenhum resultado para "${query}"`;
+    container.appendChild(empty);
+  }
+}
+
+let searchToken = 0;
+async function runGlobalSearch(rawQuery) {
+  const myToken = ++searchToken;
+  const q = rawQuery.trim().toLowerCase();
+  const appMatches = PINNED_APPS.filter((a) => a.label.toLowerCase().includes(q));
+  const settingMatches = SETTINGS_SEARCH_INDEX.filter((s) => s.label.toLowerCase().includes(q));
+  const fileMatches = await searchFiles(q);
+  if (myToken !== searchToken) return; // busca mais recente já chegou primeiro
+  renderSearchResults({ appMatches, settingMatches, fileMatches }, rawQuery.trim());
+}
+
+let searchDebounceTimer = null;
+$('#start-search').addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  clearTimeout(searchDebounceTimer);
+  if (!q) {
+    showPinnedApps();
+    return;
+  }
+  $('#start-fixed-label').classList.add('hidden');
+  $('#start-pinned').classList.add('hidden');
+  $('#start-results').classList.remove('hidden');
+  searchDebounceTimer = setTimeout(() => runGlobalSearch(q), 120);
+});
+$('#start-search').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  $('#start-results').querySelector('.search-result-row')?.click();
 });
 
 $('#start-user-btn').addEventListener('click', (e) => {
@@ -728,6 +907,152 @@ $('#calendar-flyout [data-action="open-clock"]').addEventListener('click', () =>
   hidePanel($('#calendar-flyout'));
   openClock(ctx);
 });
+
+// ---------------- Central de notificações ----------------
+async function getNotifications() {
+  return kv.get('notifications.list', []);
+}
+
+/** Registra uma notificação real (nunca decorativa): dispara um toast,
+ * soma no histórico da Central de Notificações e toca o som configurado —
+ * respeitando o interruptor de Configurações > Sistema. Usado tanto por
+ * eventos internos (bateria, armazenamento) quanto por outros apps via
+ * ctx.notify(). */
+async function pushNotification({ appId = 'system', icon = '🔔', title, body = '' }) {
+  const enabled = await kv.get('settings.notificationsEnabled', true);
+  if (!enabled || !title) return;
+  const list = await getNotifications();
+  const item = {
+    id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    appId, icon, title, body,
+    time: Date.now(),
+  };
+  list.unshift(item);
+  if (list.length > 50) list.length = 50;
+  await kv.set('notifications.list', list);
+  showToast(item);
+  playNotifyChime();
+  await updateNotifBadge();
+  if (!$('#notification-center').classList.contains('hidden')) renderNotificationCenter();
+}
+
+async function dismissNotification(id) {
+  const list = (await getNotifications()).filter((n) => n.id !== id);
+  await kv.set('notifications.list', list);
+  renderNotificationCenter();
+  await updateNotifBadge();
+}
+
+async function clearAllNotifications() {
+  await kv.set('notifications.list', []);
+  renderNotificationCenter();
+  await updateNotifBadge();
+}
+
+async function updateNotifBadge() {
+  const list = await getNotifications();
+  $('#tray-notif-btn').classList.toggle('has-unread', list.length > 0);
+}
+
+function formatNotifTime(ts) {
+  const diffMin = Math.round((Date.now() - ts) / 60000);
+  if (diffMin < 1) return 'agora';
+  if (diffMin < 60) return `há ${diffMin} min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `há ${diffH} h`;
+  return new Date(ts).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+}
+
+async function renderNotificationCenter() {
+  const list = await getNotifications();
+  const holder = $('#notification-center [data-role="notif-list"]');
+  holder.innerHTML = '';
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'notification-empty';
+    empty.textContent = 'Sem novidades no momento.';
+    holder.appendChild(empty);
+    return;
+  }
+  list.forEach((n) => {
+    const item = document.createElement('div');
+    item.className = 'notification-item';
+    item.innerHTML = `<span class="glyph">${n.icon}</span>`;
+    const text = document.createElement('div');
+    text.className = 'notification-item-text';
+    const strong = document.createElement('strong');
+    strong.textContent = n.title;
+    text.appendChild(strong);
+    if (n.body) {
+      const p = document.createElement('p');
+      p.textContent = n.body;
+      text.appendChild(p);
+    }
+    const time = document.createElement('time');
+    time.textContent = formatNotifTime(n.time);
+    text.appendChild(time);
+    item.appendChild(text);
+    const dismiss = document.createElement('button');
+    dismiss.className = 'notification-dismiss';
+    dismiss.textContent = '✕';
+    dismiss.title = 'Dispensar';
+    dismiss.addEventListener('click', () => dismissNotification(n.id));
+    item.appendChild(dismiss);
+    holder.appendChild(item);
+  });
+}
+
+function showToast(item) {
+  const stack = $('#toast-stack');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<span class="toast-icon">${item.icon}</span>`;
+  const text = document.createElement('div');
+  text.className = 'toast-text';
+  const strong = document.createElement('strong');
+  strong.textContent = item.title;
+  text.appendChild(strong);
+  if (item.body) {
+    const span = document.createElement('span');
+    span.textContent = item.body;
+    text.appendChild(span);
+  }
+  el.appendChild(text);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'toast-close';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Fechar';
+  el.appendChild(closeBtn);
+  stack.appendChild(el);
+  motion.panelOpen(el);
+  let dismissed = false;
+  const remove = () => {
+    if (dismissed) return;
+    dismissed = true;
+    motion.panelClose(el).then(() => el.remove());
+  };
+  closeBtn.addEventListener('click', remove);
+  setTimeout(remove, 6000);
+}
+
+$('#tray-notif-btn').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  hidePanel($('#account-menu'));
+  hidePanel($('#power-menu'));
+  hidePanel($('#volume-menu'));
+  hidePanel($('#calendar-flyout'));
+  const panel = $('#notification-center');
+  if (panel.classList.contains('hidden')) {
+    await renderNotificationCenter();
+    positionPanelNearButton(panel, $('#tray-notif-btn'));
+    // Ao abrir a Central, as notificações são consideradas vistas — o
+    // indicador some, como no Windows.
+    $('#tray-notif-btn').classList.remove('has-unread');
+  } else {
+    hidePanel(panel);
+  }
+});
+$('#notification-center [data-action="clear-all"]').addEventListener('click', () => clearAllNotifications());
 
 // Traz para frente (ou minimiza, se já estiver em foco) a janela mais
 // recente de um app — usado tanto pelos ícones fixos da barra de tarefas

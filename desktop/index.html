@@ -109,8 +109,9 @@
   <!-- Menu Iniciar -->
   <div id="start-menu" class="panel hidden">
     <input type="text" id="start-search" placeholder="Pesquisar" autocomplete="off">
-    <div class="start-section-label">Fixados</div>
+    <div id="start-fixed-label" class="start-section-label">Fixados</div>
     <div id="start-pinned" class="start-grid"></div>
+    <div id="start-results" class="start-results hidden"></div>
     <div class="start-footer">
       <button class="start-user" id="start-user-btn">
         <span class="avatar-sm" id="start-avatar"></span>
@@ -161,6 +162,18 @@
   <!-- Menu de contexto -->
   <div id="context-menu" class="panel small hidden"></div>
 
+  <!-- Central de notificações -->
+  <div id="notification-center" class="panel notification-center hidden">
+    <div class="notification-center-header">
+      <strong>Notificações</strong>
+      <button class="btn" data-action="clear-all" style="background:var(--hover);color:var(--text)">Limpar tudo</button>
+    </div>
+    <div data-role="notif-list" class="notification-list"></div>
+  </div>
+
+  <!-- Pilha de notificações (toasts) -->
+  <div id="toast-stack" aria-live="polite"></div>
+
   <!-- Barra de tarefas -->
   <div id="taskbar">
     <button id="start-btn" class="taskbar-btn" title="Iniciar"><span class="win-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
@@ -168,6 +181,7 @@
     <div id="tray" class="tray">
       <button id="tray-volume-btn" class="icon-btn" title="Volume">🔊</button>
       <span id="tray-clock" class="tray-clock"></span>
+      <button id="tray-notif-btn" class="icon-btn" title="Notificações">🔔</button>
     </div>
   </div>
 </div>
