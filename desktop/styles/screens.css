@@ -23,6 +23,7 @@
   border-radius: var(--radius-xl);
   padding: var(--space-8) 36px;
   width: 300px;
+  max-width: calc(100vw - 24px);
   text-align: center;
   box-shadow: var(--elevation-3);
 }
@@ -58,7 +59,7 @@
 .auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
 
 /* ---------- OOBE (assistente de configuração em várias etapas) ---------- */
-.oobe-card { width: 340px; }
+.oobe-card { width: 340px; max-width: calc(100vw - 24px); }
 .oobe-progress { display: flex; justify-content: center; gap: 6px; margin-bottom: var(--space-4); }
 .oobe-progress span {
   width: 6px; height: 6px; border-radius: 50%;
@@ -77,7 +78,7 @@
 .oobe-theme-btn span { font-size: 12px; }
 .oobe-theme-btn:hover { background: rgba(255, 255, 255, 0.16); }
 .oobe-theme-btn.selected { border-color: #fff; background: rgba(255, 255, 255, 0.2); }
-.oobe-wallpaper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: var(--space-2); }
+.oobe-wallpaper-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: var(--space-2); }
 .oobe-wallpaper-swatch { height: 56px; border-radius: var(--radius-sm); cursor: pointer; border: 2px solid transparent; }
 .oobe-wallpaper-swatch.selected { border-color: #fff; }
 .oobe-nav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-4); }
@@ -116,7 +117,7 @@
   z-index: 30;
 }
 .ease-of-access-btn:hover { background: rgba(255, 255, 255, 0.26); }
-#ease-of-access-menu { z-index: 31; width: 220px; }
+#ease-of-access-menu { z-index: 31; width: 220px; max-width: calc(100vw - 16px); }
 .eoa-scale-btn.active { background: var(--accent-2); color: #fff; }
 
 body:has(#setup-screen:not(.hidden)) .ease-of-access-btn,
