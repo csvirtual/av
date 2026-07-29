@@ -28,21 +28,61 @@
   <div class="boot-spinner"></div>
 </div>
 
-<!-- Tela de configuração inicial de senha -->
+<!-- Configuração inicial (OOBE): assistente em várias etapas, usado tanto
+     na primeira conta quanto ao adicionar uma nova conta local depois. -->
 <div id="setup-screen" class="screen hidden">
-  <div class="auth-card">
-    <div class="auth-avatar" id="setup-avatar"></div>
-    <h1>Bem-vindo</h1>
-    <p class="auth-sub">Crie uma senha para proteger sua área de trabalho.</p>
-    <form id="setup-form" autocomplete="off">
-      <input type="text" id="setup-name" placeholder="Seu nome" maxlength="40" required>
-      <input type="email" id="setup-email" placeholder="E-mail (para recuperar sua senha)" required>
-      <input type="password" id="setup-pass" placeholder="Nova senha" minlength="4" required>
-      <input type="password" id="setup-pass2" placeholder="Confirmar senha" minlength="4" required>
+  <div class="auth-card oobe-card">
+    <div class="oobe-progress" data-role="oobe-progress"></div>
+
+    <div class="oobe-step" data-step="theme">
+      <h1>Bem-vindo</h1>
+      <p class="auth-sub">Vamos preparar tudo antes de começar. Escolha a aparência do sistema.</p>
+      <div class="oobe-theme-options" data-role="oobe-theme-options">
+        <button type="button" class="oobe-theme-btn" data-oobe-theme="light">☀️<span>Claro</span></button>
+        <button type="button" class="oobe-theme-btn" data-oobe-theme="dark">🌙<span>Escuro</span></button>
+      </div>
+    </div>
+
+    <div class="oobe-step hidden" data-step="wallpaper">
+      <h1>Papel de parede</h1>
+      <p class="auth-sub">Escolha um plano de fundo para a área de trabalho.</p>
+      <div class="oobe-wallpaper-grid" data-role="oobe-wallpapers"></div>
+    </div>
+
+    <div class="oobe-step hidden" data-step="account">
+      <div class="auth-avatar" id="setup-avatar"></div>
+      <h1>Sua conta</h1>
+      <p class="auth-sub">Como podemos te chamar?</p>
+      <input type="text" id="setup-name" placeholder="Seu nome" maxlength="40">
+      <input type="file" id="setup-photo" accept="image/*" class="hidden">
+      <button type="button" class="btn" id="setup-photo-btn" style="background:rgba(255,255,255,0.12);color:#fff;margin-top:8px">Escolher foto</button>
+    </div>
+
+    <div class="oobe-step hidden" data-step="security">
+      <h1>Proteja sua conta</h1>
+      <p class="auth-sub">Crie uma senha e informe um e-mail para recuperação.</p>
+      <input type="email" id="setup-email" placeholder="E-mail (para recuperar sua senha)">
+      <input type="password" id="setup-pass" placeholder="Nova senha" minlength="4">
+      <input type="password" id="setup-pass2" placeholder="Confirmar senha" minlength="4">
       <p id="setup-error" class="auth-error hidden"></p>
-      <button type="submit" class="auth-btn">Criar senha →</button>
-    </form>
+    </div>
+
+    <div class="oobe-step hidden" data-step="done">
+      <h1>Tudo pronto!</h1>
+      <p class="auth-sub" data-role="oobe-summary"></p>
+    </div>
+
+    <div class="oobe-nav">
+      <button type="button" class="auth-link" data-action="oobe-back">← Voltar</button>
+      <button type="button" class="auth-btn" data-action="oobe-next">Avançar →</button>
+    </div>
   </div>
+</div>
+
+<!-- Seleção de conta (quando há mais de uma conta local neste dispositivo) -->
+<div id="account-picker-screen" class="screen hidden">
+  <h1 style="margin-bottom:28px">Quem vai usar o computador?</h1>
+  <div class="account-picker-grid" data-role="account-picker-grid"></div>
 </div>
 
 <!-- Tela de bloqueio / login -->
@@ -129,6 +169,7 @@
   <!-- Menu da conta (bloquear / sair) -->
   <div id="account-menu" class="panel small hidden">
     <button data-action="lock">🔒 Bloquear</button>
+    <button data-action="switch-user">👥 Trocar de usuário</button>
     <button data-action="signout">🚪 Sair</button>
   </div>
 

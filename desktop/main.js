@@ -1,13 +1,17 @@
-import { kv } from './core/state/kv-store.js';
+import { kv, setActiveAccount, getActiveAccount, hasLegacyAccountData, migrateLegacyDataToAccount } from './core/state/kv-store.js';
 import { fs, ensureSeed } from './core/state/filesystem.js';
-import { hasPassword, setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
+import { setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
+import {
+  listAccounts, addAccountRecord, updateAccountRecord, removeAccountRecord,
+  setLastActiveAccountId, newAccountId,
+} from './core/services/accounts.js';
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, playNotifyChime, volumeControl } from './core/services/sounds.js';
 import * as motion from './core/motion/motion.js';
 import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js';
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
-import { openSettings } from './apps/settings.js';
+import { openSettings, WALLPAPERS } from './apps/settings.js';
 import { openBrowser } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
@@ -53,6 +57,7 @@ const ctx = {
   setAvatar: async (dataUrl) => {
     await kv.set('user.avatar', dataUrl);
     await refreshAvatars();
+    await updateAccountRecord(getActiveAccount(), { avatar: dataUrl });
   },
   getAccentColor,
   setAccentColor,
@@ -75,6 +80,15 @@ const ctx = {
   getAutoArrange,
   setAutoArrange,
   notify: (n) => pushNotification(n),
+  getActiveAccountId: () => getActiveAccount(),
+  listAccounts,
+  addAccount: () => {
+    WM.closeAllWindows();
+    hide($('#desktop'));
+    startOobe();
+  },
+  switchToAccount: (id) => switchToSpecificAccount(id),
+  removeAccount: (id) => removeAccountFlow(id),
 };
 
 function avatarHTML(name, avatarDataUrl) {
@@ -147,7 +161,12 @@ async function setTimeFormat(value) {
 }
 
 // ---------------- Boot sequence ----------------
-async function boot() {
+/** Aplica tudo que é específico da conta (tema, papel de parede, escala,
+ * movimento reduzido, formato de hora) e semeia o sistema de arquivos DELA
+ * — chamado sempre que uma conta passa a ser a ativa (login único
+ * automático, escolha na tela de contas, ou troca de usuário). */
+async function loadAccountEnvironment(accountId) {
+  setActiveAccount(accountId);
   seed = await ensureSeed();
   const theme = await getTheme();
   document.documentElement.setAttribute('data-theme', theme);
@@ -156,51 +175,273 @@ async function boot() {
   document.documentElement.style.zoom = await getScale();
   motion.setReducedMotionOverride(await getReduceMotion());
   timeFormat = await kv.get('settings.timeFormat', '24h');
+}
 
+/** Instalações de antes do suporte a múltiplas contas tinham tudo salvo em
+ * chaves soltas (uma conta implícita única). Migra essa conta para o novo
+ * formato — sem perder senha, arquivos ou configurações — e a registra na
+ * lista de contas, para que o usuário existente não veja nada diferente. */
+async function tryMigrateLegacyAccount() {
+  if (!(await hasLegacyAccountData())) return null;
+  const id = newAccountId();
+  await migrateLegacyDataToAccount(id);
+  setActiveAccount(id);
+  const name = await kv.get('user.name', 'Usuário');
+  const avatar = await kv.get('user.avatar', null);
+  await addAccountRecord({ id, name, avatar });
+  await setLastActiveAccountId(id);
+  return id;
+}
+
+async function boot() {
   setTimeout(async () => {
     hide($('#boot-screen'));
     playStartupChime();
-    if (await hasPassword()) {
-      $('#lock-username').textContent = await kv.get('user.name', 'Usuário');
-      await refreshAvatars();
-      show($('#lock-screen'));
-      $('#lock-pass').focus();
-    } else {
-      $('#setup-avatar').innerHTML = avatarHTML('', null);
-      show($('#setup-screen'));
+    let accounts = await listAccounts();
+    if (!accounts.length) {
+      if (await tryMigrateLegacyAccount()) {
+        accounts = await listAccounts();
+      } else {
+        // Nenhuma conta local ainda: primeira execução, mostra o assistente
+        // de configuração inicial (OOBE).
+        startOobe();
+        return;
+      }
     }
+    if (accounts.length === 1) {
+      // Único usuário do dispositivo: pula a tela de escolha e vai direto
+      // para o login dele, como faz o Windows.
+      await loadAccountEnvironment(accounts[0].id);
+      await showLockScreenFor(accounts[0]);
+      return;
+    }
+    renderAccountPicker(accounts);
+    show($('#account-picker-screen'));
   }, 900);
 }
 
-// ---------------- Setup ----------------
-$('#setup-name').addEventListener('input', (e) => {
-  $('#setup-avatar').innerHTML = avatarHTML(e.target.value, null);
-});
+async function showLockScreenFor(account) {
+  $('#lock-username').textContent = await kv.get('user.name', account?.name || 'Usuário');
+  await refreshAvatars();
+  show($('#lock-screen'));
+  $('#lock-pass').focus();
+}
 
-$('#setup-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = $('#setup-name').value.trim() || 'Usuário';
-  const email = $('#setup-email').value.trim();
-  const pass = $('#setup-pass').value;
-  const pass2 = $('#setup-pass2').value;
-  const err = $('#setup-error');
-  if (pass !== pass2) {
-    err.textContent = 'As senhas não coincidem.';
-    show(err);
+async function selectAccount(accountId) {
+  await loadAccountEnvironment(accountId);
+  hide($('#account-picker-screen'));
+  await showLockScreenFor({ name: await kv.get('user.name', 'Usuário') });
+}
+
+async function switchToSpecificAccount(id) {
+  WM.closeAllWindows();
+  hide($('#desktop'));
+  playLockChime();
+  await selectAccount(id);
+}
+
+async function removeAccountFlow(id) {
+  const accounts = await listAccounts();
+  const account = accounts.find((a) => a.id === id);
+  if (!account) return false;
+  if (!confirm(`Remover a conta "${account.name}" e todos os seus arquivos permanentemente? Isso não pode ser desfeito.`)) return false;
+  const rootId = await kv.getFor(id, 'rootId');
+  if (rootId) await fs.deleteNodePermanently(rootId);
+  await kv.removeAllFor(id);
+  await removeAccountRecord(id);
+  return true;
+}
+
+function accountAvatarTileHTML(account) {
+  if (account.avatar) return `<img src="${account.avatar}" alt="">`;
+  const initial = (account.name || '?').trim().charAt(0).toUpperCase() || '?';
+  return initial;
+}
+
+function renderAccountPicker(accounts) {
+  const grid = $('[data-role="account-picker-grid"]');
+  grid.innerHTML = '';
+  accounts.forEach((account) => {
+    const tile = document.createElement('button');
+    tile.className = 'account-tile';
+    tile.innerHTML = `<span class="avatar-lg-tile">${accountAvatarTileHTML(account)}</span>`;
+    const label = document.createElement('span');
+    label.textContent = account.name;
+    tile.appendChild(label);
+    tile.addEventListener('click', () => selectAccount(account.id));
+    grid.appendChild(tile);
+  });
+  const addTile = document.createElement('button');
+  addTile.className = 'account-tile add-account';
+  addTile.innerHTML = '<span>+</span>';
+  const addLabel = document.createElement('span');
+  addLabel.textContent = 'Adicionar conta';
+  addTile.appendChild(addLabel);
+  addTile.addEventListener('click', () => {
+    hide($('#account-picker-screen'));
+    startOobe();
+  });
+  grid.appendChild(addTile);
+}
+
+async function switchUser() {
+  WM.closeAllWindows();
+  hide($('#desktop'));
+  playLockChime();
+  const accounts = await listAccounts();
+  renderAccountPicker(accounts);
+  show($('#account-picker-screen'));
+}
+
+// ---------------- OOBE (configuração inicial em várias etapas) ----------------
+const OOBE_STEPS = ['theme', 'wallpaper', 'account', 'security', 'done'];
+let oobeAccountId = null;
+let oobeStepIndex = 0;
+let oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
+
+function renderOobeWallpaperOptions() {
+  const grid = $('[data-role="oobe-wallpapers"]');
+  grid.innerHTML = '';
+  WALLPAPERS.forEach((wp) => {
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'oobe-wallpaper-swatch' + (wp.value === oobeChoices.wallpaper ? ' selected' : '');
+    swatch.style.background = wp.value;
+    swatch.title = wp.id;
+    swatch.addEventListener('click', async () => {
+      grid.querySelectorAll('.oobe-wallpaper-swatch').forEach((s) => s.classList.remove('selected'));
+      swatch.classList.add('selected');
+      oobeChoices.wallpaper = wp.value;
+      await setWallpaper(wp.value);
+    });
+    grid.appendChild(swatch);
+  });
+}
+
+function startOobe() {
+  oobeAccountId = newAccountId();
+  setActiveAccount(oobeAccountId);
+  oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
+  $('#setup-name').value = '';
+  $('#setup-email').value = '';
+  $('#setup-pass').value = '';
+  $('#setup-pass2').value = '';
+  hide($('#setup-error'));
+  $('#setup-avatar').innerHTML = avatarHTML('', null);
+  document.querySelectorAll('.oobe-theme-btn').forEach((b) => b.classList.toggle('selected', b.dataset.oobeTheme === oobeChoices.theme));
+  renderOobeWallpaperOptions();
+  showOobeStep(0);
+  show($('#setup-screen'));
+}
+
+function renderOobeProgress() {
+  $('[data-role="oobe-progress"]').innerHTML = OOBE_STEPS
+    .map((_, i) => `<span class="${i === oobeStepIndex ? 'active' : ''}"></span>`)
+    .join('');
+}
+
+function showOobeStep(index) {
+  oobeStepIndex = index;
+  document.querySelectorAll('.oobe-step').forEach((el) => {
+    el.classList.toggle('hidden', el.dataset.step !== OOBE_STEPS[index]);
+  });
+  renderOobeProgress();
+  $('[data-action="oobe-back"]').classList.toggle('hidden', index === 0);
+  const nextBtn = $('[data-action="oobe-next"]');
+  if (OOBE_STEPS[index] === 'done') {
+    nextBtn.textContent = 'Ir para a área de trabalho →';
+    $('[data-role="oobe-summary"]').textContent = `Tudo certo, ${oobeChoices.name || 'Usuário'}! Sua conta está pronta.`;
+  } else {
+    nextBtn.textContent = 'Avançar →';
+  }
+}
+
+async function finalizeOobeAccount({ email, pass }) {
+  await setPassword(pass);
+  await kv.set('user.name', oobeChoices.name);
+  await setEmail(email);
+  await setTheme(oobeChoices.theme);
+  await setWallpaper(oobeChoices.wallpaper);
+  if (oobeChoices.avatar) await kv.set('user.avatar', oobeChoices.avatar);
+  seed = await ensureSeed();
+  if (seed?.userFolderId) await fs.rename(seed.userFolderId, oobeChoices.name);
+  await addAccountRecord({ id: oobeAccountId, name: oobeChoices.name, avatar: oobeChoices.avatar });
+  await setLastActiveAccountId(oobeAccountId);
+}
+
+async function handleOobeNext() {
+  const step = OOBE_STEPS[oobeStepIndex];
+  if (step === 'account') {
+    oobeChoices.name = $('#setup-name').value.trim() || 'Usuário';
+  } else if (step === 'security') {
+    const email = $('#setup-email').value.trim();
+    const pass = $('#setup-pass').value;
+    const pass2 = $('#setup-pass2').value;
+    const err = $('#setup-error');
+    if (!email) {
+      err.textContent = 'Informe um e-mail para recuperação de senha.';
+      show(err);
+      return;
+    }
+    if (pass.length < 4) {
+      err.textContent = 'A senha deve ter ao menos 4 caracteres.';
+      show(err);
+      return;
+    }
+    if (pass !== pass2) {
+      err.textContent = 'As senhas não coincidem.';
+      show(err);
+      return;
+    }
+    hide(err);
+    await finalizeOobeAccount({ email, pass });
+  } else if (step === 'done') {
+    hide($('#setup-screen'));
+    await enterDesktop();
+    pushNotification({
+      appId: 'system',
+      icon: '🎉',
+      title: `Bem-vindo, ${oobeChoices.name}!`,
+      body: 'Sua conta foi criada. Explore o menu Iniciar para conhecer os aplicativos.',
+    });
     return;
   }
-  await setPassword(pass);
-  await kv.set('user.name', name);
-  await setEmail(email);
-  if (seed?.userFolderId) await fs.rename(seed.userFolderId, name);
-  hide($('#setup-screen'));
-  await enterDesktop();
-  pushNotification({
-    appId: 'system',
-    icon: '🎉',
-    title: `Bem-vindo, ${name}!`,
-    body: 'Sua conta foi criada. Explore o menu Iniciar para conhecer os aplicativos.',
+  if (oobeStepIndex < OOBE_STEPS.length - 1) showOobeStep(oobeStepIndex + 1);
+}
+
+function handleOobeBack() {
+  if (oobeStepIndex > 0) showOobeStep(oobeStepIndex - 1);
+}
+
+$('[data-action="oobe-next"]').addEventListener('click', () => handleOobeNext());
+$('[data-action="oobe-back"]').addEventListener('click', () => handleOobeBack());
+$('#setup-screen').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+    e.preventDefault();
+    handleOobeNext();
+  }
+});
+document.querySelectorAll('.oobe-theme-btn').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.oobe-theme-btn').forEach((b) => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    oobeChoices.theme = btn.dataset.oobeTheme;
+    await setTheme(oobeChoices.theme);
   });
+});
+$('#setup-name').addEventListener('input', (e) => {
+  $('#setup-avatar').innerHTML = avatarHTML(e.target.value, oobeChoices.avatar);
+});
+$('#setup-photo-btn').addEventListener('click', () => $('#setup-photo').click());
+$('#setup-photo').addEventListener('change', () => {
+  const file = $('#setup-photo').files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    oobeChoices.avatar = reader.result;
+    $('#setup-avatar').innerHTML = avatarHTML($('#setup-name').value, oobeChoices.avatar);
+  };
+  reader.readAsDataURL(file);
 });
 
 // ---------------- Lock screen ----------------
@@ -213,6 +454,7 @@ $('#lock-form').addEventListener('submit', async (e) => {
     hide($('#lock-screen'));
     $('#lock-pass').value = '';
     hide(err);
+    await setLastActiveAccountId(getActiveAccount());
     enterDesktop();
   } else {
     show(err);
@@ -788,6 +1030,7 @@ $('#account-menu').addEventListener('click', (e) => {
   if (!action) return;
   hidePanel($('#start-menu'));
   if (action === 'lock' || action === 'signout') lockNow();
+  if (action === 'switch-user') switchUser();
 });
 
 $('#start-power').addEventListener('click', (e) => {
