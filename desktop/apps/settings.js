@@ -14,7 +14,7 @@ function avatarPreviewHTML(name, avatarDataUrl) {
   return `<div class="avatar-initial">${initial}</div>`;
 }
 
-const WALLPAPERS = [
+export const WALLPAPERS = [
   { id: 'win11-blue', value: 'linear-gradient(135deg, #0f3057 0%, #1a5088 45%, #2c7fb8 100%)' },
   { id: 'sunset', value: 'linear-gradient(135deg, #ff8a65 0%, #ff5e62 50%, #8e2de2 100%)' },
   { id: 'forest', value: 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)' },
@@ -311,7 +311,12 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <input type="password" placeholder="Confirmar nova senha" data-role="new-pass2">
       <button class="btn" data-action="change-pass">Alterar senha</button>
       <p class="settings-msg" data-role="pass-msg"></p>
+
+      <h2 style="margin-top:20px">Outras contas neste dispositivo</h2>
+      <div data-role="other-accounts"></div>
+      <button class="btn" data-action="add-account" style="background:var(--hover);color:var(--text);margin-top:8px">+ Adicionar conta</button>
     `;
+    await renderOtherAccounts();
     content.querySelector('[data-action="save-email"]').addEventListener('click', async () => {
       const value = content.querySelector('[data-role="recovery-email"]').value.trim();
       const msg = content.querySelector('[data-role="email-msg"]');
@@ -364,6 +369,48 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       await ctx.setAvatar(null);
       preview.innerHTML = avatarPreviewHTML(name, null);
     });
+
+    async function renderOtherAccounts() {
+      const holder = content.querySelector('[data-role="other-accounts"]');
+      if (!holder) return;
+      const accounts = await ctx.listAccounts();
+      const activeId = ctx.getActiveAccountId();
+      const others = accounts.filter((a) => a.id !== activeId);
+      holder.innerHTML = '';
+      if (!others.length) {
+        const p = document.createElement('p');
+        p.style.cssText = 'font-size:13px;color:var(--text-dim)';
+        p.textContent = 'Nenhuma outra conta.';
+        holder.appendChild(p);
+        return;
+      }
+      others.forEach((acc) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0';
+        row.innerHTML = `
+          <span class="avatar-sm">${avatarPreviewHTML(acc.name, acc.avatar)}</span>
+          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}</span>
+        `;
+        const switchBtn = document.createElement('button');
+        switchBtn.className = 'btn';
+        switchBtn.style.cssText = 'background:var(--hover);color:var(--text)';
+        switchBtn.textContent = 'Trocar para';
+        switchBtn.addEventListener('click', () => ctx.switchToAccount(acc.id));
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn';
+        removeBtn.style.cssText = 'background:#e81123';
+        removeBtn.textContent = 'Remover';
+        removeBtn.addEventListener('click', async () => {
+          const removed = await ctx.removeAccount(acc.id);
+          if (removed) renderOtherAccounts();
+        });
+        row.appendChild(switchBtn);
+        row.appendChild(removeBtn);
+        holder.appendChild(row);
+      });
+    }
+
+    content.querySelector('[data-action="add-account"]').addEventListener('click', () => ctx.addAccount());
   }
 
   // ---------------- Privacidade ----------------

@@ -57,6 +57,50 @@
 }
 .auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
 
+/* ---------- OOBE (assistente de configuração em várias etapas) ---------- */
+.oobe-card { width: 340px; }
+.oobe-progress { display: flex; justify-content: center; gap: 6px; margin-bottom: var(--space-4); }
+.oobe-progress span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: width var(--duration-fast) var(--ease-standard);
+}
+.oobe-progress span.active { background: #fff; width: 18px; border-radius: 3px; }
+.oobe-step { display: flex; flex-direction: column; gap: var(--space-2); }
+.oobe-theme-options { display: flex; gap: var(--space-3); justify-content: center; margin-top: var(--space-2); }
+.oobe-theme-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: var(--space-4); border-radius: var(--radius-md);
+  border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 28px; cursor: pointer;
+}
+.oobe-theme-btn span { font-size: 12px; }
+.oobe-theme-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.oobe-theme-btn.selected { border-color: #fff; background: rgba(255, 255, 255, 0.2); }
+.oobe-wallpaper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: var(--space-2); }
+.oobe-wallpaper-swatch { height: 56px; border-radius: var(--radius-sm); cursor: pointer; border: 2px solid transparent; }
+.oobe-wallpaper-swatch.selected { border-color: #fff; }
+.oobe-nav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-4); }
+.oobe-nav .auth-link { margin-top: 0; }
+.oobe-nav .auth-btn { margin-top: 0; padding: 8px 16px; }
+
+/* ---------- Seleção de conta ---------- */
+.account-picker-grid { display: flex; gap: var(--space-5); flex-wrap: wrap; justify-content: center; max-width: 640px; }
+.account-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: var(--space-4); border-radius: var(--radius-lg); cursor: pointer;
+  border: none; background: rgba(255, 255, 255, 0.06); color: #fff; width: 140px;
+}
+.account-tile:hover { background: rgba(255, 255, 255, 0.14); }
+.account-tile .avatar-lg-tile {
+  width: 72px; height: 72px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.15); font-size: 28px;
+}
+.account-tile .avatar-lg-tile img { width: 100%; height: 100%; object-fit: cover; }
+.account-tile span { font-size: 13px; }
+.account-tile.add-account { border: 2px dashed rgba(255, 255, 255, 0.3); background: none; font-size: 28px; }
+
 /* ---------- Facilidade de Acesso (configuração inicial / bloqueio) ---------- */
 .ease-of-access-btn {
   display: none;
@@ -76,7 +120,8 @@
 .eoa-scale-btn.active { background: var(--accent-2); color: #fff; }
 
 body:has(#setup-screen:not(.hidden)) .ease-of-access-btn,
-body:has(#lock-screen:not(.hidden)) .ease-of-access-btn {
+body:has(#lock-screen:not(.hidden)) .ease-of-access-btn,
+body:has(#account-picker-screen:not(.hidden)) .ease-of-access-btn {
   display: flex;
 }
 
