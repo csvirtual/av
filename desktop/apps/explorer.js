@@ -224,13 +224,23 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   });
   root.querySelector('[data-action="upload"]').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
+    const imported = [];
     for (const file of fileInput.files) {
       const text = await file.text().catch(() => '');
       await fs.createNode({ parentId: currentFolderId, name: file.name, type: 'file', content: text, mimeType: file.type || 'text/plain' });
+      imported.push(file.name);
     }
     fileInput.value = '';
     render();
     ctx.refreshDesktop();
+    if (imported.length) {
+      ctx.notify?.({
+        appId: 'explorer',
+        icon: '📁',
+        title: imported.length > 1 ? `${imported.length} arquivos importados` : 'Arquivo importado',
+        body: imported.length > 1 ? imported.join(', ') : imported[0],
+      });
+    }
   });
   root.querySelector('[data-action="rename"]').addEventListener('click', async () => {
     if (!selectedId) return;
@@ -252,6 +262,14 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     const items = await fs.getChildren(seed.trashId);
     for (const item of items) await fs.deleteNodePermanently(item.id);
     render();
+    if (items.length) {
+      ctx.notify?.({
+        appId: 'explorer',
+        icon: '🗑️',
+        title: 'Lixeira esvaziada',
+        body: `${items.length} ${items.length > 1 ? 'itens excluídos' : 'item excluído'} permanentemente.`,
+      });
+    }
   });
 
   grid.addEventListener('click', () => {

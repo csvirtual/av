@@ -78,7 +78,10 @@ export function openTaskManager(ctx) {
         </span>
         <button class="btn" style="background:#e81123" data-id="${p.id}">Encerrar tarefa</button>
       `;
-      row.querySelector('button').addEventListener('click', () => windows.closeWindow(p.id));
+      row.querySelector('button').addEventListener('click', () => {
+        windows.closeWindow(p.id);
+        ctx.notify?.({ appId: 'taskmanager', icon: '📊', title: 'Tarefa encerrada', body: `"${p.title}" foi fechado pelo Gerenciador de Tarefas.` });
+      });
       list.appendChild(row);
     });
   }

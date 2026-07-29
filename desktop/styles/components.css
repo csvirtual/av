@@ -164,6 +164,22 @@ body.sleeping #desktop { filter: brightness(0); }
 }
 .start-app:hover { background: var(--hover); }
 .start-app .glyph { font-size: 22px; }
+
+/* ---------- Pesquisa global (menu Iniciar) ---------- */
+.start-results { max-height: 320px; overflow-y: auto; margin-bottom: var(--space-3); }
+.search-result-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-2) var(--space-2);
+  border: none; border-radius: var(--radius-md); background: none; cursor: pointer;
+  color: var(--text); text-align: left;
+}
+.search-result-row:hover { background: var(--hover); }
+.search-result-row .glyph { font-size: 20px; flex-shrink: 0; }
+.search-result-text { display: flex; flex-direction: column; overflow: hidden; }
+.search-result-text strong { font-size: 13px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-result-text small { font-size: 11px; color: var(--text-dim); }
+.start-search-empty { font-size: 13px; color: var(--text-dim); padding: var(--space-4) var(--space-2); text-align: center; }
+
 .start-footer {
   display: flex; align-items: center; justify-content: space-between;
   border-top: 1px solid var(--border); padding-top: var(--space-3); margin-top: var(--space-2);
@@ -177,8 +193,14 @@ body.sleeping #desktop { filter: brightness(0); }
 .icon-btn {
   border: none; background: none; font-size: 16px; cursor: pointer;
   color: var(--text); width: 32px; height: 32px; border-radius: var(--radius-sm);
+  position: relative;
 }
 .icon-btn:hover { background: var(--hover); }
+.icon-btn.has-unread::after {
+  content: ''; position: absolute; top: 6px; right: 6px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent-2); border: 1.5px solid var(--taskbar-bg);
+}
 
 .panel.small { padding: var(--space-2); min-width: 180px; }
 .panel.small button {
@@ -204,6 +226,54 @@ body.sleeping #desktop { filter: brightness(0); }
   color: var(--text); cursor: pointer; font-size: 13px;
 }
 .calendar-flyout-open:hover { background: var(--border); }
+
+/* ---------- Central de notificações ---------- */
+.notification-center { width: 320px; max-height: 70vh; display: flex; flex-direction: column; padding: var(--space-3); }
+.notification-center-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--space-2) var(--space-2) var(--space-3);
+}
+.notification-center-header strong { font-size: 14px; }
+.notification-list { overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); }
+.notification-empty { font-size: 13px; color: var(--text-dim); text-align: center; padding: var(--space-8) var(--space-3); }
+.notification-item {
+  display: flex; gap: var(--space-3); align-items: flex-start;
+  padding: var(--space-3); border-radius: var(--radius-md); background: var(--hover);
+  position: relative;
+}
+.notification-item .glyph { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.notification-item-text { flex: 1; min-width: 0; }
+.notification-item-text strong { font-size: 13px; display: block; }
+.notification-item-text p { font-size: 12px; color: var(--text-dim); margin: 2px 0 0; line-height: 1.4; }
+.notification-item-text time { font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px; }
+.notification-dismiss {
+  border: none; background: none; color: var(--text-dim); cursor: pointer;
+  font-size: 13px; padding: 2px 6px; border-radius: var(--radius-sm); flex-shrink: 0;
+}
+.notification-dismiss:hover { background: var(--border); color: var(--text); }
+
+/* ---------- Toasts (pilha de notificações) ---------- */
+#toast-stack {
+  position: fixed; right: var(--space-4); bottom: calc(var(--taskbar-height) + var(--space-3));
+  z-index: 40; display: flex; flex-direction: column-reverse; gap: var(--space-2);
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  width: 300px; display: flex; gap: var(--space-3); align-items: flex-start;
+  padding: var(--space-3); border-radius: var(--radius-lg);
+  background: var(--panel-bg); backdrop-filter: var(--blur-thick);
+  border: 1px solid var(--border); box-shadow: var(--elevation-3); color: var(--text);
+}
+.toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.toast-text { flex: 1; min-width: 0; }
+.toast-text strong { font-size: 13px; display: block; }
+.toast-text span { font-size: 12px; color: var(--text-dim); line-height: 1.4; display: block; margin-top: 2px; }
+.toast-close {
+  border: none; background: none; color: var(--text-dim); cursor: pointer;
+  font-size: 13px; padding: 2px 6px; border-radius: var(--radius-sm); flex-shrink: 0;
+}
+.toast-close:hover { background: var(--hover); color: var(--text); }
 
 /* ---------- Context menu ---------- */
 #context-menu { min-width: 200px; }
