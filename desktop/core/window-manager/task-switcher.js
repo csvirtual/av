@@ -22,15 +22,23 @@ function getOverlay() {
 
 function render() {
   const el = getOverlay();
-  el.innerHTML = candidates
-    .map(
-      (w, i) => `
-      <div class="task-switcher-item${i === selectedIndex ? ' selected' : ''}" data-index="${i}">
-        <div class="task-switcher-icon">${w.icon}</div>
-        <div class="task-switcher-title">${w.title}</div>
-      </div>`
-    )
-    .join('');
+  el.innerHTML = '';
+  // Via textContent: w.title pode conter um nome de arquivo/pasta escolhido
+  // pelo usuário, nunca deve ser interpretado como HTML.
+  candidates.forEach((w, i) => {
+    const item = document.createElement('div');
+    item.className = 'task-switcher-item' + (i === selectedIndex ? ' selected' : '');
+    item.dataset.index = i;
+    const icon = document.createElement('div');
+    icon.className = 'task-switcher-icon';
+    icon.textContent = w.icon;
+    const title = document.createElement('div');
+    title.className = 'task-switcher-title';
+    title.textContent = w.title;
+    item.appendChild(icon);
+    item.appendChild(title);
+    el.appendChild(item);
+  });
 }
 
 function open() {

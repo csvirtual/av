@@ -92,6 +92,7 @@ export async function closeWindow(id) {
   openWindows.delete(id);
   notify();
   win.onClose?.();
+  win.cleanupDrag?.();
   await windowClose(win.el);
   win.el.remove();
 }
@@ -144,7 +145,16 @@ function showSnapAssist(zone, excludeId) {
   candidates.forEach((w) => {
     const btn = document.createElement('button');
     btn.className = 'snap-assist-item';
-    btn.innerHTML = `<span class="snap-assist-icon">${w.icon}</span><span class="snap-assist-title">${w.title}</span>`;
+    // Via textContent: w.title pode conter um nome de arquivo/pasta
+    // escolhido pelo usuário.
+    const iconEl = document.createElement('span');
+    iconEl.className = 'snap-assist-icon';
+    iconEl.textContent = w.icon;
+    const titleEl = document.createElement('span');
+    titleEl.className = 'snap-assist-title';
+    titleEl.textContent = w.title;
+    btn.appendChild(iconEl);
+    btn.appendChild(titleEl);
     btn.addEventListener('click', () => {
       applySnap(w.id, zone);
       hideSnapAssist();
@@ -223,17 +233,23 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
 
   el.innerHTML = `
     <div class="win-titlebar" data-role="titlebar">
-      <span class="win-icon">${icon}</span>
-      <span class="win-title">${title}</span>
+      <span class="win-icon"></span>
+      <span class="win-title"></span>
       <div class="win-controls">
-        <button class="win-btn" data-action="min" title="Minimizar">&#x2013;</button>
-        <button class="win-btn" data-action="max" title="Maximizar">&#x2610;</button>
-        <button class="win-btn win-close" data-action="close" title="Fechar">&#x2715;</button>
+        <button class="win-btn" data-action="min" title="Minimizar" aria-label="Minimizar">&#x2013;</button>
+        <button class="win-btn" data-action="max" title="Maximizar" aria-label="Maximizar">&#x2610;</button>
+        <button class="win-btn win-close" data-action="close" title="Fechar" aria-label="Fechar">&#x2715;</button>
       </div>
     </div>
     <div class="win-body"></div>
     <div class="win-resize" data-role="resize"></div>
   `;
+
+  // Via textContent, nunca innerHTML: título e ícone podem vir de nomes de
+  // arquivo/pasta escolhidos pelo usuário, e não devem ser interpretados
+  // como HTML.
+  el.querySelector('.win-icon').textContent = icon;
+  el.querySelector('.win-title').textContent = title;
 
   const body = el.querySelector('.win-body');
   body.appendChild(content);
@@ -274,7 +290,11 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
     focusWindow(id);
   });
 
-  window.addEventListener('pointermove', (e) => {
+  // Nomeadas (não inline) para poderem ser removidas em closeWindow() —
+  // sem isso, cada janela aberta deixava um par de listeners permanentes em
+  // `window`, nunca liberados, mesmo depois de fechada (vazamento de
+  // memória: iam se acumulando a cada janela aberta/fechada na sessão).
+  function onWindowPointerMove(e) {
     if (dragging && el.classList.contains('maximized')) {
       // Só restaura a janela maximizada quando o arrasto realmente começa —
       // um clique duplo não deve disparar isso (senão cancela o toggle).
@@ -309,15 +329,21 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
       el.style.height = `${Math.min(maxH, Math.max(200, resizeStartH + (e.clientY - resizeStartY)))}px`;
       win.snapped = null;
     }
-  });
-  window.addEventListener('pointerup', () => {
+  }
+  function onWindowPointerUp() {
     if (dragging && activeZone) applySnap(id, activeZone);
     hideSnapPreview();
     activeZone = null;
     dragging = false;
     resizing = false;
     el.classList.remove('dragging');
-  });
+  }
+  window.addEventListener('pointermove', onWindowPointerMove);
+  window.addEventListener('pointerup', onWindowPointerUp);
+  win.cleanupDrag = () => {
+    window.removeEventListener('pointermove', onWindowPointerMove);
+    window.removeEventListener('pointerup', onWindowPointerUp);
+  };
 
   el.querySelector('[data-action="min"]').addEventListener('click', () => toggleMinimize(id));
   el.querySelector('[data-action="max"]').addEventListener('click', () => toggleMaximize(win));

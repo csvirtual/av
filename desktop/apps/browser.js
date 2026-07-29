@@ -35,15 +35,15 @@ export function openBrowser(ctx, { url } = {}) {
   root.innerHTML = `
     <div class="browser-tabbar" data-role="tabbar"></div>
     <div class="browser-toolbar">
-      <button data-action="back" title="Voltar">←</button>
-      <button data-action="forward" title="Avançar">→</button>
-      <button data-action="reload" title="Recarregar">↻</button>
-      <button data-action="star" title="Adicionar aos favoritos">☆</button>
-      <input type="text" class="browser-address" data-role="address" placeholder="Pesquisar ou digitar um endereço da Web">
+      <button data-action="back" title="Voltar" aria-label="Voltar">←</button>
+      <button data-action="forward" title="Avançar" aria-label="Avançar">→</button>
+      <button data-action="reload" title="Recarregar" aria-label="Recarregar">↻</button>
+      <button data-action="star" title="Adicionar aos favoritos" aria-label="Adicionar aos favoritos">☆</button>
+      <input type="text" class="browser-address" data-role="address" placeholder="Pesquisar ou digitar um endereço da Web" aria-label="Endereço da web">
       <button data-action="go" title="Ir">Ir</button>
-      <button data-action="bookmarks" title="Favoritos">⭐</button>
-      <button data-action="history" title="Histórico">🕘</button>
-      <button data-action="newtab" title="Abrir numa aba de verdade">⤴</button>
+      <button data-action="bookmarks" title="Favoritos" aria-label="Favoritos">⭐</button>
+      <button data-action="history" title="Histórico" aria-label="Histórico">🕘</button>
+      <button data-action="newtab" title="Abrir numa aba de verdade" aria-label="Abrir numa aba de verdade">⤴</button>
     </div>
     <div class="browser-hint">Alguns sites bloqueiam ser exibidos dentro de outro app (proteção do próprio site) — use ⤴ pra abrir numa aba de verdade.</div>
     <div class="browser-pages" data-role="pages"></div>
@@ -90,7 +90,7 @@ export function openBrowser(ctx, { url } = {}) {
     tabs.forEach((tab) => {
       const btn = document.createElement('div');
       btn.className = 'browser-tab' + (tab.id === activeId ? ' active' : '');
-      btn.innerHTML = `<span class="browser-tab-title">${escapeHtml(tab.title || 'Nova guia')}</span><button class="browser-tab-close" data-id="${tab.id}">✕</button>`;
+      btn.innerHTML = `<span class="browser-tab-title">${escapeHtml(tab.title || 'Nova guia')}</span><button class="browser-tab-close" data-id="${tab.id}" aria-label="Fechar aba">✕</button>`;
       btn.addEventListener('click', (e) => {
         if (e.target.closest('.browser-tab-close')) return;
         switchTab(tab.id);
@@ -102,6 +102,7 @@ export function openBrowser(ctx, { url } = {}) {
     addBtn.className = 'browser-tab-add';
     addBtn.textContent = '+';
     addBtn.title = 'Nova guia';
+    addBtn.setAttribute('aria-label', 'Nova guia');
     addBtn.addEventListener('click', () => createTab(HOME_URL));
     tabbar.appendChild(addBtn);
   }

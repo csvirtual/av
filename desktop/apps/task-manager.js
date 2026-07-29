@@ -73,11 +73,14 @@ export function openTaskManager(ctx) {
       row.innerHTML = `
         <span class="taskmgr-icon">${p.icon}</span>
         <span class="taskmgr-info">
-          <span class="taskmgr-title">${p.title}</span>
+          <span class="taskmgr-title"></span>
           <span class="taskmgr-sub">${p.minimized ? 'Minimizado' : 'Em execução'} · aberto há ${formatUptime(Date.now() - p.openedAt)}</span>
         </span>
         <button class="btn" style="background:#e81123" data-id="${p.id}">Encerrar tarefa</button>
       `;
+      // Via textContent: p.title pode conter um nome de arquivo/pasta
+      // escolhido pelo usuário.
+      row.querySelector('.taskmgr-title').textContent = p.title;
       row.querySelector('button').addEventListener('click', () => {
         windows.closeWindow(p.id);
         ctx.notify?.({ appId: 'taskmanager', icon: '📊', title: 'Tarefa encerrada', body: `"${p.title}" foi fechado pelo Gerenciador de Tarefas.` });
