@@ -8,6 +8,14 @@ let zCounter = 10;
 const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped }
 const listeners = new Set();
 
+// Abaixo dessa largura não há espaço de sobra para o modelo de janelas
+// flutuantes/redimensionáveis do desktop — celulares e telas bem estreitas
+// passam a abrir tudo maximizado, como um app comum de tela cheia.
+const COMPACT_BREAKPOINT = 700;
+function isCompactViewport() {
+  return window.innerWidth < COMPACT_BREAKPOINT;
+}
+
 function notify() {
   const list = Array.from(openWindows.values()).map((w) => ({
     id: w.id,
@@ -184,8 +192,12 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   // a partir do centro, nunca acumulando numa única direção — só o
   // suficiente pra dar pra perceber que há mais de uma janela aberta.
   const availableHeight = window.innerHeight - taskbarHeight();
-  const baseX = Math.max(0, Math.round((window.innerWidth - width) / 2));
-  const baseY = Math.max(0, Math.round((availableHeight - height) / 2));
+  // Nunca abre maior que a área útil: numa tela pequena, uma janela pedida
+  // com 640x460 encolhe para caber, em vez de vazar para fora da tela.
+  const effWidth = Math.min(width, Math.max(280, window.innerWidth - 16));
+  const effHeight = Math.min(height, Math.max(180, availableHeight - 16));
+  const baseX = Math.max(0, Math.round((window.innerWidth - effWidth) / 2));
+  const baseY = Math.max(0, Math.round((availableHeight - effHeight) / 2));
   const existingPositions = Array.from(openWindows.values()).map((w) => ({
     left: parseFloat(w.el.style.left) || 0,
     top: parseFloat(w.el.style.top) || 0,
@@ -199,11 +211,15 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
     startY = baseY + step * 24;
   }
   Object.assign(el.style, {
-    width: `${width}px`,
-    height: `${height}px`,
+    width: `${effWidth}px`,
+    height: `${effHeight}px`,
     left: `${startX}px`,
     top: `${startY}px`,
   });
+  // Em telas estreitas (celular) não sobra espaço de verdade para o modelo
+  // de janelas flutuantes/redimensionáveis — abre direto maximizada, como
+  // qualquer app de tela cheia.
+  if (isCompactViewport()) el.classList.add('maximized');
 
   el.innerHTML = `
     <div class="win-titlebar" data-role="titlebar">
@@ -273,8 +289,12 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
       }
     }
     if (dragging && !el.classList.contains('maximized')) {
-      el.style.left = `${Math.max(0, e.clientX - offX)}px`;
-      el.style.top = `${Math.max(0, e.clientY - offY)}px`;
+      // Nunca deixa arrastar a ponto de a barra de título sumir da tela —
+      // sempre sobra pelo menos um pedaço para conseguir pegar de volta.
+      const maxLeft = window.innerWidth - 80;
+      const maxTop = window.innerHeight - taskbarHeight() - 36;
+      el.style.left = `${Math.min(maxLeft, Math.max(0, e.clientX - offX))}px`;
+      el.style.top = `${Math.min(maxTop, Math.max(0, e.clientY - offY))}px`;
       const zone = detectZone(e.clientX, e.clientY);
       if (zone !== activeZone) {
         activeZone = zone;
@@ -283,8 +303,10 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
       }
     }
     if (resizing) {
-      el.style.width = `${Math.max(320, resizeStartW + (e.clientX - resizeStartX))}px`;
-      el.style.height = `${Math.max(200, resizeStartH + (e.clientY - resizeStartY))}px`;
+      const maxW = window.innerWidth - el.offsetLeft;
+      const maxH = window.innerHeight - taskbarHeight() - el.offsetTop;
+      el.style.width = `${Math.min(maxW, Math.max(320, resizeStartW + (e.clientX - resizeStartX)))}px`;
+      el.style.height = `${Math.min(maxH, Math.max(200, resizeStartH + (e.clientY - resizeStartY)))}px`;
       win.snapped = null;
     }
   });
@@ -325,3 +347,25 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
 export function closeAllWindows() {
   Array.from(openWindows.keys()).forEach(closeWindow);
 }
+
+// Reencaixa as janelas abertas quando a viewport muda de tamanho (girar um
+// tablet/celular, redimensionar a janela do navegador) — sem isso, uma
+// janela aberta numa tela grande podia ficar parcialmente (ou totalmente)
+// fora da área visível depois que a tela encolhesse.
+window.addEventListener('resize', () => {
+  const availableHeight = window.innerHeight - taskbarHeight();
+  openWindows.forEach((win) => {
+    if (win.el.classList.contains('maximized')) return;
+    const maxW = Math.max(280, window.innerWidth - 16);
+    const maxH = Math.max(180, availableHeight - 16);
+    if (win.el.offsetWidth > maxW) win.el.style.width = `${maxW}px`;
+    if (win.el.offsetHeight > maxH) win.el.style.height = `${maxH}px`;
+    const maxLeft = Math.max(0, window.innerWidth - 80);
+    const maxTop = Math.max(0, availableHeight - 36);
+    if (win.el.offsetLeft > maxLeft) win.el.style.left = `${maxLeft}px`;
+    if (win.el.offsetTop > maxTop) win.el.style.top = `${maxTop}px`;
+  });
+  if (isCompactViewport()) {
+    openWindows.forEach((win) => win.el.classList.add('maximized'));
+  }
+});
