@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Copiloto de Vendas - C&S Virtual",
+  "version": "2.47.0",
+  "description": "Copiloto de vendas por WhatsApp com apoio de IA.",
+  "action": {
+    "default_title": "Abrir Copiloto de Vendas"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "unlimitedStorage", "clipboardRead"],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

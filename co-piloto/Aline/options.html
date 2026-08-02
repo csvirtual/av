@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configurações - C&S Assistência Virtual 💜</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* body{margin:0} já vem de styles.css — removido daqui pra não duplicar a mesma regra em dois lugares. */
+  .app{
+    display:grid;
+    grid-template-columns:280px 1fr 220px;
+    min-height:100vh;
+  }
+  @media (max-width:1150px){
+    .app{grid-template-columns:280px 1fr;}
+    .settings-col-right{display:none;}
+  }
+  @media (max-width:880px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{order:2; border-right:none; border-top:1px solid var(--line); position:static; height:auto; max-height:none; overflow-y:visible;}
+  }
+
+  /* Coluna direita inteira (3ª coluna do grid .app): nav "Nesta página" +
+     o aviso de proteção de dados logo abaixo, um único item de grid pra
+     não bagunçar as 3 colunas declaradas em .app (um 4º filho direto do
+     grid cairia numa linha nova, na coluna 1, não na 3ª). position:sticky
+     no CONTAINER (não em cada filho) de propósito: assim o menu e o aviso
+     andam grudados um no outro ao rolar, em vez de cada um calcular um
+     "top" próprio (o que quebraria toda vez que o menu ganhasse/perdesse
+     um link e mudasse de altura). */
+  .settings-col-right{
+    position:sticky; top:24px; align-self:start;
+    margin:36px 24px 36px 0;
+    display:flex; flex-direction:column; gap:16px;
+    max-height:calc(100vh - 48px); overflow-y:auto;
+  }
+
+  /* Navegação lateral direita — pula direto pra cada seção da página, com
+     destaque automático (.active, via IntersectionObserver em options.js)
+     de qual seção está visível no momento, sem precisar rolar até achar. */
+  .settings-nav{
+    display:flex; flex-direction:column; gap:2px;
+    padding:16px 12px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
+  }
+  .settings-nav-title{
+    font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 var(--gap-titulo-subtitulo) 10px;
+  }
+  .settings-nav-link{
+    display:flex; align-items:center; gap:9px;
+    padding:9px 10px; border-radius:var(--radius-sm);
+    font-size:12.5px; font-weight:600; color:var(--muted); text-decoration:none; line-height:1.3;
+    transition:background .15s ease, color .15s ease;
+  }
+  .settings-nav-link span{ font-size:14px; flex-shrink:0; }
+  .settings-nav-link:hover{ background:var(--paper); color:var(--ink); }
+  .settings-nav-link.active{ background:var(--purple-soft); color:var(--purple); font-weight:800; }
+
+  /* Mesmo cartão visual do "Nesta página" acima (fundo, borda, raio), só
+     que sem sticky próprio — quem gruda no scroll é o .settings-col-right
+     (container-pai dos dois), não cada filho individualmente. */
+  .settings-legal-note{
+    padding:14px 14px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
+    font-size:11.5px; color:var(--muted); line-height:1.55;
+  }
+
+  /* Sticky também na barra esquerda inteira (marca + voltar + aviso de
+     privacidade + rodapé) — mesmo motivo da coluna direita: o conteúdo de
+     .main é bem mais alto que a barra, então sem isso o botão "Voltar ao
+     Copiloto" e o aviso somem de vista assim que a página rola. Só faz
+     sentido com o grid de verdade (sidebar ao lado do conteúdo); no layout
+     empilhado de telas estreitas (media query abaixo) isso é desligado,
+     senão a barra ficaria "grudada" numa página de rolagem única, sem uma
+     coluna ao lado pra justificar. */
+  .sidebar{
+    position:sticky; top:0; align-self:start;
+    height:100vh; overflow-y:auto;
+    background:var(--teal-dark);
+    color:#EAF3F0;
+    padding:24px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .sidebar .brand{ color:#fff; font-size:20px; line-height:1.25; }
+  .sidebar .brand span{ color:#D9AEE8; }
+  .privacy-note{
+    font-size:12.5px; color:#C9E4DD; line-height:1.6; margin:0;
+    background:rgba(255,255,255,.06);
+    border:1px solid #1B5E54;
+    border-radius:10px;
+    padding:12px 13px;
+  }
+  .privacy-note b{ color:#fff; }
+  .back-btn{
+    background:#0D4A42; color:#EAF3F0; border:1px solid #1B5E54;
+    border-radius:var(--radius-md); padding:10px 14px; font-weight:700; font-size:13px;
+    cursor:pointer; text-align:left;
+  }
+  .back-btn:hover{ background:#123F38; }
+  .sidebar-foot{
+    margin-top:auto; font-size:11.5px; color:#7FA69C; line-height:1.5;
+    border-top:1px solid #1B5E54; padding-top:12px;
+  }
+
+  .main{ padding:36px 40px; max-width:800px; }
+  .topbar{ margin-bottom:22px; }
+  .topbar h1{ font-size:28px; margin:0 0 6px 0; }
+  .topbar .subtitle{ color:var(--muted); font-size:14px; }
+
+  /* Mais respiro entre o título de cada card e o conteúdo logo abaixo */
+  .main .card h2{
+    margin:0 0 24px 0;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--line);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-size:18px;
+    font-weight:700;
+  }
+
+  .routing-status{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:12px 14px; border-radius:12px; border:1px solid transparent;
+    margin-bottom:var(--gap-cabecalho-conteudo);
+  }
+  .routing-status-dot{
+    width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:3px;
+    transition:background-color .15s, box-shadow .15s;
+  }
+  .routing-status-title{ font-size:13px; font-weight:800; }
+  .routing-status-sub{ font-size:11.5px; color:var(--muted); margin-top:var(--gap-titulo-subtitulo); line-height:1.45; }
+  .routing-status.on{ background:#E9F7F1; border-color:#B9E4CE; }
+  .routing-status.on .routing-status-dot{ background:#1FA37A; box-shadow:0 0 0 3px rgba(31,163,122,.18); }
+  .routing-status.on .routing-status-title{ color:#0F5C3F; }
+  .routing-status.off{ background:#FCEEEC; border-color:#F3C6C0; }
+  .routing-status.off .routing-status-dot{ background:#D64545; box-shadow:0 0 0 3px rgba(214,69,69,.18); }
+  .routing-status.off .routing-status-title{ color:#9C2A2A; }
+
+  .price-group{
+    border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px 16px; margin-bottom:14px; background:var(--paper);
+  }
+  .price-group:last-of-type{ margin-bottom:20px; }
+  .price-group-head{
+    display:flex; align-items:center; gap:8px;
+    font-family:'Fraunces',serif; font-weight:600; font-size:14px; color:var(--ink);
+    text-transform:uppercase; letter-spacing:.02em;
+    margin-bottom:14px;
+  }
+  .price-group-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .price-group-dot.claude{ background:#C9862F; }
+  .price-group-dot.gemini{ background:#4285F4; }
+  /* Zera o espaçamento só dos campos DENTRO de uma grade (.grid2 já tem seu
+     próprio gap, então o margin-bottom do .field duplicaria o respiro) — os
+     campos empilhados sem grade (Chave de API + Modelo, logo abaixo) usam o
+     margin-bottom padrão do .field normalmente, senão ficam quase colados. */
+  .price-group .grid2 .field{ margin-bottom:0; }
+  .price-input-wrap{ position:relative; }
+  .price-input-wrap .prefix{
+    position:absolute; left:13px; top:50%; transform:translateY(-50%);
+    font-size:12.5px; color:var(--muted); font-weight:700; pointer-events:none;
+  }
+  .price-input-wrap input{ padding-left:42px; padding-right:70px; }
+  .price-input-wrap .suffix{
+    position:absolute; right:13px; top:50%; transform:translateY(-50%);
+    font-size:10.5px; color:var(--muted); pointer-events:none; letter-spacing:.01em;
+  }
+
+  .provider-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  @media (max-width:600px){ .provider-row{ grid-template-columns:1fr; } }
+  .provider-card{
+    border:2px solid var(--line); border-radius:12px; padding:16px; cursor:pointer; text-align:center;
+  }
+  .provider-card.selected{ border-color:var(--purple); background:var(--purple-soft); }
+  .provider-card b{ display:block; font-size:14.5px; margin-bottom:3px; }
+  .provider-card small{ color:var(--muted); font-size:10.5px; line-height:1.35; text-transform:uppercase; letter-spacing:.03em; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:600px){ .grid2{ grid-template-columns:1fr; } }
+
+  #claudeFields .hint:last-child,
+  #geminiFields .hint:last-child{ margin-bottom:16px; }
+  #saveKeysBtn{ margin-top:4px; }
+</style>
+</head>
+<body>
+
+<div class="avancado-lock-fullscreen" id="configLockScreen">
+  <div class="avancado-lock">
+    <div class="avancado-lock-icon">🔒</div>
+    <div class="avancado-lock-title">Área restrita</div>
+    <div class="avancado-lock-sub">Informe usuário e senha para acessar as configurações do Co-piloto.</div>
+    <input type="text" id="configUserInput" class="avancado-lock-input" placeholder="Usuário" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:10px;">
+    <div style="position:relative; width:100%; max-width:280px;">
+      <input type="password" id="configPasswordInput" class="avancado-lock-input" placeholder="Senha" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%; padding-right:40px;">
+      <button type="button" id="configTogglePassBtn" title="Mostrar/ocultar senha" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:15px; padding:4px;">👁</button>
+    </div>
+    <button class="btn purple avancado-lock-btn" id="configUnlockBtn">Entrar</button>
+    <div class="avancado-lock-error" id="configLockError" style="display:none;">Acesso negado. Você não tem permissão para acessar esta área.</div>
+    <div class="avancado-lock-legal">🔒 Dados de clientes protegidos por criptografia. Acesso ou uso indevido de informação de terceiros pode configurar violação da LGPD (Lei 13.709/2018).</div>
+  </div>
+</div>
+
+<div class="app" id="configApp" style="display:none;">
+
+  <div class="sidebar">
+    <div class="brand">C&amp;S<span> Assistência Virtual</span></div>
+    <button class="back-btn" id="backBtn">← Voltar ao Copiloto</button>
+    <p class="privacy-note">Essas informações ficam guardadas só no seu computador, no armazenamento local do Chrome. Não vão para nenhum servidor da <b>C&amp;S Virtual</b> — só para a IA escolhida, na hora de gerar cada resposta.</p>
+    <div class="sidebar-foot">
+      Nenhuma automação toca no WhatsApp Web. Tudo aqui é configuração local do seu copiloto.
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="admin-impersonando-faixa" id="adminImpersonandoFaixa">
+      <span>🛡️</span>
+      <span id="adminImpersonandoTexto"></span>
+      <button class="voltar-btn" id="adminImpersonandoVoltarBtn">Voltar ao meu perfil</button>
+    </div>
+    <div class="topbar">
+      <h1>Configurações</h1>
+      <div class="subtitle">Ajuste o provedor de IA e como o copiloto fala pelo seu negócio.</div>
+    </div>
+
+    <div class="card" id="cardMinhaConta">
+      <h2>🔒 Minha conta</h2>
+      <p class="hint" style="margin-top:-6px; margin-bottom:14px;">Perfil atual: <b id="minhaContaNome">—</b></p>
+
+      <div class="field">
+        <label for="minhaContaNomeInput">Nome</label>
+        <input type="text" id="minhaContaNomeInput" placeholder="Seu nome" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false">
+        <button class="btn secondary" id="minhaContaSalvarNomeBtn" style="margin-top:8px;">Salvar nome</button>
+        <p class="hint" id="minhaContaNomeMsg"></p>
+      </div>
+
+      <div class="field">
+        <label for="minhaContaSenhaAtual">Senha atual</label>
+        <input type="password" id="minhaContaSenhaAtual" placeholder="Sua senha atual" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field" id="minhaContaPinCampo" style="display:none;">
+        <label for="minhaContaPinInput">PIN alfanumérico</label>
+        <input type="text" id="minhaContaPinInput" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
+        <p class="hint">Gerado na última vez que sua senha foi criada ou trocada — sem ele, essa troca não é possível (só a recuperação com o usuário/senha geral do sistema).</p>
+      </div>
+      <div class="field">
+        <label for="minhaContaSenhaNova">Nova senha</label>
+        <input type="password" id="minhaContaSenhaNova" placeholder="Mínimo de 4 caracteres" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="minhaContaSenhaConfirmar">Confirmar nova senha</label>
+        <input type="password" id="minhaContaSenhaConfirmar" placeholder="Repita a nova senha" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <button class="btn purple" id="minhaContaSalvarBtn">Alterar senha</button>
+      <p class="hint" id="minhaContaMsg"></p>
+    </div>
+
+    <div class="card" id="cardProvedorIA">
+      <h2>🤖 Provedor de IA</h2>
+      <div class="provider-row">
+        <div class="provider-card" id="cardClaude">
+          <b>Claude (Anthropic)</b>
+          <small>Resposta mais refinada / pago por uso</small>
+        </div>
+        <div class="provider-card" id="cardGemini">
+          <b>Gemini (Google)</b>
+          <small>Camada gratuita generosa</small>
+        </div>
+      </div>
+
+      <div id="claudeFields" style="display:none;">
+        <div class="field">
+          <label>Chave de API da Anthropic</label>
+          <input type="password" id="claudeKey" placeholder="sk-ant-..." autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Modelo</label>
+          <select id="claudeModel">
+            <option value="claude-haiku-4-5-20251001" selected>Haiku 4.5 — modelo mais econômico, focado em seguir um roteiro já definido com rapidez</option>
+            <option value="claude-sonnet-5">Sonnet 5 — modelo equilibrado, focado em mais nuance quando a conversa fica complexa</option>
+            <option value="claude-opus-4-8">Opus 4.8 — modelo robusto, focado em raciocínio mais profundo (maior custo)</option>
+            <option value="claude-fable-5">Fable 5 — modelo mais avançado da Anthropic, focado em máxima qualidade (custo mais alto de todos)</option>
+          </select>
+          <div class="hint">A Anthropic ainda não oferece um apelido "sempre a versão mais nova" — por isso a lista é fixa; se ela lançar um modelo novo, adicione o nome exato aqui.</div>
+        </div>
+        <div class="hint">Pegue sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"><b>console.anthropic.com</b></a> → API Keys.</div>
+      </div>
+
+      <div id="geminiFields" style="display:none;">
+        <div class="hint" style="margin-bottom:14px;">
+          O Gemini tem nível gratuito — por isso ele usa <b>duas chaves</b>: a <b>Chave A (gratuita)</b>, usada na maior parte das mensagens, e a <b>Chave B (paga)</b>, usada só nas etapas do funil onde vale mais a pena caprichar. O modelo de cada chave é sempre o que você escolher abaixo — isso nunca muda sozinho. A Chave B é opcional — e as duas se cobrem: com as duas preenchidas, o copiloto alterna entre elas por etapa; se só uma estiver preenchida, ela assume todas as etapas sozinha, sempre com o modelo que você escolheu pra ela.
+        </div>
+
+        <div class="routing-status" id="geminiRoutingStatus">
+          <span class="routing-status-dot"></span>
+          <div>
+            <div class="routing-status-title" id="geminiRoutingStatusTitle">Roteamento inativo</div>
+            <div class="routing-status-sub" id="geminiRoutingStatusSub">Nenhuma chave configurada ainda.</div>
+          </div>
+        </div>
+
+        <div class="price-group">
+          <div class="price-group-head"><span class="price-group-dot gemini"></span>Chave A - Gratuita (Uso: Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido, Central de mensagens)</div>
+          <div class="field">
+            <label>Chave de API - (gratuita)</label>
+            <input type="password" id="geminiKeyBasico" placeholder="AIza..." autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Modelo — Chave A</label>
+            <select id="geminiModeloBasico">
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — modelo mais econômico, focado em tarefas simples e alto volume</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash — modelo equilibrado, focado em custo-benefício geral</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro — modelo robusto, focado em raciocínio mais complexo (maior custo)</option>
+              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite — geração mais nova, ainda no nível mais econômico</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — versão mais recente da linha mais barata</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash — modelo Flash mais atual, meio-termo entre custo e capacidade</option>
+              <option value="gemini-flash-lite-latest" selected>gemini-flash-lite-latest — sempre a versão mais nova e mais econômica (recomendado)</option>
+              <option value="gemini-flash-latest">gemini-flash-latest — sempre a versão mais nova de custo médio</option>
+              <option value="gemini-pro-latest">gemini-pro-latest — sempre a versão mais nova e mais robusta (maior custo)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="price-group">
+          <div class="price-group-head"><span class="price-group-dot gemini"></span>Chave B - Paga (Uso: Apresentação da solução, Condução ao valor, Objeção, Fechamento)</div>
+          <div class="field">
+            <label>Chave de API - (paga, opcional)</label>
+            <input type="password" id="geminiKeyAvancado" placeholder="Deixe em branco pra usar a Chave A também aqui" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Modelo — Chave B</label>
+            <select id="geminiModeloAvancado">
+              <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — modelo mais econômico, focado em tarefas simples e alto volume</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash — modelo equilibrado, focado em custo-benefício geral</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro — modelo robusto, focado em raciocínio mais complexo (maior custo)</option>
+              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite — geração mais nova, ainda no nível mais econômico</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — versão mais recente da linha mais barata</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash — modelo Flash mais atual, meio-termo entre custo e capacidade</option>
+              <option value="gemini-flash-lite-latest" selected>gemini-flash-lite-latest — sempre a versão mais nova e mais econômica (recomendado de fábrica)</option>
+              <option value="gemini-flash-latest">gemini-flash-latest — sempre a versão mais nova de custo médio</option>
+              <option value="gemini-pro-latest">gemini-pro-latest — sempre a versão mais nova e mais robusta (maior custo)</option>
+            </select>
+          </div>
+          <div class="hint">Por padrão, a Chave B também vem com o modelo mais econômico selecionado — o roteamento por estágio já concentra as etapas de maior risco nela, então o ganho de robustez fica por sua conta: troque pra um modelo mais robusto aqui só se quiser. Se as duas chaves estiverem preenchidas e a Chave A bater no limite de cota do dia, o copiloto cai sozinho pra Chave B nessa hora, só pra não travar o atendimento — sempre com o modelo que você escolheu pra ela. Se a Chave A ficar em branco, a Chave B assume sozinha todas as etapas, sempre com o modelo escolhido acima pra ela (sem trocar de modelo por etapa).</div>
+        </div>
+
+        <div class="hint">Pegue suas chaves em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"><b>aistudio.google.com/apikey</b></a> — pode usar a mesma conta pras duas, ou criar um projeto separado pra manter o uso da Chave B fora da cota gratuita da Chave A.</div>
+      </div>
+
+      <button class="btn purple" id="saveKeysBtn">Salvar chave e modelo</button>
+      <div class="disclaimer">
+        Sua chave fica só nesta máquina/perfil do Chrome. Se reinstalar a extensão ou trocar de computador, precisa configurar de novo.
+      </div>
+    </div>
+
+    <div class="card" id="cardCustoToken">
+      <h2>🏷️ Custo por token</h2>
+      <div class="hint" style="margin-bottom:18px;">
+        Usado só para estimar o gasto na tela "Uso de tokens na API" do painel. A Anthropic/Google podem mudar esse preço —
+        confira o valor atual em <a href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer"><b>claude.com/pricing</b></a> ou <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer"><b>ai.google.dev/pricing</b></a> e ajuste aqui se precisar.
+        Valores em <b>US$ por milhão de tokens</b>.
+      </div>
+
+      <div class="price-group">
+        <div class="price-group-head"><span class="price-group-dot claude"></span>Claude (Anthropic)</div>
+        <div class="grid2">
+          <div class="field">
+            <label>Preço de entrada (input)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoClaudeInput" placeholder="2.00">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Preço de saída (output)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoClaudeOutput" placeholder="10.00">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="price-group">
+        <div class="price-group-head"><span class="price-group-dot gemini"></span>Gemini (Google) — Chave A</div>
+        <div class="grid2">
+          <div class="field">
+            <label>Preço de entrada (input)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoGeminiInput" placeholder="0.25">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Preço de saída (output)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoGeminiOutput" placeholder="1.50">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="price-group">
+        <div class="price-group-head"><span class="price-group-dot gemini"></span>Gemini (Google) — Chave B</div>
+        <div class="grid2">
+          <div class="field">
+            <label>Preço de entrada (input)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoGeminiAvancadoInput" placeholder="0.25">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Preço de saída (output)</label>
+            <div class="price-input-wrap">
+              <span class="prefix">US$</span>
+              <input type="number" step="0.01" min="0" id="precoGeminiAvancadoOutput" placeholder="1.50">
+              <span class="suffix">/ 1M tok.</span>
+            </div>
+          </div>
+        </div>
+        <div class="hint">Se a Chave A e a Chave B usarem o mesmo modelo, o preço é o mesmo (é do modelo, não da chave) — editar um dos dois já atualiza o outro. Deixe em branco pra usar o preço de referência embutido no Co-piloto.</div>
+      </div>
+
+      <button class="btn purple" id="savePrecosBtn">Salvar preços</button>
+    </div>
+
+    <div class="card" id="cardContador">
+      <h2>🧮 Contador de respostas geradas</h2>
+      <div class="hint" style="margin-bottom:14px;">
+        É o contador "🧮 respostas geradas" que aparece perto do topo da tela principal (mês atual e total).
+        Zerar aqui não apaga nenhuma resposta nem histórico de lead — é só a contagem exibida na tela principal.
+        Esse contador é independente do uso de tokens/custo estimado, que fica em "Uso de tokens na API" (dentro do painel) e tem seu próprio botão de zerar.
+      </div>
+      <button class="btn danger" id="resetUsageStatsBtn">Zerar contador de respostas geradas</button>
+    </div>
+
+    <div class="card" id="cardFunil">
+      <h2>🗣️ Funil de vendas</h2>
+      <div class="hint" style="margin-bottom:16px;">Este texto guia a IA em TODA resposta gerada, não importa a etapa selecionada no lead — é a única fonte de comportamento da IA (tom, postura, o que dizer, o que nunca fazer).</div>
+
+      <div class="field" style="margin-bottom:20px;">
+        <label>Instruções gerais de como a IA deve se comportar</label>
+        <textarea id="funilInstrucoes" style="min-height:520px;" placeholder="Ex: Seja consultivo, nunca insistente. Nunca presuma emoção não sinalizada. Feche sempre com uma pergunta de próximo passo."></textarea>
+      </div>
+
+      <button class="btn purple" id="saveFunilBtn">Salvar funil</button>
+    </div>
+  </div>
+
+  <div class="settings-col-right">
+    <nav class="settings-nav" aria-label="Navegação das seções desta página">
+      <div class="settings-nav-title">Nesta página</div>
+      <a href="#cardMinhaConta" class="settings-nav-link" data-target="cardMinhaConta"><span>🔒</span>Minha conta</a>
+      <a href="#cardProvedorIA" class="settings-nav-link" data-target="cardProvedorIA"><span>🤖</span>Provedor de IA</a>
+      <a href="#cardCustoToken" class="settings-nav-link" data-target="cardCustoToken"><span>🏷️</span>Custo por token</a>
+      <a href="#cardContador" class="settings-nav-link" data-target="cardContador"><span>🧮</span>Respostas geradas</a>
+      <a href="#cardFunil" class="settings-nav-link" data-target="cardFunil"><span>🗣️</span>Funil de vendas</a>
+    </nav>
+    <div class="settings-legal-note">🔒 Dados de clientes protegidos por criptografia. Acesso ou uso indevido de informação de terceiros pode configurar violação da LGPD (Lei 13.709/2018).</div>
+  </div>
+</div>
+
+<div class="palavra-chave-overlay" id="palavraChaveOverlay">
+  <div class="palavra-chave-card">
+    <div class="palavra-chave-icone">🔑</div>
+    <h2 class="palavra-chave-titulo" id="palavraChaveTitulo">Guarde seu código</h2>
+    <p class="palavra-chave-sub" id="palavraChaveSub">Este código só aparece agora, uma única vez. Guarde em um local seguro.</p>
+    <div class="palavra-chave-codigo" id="palavraChaveCodigo">XXXX-XXXX-XXXX</div>
+    <button class="btn secondary" id="palavraChaveCopiarBtn" style="width:100%;">📋 Copiar</button>
+    <label class="palavra-chave-confirma">
+      <input type="checkbox" id="palavraChaveConfirmaCheckbox">
+      <span>Já guardei este código em um local seguro</span>
+    </label>
+    <button class="btn purple" id="palavraChaveFecharBtn" style="width:100%;" disabled>Continuar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="funil-padrao.js"></script>
+<script src="auth.js"></script>
+<script src="perfis.js"></script>
+<script src="options.js"></script>
+<script src="backtotop.js"></script>
+</body>
+</html>
