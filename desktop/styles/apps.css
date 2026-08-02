@@ -262,7 +262,6 @@
 .calc-op { background: var(--accent-2); color: #fff; }
 .calc-op:hover { filter: brightness(1.1); }
 .calc-eq { background: var(--accent-2); color: #fff; }
-.calc-zero { grid-column: span 2; }
 
 /* ---------- Relógio e Calendário ---------- */
 .clockapp { display: flex; flex-direction: column; height: 100%; }
@@ -326,8 +325,9 @@
   display: flex; flex-direction: column; height: 100%;
   background: #0c0c0c; color: #f2f2f2;
   font-family: 'Cascadia Code', Consolas, monospace; font-size: 13px;
+  overflow: hidden;
 }
-.terminal-output { flex: 1; overflow-y: auto; padding: var(--space-3); }
+.terminal-output { flex: 1; overflow-y: auto; overflow-x: hidden; padding: var(--space-3); }
 .terminal-line { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
 .terminal-line.err { color: #ff6b6b; }
 .terminal-line.echo { color: #9cdcfe; }
@@ -335,10 +335,14 @@
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3); border-top: 1px solid rgba(255,255,255,0.1);
   flex-shrink: 0;
+  min-width: 0;
 }
-.terminal-prompt { color: #4ec9b0; white-space: nowrap; }
+.terminal-prompt {
+  color: #4ec9b0; white-space: nowrap;
+  flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
 .terminal-input {
-  flex: 1; background: none; border: none; outline: none;
+  flex: 1; min-width: 0; background: none; border: none; outline: none;
   color: #f2f2f2; font-family: inherit; font-size: 13px;
 }
 

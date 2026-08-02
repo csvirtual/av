@@ -35,7 +35,7 @@ export function openCalculator(ctx) {
       <button data-digit="3">3</button>
       <button data-op="+" class="calc-op">+</button>
 
-      <button data-digit="0" class="calc-zero">0</button>
+      <button data-digit="0">0</button>
       <button data-action="decimal">,</button>
       <button data-action="backspace">⌫</button>
       <button data-action="equals" class="calc-eq">=</button>
