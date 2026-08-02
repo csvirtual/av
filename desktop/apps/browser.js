@@ -2,9 +2,12 @@
 // navegador de verdade. Limitação inerente à web: como é uma janela dentro
 // do próprio site, só consegue exibir páginas que permitem ser incorporadas
 // em outro site (a maioria dos grandes bloqueia isso por segurança, ex:
-// X-Frame-Options/CSP) — nesse caso, o botão ⤴ abre numa aba de verdade.
+// X-Frame-Options/CSP) — quando isso acontece (ou o site demora demais pra
+// responder), mostra um aviso real e o botão "Abrir em nova aba" de
+// verdade, em vez de deixar uma página em branco sem explicação.
 const HOME_URL = 'https://www.wikipedia.org';
 const MAX_HISTORY = 200;
+const LOAD_TIMEOUT_MS = 7000;
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,7 +18,11 @@ function normalizeUrl(input) {
   if (!v) return null;
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+([/:?#].*)?$/.test(v)) return `https://${v}`;
-  return `https://www.bing.com/search?q=${encodeURIComponent(v)}`;
+  // Mojeek é uma das poucas buscas grandes que não bloqueia ser exibida
+  // num iframe de outro site (Google/Bing/DuckDuckGo bloqueiam via
+  // X-Frame-Options) — assim uma pesquisa digitada tem chance real de
+  // funcionar aqui dentro, e não só quando se digita uma URL direta.
+  return `https://www.mojeek.com/search?q=${encodeURIComponent(v)}`;
 }
 
 function shortTitle(url) {
@@ -35,9 +42,9 @@ export function openBrowser(ctx, { url } = {}) {
   root.innerHTML = `
     <div class="browser-tabbar" data-role="tabbar"></div>
     <div class="browser-toolbar">
-      <button data-action="back" title="Voltar" aria-label="Voltar">←</button>
-      <button data-action="forward" title="Avançar" aria-label="Avançar">→</button>
-      <button data-action="reload" title="Recarregar" aria-label="Recarregar">↻</button>
+      <button data-action="back" title="Voltar (Alt+←)" aria-label="Voltar">←</button>
+      <button data-action="forward" title="Avançar (Alt+→)" aria-label="Avançar">→</button>
+      <button data-action="reload" title="Recarregar (F5)" aria-label="Recarregar">↻</button>
       <button data-action="star" title="Adicionar aos favoritos" aria-label="Adicionar aos favoritos">☆</button>
       <input type="text" class="browser-address" data-role="address" placeholder="Pesquisar ou digitar um endereço da Web" aria-label="Endereço da web">
       <button data-action="go" title="Ir">Ir</button>
@@ -45,8 +52,16 @@ export function openBrowser(ctx, { url } = {}) {
       <button data-action="history" title="Histórico" aria-label="Histórico">🕘</button>
       <button data-action="newtab" title="Abrir numa aba de verdade" aria-label="Abrir numa aba de verdade">⤴</button>
     </div>
-    <div class="browser-hint">Alguns sites bloqueiam ser exibidos dentro de outro app (proteção do próprio site) — use ⤴ pra abrir numa aba de verdade.</div>
-    <div class="browser-pages" data-role="pages"></div>
+    <div class="browser-pages" data-role="pages">
+      <div class="browser-status browser-status-loading hidden" data-role="loading">
+        <div class="browser-spinner"></div>
+        <span>Carregando…</span>
+      </div>
+      <div class="browser-status browser-status-blocked hidden" data-role="blocked">
+        <p>Este site não respondeu a tempo ou não permite ser exibido dentro de outro app (proteção do próprio site contra incorporação, ex: X-Frame-Options).</p>
+        <button data-action="open-real-tab" class="btn">⤴ Abrir em uma aba de verdade</button>
+      </div>
+    </div>
     <div class="browser-dropdown hidden" data-role="dropdown"></div>
   `;
 
@@ -63,7 +78,11 @@ export function openBrowser(ctx, { url } = {}) {
   const pages = root.querySelector('[data-role="pages"]');
   const address = root.querySelector('[data-role="address"]');
   const starBtn = root.querySelector('[data-action="star"]');
+  const backBtn = root.querySelector('[data-action="back"]');
+  const forwardBtn = root.querySelector('[data-action="forward"]');
   const dropdown = root.querySelector('[data-role="dropdown"]');
+  const loadingEl = root.querySelector('[data-role="loading"]');
+  const blockedEl = root.querySelector('[data-role="blocked"]');
 
   let tabs = [];
   let activeId = null;
@@ -101,7 +120,7 @@ export function openBrowser(ctx, { url } = {}) {
     const addBtn = document.createElement('button');
     addBtn.className = 'browser-tab-add';
     addBtn.textContent = '+';
-    addBtn.title = 'Nova guia';
+    addBtn.title = 'Nova guia (Ctrl+T)';
     addBtn.setAttribute('aria-label', 'Nova guia');
     addBtn.addEventListener('click', () => createTab(HOME_URL));
     tabbar.appendChild(addBtn);
@@ -114,13 +133,42 @@ export function openBrowser(ctx, { url } = {}) {
     starBtn.textContent = bookmarks.some((b) => b.url === tab.url) ? '★' : '☆';
   }
 
+  function refreshNavButtons() {
+    const tab = activeTab();
+    backBtn.disabled = !tab || tab.historyIndex <= 0;
+    forwardBtn.disabled = !tab || tab.historyIndex >= tab.history.length - 1;
+  }
+
+  // Mostra o estado (carregando/bloqueado/nenhum) só da aba ativa — cada aba
+  // tem seu próprio status, já que o usuário pode trocar de aba enquanto
+  // outra ainda está carregando.
+  function refreshStatusOverlay() {
+    const tab = activeTab();
+    loadingEl.classList.toggle('hidden', tab?.status !== 'loading');
+    blockedEl.classList.toggle('hidden', tab?.status !== 'blocked');
+  }
+
+  function setTabStatus(tab, status) {
+    tab.status = status;
+    if (tab.id === activeId) refreshStatusOverlay();
+  }
+
   function createTab(initialUrl) {
     const id = `tab-${++tabCounter}`;
     const iframe = document.createElement('iframe');
     iframe.className = 'browser-frame hidden';
     iframe.referrerPolicy = 'no-referrer';
     pages.appendChild(iframe);
-    const tab = { id, iframe, url: '', title: 'Nova guia', history: [], historyIndex: -1 };
+    const tab = { id, iframe, url: '', title: 'Nova guia', history: [], historyIndex: -1, status: null, loadTimer: null };
+    // O listener só é preso depois do appendChild, então o "load" implícito
+    // do about:blank inicial (disparado pela própria inserção no DOM) já
+    // passou antes de existir alguém ouvindo — todo evento "load" que este
+    // listener de fato recebe corresponde a uma navegação real (inicial,
+    // recarregar, voltar ou avançar).
+    iframe.addEventListener('load', () => {
+      clearTimeout(tab.loadTimer);
+      setTabStatus(tab, null);
+    });
     tabs.push(tab);
     switchTab(id);
     navigate(initialUrl, true);
@@ -130,6 +178,7 @@ export function openBrowser(ctx, { url } = {}) {
   function closeTab(id) {
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
+    clearTimeout(tabs[idx].loadTimer);
     tabs[idx].iframe.remove();
     tabs.splice(idx, 1);
     if (!tabs.length) {
@@ -147,6 +196,8 @@ export function openBrowser(ctx, { url } = {}) {
     address.value = tab.url;
     win.setTitle(tab.title ? `${tab.title} - Navegador` : 'Navegador');
     refreshStarState();
+    refreshNavButtons();
+    refreshStatusOverlay();
     renderTabbar();
   }
 
@@ -167,35 +218,49 @@ export function openBrowser(ctx, { url } = {}) {
     }
     addHistory(target, tab.title);
     refreshStarState();
+    refreshNavButtons();
     renderTabbar();
+
+    clearTimeout(tab.loadTimer);
+    setTabStatus(tab, 'loading');
+    tab.loadTimer = setTimeout(() => {
+      // Se o "load" do iframe não disparou a tempo, o site provavelmente
+      // recusou ser exibido aqui (ou está fora do ar) — avisa de verdade em
+      // vez de deixar uma página em branco sem explicação nenhuma.
+      if (tab.status === 'loading') setTabStatus(tab, 'blocked');
+    }, LOAD_TIMEOUT_MS);
+  }
+
+  function openActiveInRealTab() {
+    const tab = activeTab();
+    if (tab?.url) window.open(tab.url, '_blank', 'noopener');
   }
 
   root.querySelector('[data-action="go"]').addEventListener('click', () => navigate(address.value));
   address.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') navigate(address.value);
   });
+  address.addEventListener('focus', () => address.select());
   root.querySelector('[data-action="reload"]').addEventListener('click', () => {
     const tab = activeTab();
-    if (tab) tab.iframe.src = tab.iframe.src;
+    if (tab) navigate(tab.url, false);
   });
-  root.querySelector('[data-action="back"]').addEventListener('click', () => {
+  backBtn.addEventListener('click', () => {
     const tab = activeTab();
     if (tab && tab.historyIndex > 0) {
       tab.historyIndex--;
       navigate(tab.history[tab.historyIndex], false);
     }
   });
-  root.querySelector('[data-action="forward"]').addEventListener('click', () => {
+  forwardBtn.addEventListener('click', () => {
     const tab = activeTab();
     if (tab && tab.historyIndex < tab.history.length - 1) {
       tab.historyIndex++;
       navigate(tab.history[tab.historyIndex], false);
     }
   });
-  root.querySelector('[data-action="newtab"]').addEventListener('click', () => {
-    const tab = activeTab();
-    if (tab?.url) window.open(tab.url, '_blank', 'noopener');
-  });
+  root.querySelector('[data-action="newtab"]').addEventListener('click', openActiveInRealTab);
+  blockedEl.querySelector('[data-action="open-real-tab"]').addEventListener('click', openActiveInRealTab);
 
   root.querySelector('[data-action="star"]').addEventListener('click', async () => {
     const tab = activeTab();
@@ -253,6 +318,34 @@ export function openBrowser(ctx, { url } = {}) {
     if (!dropdown.classList.contains('hidden') && !e.target.closest('[data-role="dropdown"]') && !e.target.closest('[data-action="bookmarks"]') && !e.target.closest('[data-action="history"]')) {
       hideDropdown();
     }
+  });
+
+  // Atalhos de teclado de um navegador de verdade — só ativos com a janela
+  // em foco. Em Ctrl+T/Ctrl+W: como isto roda dentro da aba/janela real do
+  // navegador do usuário, esses atalhos só têm efeito quando o app está
+  // instalado/rodando em modo standalone (senão o navegador real intercepta
+  // antes de chegar aqui — não há como e nem se deve tentar sobrepor isso).
+  function onKeydown(e) {
+    if (!win.el.classList.contains('focused')) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === 'l') { address.focus(); address.select(); e.preventDefault(); }
+    else if (mod && e.key.toLowerCase() === 't') { createTab(HOME_URL); e.preventDefault(); }
+    else if (mod && e.key.toLowerCase() === 'w') { closeTab(activeId); e.preventDefault(); }
+    else if ((mod && e.key.toLowerCase() === 'r') || e.key === 'F5') { const t = activeTab(); if (t) navigate(t.url, false); e.preventDefault(); }
+    else if (e.altKey && e.key === 'ArrowLeft') { backBtn.click(); e.preventDefault(); }
+    else if (e.altKey && e.key === 'ArrowRight') { forwardBtn.click(); e.preventDefault(); }
+    else if (mod && e.key === 'Tab') {
+      if (tabs.length < 2) return;
+      const idx = tabs.findIndex((t) => t.id === activeId);
+      const next = e.shiftKey ? (idx - 1 + tabs.length) % tabs.length : (idx + 1) % tabs.length;
+      switchTab(tabs[next].id);
+      e.preventDefault();
+    }
+  }
+  window.addEventListener('keydown', onKeydown);
+  win.onClose(() => {
+    window.removeEventListener('keydown', onKeydown);
+    tabs.forEach((t) => clearTimeout(t.loadTimer));
   });
 
   createTab(url || HOME_URL);
