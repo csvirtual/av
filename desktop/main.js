@@ -213,12 +213,13 @@ function isAppDisabled(id) {
 async function setAppDisabled(id, disabled) {
   disabledApps = disabled ? [...new Set([...disabledApps, id])] : disabledApps.filter((a) => a !== id);
   await kv.set('apps.disabled', disabledApps);
-  if (disabled) {
-    const pinned = await getPinnedTaskbarApps();
-    if (pinned.includes(id)) await setPinnedTaskbarApps(pinned.filter((a) => a !== id));
-  }
+  // Não mexe em taskbar.pinned nem em desktop.appShortcuts — desativar só
+  // esconde (via filtro na hora de renderizar), nunca desfixa de verdade,
+  // pra reativar trazer tudo de volta exatamente como estava antes, sem
+  // precisar fixar/enviar pra área de trabalho de novo.
   renderTaskbarApps();
   renderStartMenu();
+  renderDesktopIcons();
 }
 
 // ---------------- Boot sequence ----------------
@@ -722,6 +723,27 @@ async function checkSystemNotifications() {
   }
 }
 
+// Atalhos de apps enviados pro desktop a partir do Menu Iniciar — não são
+// arquivo/pasta nenhum no sistema de arquivos virtual, só um appId
+// lembrado aqui. Filtrados pelos mesmos apps desativados (some da área de
+// trabalho junto com o Menu Iniciar/busca/Abrir com, volta ao reativar).
+async function getDesktopAppShortcuts() {
+  return kv.get('desktop.appShortcuts', []);
+}
+async function setDesktopAppShortcuts(list) {
+  await kv.set('desktop.appShortcuts', list);
+}
+async function sendAppToDesktop(appId) {
+  const list = await getDesktopAppShortcuts();
+  if (!list.includes(appId)) await setDesktopAppShortcuts([...list, appId]);
+  renderDesktopIcons();
+}
+async function removeDesktopAppShortcut(appId) {
+  const list = await getDesktopAppShortcuts();
+  await setDesktopAppShortcuts(list.filter((id) => id !== appId));
+  renderDesktopIcons();
+}
+
 function fixedIcons() {
   return [
     { id: 'this-pc', label: 'Este Computador', glyph: '🖥️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.rootId }) },
@@ -771,8 +793,21 @@ async function renderDesktopIcons() {
   const container = $('#desktop-icons');
   container.innerHTML = '';
   const children = await fs.getChildren(seed.desktopId);
+  const appShortcuts = await getDesktopAppShortcuts();
   const icons = [
     ...fixedIcons(),
+    ...appShortcuts
+      .filter((appId) => !isAppDisabled(appId))
+      .map((appId) => PINNED_APPS.find((a) => a.id === appId))
+      .filter(Boolean)
+      .map((app) => ({
+        id: `shortcut-${app.id}`,
+        label: app.label,
+        glyph: app.glyph,
+        isShortcut: true,
+        appId: app.id,
+        onOpen: app.onOpen,
+      })),
     ...children.map((node) => ({
       id: node.id,
       label: node.name,
@@ -787,7 +822,7 @@ async function renderDesktopIcons() {
   icons.forEach((icon, idx) => {
     const el = document.createElement('div');
     el.className = 'desktop-icon';
-    el.innerHTML = `<div class="icon-glyph">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
+    el.innerHTML = `<div class="icon-glyph${icon.isShortcut ? ' is-shortcut' : ''}">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
     const pos = positions[icon.id] || gridPosition(idx);
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
@@ -809,7 +844,9 @@ async function renderDesktopIcons() {
       e.preventDefault();
       e.stopPropagation();
       const items = [{ label: 'Abrir', onClick: () => icon.onOpen() }];
-      if (!icon.fixed) {
+      if (icon.isShortcut) {
+        items.push({ label: '✕ Remover da área de trabalho', onClick: () => removeDesktopAppShortcut(icon.appId) });
+      } else if (!icon.fixed) {
         items.push(
           { label: 'Renomear', onClick: () => renameIcon(icon.node) },
           { label: 'Excluir', onClick: () => deleteIcon(icon.node) }
@@ -973,6 +1010,8 @@ function renderStartMenu() {
       e.stopPropagation();
       const pinned = await getPinnedTaskbarApps();
       const isPinned = pinned.includes(app.id);
+      const shortcuts = await getDesktopAppShortcuts();
+      const onDesktop = shortcuts.includes(app.id);
       showContextMenu(e.clientX, e.clientY, [
         { label: '📂 Abrir', onClick: () => { hidePanel($('#start-menu')); app.onOpen(); } },
         {
@@ -982,6 +1021,10 @@ function renderStartMenu() {
             await setPinnedTaskbarApps(next);
             renderTaskbarApps();
           },
+        },
+        {
+          label: onDesktop ? '🖵 Remover da área de trabalho' : '🖵 Enviar para a área de trabalho',
+          onClick: () => (onDesktop ? removeDesktopAppShortcut(app.id) : sendAppToDesktop(app.id)),
         },
       ]);
     });
