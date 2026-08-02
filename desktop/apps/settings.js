@@ -39,6 +39,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   root.innerHTML = `
     <div class="settings-nav">
       <button data-tab="system">🖥️ Sistema</button>
+      <button data-tab="apps">📦 Aplicativos</button>
       <button data-tab="personalization" class="active">🎨 Personalização</button>
       <button data-tab="time">🕒 Hora e idioma</button>
       <button data-tab="accessibility">♿ Acessibilidade</button>
@@ -112,6 +113,69 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       msg.textContent = 'Cache limpo. Os seus arquivos e configurações não foram afetados.';
       msg.className = 'settings-msg ok';
     });
+  }
+
+  // ---------------- Aplicativos (desativar/reativar) ----------------
+  // "Desativar" nunca desinstala de verdade (não existe onde desinstalar
+  // pra — são apps do próprio sistema) — só tira o app do Menu Iniciar, da
+  // busca e do "Abrir com", e desafixa da barra de tarefas se estava lá.
+  // Reativar traz de volta em todos esses lugares. Explorador e
+  // Configurações não têm essa opção, do mesmo jeito que o Windows de
+  // verdade não deixa desinstalar o próprio Explorador de Arquivos.
+  const PROGRAM_PUBLISHER = 'Windows 11 Web Desktop';
+  function fakeSizeFor(appId) {
+    let hash = 0;
+    for (const ch of appId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    const mb = 6 + (hash % 190);
+    const decimal = hash % 10;
+    return `${mb},${decimal} MB`;
+  }
+
+  function renderPrograms() {
+    const apps = ctx.getAppCatalog()
+      .filter((app) => !app.hideFromPrograms)
+      .slice()
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+    content.innerHTML = `
+      <h2>Aplicativos instalados</h2>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
+        Desativar um aplicativo o remove do Menu Iniciar, da busca e do "Abrir com" — não apaga nada, e pode ser reativado a qualquer momento.
+      </p>
+      <input type="text" data-role="program-search" placeholder="Pesquisar aplicativos" style="margin-bottom:12px">
+      <div class="program-list" data-role="program-list"></div>
+    `;
+
+    const listEl = content.querySelector('[data-role="program-list"]');
+    function renderList(filterText) {
+      const q = (filterText || '').trim().toLowerCase();
+      const filtered = apps.filter((app) => app.label.toLowerCase().includes(q));
+      listEl.innerHTML = filtered.length ? '' : '<p class="settings-msg" style="margin:0">Nenhum aplicativo encontrado.</p>';
+      filtered.forEach((app) => {
+        const enabled = !ctx.isAppDisabled(app.id);
+        const row = document.createElement('div');
+        row.className = 'program-row';
+        row.innerHTML = `
+          <span class="program-glyph">${app.glyph}</span>
+          <div class="program-info">
+            <div class="program-name">${escapeAttr(app.label)}</div>
+            <div class="program-meta">${escapeAttr(PROGRAM_PUBLISHER)} • ${fakeSizeFor(app.id)}${app.core ? ' • Aplicativo do sistema' : ''}</div>
+          </div>
+          <label class="toggle-switch" title="${app.core ? 'Aplicativos do sistema não podem ser desativados' : (enabled ? 'Desativar' : 'Ativar')}">
+            <input type="checkbox" ${enabled ? 'checked' : ''} ${app.core ? 'disabled' : ''}>
+            <span class="toggle-switch-track"></span>
+          </label>
+        `;
+        if (!app.core) {
+          row.querySelector('input').addEventListener('change', async (e) => {
+            await ctx.setAppDisabled(app.id, !e.target.checked);
+          });
+        }
+        listEl.appendChild(row);
+      });
+    }
+    renderList('');
+    content.querySelector('[data-role="program-search"]').addEventListener('input', (e) => renderList(e.target.value));
   }
 
   // ---------------- Personalização ----------------
@@ -461,6 +525,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
 
   const renderers = {
     system: renderSystem,
+    apps: renderPrograms,
     personalization: renderPersonalization,
     time: renderTime,
     accessibility: renderAccessibility,

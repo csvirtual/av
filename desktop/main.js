@@ -60,7 +60,10 @@ const ctx = {
   windows: WM,
   get seed() { return seed; },
   openFile,
-  openWithApps: OPEN_WITH_APPS,
+  get openWithApps() { return OPEN_WITH_APPS.filter((app) => !isAppDisabled(app.id)); },
+  getAppCatalog: () => PINNED_APPS,
+  isAppDisabled,
+  setAppDisabled,
   refreshDesktop: () => renderDesktopIcons(),
   getTheme,
   setTheme,
@@ -199,6 +202,25 @@ async function setTimeFormat(value) {
   updateClocks();
 }
 
+// ---------------- Apps desativados (Configurações > Aplicativos) ----------------
+// "Desativar" nunca apaga nada de verdade — só tira o app do Menu Iniciar,
+// da busca e do "Abrir com", e some da barra de tarefas se estava fixado
+// lá. Janelas já abertas desse app continuam funcionando normalmente.
+let disabledApps = [];
+function isAppDisabled(id) {
+  return disabledApps.includes(id);
+}
+async function setAppDisabled(id, disabled) {
+  disabledApps = disabled ? [...new Set([...disabledApps, id])] : disabledApps.filter((a) => a !== id);
+  await kv.set('apps.disabled', disabledApps);
+  if (disabled) {
+    const pinned = await getPinnedTaskbarApps();
+    if (pinned.includes(id)) await setPinnedTaskbarApps(pinned.filter((a) => a !== id));
+  }
+  renderTaskbarApps();
+  renderStartMenu();
+}
+
 // ---------------- Boot sequence ----------------
 /** Aplica tudo que é específico da conta (tema, papel de parede, escala,
  * movimento reduzido, formato de hora) e semeia o sistema de arquivos DELA
@@ -214,6 +236,7 @@ async function loadAccountEnvironment(accountId) {
   document.documentElement.style.zoom = await getScale();
   motion.setReducedMotionOverride(await getReduceMotion());
   timeFormat = await kv.get('settings.timeFormat', '24h');
+  disabledApps = await kv.get('apps.disabled', []);
 }
 
 /** Instalações de antes do suporte a múltiplas contas tinham tudo salvo em
@@ -795,7 +818,7 @@ async function renderDesktopIcons() {
       if (icon.node?.type === 'file') {
         items.push({
           label: '🗂️ Abrir com',
-          onClick: () => showContextMenu(e.clientX, e.clientY, OPEN_WITH_APPS.map((app) => ({
+          onClick: () => showContextMenu(e.clientX, e.clientY, ctx.openWithApps.map((app) => ({
             label: `${app.glyph} ${app.label}`,
             onClick: () => app.open(icon.node),
           }))),
@@ -917,7 +940,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------------- Taskbar / Start menu ----------------
 const PINNED_APPS = [
-  { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
+  { id: 'explorer', label: 'Explorador', glyph: '📁', core: true, onOpen: () => openExplorer(ctx) },
   { id: 'browser', label: 'Navegador', glyph: BROWSER_GLYPH, onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
@@ -930,14 +953,14 @@ const PINNED_APPS = [
   { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
   { id: 'taskmanager', label: 'Gerenciador de Tarefas', glyph: '📊', onOpen: () => openTaskManager(ctx) },
-  { id: 'settings', label: 'Configurações', glyph: '⚙️', onOpen: () => openSettings(ctx) },
-  { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
+  { id: 'settings', label: 'Configurações', glyph: '⚙️', core: true, onOpen: () => openSettings(ctx) },
+  { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', core: true, hideFromPrograms: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
 ];
 
 function renderStartMenu() {
   const grid = $('#start-pinned');
   grid.innerHTML = '';
-  PINNED_APPS.forEach((app) => {
+  PINNED_APPS.filter((app) => !isAppDisabled(app.id)).forEach((app) => {
     const btn = document.createElement('button');
     btn.className = 'start-app';
     btn.innerHTML = `<span class="glyph">${app.glyph}</span><span>${app.label}</span>`;
@@ -1086,7 +1109,7 @@ let searchToken = 0;
 async function runGlobalSearch(rawQuery) {
   const myToken = ++searchToken;
   const q = rawQuery.trim().toLowerCase();
-  const appMatches = PINNED_APPS.filter((a) => a.label.toLowerCase().includes(q));
+  const appMatches = PINNED_APPS.filter((a) => !isAppDisabled(a.id) && a.label.toLowerCase().includes(q));
   const settingMatches = SETTINGS_SEARCH_INDEX.filter((s) => s.label.toLowerCase().includes(q));
   const fileMatches = await searchFiles(q);
   if (myToken !== searchToken) return; // busca mais recente já chegou primeiro
@@ -1564,7 +1587,7 @@ async function renderTaskbarApps() {
 
   pinned.forEach((appId) => {
     const app = PINNED_APPS.find((a) => a.id === appId);
-    if (!app) return;
+    if (!app || isAppDisabled(appId)) return;
     holder.appendChild(buildTaskbarAppButton(app, byApp.get(appId) || [], true));
     byApp.delete(appId);
   });
