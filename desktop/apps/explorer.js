@@ -119,7 +119,9 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       const item = document.createElement('div');
       item.className = 'file-item';
       item.dataset.id = node.id;
-      const glyph = node.type !== 'folder' ? '📄' : (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁');
+      const glyph = node.type === 'folder'
+        ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
+        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄');
       item.innerHTML = `<div class="glyph">${glyph}</div><div class="name">${escapeHtml(node.name)}</div>`;
       item.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -210,6 +212,16 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   }
 
   function downloadNode(node) {
+    // Imagens já são uma data URL — baixa direto, sem passar por Blob
+    // (senão o arquivo baixado seria o texto da própria data URL, não a
+    // imagem de verdade).
+    if ((node.content || '').startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = node.content;
+      a.download = node.name;
+      a.click();
+      return;
+    }
     const blob = new Blob([node.content || ''], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -217,6 +229,15 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     a.download = node.name;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function readAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
   }
 
   root.querySelector('[data-action="new-folder"]').addEventListener('click', async () => {
@@ -233,8 +254,11 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   fileInput.addEventListener('change', async () => {
     const imported = [];
     for (const file of fileInput.files) {
-      const text = await file.text().catch(() => '');
-      await fs.createNode({ parentId: currentFolderId, name: file.name, type: 'file', content: text, mimeType: file.type || 'text/plain' });
+      // Imagens precisam entrar como data URL (base64) — lê-las como texto
+      // (como os outros arquivos) corromperia o binário.
+      const isImage = (file.type || '').startsWith('image/');
+      const content = isImage ? await readAsDataURL(file) : await file.text().catch(() => '');
+      await fs.createNode({ parentId: currentFolderId, name: file.name, type: 'file', content, mimeType: file.type || 'text/plain' });
       imported.push(file.name);
     }
     fileInput.value = '';

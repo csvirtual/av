@@ -11,6 +11,7 @@ import * as motion from './core/motion/motion.js';
 import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js';
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
+import { openPhotos } from './apps/photos.js';
 import { openSettings, WALLPAPERS } from './apps/settings.js';
 import { openBrowser } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
@@ -107,6 +108,7 @@ async function refreshAvatars() {
 function openFile(node) {
   if (!node) return;
   if (node.type === 'folder') openExplorer(ctx, { startFolderId: node.id });
+  else if ((node.mimeType || '').startsWith('image/')) openPhotos(ctx, { fileId: node.id });
   else openNotepad(ctx, { fileId: node.id });
 }
 
@@ -712,7 +714,7 @@ async function renderDesktopIcons() {
     ...children.map((node) => ({
       id: node.id,
       label: node.name,
-      glyph: node.type === 'folder' ? '📁' : '📄',
+      glyph: node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄'),
       node,
       onOpen: () => openFile(node),
     })),
@@ -869,6 +871,7 @@ const PINNED_APPS = [
   { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
   { id: 'browser', label: 'Navegador', glyph: '🌐', onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
+  { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
   { id: 'calculator', label: 'Calculadora', glyph: '🧮', onOpen: () => openCalculator(ctx) },
   { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
@@ -996,7 +999,7 @@ function renderSearchResults({ appMatches, settingMatches, fileMatches }, query)
   addSection('Aplicativos', appMatches, (app) => searchResultRow(app.glyph, app.label, 'Aplicativo', () => app.onOpen()));
   addSection('Configurações', settingMatches, (s) => searchResultRow('⚙️', s.label, 'Configuração', () => openSettings(ctx, { tab: s.tab })));
   addSection('Arquivos e pastas', fileMatches, (node) =>
-    searchResultRow(node.type === 'folder' ? '📁' : '📄', node.name, 'Arquivo/pasta', () => openFile(node))
+    searchResultRow(node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄'), node.name, 'Arquivo/pasta', () => openFile(node))
   );
 
   if (!appMatches.length && !settingMatches.length && !fileMatches.length) {
