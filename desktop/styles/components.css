@@ -20,6 +20,19 @@
   border-radius: 0.05em;
 }
 
+/* ---------- Ícone de Exibição de Tarefas (janelas sobrepostas) ----------
+   Também um desenho próprio em CSS, sem usar nenhum ícone da Microsoft. */
+.task-view-icon { position: relative; display: inline-block; width: 15px; height: 13px; }
+.task-view-icon::before, .task-view-icon::after {
+  content: ''; position: absolute;
+  width: 10px; height: 8px;
+  border: 1.4px solid currentColor;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+.task-view-icon::before { left: 0; top: 0; background: var(--taskbar-bg); }
+.task-view-icon::after { right: 0; bottom: 0; background: var(--taskbar-bg); }
+
 /* ---------- Avatar ---------- */
 .auth-avatar {
   width: 72px; height: 72px;

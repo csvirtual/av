@@ -5,8 +5,71 @@ import { windowOpen, windowClose, windowMinimize, windowRestore, animateLayoutCh
 import { detectZone, computeZoneRect, opposingZone, taskbarHeight } from './snap-zones.js';
 
 let zCounter = 10;
-const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped }
+const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped, desktopId }
 const listeners = new Set();
+
+// ---------------- Áreas de trabalho virtuais (Task View) ----------------
+let desktops = [{ id: 'desktop-1', name: 'Área de trabalho 1' }];
+let activeDesktopId = 'desktop-1';
+
+export function listDesktops() {
+  return desktops.map((d) => ({
+    ...d,
+    active: d.id === activeDesktopId,
+    windowCount: Array.from(openWindows.values()).filter((w) => w.desktopId === d.id && !w.minimized).length,
+  }));
+}
+
+export function getActiveDesktopId() {
+  return activeDesktopId;
+}
+
+export function addDesktop(name) {
+  const id = `desktop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const desktop = { id, name: name?.trim() || `Área de trabalho ${desktops.length + 1}` };
+  desktops.push(desktop);
+  return desktop;
+}
+
+export function renameDesktop(id, name) {
+  const desktop = desktops.find((d) => d.id === id);
+  if (desktop && name?.trim()) desktop.name = name.trim();
+}
+
+/** Troca a área de trabalho ativa: janelas de outras áreas somem (sem
+ * fechar de verdade) e a janela mais recente da área escolhida ganha foco,
+ * como no Windows 11. */
+export function setActiveDesktop(id) {
+  if (!desktops.some((d) => d.id === id) || id === activeDesktopId) return;
+  activeDesktopId = id;
+  openWindows.forEach((w) => {
+    w.el.classList.toggle('desktop-hidden', w.desktopId !== id);
+  });
+  const visible = Array.from(openWindows.values()).filter((w) => w.desktopId === id && !w.minimized);
+  if (visible.length) {
+    const top = visible.reduce((a, b) => (parseInt(b.el.style.zIndex || '0', 10) > parseInt(a.el.style.zIndex || '0', 10) ? b : a));
+    focusWindow(top.id);
+  } else {
+    notify();
+  }
+}
+
+/** Remove uma área de trabalho: nunca perde as janelas dela — são
+ * realocadas para uma área vizinha antes de removê-la. Não permite remover
+ * a última área restante. */
+export function removeDesktop(id) {
+  if (desktops.length <= 1) return false;
+  const idx = desktops.findIndex((d) => d.id === id);
+  if (idx === -1) return false;
+  const wasActive = activeDesktopId === id;
+  const fallback = desktops[idx === 0 ? 1 : idx - 1].id;
+  openWindows.forEach((w) => { if (w.desktopId === id) w.desktopId = fallback; });
+  desktops.splice(idx, 1);
+  if (wasActive) activeDesktopId = fallback;
+  openWindows.forEach((w) => w.el.classList.toggle('desktop-hidden', w.desktopId !== activeDesktopId));
+  notify();
+  return true;
+}
 
 // Abaixo dessa largura não há espaço de sobra para o modelo de janelas
 // flutuantes/redimensionáveis do desktop — celulares e telas bem estreitas
@@ -50,15 +113,18 @@ export function focusById(id) {
   focusWindow(id);
 }
 
-/** Lista as janelas não minimizadas por ordem de foco mais recente (para o Alt+Tab). */
+/** Lista as janelas não minimizadas da área de trabalho ativa, por ordem de
+ * foco mais recente (para o Alt+Tab — como no Windows 11, só circula entre
+ * as janelas da área de trabalho virtual atual). */
 export function getWindowsOrder() {
   return Array.from(openWindows.values())
-    .filter((w) => !w.minimized)
+    .filter((w) => !w.minimized && w.desktopId === activeDesktopId)
     .sort((a, b) => parseInt(b.el.style.zIndex || '0', 10) - parseInt(a.el.style.zIndex || '0', 10))
     .map((w) => ({ id: w.id, title: w.title, icon: w.icon }));
 }
 
-/** Lista completa de janelas abertas, para o Gerenciador de Tarefas. */
+/** Lista completa de janelas abertas (de todas as áreas de trabalho), para
+ * o Gerenciador de Tarefas. */
 export function listProcesses() {
   return Array.from(openWindows.values()).map((w) => ({
     id: w.id,
@@ -68,6 +134,7 @@ export function listProcesses() {
     minimized: w.minimized,
     focused: w.focused,
     openedAt: w.openedAt,
+    desktopId: w.desktopId,
   }));
 }
 
@@ -192,6 +259,61 @@ function applySnap(id, zone) {
   focusWindow(id);
 }
 
+// ---------------- Snap Layouts (flyout ao passar o mouse no maximizar) ----------------
+const SNAP_LAYOUTS = [
+  { id: 'columns', zones: ['left', 'right'] },
+  { id: 'quarters', zones: ['top-left', 'top-right', 'bottom-left', 'bottom-right'] },
+];
+let snapLayoutsEl = null;
+let snapLayoutsHideTimer = null;
+function getSnapLayoutsPanel() {
+  if (!snapLayoutsEl) {
+    snapLayoutsEl = document.createElement('div');
+    snapLayoutsEl.className = 'snap-layouts hidden';
+    snapLayoutsEl.addEventListener('mouseenter', () => clearTimeout(snapLayoutsHideTimer));
+    snapLayoutsEl.addEventListener('mouseleave', scheduleHideSnapLayouts);
+    document.getElementById('windows-layer').appendChild(snapLayoutsEl);
+  }
+  return snapLayoutsEl;
+}
+function hideSnapLayouts() {
+  clearTimeout(snapLayoutsHideTimer);
+  if (snapLayoutsEl) snapLayoutsEl.classList.add('hidden');
+}
+function scheduleHideSnapLayouts() {
+  clearTimeout(snapLayoutsHideTimer);
+  snapLayoutsHideTimer = setTimeout(hideSnapLayouts, 250);
+}
+function showSnapLayouts(id, anchorBtn) {
+  if (isCompactViewport()) return;
+  const panel = getSnapLayoutsPanel();
+  panel.innerHTML = '';
+  SNAP_LAYOUTS.forEach((layout) => {
+    const group = document.createElement('div');
+    group.className = `snap-layout-option snap-layout-${layout.id}`;
+    layout.zones.forEach((zone) => {
+      const cell = document.createElement('button');
+      cell.className = `snap-layout-cell zone-${zone}`;
+      cell.setAttribute('aria-label', 'Encaixar janela');
+      cell.addEventListener('click', () => {
+        applySnap(id, zone);
+        hideSnapLayouts();
+      });
+      group.appendChild(cell);
+    });
+    panel.appendChild(group);
+  });
+  const rect = anchorBtn.getBoundingClientRect();
+  panel.classList.remove('hidden');
+  const panelWidth = panel.offsetWidth || 220;
+  panel.style.left = `${Math.min(window.innerWidth - panelWidth - 8, Math.max(8, rect.left - panelWidth / 2))}px`;
+  panel.style.top = `${rect.bottom + 6}px`;
+  panelOpen(panel);
+}
+document.addEventListener('pointerdown', (e) => {
+  if (snapLayoutsEl && !snapLayoutsEl.classList.contains('hidden') && !e.target.closest('.snap-layouts') && !e.target.closest('[data-action="max"]')) hideSnapLayouts();
+});
+
 export function createWindow({ appId, title, icon = '🗔', width = 640, height = 460, content }) {
   const id = `win-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const el = document.createElement('div');
@@ -256,7 +378,7 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   document.getElementById('windows-layer').appendChild(el);
   windowOpen(el);
 
-  const win = { id, el, title, icon, appId, minimized: false, focused: true, snapped: null, openedAt: Date.now() };
+  const win = { id, el, title, icon, appId, minimized: false, focused: true, snapped: null, openedAt: Date.now(), desktopId: activeDesktopId };
   openWindows.set(id, win);
   focusWindow(id);
 
@@ -343,10 +465,21 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
   win.cleanupDrag = () => {
     window.removeEventListener('pointermove', onWindowPointerMove);
     window.removeEventListener('pointerup', onWindowPointerUp);
+    clearTimeout(snapLayoutsShowTimer);
   };
 
   el.querySelector('[data-action="min"]').addEventListener('click', () => toggleMinimize(id));
-  el.querySelector('[data-action="max"]').addEventListener('click', () => toggleMaximize(win));
+  const maxBtn = el.querySelector('[data-action="max"]');
+  maxBtn.addEventListener('click', () => toggleMaximize(win));
+  let snapLayoutsShowTimer = null;
+  maxBtn.addEventListener('mouseenter', () => {
+    clearTimeout(snapLayoutsShowTimer);
+    snapLayoutsShowTimer = setTimeout(() => showSnapLayouts(id, maxBtn), 450);
+  });
+  maxBtn.addEventListener('mouseleave', () => {
+    clearTimeout(snapLayoutsShowTimer);
+    scheduleHideSnapLayouts();
+  });
   el.querySelector('[data-action="close"]').addEventListener('click', () => closeWindow(id));
 
   notify();
