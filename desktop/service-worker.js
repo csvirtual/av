@@ -1,5 +1,5 @@
 // Cache básico para permitir instalar como app e abrir mesmo sem internet.
-const CACHE_NAME = 'win11-web-v19';
+const CACHE_NAME = 'win11-web-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const ASSETS = [
   './apps/explorer.js',
   './apps/notepad.js',
   './apps/photos.js',
+  './apps/word.js',
   './apps/settings.js',
   './apps/browser.js',
   './apps/calculator.js',

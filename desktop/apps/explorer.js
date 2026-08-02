@@ -3,6 +3,7 @@
 // baixar arquivos virtuais de volta para o computador real, recortar/copiar/
 // colar, selecionar múltiplos itens, ver propriedades e ordenar/alternar a
 // visualização (grade/lista).
+import { WORD_MIME } from './word.js';
 
 // Ícone de disco (próprio, sem usar o arquivo/ícone proprietário da
 // Microsoft) para diferenciar "Disco Local (C:)" de uma pasta comum.
@@ -101,8 +102,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     </div>
     <div class="explorer-main">
       <div class="explorer-toolbar">
-        <button data-action="new-folder">📁 Nova pasta</button>
-        <button data-action="new-file">📄 Novo arquivo</button>
+        <button data-action="new">➕ Novo</button>
         <button data-action="upload">⬆️ Importar do PC</button>
         <button data-action="rename">✏️ Renomear</button>
         <button data-action="copy">🗐 Copiar</button>
@@ -285,7 +285,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       item.dataset.id = node.id;
       const glyph = node.type === 'folder'
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
-        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄');
+        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : '📄'));
 
       if (viewMode === 'list') {
         const typeLabel = node.type === 'folder' ? 'Pasta de arquivos' : (node.mimeType || 'Arquivo');
@@ -536,16 +536,32 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     root.appendChild(overlay);
   }
 
-  root.querySelector('[data-action="new-folder"]').addEventListener('click', async () => {
-    await fs.createNode({ parentId: currentFolderId, name: 'Nova pasta', type: 'folder' });
+  root.querySelector('[data-action="new"]').addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    simpleContextMenu(rect.left, rect.bottom, [
+      { label: '📁 Pasta', onClick: () => newFolder() },
+      { label: '📄 Documento de Texto', onClick: () => newTextFile() },
+      { label: '📘 Documento (.docx)', onClick: () => newWordFile() },
+    ]);
+  });
+  async function newFolder() {
+    await fs.createNode({ parentId: currentFolderId, name: await uniqueNameInFolder(fs, currentFolderId, 'Nova pasta'), type: 'folder' });
     render();
     ctx.refreshDesktop();
-  });
-  root.querySelector('[data-action="new-file"]').addEventListener('click', async () => {
-    await fs.createNode({ parentId: currentFolderId, name: 'Novo Documento de Texto.txt', type: 'file', content: '' });
+  }
+  async function newTextFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Novo Documento de Texto.txt');
+    await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '' });
     render();
     ctx.refreshDesktop();
-  });
+  }
+  async function newWordFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Novo Documento.docx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: WORD_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
   root.querySelector('[data-action="upload"]').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
     const imported = [];

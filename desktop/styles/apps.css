@@ -114,6 +114,32 @@
 }
 .notepad-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
 
+/* ---------- Documento (Word-like) ---------- */
+.word-app { display: flex; flex-direction: column; height: 100%; background: var(--win-bg); }
+.word-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.word-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap;
+}
+.word-toolbar button:hover { background: var(--hover); }
+.word-toolbar button.active { background: var(--accent-2); color: #fff; }
+.word-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
+.word-page-wrap { flex: 1; overflow-y: auto; padding: var(--space-5); background: var(--hover); }
+.word-page {
+  max-width: 720px; min-height: 100%; margin: 0 auto; padding: 48px 56px;
+  background: #fff; color: #1a1a1a; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  font-family: 'Cambria', Georgia, serif; font-size: 15px; line-height: 1.6; outline: none;
+}
+.word-page h1 { font-size: 26px; margin: 0.6em 0 0.3em; }
+.word-page h2 { font-size: 21px; margin: 0.6em 0 0.3em; }
+.word-page h3 { font-size: 17px; margin: 0.6em 0 0.3em; }
+.word-page p { margin: 0 0 0.8em; }
+.word-page ul, .word-page ol { margin: 0 0 0.8em; padding-left: 1.6em; }
+.word-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
+
 /* ---------- Fotos ---------- */
 .photos-app { display: flex; flex-direction: column; height: 100%; background: var(--win-bg); }
 .photos-toolbar {
