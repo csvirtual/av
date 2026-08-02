@@ -8,6 +8,15 @@ let zCounter = 10;
 const openWindows = new Map(); // id -> { el, title, icon, minimized, focused, snapped, desktopId }
 const listeners = new Set();
 
+// Ícone de janela/app: quase sempre um emoji (texto simples). Alguns apps
+// (ex: Navegador) definem um SVG próprio como ícone — nunca vindo de dado do
+// usuário, só de um literal fixo no código do app — e é o único caso em que
+// interpretamos como HTML em vez de texto puro.
+export function setGlyph(el, value) {
+  if (typeof value === 'string' && value.trimStart().startsWith('<svg')) el.innerHTML = value;
+  else el.textContent = value;
+}
+
 // ---------------- Áreas de trabalho virtuais (Task View) ----------------
 let desktops = [{ id: 'desktop-1', name: 'Área de trabalho 1' }];
 let activeDesktopId = 'desktop-1';
@@ -220,11 +229,12 @@ function showSnapAssist(zone, excludeId) {
   candidates.forEach((w) => {
     const btn = document.createElement('button');
     btn.className = 'snap-assist-item';
-    // Via textContent: w.title pode conter um nome de arquivo/pasta
-    // escolhido pelo usuário.
+    // w.title pode conter um nome de arquivo/pasta escolhido pelo usuário,
+    // por isso sempre via textContent (nunca HTML). w.icon é sempre um emoji
+    // ou um SVG confiável definido pelo próprio app — ver setGlyph().
     const iconEl = document.createElement('span');
     iconEl.className = 'snap-assist-icon';
-    iconEl.textContent = w.icon;
+    setGlyph(iconEl, w.icon);
     const titleEl = document.createElement('span');
     titleEl.className = 'snap-assist-title';
     titleEl.textContent = w.title;
@@ -380,10 +390,9 @@ export function createWindow({ appId, title, icon = '🗔', width = 640, height 
     <div class="win-resize" data-role="resize"></div>
   `;
 
-  // Via textContent, nunca innerHTML: título e ícone podem vir de nomes de
-  // arquivo/pasta escolhidos pelo usuário, e não devem ser interpretados
-  // como HTML.
-  el.querySelector('.win-icon').textContent = icon;
+  // Título sempre via textContent, nunca innerHTML: pode vir de nome de
+  // arquivo/pasta escolhido pelo usuário. Ícone vai por setGlyph() — ver ali.
+  setGlyph(el.querySelector('.win-icon'), icon);
   el.querySelector('.win-title').textContent = title;
 
   const body = el.querySelector('.win-body');

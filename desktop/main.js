@@ -15,7 +15,7 @@ import { openPhotos } from './apps/photos.js';
 import { openWord, WORD_MIME } from './apps/word.js';
 import { openSheet, SHEET_MIME } from './apps/sheet.js';
 import { openSettings, WALLPAPERS } from './apps/settings.js';
-import { openBrowser } from './apps/browser.js';
+import { openBrowser, BROWSER_GLYPH } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
@@ -877,7 +877,7 @@ document.addEventListener('keydown', (e) => {
 // ---------------- Taskbar / Start menu ----------------
 const PINNED_APPS = [
   { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
-  { id: 'browser', label: 'Navegador', glyph: '🌐', onOpen: () => openBrowser(ctx) },
+  { id: 'browser', label: 'Navegador', glyph: BROWSER_GLYPH, onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
   { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
@@ -1476,7 +1476,7 @@ function buildTaskbarAppButton(app, appWindows, isPinned) {
   btn.dataset.app = app.id;
   btn.title = appWindows.length > 1 ? `${app.label} (+${appWindows.length - 1})` : app.label;
   btn.setAttribute('aria-label', app.label);
-  btn.textContent = app.glyph;
+  WM.setGlyph(btn, app.glyph);
   btn.addEventListener('click', () => {
     if (focusOrToggleApp(app.id)) return;
     app.onOpen?.();
