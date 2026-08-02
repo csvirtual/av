@@ -1,7 +1,7 @@
 /* Estilos específicos de cada aplicativo. */
 
 /* ---------- Explorer ---------- */
-.explorer { display: flex; height: 100%; font-size: 13px; }
+.explorer { display: flex; height: 100%; font-size: 13px; position: relative; }
 .explorer-sidebar {
   width: 160px; flex-shrink: 0;
   background: var(--panel-bg);
@@ -23,6 +23,16 @@
   cursor: pointer; font-size: 12px; color: var(--text);
 }
 .explorer-toolbar button:hover { background: var(--hover); }
+.explorer-toolbar button:disabled { opacity: 0.4; cursor: default; background: none; }
+.explorer-toolbar-spacer { flex: 1; }
+.explorer-sort-label {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: 12px; color: var(--text-dim);
+}
+.explorer-sort-label select {
+  font-size: 12px; padding: 4px 6px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--win-bg); color: var(--text);
+}
 .explorer-breadcrumb { padding: var(--space-2) var(--space-3); font-size: 12px; color: var(--text-dim); border-bottom: 1px solid var(--border); }
 .explorer-breadcrumb span { cursor: pointer; }
 .explorer-breadcrumb span:hover { text-decoration: underline; }
@@ -37,10 +47,55 @@
 }
 .file-item:hover { background: var(--hover); }
 .file-item.selected { background: rgba(0, 120, 212, 0.18); }
+.file-item.cut-pending { opacity: 0.5; }
 .file-item .glyph { font-size: 28px; }
 .file-item .name { font-size: 11px; word-break: break-word; max-height: 2.4em; overflow: hidden; }
 .explorer-grid.is-empty { display: flex; align-items: center; justify-content: center; }
 .explorer-empty { color: var(--text-dim); padding: 30px; text-align: center; }
+
+/* ---------- Explorer: visualização em lista ---------- */
+.explorer-grid.view-list { display: block; padding: 0; }
+.explorer-grid.view-list.is-empty { display: flex; }
+.file-list-header, .file-row {
+  display: grid;
+  grid-template-columns: 1fr 160px 140px 90px;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 6px var(--space-3);
+}
+.file-list-header {
+  font-size: 11px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--win-bg);
+}
+.file-row { cursor: pointer; font-size: 12px; border-bottom: 1px solid transparent; }
+.file-row:hover { background: var(--hover); }
+.file-row.selected { background: rgba(0, 120, 212, 0.18); }
+.file-row.cut-pending { opacity: 0.5; }
+.file-row .name-cell { display: flex; align-items: center; gap: var(--space-2); overflow: hidden; }
+.file-row .name-cell .glyph { font-size: 16px; flex-shrink: 0; }
+.file-row .name-cell .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-row .col-dim { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+
+/* ---------- Explorer: diálogo de Propriedades ---------- */
+.explorer-modal-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+.explorer-modal {
+  background: var(--panel-bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--space-4); width: 320px; max-width: calc(100% - 32px);
+  box-shadow: var(--elevation-4);
+}
+.explorer-modal h3 { margin: 0 0 var(--space-3); font-size: 15px; color: var(--text); }
+.explorer-modal-row {
+  display: flex; justify-content: space-between; gap: var(--space-3);
+  font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--text);
+}
+.explorer-modal-row span:first-child { color: var(--text-dim); flex-shrink: 0; }
+.explorer-modal-row span:last-child { text-align: right; overflow-wrap: anywhere; }
+.explorer-modal-actions { display: flex; justify-content: flex-end; margin-top: var(--space-3); }
 
 /* ---------- Notepad ---------- */
 .notepad { display: flex; flex-direction: column; height: 100%; }

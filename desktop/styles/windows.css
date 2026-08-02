@@ -15,6 +15,7 @@
   will-change: transform, opacity;
 }
 .app-window.minimized { display: none; }
+.app-window.desktop-hidden { display: none; }
 .app-window.maximized {
   left: 0 !important; top: 0 !important;
   width: 100% !important; height: calc(100% - var(--taskbar-height)) !important;
@@ -83,6 +84,77 @@
 .snap-assist-item:hover { background: var(--border); }
 .snap-assist-icon { font-size: 26px; }
 .snap-assist-title { font-size: 11px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---------- Snap Layouts (flyout ao passar o mouse no botão maximizar) ---------- */
+.snap-layouts {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: auto;
+  display: flex; gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--panel-bg);
+  backdrop-filter: var(--blur-regular);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-3);
+}
+.snap-layout-option {
+  display: grid; gap: 3px;
+  width: 84px; height: 56px;
+  padding: 3px;
+}
+.snap-layout-columns { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+.snap-layout-quarters { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.snap-layout-cell {
+  border: none; border-radius: 3px;
+  background: var(--hover);
+  cursor: pointer;
+}
+.snap-layout-cell:hover { background: var(--accent); }
+
+/* ---------- Task View (áreas de trabalho virtuais) ---------- */
+#task-view {
+  position: fixed; inset: 0; bottom: var(--taskbar-height);
+  z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: var(--blur-thick);
+  padding: var(--space-5);
+}
+#task-view-desktops { display: flex; align-items: center; justify-content: center; gap: var(--space-5); flex-wrap: wrap; }
+.task-view-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  position: relative;
+}
+.task-view-thumb {
+  width: 200px; height: 120px;
+  border-radius: var(--radius-md);
+  background: var(--win-bg);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); font-size: 12px;
+}
+.task-view-card.active .task-view-thumb { border-color: var(--accent); box-shadow: var(--elevation-3); }
+.task-view-thumb:hover { border-color: var(--accent); }
+.task-view-label { color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+.task-view-close {
+  position: absolute; top: -8px; right: -8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: var(--panel-bg); color: var(--text);
+  cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+.task-view-close:hover { background: #e81123; color: #fff; }
+.task-view-add {
+  width: 200px; height: 120px;
+  border-radius: var(--radius-md);
+  border: 2px dashed rgba(255,255,255,0.5);
+  background: transparent; color: #fff;
+  cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.task-view-add:hover { border-color: #fff; background: rgba(255,255,255,0.08); }
 
 /* ---------- Alternador de janelas (Alt+Tab) ---------- */
 .task-switcher {

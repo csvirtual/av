@@ -847,6 +847,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
   if (!e.target.closest('#ease-of-access-menu') && !e.target.closest('#ease-of-access-btn')) hidePanel($('#ease-of-access-menu'));
   if (!e.target.closest('#notification-center') && !e.target.closest('#tray-notif-btn')) hidePanel($('#notification-center'));
+  if (!e.target.closest('#task-view') && !e.target.closest('#task-view-btn')) hidePanel($('#task-view'));
 });
 
 // Esc fecha o painel flutuante aberto no momento — um por vez, o mais
@@ -855,7 +856,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const panelSelectors = [
     '#context-menu', '#notification-center', '#calendar-flyout',
-    '#volume-menu', '#ease-of-access-menu', '#account-menu', '#power-menu', '#start-menu',
+    '#volume-menu', '#ease-of-access-menu', '#account-menu', '#power-menu', '#start-menu', '#task-view',
   ];
   for (const sel of panelSelectors) {
     const el = $(sel);
@@ -898,6 +899,7 @@ function renderStartMenu() {
 $('#start-btn').addEventListener('click', (e) => {
   e.stopPropagation();
   hidePanel($('#power-menu'));
+  hidePanel($('#task-view'));
   const menu = $('#start-menu');
   if (menu.classList.contains('hidden')) {
     showPanel(menu);
@@ -1320,12 +1322,87 @@ $('#tray-notif-btn').addEventListener('click', async (e) => {
 });
 $('#notification-center [data-action="clear-all"]').addEventListener('click', () => clearAllNotifications());
 
+// ---------------- Task View (áreas de trabalho virtuais) ----------------
+function renderTaskView() {
+  const container = $('#task-view-desktops');
+  container.innerHTML = '';
+  const desktops = WM.listDesktops();
+  desktops.forEach((d) => {
+    const card = document.createElement('div');
+    card.className = 'task-view-card' + (d.active ? ' active' : '');
+
+    const thumb = document.createElement('button');
+    thumb.className = 'task-view-thumb';
+    thumb.setAttribute('aria-label', `Ir para ${d.name}`);
+    thumb.textContent = d.windowCount
+      ? `${d.windowCount} janela${d.windowCount > 1 ? 's' : ''} aberta${d.windowCount > 1 ? 's' : ''}`
+      : 'Nenhuma janela aberta';
+    thumb.addEventListener('click', (e) => {
+      e.stopPropagation();
+      WM.setActiveDesktop(d.id);
+      hidePanel($('#task-view'));
+      renderTaskbarApps();
+    });
+
+    const label = document.createElement('div');
+    label.className = 'task-view-label';
+    label.textContent = d.name;
+
+    card.appendChild(thumb);
+    card.appendChild(label);
+
+    if (desktops.length > 1) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'task-view-close';
+      closeBtn.setAttribute('aria-label', `Fechar ${d.name}`);
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        WM.removeDesktop(d.id);
+        renderTaskView();
+        renderTaskbarApps();
+      });
+      card.appendChild(closeBtn);
+    }
+
+    container.appendChild(card);
+  });
+
+  const addCard = document.createElement('button');
+  addCard.className = 'task-view-add';
+  addCard.textContent = '+ Nova área de trabalho';
+  addCard.addEventListener('click', (e) => {
+    e.stopPropagation();
+    WM.addDesktop();
+    renderTaskView();
+  });
+  container.appendChild(addCard);
+}
+
+$('#task-view-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  hidePanel($('#start-menu'));
+  hidePanel($('#power-menu'));
+  hidePanel($('#account-menu'));
+  hidePanel($('#notification-center'));
+  const panel = $('#task-view');
+  if (panel.classList.contains('hidden')) {
+    renderTaskView();
+    showPanel(panel);
+  } else {
+    hidePanel(panel);
+  }
+});
+$('#task-view').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) hidePanel($('#task-view'));
+});
+
 // Traz para frente (ou minimiza, se já estiver em foco) a janela mais
 // recente de um app — usado tanto pelos ícones fixos da barra de tarefas
 // quanto pelos temporários, para que um app aberto NUNCA ganhe um ícone
 // duplicado ao lado do seu: o mesmo ícone é reutilizado, só muda de estado.
 function focusOrToggleApp(appId) {
-  const windows = WM.listProcesses().filter((w) => w.appId === appId);
+  const windows = WM.listProcesses().filter((w) => w.appId === appId && w.desktopId === WM.getActiveDesktopId());
   if (!windows.length) return false;
   const focused = windows.find((w) => w.focused);
   if (focused) {
@@ -1396,7 +1473,8 @@ function buildTaskbarAppButton(app, appWindows, isPinned) {
 async function renderTaskbarApps() {
   const pinned = await getPinnedTaskbarApps();
   const byApp = new Map();
-  WM.listProcesses().forEach((w) => {
+  const activeDesktopId = WM.getActiveDesktopId();
+  WM.listProcesses().filter((w) => w.desktopId === activeDesktopId).forEach((w) => {
     if (!byApp.has(w.appId)) byApp.set(w.appId, []);
     byApp.get(w.appId).push(w);
   });

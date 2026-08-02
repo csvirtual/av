@@ -215,9 +215,15 @@
   <!-- Pilha de notificações (toasts) -->
   <div id="toast-stack" aria-live="polite"></div>
 
+  <!-- Exibição de Tarefas (áreas de trabalho virtuais) -->
+  <div id="task-view" class="hidden" role="dialog" aria-label="Exibição de Tarefas">
+    <div id="task-view-desktops"></div>
+  </div>
+
   <!-- Barra de tarefas -->
   <div id="taskbar">
     <button id="start-btn" class="taskbar-btn" title="Iniciar" aria-label="Menu Iniciar"><span class="win-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+    <button id="task-view-btn" class="taskbar-btn" title="Exibição de Tarefas" aria-label="Exibição de Tarefas"><span class="task-view-icon" aria-hidden="true"></span></button>
     <div id="taskbar-apps" class="taskbar-running"></div>
     <div id="tray" class="tray">
       <button id="tray-volume-btn" class="icon-btn" title="Volume" aria-label="Volume">🔊</button>
