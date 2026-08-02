@@ -81,6 +81,13 @@
 .oobe-wallpaper-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: var(--space-2); }
 .oobe-wallpaper-swatch { height: 56px; border-radius: var(--radius-sm); cursor: pointer; border: 2px solid transparent; }
 .oobe-wallpaper-swatch.selected { border-color: #fff; }
+.oobe-photo-btn {
+  align-self: center; margin-top: 4px;
+  padding: 8px 18px; border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 13px; cursor: pointer;
+}
+.oobe-photo-btn:hover { background: rgba(255, 255, 255, 0.16); }
 .oobe-nav { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-4); }
 .oobe-nav .auth-link { margin-top: 0; }
 .oobe-nav .auth-btn { margin-top: 0; padding: 8px 16px; }

@@ -5,6 +5,22 @@
 // visualização (grade/lista).
 import { WORD_MIME } from './word.js';
 import { SHEET_MIME } from './sheet.js';
+import { VIDEO_MIME_PREFIX } from './video-player.js';
+import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
+import { PRESENTATION_MIME } from './presentation.js';
+
+// Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
+// Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
+function fileGlyph(node) {
+  const mime = node.mimeType || '';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime === WORD_MIME) return '📘';
+  if (mime === SHEET_MIME) return '📗';
+  if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
+  if (mime.startsWith(AUDIO_MIME_PREFIX)) return AUDIO_GLYPH;
+  if (mime === PRESENTATION_MIME) return '📙';
+  return '📄';
+}
 
 // Ícone de disco (próprio, sem usar o arquivo/ícone proprietário da
 // Microsoft) para diferenciar "Disco Local (C:)" de uma pasta comum.
@@ -286,7 +302,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       item.dataset.id = node.id;
       const glyph = node.type === 'folder'
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
-        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : (node.mimeType === SHEET_MIME ? '📗' : '📄')));
+        : fileGlyph(node);
 
       if (viewMode === 'list') {
         const typeLabel = node.type === 'folder' ? 'Pasta de arquivos' : (node.mimeType || 'Arquivo');
@@ -356,6 +372,13 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       items.push({ label: multi ? `🗑️ Excluir (${selectedIds.size})` : '🗑️ Excluir', onClick: () => confirmAnd(() => deleteSelectionToTrash(), `Mover ${multi ? 'os itens selecionados' : `"${node.name}"`} para a Lixeira?`) });
       if (!multi && node.type === 'file') {
         items.push({ label: '⬇️ Baixar para o computador', onClick: () => downloadNode(node) });
+        items.push({
+          label: '🗂️ Abrir com',
+          onClick: () => simpleContextMenu(x, y, (ctx.openWithApps || []).map((app) => ({
+            label: `${app.glyph} ${app.label}`,
+            onClick: () => app.open(node),
+          }))),
+        });
       }
       if (!multi) items.push({ label: 'ℹ️ Propriedades', onClick: () => showProperties(node) });
     }
@@ -544,6 +567,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       { label: '📄 Documento de Texto', onClick: () => newTextFile() },
       { label: '📘 Documento (.docx)', onClick: () => newWordFile() },
       { label: '📗 Planilha (.xlsx)', onClick: () => newSheetFile() },
+      { label: '📙 Apresentação (.pptx)', onClick: () => newPresentationFile() },
     ]);
   });
   async function newFolder() {
@@ -571,14 +595,24 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     ctx.refreshDesktop();
     openFile(node);
   }
+  async function newPresentationFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Nova Apresentação.pptx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: PRESENTATION_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
   root.querySelector('[data-action="upload"]').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
     const imported = [];
     for (const file of fileInput.files) {
-      // Imagens precisam entrar como data URL (base64) — lê-las como texto
-      // (como os outros arquivos) corromperia o binário.
-      const isImage = (file.type || '').startsWith('image/');
-      const content = isImage ? await readAsDataURL(file) : await file.text().catch(() => '');
+      // Qualquer arquivo binário (imagem, vídeo, .docx, .xlsx, etc.) precisa
+      // entrar como data URL (base64) — lê-lo como texto corromperia os
+      // bytes. Só arquivos realmente textuais usam file.text() direto (o
+      // Bloco de Notas não sabe exibir uma data URL).
+      const isText = (file.type || '').startsWith('text/') || file.type === 'application/json'
+        || (!file.type && /\.(txt|md|csv|json|log|xml|ya?ml|ini|conf)$/i.test(file.name));
+      const content = isText ? await file.text().catch(() => '') : await readAsDataURL(file);
       await fs.createNode({ parentId: currentFolderId, name: file.name, type: 'file', content, mimeType: file.type || 'text/plain' });
       imported.push(file.name);
     }

@@ -14,6 +14,9 @@ import { openNotepad } from './apps/notepad.js';
 import { openPhotos } from './apps/photos.js';
 import { openWord, WORD_MIME } from './apps/word.js';
 import { openSheet, SHEET_MIME } from './apps/sheet.js';
+import { openVideoPlayer, VIDEO_GLYPH, VIDEO_MIME_PREFIX } from './apps/video-player.js';
+import { openAudioPlayer, AUDIO_GLYPH, AUDIO_MIME_PREFIX } from './apps/audio-player.js';
+import { openPresentation, PRESENTATION_MIME } from './apps/presentation.js';
 import { openSettings, WALLPAPERS } from './apps/settings.js';
 import { openBrowser, BROWSER_GLYPH } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
@@ -38,12 +41,26 @@ function hidePanel(el) {
 let seed = null;
 let bootTime = Date.now();
 
+// Apps que sabem abrir um arquivo (aparecem no menu "Abrir com" do
+// Explorador e dos ícones da área de trabalho) — de propósito não inclui
+// Calculadora nem Terminal, que não abrem arquivo nenhum.
+const OPEN_WITH_APPS = [
+  { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', open: (node) => openNotepad(ctx, { fileId: node.id }) },
+  { id: 'word', label: 'Documento', glyph: '📘', open: (node) => openWord(ctx, { fileId: node.id }) },
+  { id: 'sheet', label: 'Planilha', glyph: '📗', open: (node) => openSheet(ctx, { fileId: node.id }) },
+  { id: 'photos', label: 'Fotos', glyph: '🖼️', open: (node) => openPhotos(ctx, { fileId: node.id }) },
+  { id: 'video-player', label: 'Player de Vídeo', glyph: '🎬', open: (node) => openVideoPlayer(ctx, { fileId: node.id }) },
+  { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, open: (node) => openAudioPlayer(ctx, { fileId: node.id }) },
+  { id: 'presentation', label: 'Apresentação', glyph: '📙', open: (node) => openPresentation(ctx, { fileId: node.id }) },
+];
+
 const ctx = {
   fs,
   kv,
   windows: WM,
   get seed() { return seed; },
   openFile,
+  openWithApps: OPEN_WITH_APPS,
   refreshDesktop: () => renderDesktopIcons(),
   getTheme,
   setTheme,
@@ -108,12 +125,27 @@ async function refreshAvatars() {
   document.querySelectorAll('#lock-avatar, #start-avatar').forEach((el) => (el.innerHTML = html));
 }
 
+function fileGlyph(node) {
+  if (node.type === 'folder') return '📁';
+  const mime = node.mimeType || '';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime === WORD_MIME) return '📘';
+  if (mime === SHEET_MIME) return '📗';
+  if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
+  if (mime.startsWith(AUDIO_MIME_PREFIX)) return AUDIO_GLYPH;
+  if (mime === PRESENTATION_MIME) return '📙';
+  return '📄';
+}
+
 function openFile(node) {
   if (!node) return;
   if (node.type === 'folder') openExplorer(ctx, { startFolderId: node.id });
   else if ((node.mimeType || '').startsWith('image/')) openPhotos(ctx, { fileId: node.id });
   else if (node.mimeType === WORD_MIME || /\.docx$/i.test(node.name)) openWord(ctx, { fileId: node.id });
   else if (node.mimeType === SHEET_MIME || /\.xlsx$/i.test(node.name)) openSheet(ctx, { fileId: node.id });
+  else if ((node.mimeType || '').startsWith(VIDEO_MIME_PREFIX)) openVideoPlayer(ctx, { fileId: node.id });
+  else if ((node.mimeType || '').startsWith(AUDIO_MIME_PREFIX)) openAudioPlayer(ctx, { fileId: node.id });
+  else if (node.mimeType === PRESENTATION_MIME || /\.pptx$/i.test(node.name)) openPresentation(ctx, { fileId: node.id });
   else openNotepad(ctx, { fileId: node.id });
 }
 
@@ -721,7 +753,7 @@ async function renderDesktopIcons() {
     ...children.map((node) => ({
       id: node.id,
       label: node.name,
-      glyph: node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄'),
+      glyph: fileGlyph(node),
       node,
       onOpen: () => openFile(node),
     })),
@@ -759,6 +791,15 @@ async function renderDesktopIcons() {
           { label: 'Renomear', onClick: () => renameIcon(icon.node) },
           { label: 'Excluir', onClick: () => deleteIcon(icon.node) }
         );
+      }
+      if (icon.node?.type === 'file') {
+        items.push({
+          label: '🗂️ Abrir com',
+          onClick: () => showContextMenu(e.clientX, e.clientY, OPEN_WITH_APPS.map((app) => ({
+            label: `${app.glyph} ${app.label}`,
+            onClick: () => app.open(icon.node),
+          }))),
+        });
       }
       showContextMenu(e.clientX, e.clientY, items);
     });
@@ -882,6 +923,9 @@ const PINNED_APPS = [
   { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
   { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
   { id: 'sheet', label: 'Planilha', glyph: '📗', onOpen: () => openSheet(ctx) },
+  { id: 'video-player', label: 'Player de Vídeo', glyph: VIDEO_GLYPH, onOpen: () => openVideoPlayer(ctx) },
+  { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, onOpen: () => openAudioPlayer(ctx) },
+  { id: 'presentation', label: 'Apresentação', glyph: '📙', onOpen: () => openPresentation(ctx) },
   { id: 'calculator', label: 'Calculadora', glyph: '🧮', onOpen: () => openCalculator(ctx) },
   { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
@@ -900,6 +944,23 @@ function renderStartMenu() {
     btn.addEventListener('click', () => {
       hidePanel($('#start-menu'));
       app.onOpen();
+    });
+    btn.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pinned = await getPinnedTaskbarApps();
+      const isPinned = pinned.includes(app.id);
+      showContextMenu(e.clientX, e.clientY, [
+        { label: '📂 Abrir', onClick: () => { hidePanel($('#start-menu')); app.onOpen(); } },
+        {
+          label: isPinned ? '📌 Desafixar da barra de tarefas' : '📌 Fixar na barra de tarefas',
+          onClick: async () => {
+            const next = isPinned ? pinned.filter((id) => id !== app.id) : [...pinned, app.id];
+            await setPinnedTaskbarApps(next);
+            renderTaskbarApps();
+          },
+        },
+      ]);
     });
     grid.appendChild(btn);
   });
@@ -1010,7 +1071,7 @@ function renderSearchResults({ appMatches, settingMatches, fileMatches }, query)
   addSection('Aplicativos', appMatches, (app) => searchResultRow(app.glyph, app.label, 'Aplicativo', () => app.onOpen()));
   addSection('Configurações', settingMatches, (s) => searchResultRow('⚙️', s.label, 'Configuração', () => openSettings(ctx, { tab: s.tab })));
   addSection('Arquivos e pastas', fileMatches, (node) =>
-    searchResultRow(node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : (node.mimeType === SHEET_MIME ? '📗' : '📄'))), node.name, 'Arquivo/pasta', () => openFile(node))
+    searchResultRow(fileGlyph(node), node.name, 'Arquivo/pasta', () => openFile(node))
   );
 
   if (!appMatches.length && !settingMatches.length && !fileMatches.length) {

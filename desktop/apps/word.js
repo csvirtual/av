@@ -33,6 +33,11 @@ function loadLibs() {
   return libsPromise;
 }
 
+function escapeHtmlText(text) {
+  const escaped = text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  return escaped.split(/\r?\n/).join('</p><p>');
+}
+
 // Sanitização defensiva do HTML que vem do mammoth (arquivo .docx importado
 // pode ter sido criado por qualquer programa) antes de jogar em innerHTML.
 function sanitizeHtml(html) {
@@ -289,11 +294,22 @@ export function openWord(ctx, { fileId = null } = {}) {
     status.dataset.name = node.name;
     if (!node.content) {
       editor.innerHTML = '';
+    } else if (!node.content.startsWith('data:')) {
+      // Arquivo aberto via "Abrir com" que não é um .docx (ex: um .txt) —
+      // carrega o texto puro em vez de tentar (e falhar) interpretar como
+      // OOXML. O Word de verdade também abre arquivos de texto assim.
+      editor.innerHTML = `<p>${escapeHtmlText(node.content)}</p>`;
     } else {
-      const { mammoth } = await ensureLibs();
-      const arrayBuffer = dataUrlToArrayBuffer(node.content);
-      const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: ['u => u'] });
-      editor.innerHTML = sanitizeHtml(result.value);
+      try {
+        const { mammoth } = await ensureLibs();
+        const arrayBuffer = dataUrlToArrayBuffer(node.content);
+        const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: ['u => u'] });
+        editor.innerHTML = sanitizeHtml(result.value);
+      } catch {
+        editor.innerHTML = '';
+        status.textContent = `Não foi possível ler "${node.name}" como documento do Word (arquivo corrompido ou não é um .docx de verdade).`;
+        return;
+      }
     }
     dirty = false;
     updateTitle();

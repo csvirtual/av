@@ -441,11 +441,24 @@ export function openSheet(ctx, { fileId = null } = {}) {
     if (!node) return;
     currentFileId = id;
     status.dataset.name = node.name;
-    if (node.content) {
-      const { XLSXLib } = await ensureLibs();
-      cells = xlsxArrayBufferToCells(XLSXLib, dataUrlToArrayBuffer(node.content));
-    } else {
+    if (!node.content) {
       cells = {};
+    } else if (!node.content.startsWith('data:')) {
+      // Arquivo aberto via "Abrir com" que não é um .xlsx (ex: um .txt) —
+      // joga o texto na primeira célula em vez de tentar (e falhar)
+      // interpretar como planilha OOXML.
+      cells = { A1: { raw: node.content } };
+    } else {
+      try {
+        const { XLSXLib } = await ensureLibs();
+        cells = xlsxArrayBufferToCells(XLSXLib, dataUrlToArrayBuffer(node.content));
+      } catch {
+        cells = {};
+        status.textContent = `Não foi possível ler "${node.name}" como planilha (arquivo corrompido ou não é um .xlsx de verdade).`;
+        recalcAndRender();
+        dirty = false;
+        return;
+      }
     }
     recalcAndRender();
     dirty = false;
