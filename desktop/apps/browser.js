@@ -1,13 +1,19 @@
 // Navegador: abas, favoritos e histórico reais (persistidos), como um
-// navegador de verdade. Limitação inerente à web: como é uma janela dentro
-// do próprio site, só consegue exibir páginas que permitem ser incorporadas
-// em outro site (a maioria dos grandes bloqueia isso por segurança, ex:
-// X-Frame-Options/CSP) — quando isso acontece (ou o site demora demais pra
-// responder), mostra um aviso real e o botão "Abrir em nova aba" de
-// verdade, em vez de deixar uma página em branco sem explicação.
+// navegador de verdade. A maioria dos grandes sites recusa ser incorporada
+// direto num iframe de outro domínio (X-Frame-Options/CSP: frame-ancestors)
+// — isso é aplicado pelo navegador do visitante antes de qualquer JS nosso
+// rodar, então não dá pra contornar por aqui. Por isso toda navegação passa
+// por um proxy reverso (netlify/functions/proxy.js) que busca a página no
+// servidor, remove esses cabeçalhos e entrega o conteúdo pelo nosso próprio
+// domínio. Continua havendo casos reais que não funcionam (sites que exigem
+// sessão/login do domínio original, ou SPAs que chamam APIs por caminho
+// absoluto fora do domínio) — quando isso acontece mostra um aviso real e o
+// botão "Abrir em nova aba" de verdade, em vez de deixar uma página em
+// branco sem explicação.
 const HOME_URL = 'https://www.wikipedia.org';
+const PROXY_ENDPOINT = '/.netlify/functions/proxy';
 const MAX_HISTORY = 200;
-const LOAD_TIMEOUT_MS = 7000;
+const LOAD_TIMEOUT_MS = 12000;
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,11 +24,11 @@ function normalizeUrl(input) {
   if (!v) return null;
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+([/:?#].*)?$/.test(v)) return `https://${v}`;
-  // Mojeek é uma das poucas buscas grandes que não bloqueia ser exibida
-  // num iframe de outro site (Google/Bing/DuckDuckGo bloqueiam via
-  // X-Frame-Options) — assim uma pesquisa digitada tem chance real de
-  // funcionar aqui dentro, e não só quando se digita uma URL direta.
-  return `https://www.mojeek.com/search?q=${encodeURIComponent(v)}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(v)}`;
+}
+
+function proxiedUrl(target) {
+  return `${PROXY_ENDPOINT}?url=${encodeURIComponent(target)}`;
 }
 
 function shortTitle(url) {
@@ -58,7 +64,7 @@ export function openBrowser(ctx, { url } = {}) {
         <span>Carregando…</span>
       </div>
       <div class="browser-status browser-status-blocked hidden" data-role="blocked">
-        <p>Este site não respondeu a tempo ou não permite ser exibido dentro de outro app (proteção do próprio site contra incorporação, ex: X-Frame-Options).</p>
+        <p>Não foi possível exibir este site aqui dentro (ele pode exigir login, demorou demais para responder, ou aponta pra um endereço bloqueado).</p>
         <button data-action="open-real-tab" class="btn">⤴ Abrir em uma aba de verdade</button>
       </div>
     </div>
@@ -167,7 +173,22 @@ export function openBrowser(ctx, { url } = {}) {
     // recarregar, voltar ou avançar).
     iframe.addEventListener('load', () => {
       clearTimeout(tab.loadTimer);
+      // A resposta do proxy vem do nosso próprio domínio, então
+      // contentDocument é acessível de verdade (não é cross-origin) — dá
+      // pra saber se o proxy sinalizou erro e pra pegar o título real da
+      // página em vez de só o hostname.
+      let doc = null;
+      try { doc = tab.iframe.contentDocument; } catch { /* nunca deveria acontecer, é same-origin */ }
+      if (doc?.documentElement?.dataset?.proxyError) {
+        setTabStatus(tab, 'blocked');
+        return;
+      }
       setTabStatus(tab, null);
+      if (doc?.title) {
+        tab.title = doc.title;
+        renderTabbar();
+        if (tab.id === activeId) win.setTitle(`${tab.title} - Navegador`);
+      }
     });
     tabs.push(tab);
     switchTab(id);
@@ -208,7 +229,7 @@ export function openBrowser(ctx, { url } = {}) {
     if (!target) return;
     tab.url = target;
     tab.title = shortTitle(target);
-    tab.iframe.src = target;
+    tab.iframe.src = proxiedUrl(target);
     address.value = target;
     win.setTitle(`${tab.title} - Navegador`);
     if (pushHistory) {
