@@ -210,17 +210,30 @@
   cursor: pointer; font-size: 14px; color: var(--text); flex-shrink: 0;
 }
 .browser-toolbar button:hover { background: var(--hover); }
+.browser-toolbar button:disabled { opacity: 0.35; cursor: default; background: none; }
 .browser-address {
   flex: 1; padding: 7px var(--space-3); border-radius: var(--radius-pill);
   border: 1px solid var(--border); background: var(--hover);
   color: var(--text); font-size: 13px; outline: none; min-width: 0;
 }
-.browser-hint {
-  font-size: 11px; color: var(--text-dim); padding: var(--space-1) var(--space-3);
-  border-bottom: 1px solid var(--border);
-}
 .browser-pages { flex: 1; position: relative; }
 .browser-frame { position: absolute; inset: 0; border: none; width: 100%; height: 100%; background: #fff; }
+.browser-status {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-3); text-align: center; padding: var(--space-5);
+  background: var(--win-bg); color: var(--text);
+}
+.browser-status-loading { color: var(--text-dim); font-size: 13px; }
+.browser-spinner {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--accent-2);
+  animation: browser-spin 0.8s linear infinite;
+}
+@keyframes browser-spin { to { transform: rotate(360deg); } }
+.browser-status-blocked p { max-width: 380px; font-size: 13px; color: var(--text-dim); }
+.browser-status-blocked .btn { background: var(--accent-2); color: #fff; border: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; }
+.browser-status-blocked .btn:hover { filter: brightness(1.1); }
 .browser-dropdown {
   position: absolute; top: 76px; right: var(--space-3); z-index: 5;
   background: var(--panel-bg); backdrop-filter: var(--blur-thick);
