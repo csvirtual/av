@@ -13,6 +13,7 @@ import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openPhotos } from './apps/photos.js';
 import { openWord, WORD_MIME } from './apps/word.js';
+import { openSheet, SHEET_MIME } from './apps/sheet.js';
 import { openSettings, WALLPAPERS } from './apps/settings.js';
 import { openBrowser } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
@@ -112,6 +113,7 @@ function openFile(node) {
   if (node.type === 'folder') openExplorer(ctx, { startFolderId: node.id });
   else if ((node.mimeType || '').startsWith('image/')) openPhotos(ctx, { fileId: node.id });
   else if (node.mimeType === WORD_MIME || /\.docx$/i.test(node.name)) openWord(ctx, { fileId: node.id });
+  else if (node.mimeType === SHEET_MIME || /\.xlsx$/i.test(node.name)) openSheet(ctx, { fileId: node.id });
   else openNotepad(ctx, { fileId: node.id });
 }
 
@@ -879,6 +881,7 @@ const PINNED_APPS = [
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
   { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
+  { id: 'sheet', label: 'Planilha', glyph: '📗', onOpen: () => openSheet(ctx) },
   { id: 'calculator', label: 'Calculadora', glyph: '🧮', onOpen: () => openCalculator(ctx) },
   { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
@@ -1007,7 +1010,7 @@ function renderSearchResults({ appMatches, settingMatches, fileMatches }, query)
   addSection('Aplicativos', appMatches, (app) => searchResultRow(app.glyph, app.label, 'Aplicativo', () => app.onOpen()));
   addSection('Configurações', settingMatches, (s) => searchResultRow('⚙️', s.label, 'Configuração', () => openSettings(ctx, { tab: s.tab })));
   addSection('Arquivos e pastas', fileMatches, (node) =>
-    searchResultRow(node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : '📄')), node.name, 'Arquivo/pasta', () => openFile(node))
+    searchResultRow(node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : (node.mimeType === SHEET_MIME ? '📗' : '📄'))), node.name, 'Arquivo/pasta', () => openFile(node))
   );
 
   if (!appMatches.length && !settingMatches.length && !fileMatches.length) {

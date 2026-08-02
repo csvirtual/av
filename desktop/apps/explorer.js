@@ -4,6 +4,7 @@
 // colar, selecionar múltiplos itens, ver propriedades e ordenar/alternar a
 // visualização (grade/lista).
 import { WORD_MIME } from './word.js';
+import { SHEET_MIME } from './sheet.js';
 
 // Ícone de disco (próprio, sem usar o arquivo/ícone proprietário da
 // Microsoft) para diferenciar "Disco Local (C:)" de uma pasta comum.
@@ -285,7 +286,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       item.dataset.id = node.id;
       const glyph = node.type === 'folder'
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
-        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : '📄'));
+        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : (node.mimeType === WORD_MIME ? '📘' : (node.mimeType === SHEET_MIME ? '📗' : '📄')));
 
       if (viewMode === 'list') {
         const typeLabel = node.type === 'folder' ? 'Pasta de arquivos' : (node.mimeType || 'Arquivo');
@@ -542,6 +543,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       { label: '📁 Pasta', onClick: () => newFolder() },
       { label: '📄 Documento de Texto', onClick: () => newTextFile() },
       { label: '📘 Documento (.docx)', onClick: () => newWordFile() },
+      { label: '📗 Planilha (.xlsx)', onClick: () => newSheetFile() },
     ]);
   });
   async function newFolder() {
@@ -558,6 +560,13 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   async function newWordFile() {
     const name = await uniqueNameInFolder(fs, currentFolderId, 'Novo Documento.docx');
     const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: WORD_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
+  async function newSheetFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Nova Planilha.xlsx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: SHEET_MIME });
     render();
     ctx.refreshDesktop();
     openFile(node);
