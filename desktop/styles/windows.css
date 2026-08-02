@@ -137,7 +137,12 @@
 }
 .task-view-card.active .task-view-thumb { border-color: var(--accent); box-shadow: var(--elevation-3); }
 .task-view-thumb:hover { border-color: var(--accent); }
-.task-view-label { color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+.task-view-label {
+  border: none; background: none; font: inherit; cursor: pointer;
+  color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.task-view-label:hover { background: rgba(255,255,255,0.15); text-decoration: underline; }
 .task-view-close {
   position: absolute; top: -8px; right: -8px;
   width: 22px; height: 22px; border-radius: 50%;

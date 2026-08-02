@@ -529,6 +529,10 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
 
     overlay.appendChild(box);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    function onEscape(e) {
+      if (e.key === 'Escape') { overlay.remove(); window.removeEventListener('keydown', onEscape); }
+    }
+    window.addEventListener('keydown', onEscape);
     root.appendChild(overlay);
   }
 
