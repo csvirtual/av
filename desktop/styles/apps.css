@@ -59,6 +59,26 @@
 }
 .notepad-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
 
+/* ---------- Fotos ---------- */
+.photos-app { display: flex; flex-direction: column; height: 100%; background: var(--win-bg); }
+.photos-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.photos-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap;
+}
+.photos-toolbar button:hover { background: var(--hover); }
+.photos-toolbar-spacer { flex: 1; }
+.photos-name { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30vw; }
+.photos-viewport {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; background: #000;
+}
+.photos-viewport img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.photos-empty { color: var(--text-dim); padding: 30px; text-align: center; font-size: 13px; }
+
 /* ---------- Settings ---------- */
 .settings { display: flex; height: 100%; }
 .settings-nav { width: 160px; border-right: 1px solid var(--border); padding: var(--space-3) var(--space-2); }
