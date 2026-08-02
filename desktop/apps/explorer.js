@@ -8,6 +8,7 @@ import { SHEET_MIME } from './sheet.js';
 import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
+import { trashGlyph } from '../core/icons.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
@@ -115,7 +116,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       <div class="side-item" data-nav="documents">📄 Documentos</div>
       <div class="side-item" data-nav="pictures">🖼️ Imagens</div>
       <div class="side-item" data-nav="downloads">⬇️ Downloads</div>
-      <div class="side-item" data-nav="trash">🗑️ Lixeira</div>
+      <div class="side-item" data-nav="trash"><span data-role="trash-glyph">🗑️</span> Lixeira</div>
     </div>
     <div class="explorer-main">
       <div class="explorer-toolbar">
@@ -251,6 +252,8 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
 
   async function render() {
     root.querySelector('.trash-only').classList.toggle('hidden', !trashMode);
+    const trashHasItems = (await fs.getChildren(seed.trashId)).length > 0;
+    root.querySelector('[data-role="trash-glyph"]').innerHTML = trashGlyph(trashHasItems);
     root.querySelectorAll('.side-item').forEach((item) => {
       const map = { 'this-pc': seed.rootId, desktop: seed.desktopId, documents: seed.documentsId, pictures: seed.picturesId, downloads: seed.downloadsId, trash: seed.trashId };
       item.classList.toggle('active', map[item.dataset.nav] === currentFolderId);
@@ -438,6 +441,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     for (const n of nodes) await fs.deleteNodePermanently(n.id);
     clearSelection();
     render();
+    ctx.refreshDesktop();
   }
 
   async function restoreSelection() {
@@ -655,6 +659,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     const items = await fs.getChildren(seed.trashId);
     for (const item of items) await fs.deleteNodePermanently(item.id);
     render();
+    ctx.refreshDesktop();
     if (items.length) {
       ctx.notify?.({
         appId: 'explorer',

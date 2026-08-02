@@ -23,6 +23,7 @@ import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
+import { trashGlyph } from './core/icons.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -64,7 +65,7 @@ const ctx = {
   getAppCatalog: () => PINNED_APPS,
   isAppDisabled,
   setAppDisabled,
-  refreshDesktop: () => renderDesktopIcons(),
+  refreshDesktop: () => refreshTrashState(),
   getTheme,
   setTheme,
   getWallpaper,
@@ -222,6 +223,17 @@ async function setAppDisabled(id, disabled) {
   renderDesktopIcons();
 }
 
+// ---------------- Ícone da Lixeira (muda com o conteúdo, como no Windows) ----------------
+let trashHasItems = false;
+async function refreshTrashState() {
+  trashHasItems = (await fs.getChildren(seed.trashId)).length > 0;
+  const rb = PINNED_APPS.find((a) => a.id === 'recycle-bin');
+  if (rb) rb.glyph = trashGlyph(trashHasItems);
+  renderDesktopIcons();
+  renderTaskbarApps();
+  renderStartMenu();
+}
+
 // ---------------- Boot sequence ----------------
 /** Aplica tudo que é específico da conta (tema, papel de parede, escala,
  * movimento reduzido, formato de hora) e semeia o sistema de arquivos DELA
@@ -238,6 +250,7 @@ async function loadAccountEnvironment(accountId) {
   motion.setReducedMotionOverride(await getReduceMotion());
   timeFormat = await kv.get('settings.timeFormat', '24h');
   disabledApps = await kv.get('apps.disabled', []);
+  await refreshTrashState();
 }
 
 /** Instalações de antes do suporte a múltiplas contas tinham tudo salvo em
@@ -747,7 +760,7 @@ async function removeDesktopAppShortcut(appId) {
 function fixedIcons() {
   return [
     { id: 'this-pc', label: 'Este Computador', glyph: '🖥️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.rootId }) },
-    { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
+    { id: 'recycle-bin', label: 'Lixeira', glyph: trashGlyph(trashHasItems), fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
   ];
 }
 
@@ -991,7 +1004,7 @@ const PINNED_APPS = [
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
   { id: 'taskmanager', label: 'Gerenciador de Tarefas', glyph: '📊', onOpen: () => openTaskManager(ctx) },
   { id: 'settings', label: 'Configurações', glyph: '⚙️', core: true, onOpen: () => openSettings(ctx) },
-  { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', core: true, hideFromPrograms: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
+  { id: 'recycle-bin', label: 'Lixeira', glyph: trashGlyph(trashHasItems), core: true, hideFromPrograms: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
 ];
 
 function renderStartMenu() {
