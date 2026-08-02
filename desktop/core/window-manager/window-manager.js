@@ -71,6 +71,14 @@ export function removeDesktop(id) {
   return true;
 }
 
+/** Volta a ter uma única área de trabalho — chamado ao trocar de conta ou
+ * de usuário, já que áreas de trabalho virtuais são um conceito da sessão
+ * atual, não devem "vazar" de uma conta para outra. */
+export function resetDesktops() {
+  desktops = [{ id: 'desktop-1', name: 'Área de trabalho 1' }];
+  activeDesktopId = 'desktop-1';
+}
+
 // Abaixo dessa largura não há espaço de sobra para o modelo de janelas
 // flutuantes/redimensionáveis do desktop — celulares e telas bem estreitas
 // passam a abrir tudo maximizado, como um app comum de tela cheia.
@@ -264,6 +272,11 @@ const SNAP_LAYOUTS = [
   { id: 'columns', zones: ['left', 'right'] },
   { id: 'quarters', zones: ['top-left', 'top-right', 'bottom-left', 'bottom-right'] },
 ];
+const ZONE_LABELS = {
+  left: 'metade esquerda', right: 'metade direita',
+  'top-left': 'quadrante superior esquerdo', 'top-right': 'quadrante superior direito',
+  'bottom-left': 'quadrante inferior esquerdo', 'bottom-right': 'quadrante inferior direito',
+};
 let snapLayoutsEl = null;
 let snapLayoutsHideTimer = null;
 function getSnapLayoutsPanel() {
@@ -294,7 +307,7 @@ function showSnapLayouts(id, anchorBtn) {
     layout.zones.forEach((zone) => {
       const cell = document.createElement('button');
       cell.className = `snap-layout-cell zone-${zone}`;
-      cell.setAttribute('aria-label', 'Encaixar janela');
+      cell.setAttribute('aria-label', `Encaixar janela: ${ZONE_LABELS[zone] || zone}`);
       cell.addEventListener('click', () => {
         applySnap(id, zone);
         hideSnapLayouts();

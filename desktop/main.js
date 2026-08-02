@@ -85,6 +85,7 @@ const ctx = {
   listAccounts,
   addAccount: () => {
     WM.closeAllWindows();
+    WM.resetDesktops();
     hide($('#desktop'));
     startOobe();
   },
@@ -237,6 +238,7 @@ async function selectAccount(accountId) {
 
 async function switchToSpecificAccount(id) {
   WM.closeAllWindows();
+  WM.resetDesktops();
   hide($('#desktop'));
   playLockChime();
   await selectAccount(id);
@@ -288,6 +290,7 @@ function renderAccountPicker(accounts) {
 
 async function switchUser() {
   WM.closeAllWindows();
+  WM.resetDesktops();
   hide($('#desktop'));
   playLockChime();
   const accounts = await listAccounts();
@@ -1344,9 +1347,19 @@ function renderTaskView() {
       renderTaskbarApps();
     });
 
-    const label = document.createElement('div');
+    const label = document.createElement('button');
     label.className = 'task-view-label';
     label.textContent = d.name;
+    label.title = 'Clique para renomear';
+    label.setAttribute('aria-label', `Renomear ${d.name}`);
+    label.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const name = prompt('Nome da área de trabalho:', d.name);
+      if (name && name.trim()) {
+        WM.renameDesktop(d.id, name.trim());
+        renderTaskView();
+      }
+    });
 
     card.appendChild(thumb);
     card.appendChild(label);
