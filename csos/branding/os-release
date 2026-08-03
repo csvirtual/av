@@ -1,0 +1,10 @@
+NAME="C&S OS"
+PRETTY_NAME="C&S OS 1.0 (Inicial)"
+ID=csos
+ID_LIKE=debian
+VERSION="1.0 (Inicial)"
+VERSION_ID="1.0"
+VERSION_CODENAME=inicial
+HOME_URL="https://github.com/csvirtual/av"
+SUPPORT_URL="https://github.com/csvirtual/av"
+BUG_REPORT_URL="https://github.com/csvirtual/av/issues"

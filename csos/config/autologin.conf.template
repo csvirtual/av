@@ -1,0 +1,6 @@
+# Drop-in de autologin na tty1 — instalado pelo install.sh em
+# /etc/systemd/system/getty@tty1.service.d/csos-autologin.conf, com
+# __CSOS_USER__ substituído pelo usuário real de kiosk escolhido.
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin __CSOS_USER__ --noclear %I $TERM

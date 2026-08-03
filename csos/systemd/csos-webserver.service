@@ -1,0 +1,18 @@
+[Unit]
+Description=C&S OS - servidor estatico local do app (Windows 11 Web Desktop)
+After=network.target
+
+[Service]
+Type=simple
+# __CSOS_APP_DIR__/__CSOS_PORT__/__CSOS_USER__ sao substituidos pelo install.sh.
+WorkingDirectory=__CSOS_APP_DIR__
+User=__CSOS_USER__
+Group=__CSOS_USER__
+# Só escuta em loopback — nunca fica acessível pra fora desta máquina.
+ExecStart=/usr/bin/python3 -m http.server __CSOS_PORT__ --bind 127.0.0.1
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

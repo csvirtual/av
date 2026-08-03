@@ -1,0 +1,6 @@
+#!/bin/sh
+# .xinitrc do usuário de kiosk — instalado pelo install.sh como
+# ~/.xinitrc. Único trabalho: repassar pro start-kiosk.sh instalado em
+# /opt/csos-app/csos/kiosk/start-kiosk.sh (ou onde quer que o install.sh
+# tenha copiado o app), que é quem realmente sobe o Chromium.
+exec __CSOS_APP_DIR__/csos/kiosk/start-kiosk.sh
