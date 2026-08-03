@@ -355,17 +355,35 @@ async function boot() {
   }, 900);
 }
 
+// A hora/data grande da tela de bloqueio só faz sentido quando a tela toda
+// é "nossa" — em tela cheia de verdade (F11/Fullscreen API) ou instalado
+// como PWA (standalone/fullscreen/minimal-ui) — nunca numa aba normal do
+// navegador, onde já existe a própria barra de endereço/relógio do sistema
+// operacional real ali do lado.
+function isImmersiveDisplay() {
+  const installedAsPwa = window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || window.matchMedia('(display-mode: minimal-ui)').matches
+    || navigator.standalone === true; // iOS Safari: "Adicionar à Tela de Início"
+  return installedAsPwa || !!document.fullscreenElement;
+}
+function updateLockClockVisibility() {
+  $('.lock-clock').classList.toggle('hidden', !isImmersiveDisplay());
+}
+document.addEventListener('fullscreenchange', updateLockClockVisibility);
+
 async function showLockScreenFor(account) {
   $('#lock-username').textContent = await kv.get('user.name', account?.name || 'Usuário');
   await refreshAvatars();
   const lockUntil = await kv.get('auth.lockUntil', 0);
   if (lockUntil > Date.now()) startLockoutCountdown(lockUntil);
-  // Sempre entra pelo formulário de senha normal, com o relógio visível —
-  // nunca deve sobrar um estado de "esqueci minha senha" de uma sessão
-  // anterior (ali o relógio fica escondido de propósito).
+  // Sempre entra pelo formulário de senha normal — nunca deve sobrar um
+  // estado de "esqueci minha senha" de uma sessão anterior (ali o relógio
+  // fica escondido de propósito, além de já não aparecer fora de tela
+  // cheia/PWA).
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
-  show($('.lock-clock'));
+  updateLockClockVisibility();
   // "Trocar de usuário" só faz sentido (e só aparece) quando existe outra
   // conta pra onde voltar — em um dispositivo de conta única não há pra
   // onde "trocar", então o botão fica escondido.
@@ -838,7 +856,7 @@ $('#lock-hint-btn').addEventListener('click', () => {
 $('#recovery-back-btn').addEventListener('click', () => {
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
-  show($('.lock-clock'));
+  updateLockClockVisibility();
 });
 $('#lock-switch-user-btn').addEventListener('click', () => backToAccountPicker());
 $('#lock-recovery-form').addEventListener('submit', async (e) => {
@@ -866,7 +884,7 @@ $('#lock-recovery-form').addEventListener('submit', async (e) => {
   }
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
-  show($('.lock-clock'));
+  updateLockClockVisibility();
   $('#lock-pass').value = '';
   hide($('#lock-error'));
   alert('Senha redefinida com sucesso. Faça login com a nova senha.');
