@@ -123,15 +123,44 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   // Configurações não têm essa opção, do mesmo jeito que o Windows de
   // verdade não deixa desinstalar o próprio Explorador de Arquivos.
   const PROGRAM_PUBLISHER = 'Windows 11 Web Desktop';
-  function fakeSizeFor(appId) {
-    let hash = 0;
-    for (const ch of appId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-    const mb = 6 + (hash % 190);
-    const decimal = hash % 10;
-    return `${mb},${decimal} MB`;
+  // Cada app do catálogo corresponde a um módulo .js irmão de settings.js
+  // (mesma pasta apps/). O tamanho mostrado é o peso REAL desse arquivo,
+  // medido com fetch() — nada de número inventado.
+  const APP_SOURCE_FILE = {
+    explorer: './apps/explorer.js',
+    browser: './apps/browser.js',
+    notepad: './apps/notepad.js',
+    photos: './apps/photos.js',
+    word: './apps/word.js',
+    sheet: './apps/sheet.js',
+    'video-player': './apps/video-player.js',
+    'audio-player': './apps/audio-player.js',
+    presentation: './apps/presentation.js',
+    calculator: './apps/calculator.js',
+    clock: './apps/clock.js',
+    terminal: './apps/terminal.js',
+    taskmanager: './apps/task-manager.js',
+    settings: './apps/settings.js',
+  };
+  const appSizeCache = new Map();
+  async function realSizeFor(appId) {
+    if (appSizeCache.has(appId)) return appSizeCache.get(appId);
+    const path = APP_SOURCE_FILE[appId];
+    let label = 'Tamanho indisponível';
+    if (path) {
+      try {
+        const res = await fetch(path, { cache: 'no-store' });
+        const buf = await res.arrayBuffer();
+        label = formatBytes(buf.byteLength);
+      } catch {
+        label = 'Tamanho indisponível';
+      }
+    }
+    appSizeCache.set(appId, label);
+    return label;
   }
 
-  function renderPrograms() {
+  async function renderPrograms() {
     const apps = ctx.getAppCatalog()
       .filter((app) => !app.hideFromPrograms)
       .slice()
@@ -140,13 +169,16 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     content.innerHTML = `
       <h2>Aplicativos instalados</h2>
       <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
-        Desativar um aplicativo o remove do Menu Iniciar, da busca e do "Abrir com" — não apaga nada, e pode ser reativado a qualquer momento.
+        Desativar um aplicativo o remove do Menu Iniciar, da busca e do "Abrir com" — não apaga nada, e pode ser reativado a qualquer momento. O tamanho exibido é o peso real do arquivo do aplicativo.
       </p>
       <input type="text" data-role="program-search" placeholder="Pesquisar aplicativos" style="margin-bottom:12px">
-      <div class="program-list" data-role="program-list"></div>
+      <div class="program-list" data-role="program-list"><p class="settings-msg" style="margin:0">Calculando tamanhos…</p></div>
     `;
 
     const listEl = content.querySelector('[data-role="program-list"]');
+    const sizeLabels = {};
+    await Promise.all(apps.map(async (app) => { sizeLabels[app.id] = await realSizeFor(app.id); }));
+
     function renderList(filterText) {
       const q = (filterText || '').trim().toLowerCase();
       const filtered = apps.filter((app) => app.label.toLowerCase().includes(q));
@@ -159,7 +191,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
           <span class="program-glyph">${app.glyph}</span>
           <div class="program-info">
             <div class="program-name">${escapeAttr(app.label)}</div>
-            <div class="program-meta">${escapeAttr(PROGRAM_PUBLISHER)} • ${fakeSizeFor(app.id)}${app.core ? ' • Aplicativo do sistema' : ''}</div>
+            <div class="program-meta">${escapeAttr(PROGRAM_PUBLISHER)} • ${sizeLabels[app.id]}${app.core ? ' • Aplicativo do sistema' : ''}</div>
           </div>
           <label class="toggle-switch" title="${app.core ? 'Aplicativos do sistema não podem ser desativados' : (enabled ? 'Desativar' : 'Ativar')}">
             <input type="checkbox" ${enabled ? 'checked' : ''} ${app.core ? 'disabled' : ''}>
