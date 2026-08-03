@@ -83,7 +83,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <h2>Notificações</h2>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
         <input type="checkbox" data-role="notifications-toggle" ${notificationsEnabled ? 'checked' : ''}>
-        Permitir sons e avisos deste sistema operacional
+        Permitir sons e avisos do Windows
       </label>
 
       <h2 style="margin-top:24px">Bateria</h2>
@@ -572,8 +572,8 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     content.innerHTML = `
       <h2>Seus dados</h2>
       <p style="font-size:13px;color:var(--text-dim);max-width:440px;line-height:1.6">
-        Este sistema operacional roda inteiramente no seu navegador. Arquivos, senha,
-        papel de parede e todas as outras configurações ficam salvos só neste
+        Este sistema operacional roda inteiramente no seu navegador. Arquivos, senhas,
+        papéis de parede e todas as outras configurações ficam salvos só neste
         dispositivo (IndexedDB) — nada é enviado a um servidor.
       </p>
 
@@ -588,13 +588,13 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
 
       <h2 style="margin-top:24px">Apagar dados</h2>
       <p style="font-size:13px;color:var(--text-dim);max-width:440px">
-        Isso apaga permanentemente todos os seus arquivos, senha e preferências
-        deste sistema operacional neste navegador. Não pode ser desfeito.
+        Isso apaga permanentemente todos os seus arquivos, senhas e preferências
+        desta instalação. Não pode ser desfeito.
       </p>
       <button class="btn" data-action="wipe" style="background:#e81123;margin-top:8px">Apagar todos os dados deste sistema operacional</button>
     `;
     content.querySelector('[data-action="wipe"]').addEventListener('click', async () => {
-      if (!confirm('Tem certeza? Todos os seus arquivos, senha e configurações deste sistema operacional serão apagados permanentemente.')) return;
+      if (!confirm('Tem certeza? Todos os seus arquivos, senhas e configurações desta instalação serão apagados permanentemente.')) return;
       const keys = await caches.keys();
       await Promise.all(keys.map((k) => caches.delete(k)));
       indexedDB.deleteDatabase('win11-web-os');
