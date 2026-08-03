@@ -166,15 +166,25 @@ export async function ensureSeed() {
   let rootId = await kv.get('rootId');
   if (rootId) {
     const cDriveId = (await kv.get('cDriveId')) || (await migrateToLocalDisk(rootId));
+    const userFolderId = await kv.get('userFolderId');
+    // Instalações antigas (antes da pasta Vídeos existir) não têm videosId
+    // salvo — cria na hora, uma única vez, pra quem já tinha conta aberta.
+    let videosId = await kv.get('videosId');
+    if (!videosId && userFolderId) {
+      const videos = await fs.createNode({ parentId: userFolderId, name: 'Vídeos', type: 'folder' });
+      videosId = videos.id;
+      await kv.set('videosId', videosId);
+    }
     return {
       rootId,
       cDriveId,
       usersId: await kv.get('usersId'),
-      userFolderId: await kv.get('userFolderId'),
+      userFolderId,
       desktopId: await kv.get('desktopId'),
       documentsId: await kv.get('documentsId'),
       picturesId: await kv.get('picturesId'),
       downloadsId: await kv.get('downloadsId'),
+      videosId,
       trashId: await kv.get('trashId'),
     };
   }
@@ -188,6 +198,7 @@ export async function ensureSeed() {
   const documents = await fs.createNode({ parentId: userFolder.id, name: 'Documentos', type: 'folder' });
   const pictures = await fs.createNode({ parentId: userFolder.id, name: 'Imagens', type: 'folder' });
   const downloads = await fs.createNode({ parentId: userFolder.id, name: 'Downloads', type: 'folder' });
+  const videos = await fs.createNode({ parentId: userFolder.id, name: 'Vídeos', type: 'folder' });
   const trash = await fs.createNode({ parentId: cDrive.id, name: 'Lixeira', type: 'folder' });
 
   await fs.createNode({
@@ -205,6 +216,7 @@ export async function ensureSeed() {
   await kv.set('documentsId', documents.id);
   await kv.set('picturesId', pictures.id);
   await kv.set('downloadsId', downloads.id);
+  await kv.set('videosId', videos.id);
   await kv.set('trashId', trash.id);
 
   return {
@@ -216,6 +228,7 @@ export async function ensureSeed() {
     documentsId: documents.id,
     picturesId: pictures.id,
     downloadsId: downloads.id,
+    videosId: videos.id,
     trashId: trash.id,
   };
 }

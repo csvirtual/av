@@ -118,6 +118,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       <div class="side-item" data-nav="desktop">${PC_GLYPH} Área de Trabalho</div>
       <div class="side-item" data-nav="documents">📄 Documentos</div>
       <div class="side-item" data-nav="pictures">${PHOTO_GLYPH} Imagens</div>
+      <div class="side-item" data-nav="videos">🎬 Vídeos</div>
       <div class="side-item" data-nav="downloads">⬇️ Downloads</div>
       <div class="side-item" data-nav="trash"><span data-role="trash-glyph">🗑️</span> Lixeira</div>
     </div>
@@ -173,6 +174,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         desktop: seed.desktopId,
         documents: seed.documentsId,
         pictures: seed.picturesId,
+        videos: seed.videosId,
         downloads: seed.downloadsId,
         trash: seed.trashId,
       };
@@ -295,7 +297,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     const trashHasItems = (await fs.getChildren(seed.trashId)).length > 0;
     root.querySelector('[data-role="trash-glyph"]').innerHTML = trashGlyph(trashHasItems);
     root.querySelectorAll('.side-item').forEach((item) => {
-      const map = { 'this-pc': seed.rootId, desktop: seed.desktopId, documents: seed.documentsId, pictures: seed.picturesId, downloads: seed.downloadsId, trash: seed.trashId };
+      const map = { 'this-pc': seed.rootId, desktop: seed.desktopId, documents: seed.documentsId, pictures: seed.picturesId, videos: seed.videosId, downloads: seed.downloadsId, trash: seed.trashId };
       item.classList.toggle('active', map[item.dataset.nav] === currentFolderId);
     });
 
@@ -350,6 +352,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
           : node.id === seed.desktopId ? PC_GLYPH
           : node.id === seed.documentsId ? '📄'
           : node.id === seed.picturesId ? PHOTO_GLYPH
+          : node.id === seed.videosId ? '🎬'
           : node.id === seed.downloadsId ? '⬇️'
           : '📁')
         : fileGlyph(node);
@@ -430,6 +433,21 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
           }))),
         });
       }
+      if (node.id !== seed.cDriveId && node.id !== seed.usersId && node.id !== seed.userFolderId && node.id !== seed.trashId) {
+        items.push({
+          label: '📤 Enviar para',
+          onClick: async () => {
+            const nodes = multi ? await getSelectedNodes() : [node];
+            simpleContextMenu(x, y, [
+              { label: `${PC_GLYPH} Área de Trabalho`, onClick: () => sendSelectionTo(nodes, seed.desktopId, 'Área de Trabalho') },
+              { label: '📄 Documentos', onClick: () => sendSelectionTo(nodes, seed.documentsId, 'Documentos') },
+              { label: `${PHOTO_GLYPH} Imagens`, onClick: () => sendSelectionTo(nodes, seed.picturesId, 'Imagens') },
+              { label: '🎬 Vídeos', onClick: () => sendSelectionTo(nodes, seed.videosId, 'Vídeos') },
+              { label: '⬇️ Downloads', onClick: () => sendSelectionTo(nodes, seed.downloadsId, 'Downloads') },
+            ]);
+          },
+        });
+      }
       if (!multi && node.id === seed.cDriveId) {
         items.push({ label: '💽 Formatar...', onClick: () => ctx.startWipeFlow() });
       }
@@ -506,6 +524,21 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     if (!selectedIds.size || trashMode) return;
     clipboard = { mode, ids: Array.from(selectedIds) };
     render();
+  }
+
+  // "Enviar para": copia o(s) item(ns) selecionado(s) direto pra uma das
+  // pastas do usuário, sem precisar navegar até lá e colar manualmente —
+  // igual ao "Enviar para" do Explorador do Windows de verdade.
+  async function sendSelectionTo(nodes, destId, destLabel) {
+    for (const n of nodes) await deepCopyNode(fs, n, destId);
+    render();
+    ctx.refreshDesktop();
+    ctx.notify?.({
+      appId: 'explorer',
+      icon: '📤',
+      title: 'Enviado',
+      body: `${nodes.length > 1 ? `${nodes.length} itens enviados` : `"${nodes[0].name}" enviado`} para ${destLabel}.`,
+    });
   }
 
   async function pasteClipboard() {
