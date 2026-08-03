@@ -3,11 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<!-- Reforço da mesma política de netlify.toml pra quando o app é servido
-     sem os cabeçalhos HTTP dele (ex: hospedagem estática simples, ou
-     ambiente de desenvolvimento local) — frame-ancestors/sandbox não têm
-     efeito vindo de <meta> (só via cabeçalho HTTP de verdade), o resto sim. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<!-- O site é servido como página estática (GitHub Pages), que não permite
+     configurar cabeçalhos HTTP customizados — esta <meta> é a única camada
+     de CSP que existe de verdade aqui (diferente de quando era servido pelo
+     Netlify, com cabeçalho HTTP + esta tag como reforço). frame-src inclui
+     o domínio do Netlify porque só a função de proxy do Navegador
+     (netlify/functions/proxy.js) continua rodando lá — ver comentário em
+     desktop/apps/browser.js. frame-ancestors/sandbox não têm efeito vindo
+     de <meta> (só via cabeçalho HTTP de verdade), então esta política não
+     cobre proteção contra este site ser embutido em outro — sem controle
+     sobre cabeçalhos, isso não dá pra reforçar num host só estático. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self' https://cscpl.netlify.app; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Windows 11 — Área de Trabalho</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles/tokens.css">
