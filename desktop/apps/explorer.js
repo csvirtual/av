@@ -9,6 +9,7 @@ import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
 import { trashGlyph, USERS_GLYPH } from '../core/icons.js';
+import { showSystemProperties } from '../core/services/system-properties.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
@@ -181,11 +182,37 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         e.stopPropagation();
         simpleContextMenu(e.clientX, e.clientY, [
           { label: '📂 Abrir', onClick: () => navigate(seed.rootId) },
-          { label: 'ℹ️ Propriedades', onClick: () => showSystemProperties() },
+          { label: 'ℹ️ Propriedades', onClick: () => showSystemProperties(ctx, root) },
+        ]);
+      });
+    }
+    if (item.dataset.nav === 'trash') {
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        simpleContextMenu(e.clientX, e.clientY, [
+          { label: '📂 Abrir', onClick: () => navigate(seed.trashId) },
+          { label: '🧹 Esvaziar Lixeira', onClick: () => emptyTrash() },
         ]);
       });
     }
   });
+
+  async function emptyTrash() {
+    if (!confirm('Excluir permanentemente todos os itens da Lixeira?')) return;
+    const items = await fs.getChildren(seed.trashId);
+    for (const item of items) await fs.deleteNodePermanently(item.id);
+    render();
+    ctx.refreshDesktop();
+    if (items.length) {
+      ctx.notify?.({
+        appId: 'explorer',
+        icon: '🗑️',
+        title: 'Lixeira esvaziada',
+        body: `${items.length} ${items.length > 1 ? 'itens excluídos' : 'item excluído'} permanentemente.`,
+      });
+    }
+  }
 
   async function navigate(folderId) {
     currentFolderId = folderId;
@@ -400,6 +427,9 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
           }))),
         });
       }
+      if (!multi && node.id === seed.cDriveId) {
+        items.push({ label: '💽 Formatar...', onClick: () => ctx.startWipeFlow() });
+      }
       if (!multi) items.push({ label: 'ℹ️ Propriedades', onClick: () => showProperties(node) });
     }
     simpleContextMenu(x, y, items);
@@ -523,74 +553,6 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-  }
-
-  // Propriedades de "Este Computador" — igual à tela de Propriedades do
-  // Sistema do Windows real, mas só com dados que dá pra saber de verdade
-  // rodando num navegador. Campos que o Windows real mostra mas que não têm
-  // como ser reais aqui (modelo exato do processador, "Grupo de trabalho",
-  // tipo de sistema 32/64 bits) ficam de fora, em vez de inventados.
-  async function showSystemProperties() {
-    const overlay = document.createElement('div');
-    overlay.className = 'explorer-modal-overlay';
-    const box = document.createElement('div');
-    box.className = 'explorer-modal';
-    const title = document.createElement('h3');
-    title.textContent = 'Propriedades do Sistema';
-    box.appendChild(title);
-
-    const accounts = await ctx.listAccounts();
-    const primary = accounts.find((a) => a.primary);
-    const installedAt = primary?.createdAt ? new Date(primary.createdAt).toLocaleString('pt-BR') : 'desconhecida';
-    const cores = navigator.hardwareConcurrency;
-    const ram = navigator.deviceMemory;
-    const touchPoints = navigator.maxTouchPoints || 0;
-
-    const rows = [
-      ['Edição', 'Windows 11 Web Desktop'],
-      ['Versão', '10.0.22631.4317'],
-      ['Nome do dispositivo', 'WIN11-WEB'],
-      ['Processador', cores ? `${cores} núcleos lógicos disponíveis` : 'Não disponível neste navegador'],
-      ['Memória instalada (RAM)', ram ? `${ram} GB (aproximado)` : 'Não disponível neste navegador'],
-      ['Entrada por caneta e toque', touchPoints > 0 ? `Suporte a toque com ${touchPoints} ${touchPoints === 1 ? 'ponto' : 'pontos'} de toque` : 'Nenhuma entrada de caneta ou toque disponível para esta tela'],
-    ];
-    rows.forEach(([label, value]) => {
-      const row = document.createElement('div');
-      row.className = 'explorer-modal-row';
-      const labelSpan = document.createElement('span');
-      labelSpan.textContent = label;
-      const valueSpan = document.createElement('span');
-      valueSpan.textContent = value;
-      row.appendChild(labelSpan);
-      row.appendChild(valueSpan);
-      box.appendChild(row);
-    });
-
-    const activationNote = document.createElement('p');
-    activationNote.style.cssText = 'font-size:12px;color:#7ee787;margin:14px 0 0';
-    activationNote.textContent = '✓ O Windows está ativado.';
-    box.appendChild(activationNote);
-    const installNote = document.createElement('p');
-    installNote.style.cssText = 'font-size:12px;color:var(--text-dim);margin:4px 0 0';
-    installNote.textContent = `Instalado em: ${installedAt}`;
-    box.appendChild(installNote);
-
-    const actions = document.createElement('div');
-    actions.className = 'explorer-modal-actions';
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'btn';
-    closeBtn.textContent = 'Fechar';
-    closeBtn.addEventListener('click', () => overlay.remove());
-    actions.appendChild(closeBtn);
-    box.appendChild(actions);
-
-    overlay.appendChild(box);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    function onEscape(e) {
-      if (e.key === 'Escape') { overlay.remove(); window.removeEventListener('keydown', onEscape); }
-    }
-    window.addEventListener('keydown', onEscape);
-    root.appendChild(overlay);
   }
 
   async function showProperties(node) {
@@ -739,21 +701,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     const node = await fs.getNode(Array.from(selectedIds)[0]);
     if (node) showProperties(node);
   });
-  root.querySelector('[data-action="empty-trash"]').addEventListener('click', async () => {
-    if (!confirm('Excluir permanentemente todos os itens da Lixeira?')) return;
-    const items = await fs.getChildren(seed.trashId);
-    for (const item of items) await fs.deleteNodePermanently(item.id);
-    render();
-    ctx.refreshDesktop();
-    if (items.length) {
-      ctx.notify?.({
-        appId: 'explorer',
-        icon: '🗑️',
-        title: 'Lixeira esvaziada',
-        body: `${items.length} ${items.length > 1 ? 'itens excluídos' : 'item excluído'} permanentemente.`,
-      });
-    }
-  });
+  root.querySelector('[data-action="empty-trash"]').addEventListener('click', emptyTrash);
   sortBySelect.addEventListener('change', async () => {
     sortBy = sortBySelect.value;
     await kv.set('explorer.sortBy', sortBy);

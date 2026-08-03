@@ -28,6 +28,7 @@ import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
 import { trashGlyph, USERS_GLYPH } from './core/icons.js';
+import { showSystemProperties } from './core/services/system-properties.js';
 import { listRealEntryNames, isValidBackup, restoreBackup } from './core/services/backup.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -263,6 +264,21 @@ async function refreshTrashState() {
   renderDesktopIcons();
   renderTaskbarApps();
   renderStartMenu();
+}
+
+async function emptyTrashFromDesktop() {
+  if (!confirm('Excluir permanentemente todos os itens da Lixeira?')) return;
+  const items = await fs.getChildren(seed.trashId);
+  for (const item of items) await fs.deleteNodePermanently(item.id);
+  refreshTrashState();
+  if (items.length) {
+    ctx.notify?.({
+      appId: 'explorer',
+      icon: '🗑️',
+      title: 'Lixeira esvaziada',
+      body: `${items.length} ${items.length > 1 ? 'itens excluídos' : 'item excluído'} permanentemente.`,
+    });
+  }
 }
 
 // ---------------- Boot sequence ----------------
@@ -1287,6 +1303,12 @@ async function renderDesktopIcons() {
             onClick: () => app.open(icon.node),
           }))),
         });
+      }
+      if (icon.id === 'this-pc') {
+        items.push({ label: 'ℹ️ Propriedades', onClick: () => showSystemProperties(ctx, document.body) });
+      }
+      if (icon.id === 'recycle-bin') {
+        items.push({ label: '🧹 Esvaziar Lixeira', onClick: () => emptyTrashFromDesktop() });
       }
       showContextMenu(e.clientX, e.clientY, items);
     });
