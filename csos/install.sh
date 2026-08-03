@@ -52,6 +52,23 @@ if command -v apt-get >/dev/null 2>&1; then
     CHROMIUM_PKG=chromium-browser
   fi
   apt-get install -y -qq xserver-xorg xinit "$CHROMIUM_PKG" python3 curl x11-xserver-utils
+
+  # No Ubuntu (desde a 20.04), o pacote apt "chromium"/"chromium-browser" é
+  # só um "transitional package" que aciona a instalação do snap por baixo
+  # — se o snapd não estiver disponível (ou não tiver rede pra loja de
+  # snaps), o apt "termina com sucesso" mas nenhum binário de verdade fica
+  # no PATH, e a máquina reiniciaria pra uma tela preta sem navegador
+  # nenhum. Detecta esse caso agora, com o instalador ainda rodando, em vez
+  # de descobrir só depois do reboot.
+  if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1 \
+     && ! command -v google-chrome >/dev/null 2>&1 && ! command -v google-chrome-stable >/dev/null 2>&1; then
+    if command -v snap >/dev/null 2>&1; then
+      log "binário do Chromium não apareceu via apt — tentando 'snap install chromium'..."
+      snap install chromium || die "'$CHROMIUM_PKG' instalou via apt mas é um pacote de transição pro snap, e 'snap install chromium' falhou (sem rede pra loja de snaps?). Instale um Chromium/Chrome de verdade manualmente e rode install.sh de novo."
+    else
+      die "'$CHROMIUM_PKG' instalou via apt mas nenhum binário do Chromium apareceu no PATH — nesta distro isso normalmente significa que é um pacote de transição pro snap, e snapd não está instalado aqui. Instale snapd (e rode 'snap install chromium'), ou instale o Google Chrome manualmente, ou use uma base Debian (onde 'chromium' é um pacote real via apt) — depois rode install.sh de novo."
+    fi
+  fi
 else
   log "aviso: apt-get não encontrado — pulando instalação de pacotes (garanta que xserver-xorg, xinit, chromium, python3 e curl já estejam instalados)."
 fi
