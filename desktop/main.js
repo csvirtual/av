@@ -35,6 +35,15 @@ const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
 const hide = (el) => el.classList.add('hidden');
 
+// Bloqueio geral do menu de contexto nativo do navegador: em nenhum lugar da
+// página o clique direito deve abrir o menu de verdade do Chrome/Edge/etc.
+// (Voltar, Recarregar, Inspecionar...) — só os menus próprios do "sistema
+// operacional" simulado (ícones, arquivos, área de trabalho etc.), cada um já
+// com seu próprio preventDefault(). Onde não existe menu próprio nenhum
+// (telas de login, espaços vazios sem handler específico), o clique direito
+// agora não mostra nada, em vez de cair pro menu nativo do navegador.
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
 // Painéis flutuantes (menus, popups) animam com o motion compartilhado.
 function showPanel(el) {
   show(el);
