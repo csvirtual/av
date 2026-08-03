@@ -27,7 +27,7 @@ import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
-import { trashGlyph } from './core/icons.js';
+import { trashGlyph, USERS_GLYPH } from './core/icons.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -152,7 +152,7 @@ async function refreshAvatars() {
 
 function fileGlyph(node) {
   if (node.type === 'folder') {
-    if (node.id === seed?.usersId) return '👤';
+    if (node.id === seed?.usersId) return USERS_GLYPH;
     if (node.id === seed?.trashId) return trashGlyph();
     if (node.id === seed?.desktopId) return '🖥️';
     if (node.id === seed?.documentsId) return '📄';
