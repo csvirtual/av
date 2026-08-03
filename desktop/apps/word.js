@@ -13,6 +13,20 @@
 // Docs, sem conversão nenhuma no meio.
 export const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
+// O mammoth (usado pra reabrir um .docx) por padrão ignora formatação
+// direta como cor de texto e tamanho de fonte — o arquivo salvo continua
+// correto de verdade (abre certo no Word/LibreOffice de verdade, dá pra
+// conferir olhando o XML), só a nossa própria pré-visualização ao reabrir
+// não mostra essas duas. Realce, porém, o mammoth sabe recuperar via
+// style map — por isso mapeamos as 4 cores que a barra de ferramentas usa.
+const MAMMOTH_STYLE_MAP = [
+  'u => u',
+  "highlight[color='yellow'] => span.mammoth-hl-yellow",
+  "highlight[color='green'] => span.mammoth-hl-green",
+  "highlight[color='cyan'] => span.mammoth-hl-cyan",
+  "highlight[color='magenta'] => span.mammoth-hl-magenta",
+];
+
 let libsPromise = null;
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -80,14 +94,42 @@ const HEADING_MAP = { h1: 'HEADING_1', h2: 'HEADING_2', h3: 'HEADING_3' };
 const ALIGN_MAP = { left: 'LEFT', center: 'CENTER', right: 'RIGHT', justify: 'BOTH' };
 const NUMBERING_REF = 'lista-numerada';
 
+function colorToHex(colorStr) {
+  if (!colorStr) return null;
+  if (colorStr.startsWith('#')) return colorStr.slice(1).toUpperCase();
+  const m = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return null;
+  return [1, 2, 3].map((i) => parseInt(m[i], 10).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+// O .docx só aceita um conjunto fixo de cores de realce nomeadas (não
+// qualquer hex) — mapeia de volta o hex aplicado pelo seletor de realce pro
+// nome mais próximo que o formato realmente suporta.
+const HIGHLIGHT_HEX_TO_DOCX = { FFFF00: 'yellow', '00FF00': 'green', '00FFFF': 'cyan', FF00FF: 'magenta' };
+// Um documento reaberto via mammoth representa o realce como uma classe CSS
+// (ver MAMMOTH_STYLE_MAP), não como style inline — reconhece as duas formas,
+// senão editar e salvar de novo um arquivo importado perderia o realce.
+const HIGHLIGHT_CLASS_TO_DOCX = { 'mammoth-hl-yellow': 'yellow', 'mammoth-hl-green': 'green', 'mammoth-hl-cyan': 'cyan', 'mammoth-hl-magenta': 'magenta' };
+
 // Constrói as "runs" (trechos de texto com formatação) de um elemento
-// inline, percorrendo os descendentes e acumulando negrito/itálico/sublinhado
-// conforme as tags encontradas (<b>/<strong>, <i>/<em>, <u>).
+// inline, percorrendo os descendentes e acumulando negrito/itálico/
+// sublinhado/tamanho/cor/realce conforme as tags e estilos encontrados
+// (<b>/<strong>, <i>/<em>, <u>, ou um <span style="..."> gerado pelo
+// execCommand ao aplicar tamanho/cor/realce pela barra de ferramentas).
 function runsFromInline(DocxLib, node, base = {}) {
   const runs = [];
   node.childNodes.forEach((child) => {
     if (child.nodeType === Node.TEXT_NODE) {
-      if (child.textContent) runs.push(new DocxLib.TextRun({ text: child.textContent, bold: base.bold, italics: base.italic, underline: base.underline ? {} : undefined }));
+      if (child.textContent) {
+        runs.push(new DocxLib.TextRun({
+          text: child.textContent,
+          bold: base.bold,
+          italics: base.italic,
+          underline: base.underline ? {} : undefined,
+          size: base.size,
+          color: base.color,
+          highlight: base.highlight,
+        }));
+      }
       return;
     }
     if (child.nodeType !== Node.ELEMENT_NODE) return;
@@ -97,6 +139,33 @@ function runsFromInline(DocxLib, node, base = {}) {
     if (tag === 'b' || tag === 'strong') next.bold = true;
     if (tag === 'i' || tag === 'em') next.italic = true;
     if (tag === 'u') next.underline = true;
+    const style = child.style;
+    // Com styleWithCSS ligado (ver abaixo), o próprio execCommand('bold'/
+    // 'italic'/'underline') do botão da barra passa a gerar um <span
+    // style="..."> em vez de <b>/<i>/<u> — reconhece os dois formatos,
+    // senão o negrito/itálico/sublinhado do botão pararia de ser exportado.
+    if (style?.fontWeight) {
+      const fw = String(style.fontWeight).toLowerCase();
+      if (fw === 'bold' || fw === 'bolder' || (Number(fw) >= 700)) next.bold = true;
+    }
+    if (style?.fontStyle === 'italic') next.italic = true;
+    if (style?.textDecorationLine?.includes('underline') || style?.textDecoration?.includes('underline')) next.underline = true;
+    if (style?.fontSize) {
+      const pt = parseFloat(style.fontSize);
+      if (pt) next.size = Math.round(pt * 2); // docx mede em meios-de-ponto
+    }
+    if (style?.color) {
+      const hex = colorToHex(style.color);
+      if (hex) next.color = hex;
+    }
+    if (style?.backgroundColor) {
+      const hex = colorToHex(style.backgroundColor);
+      const name = hex && HIGHLIGHT_HEX_TO_DOCX[hex];
+      if (name) next.highlight = name;
+    }
+    for (const cls of child.classList) {
+      if (HIGHLIGHT_CLASS_TO_DOCX[cls]) next.highlight = HIGHLIGHT_CLASS_TO_DOCX[cls];
+    }
     runs.push(...runsFromInline(DocxLib, child, next));
   });
   return runs;
@@ -185,6 +254,28 @@ export function openWord(ctx, { fileId = null } = {}) {
       <button data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
       <button data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
       <button data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button>
+      <select data-role="font-size" title="Tamanho da fonte" aria-label="Tamanho da fonte">
+        <option value="">Tamanho</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12" selected>12</option>
+        <option value="14">14</option>
+        <option value="16">16</option>
+        <option value="18">18</option>
+        <option value="24">24</option>
+        <option value="28">28</option>
+        <option value="36">36</option>
+      </select>
+      <label class="word-color-label" title="Cor do texto">A<input type="color" data-role="text-color" value="#000000"></label>
+      <select data-role="highlight" title="Realçar texto" aria-label="Realçar texto">
+        <option value="">Realce</option>
+        <option value="yellow">🟡 Amarelo</option>
+        <option value="green">🟢 Verde</option>
+        <option value="cyan">🔵 Ciano</option>
+        <option value="magenta">🩷 Rosa</option>
+        <option value="none">Nenhum</option>
+      </select>
       <span class="word-sep"></span>
       <button data-block="h1" title="Título 1">T1</button>
       <button data-block="h2" title="Título 2">T2</button>
@@ -219,6 +310,9 @@ export function openWord(ctx, { fileId = null } = {}) {
   const status = root.querySelector('[data-role="status"]');
   const importInput = root.querySelector('[data-role="import-input"]');
   document.execCommand('defaultParagraphSeparator', false, 'p');
+  // Sem isso, foreColor/hiliteColor no Chrome geram <font color> em vez de
+  // <span style="...">, que é o que o exportador pro .docx sabe ler.
+  document.execCommand('styleWithCSS', false, true);
 
   function updateTitle() {
     const name = status.dataset.name || 'Novo documento';
@@ -279,6 +373,50 @@ export function openWord(ctx, { fileId = null } = {}) {
     });
   });
 
+  // execCommand('fontSize') só aceita a escala antiga 1-7 (xx-small..xx-large),
+  // não um tamanho em pt de verdade — o truque padrão é aplicar o "7" (maior
+  // da escala, fácil de achar de volta) e trocar pelo tamanho real que a
+  // gente quer. Com styleWithCSS ligado (ver acima), o Chrome/Firefox geram
+  // um <span style="font-size: xxx-large"> direto; navegadores mais antigos
+  // podem gerar <font size="7"> — trata os dois casos.
+  const fontSizeEl = root.querySelector('[data-role="font-size"]');
+  fontSizeEl.addEventListener('change', () => {
+    const pt = fontSizeEl.value;
+    if (!pt) return;
+    editor.focus();
+    document.execCommand('fontSize', false, '7');
+    editor.querySelectorAll('span').forEach((span) => {
+      if (span.style.fontSize === 'xxx-large') span.style.fontSize = `${pt}pt`;
+    });
+    editor.querySelectorAll('font[size="7"]').forEach((f) => {
+      const span = document.createElement('span');
+      span.style.fontSize = `${pt}pt`;
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.replaceWith(span);
+    });
+    fontSizeEl.value = '';
+    markDirty();
+  });
+
+  const textColorEl = root.querySelector('[data-role="text-color"]');
+  textColorEl.addEventListener('input', () => {
+    editor.focus();
+    document.execCommand('foreColor', false, textColorEl.value);
+    markDirty();
+  });
+
+  const highlightEl = root.querySelector('[data-role="highlight"]');
+  const HIGHLIGHT_CSS = { yellow: '#ffff00', green: '#00ff00', cyan: '#00ffff', magenta: '#ff00ff', none: 'transparent' };
+  highlightEl.addEventListener('change', () => {
+    const value = highlightEl.value;
+    if (!value) return;
+    editor.focus();
+    const supportsHilite = document.queryCommandSupported?.('hiliteColor');
+    document.execCommand(supportsHilite ? 'hiliteColor' : 'backColor', false, HIGHLIGHT_CSS[value]);
+    highlightEl.value = '';
+    markDirty();
+  });
+
   async function ensureLibs() {
     if (!libs) {
       status.textContent = 'Carregando editor de documentos…';
@@ -303,7 +441,7 @@ export function openWord(ctx, { fileId = null } = {}) {
       try {
         const { mammoth } = await ensureLibs();
         const arrayBuffer = dataUrlToArrayBuffer(node.content);
-        const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: ['u => u'] });
+        const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: MAMMOTH_STYLE_MAP });
         editor.innerHTML = sanitizeHtml(result.value);
       } catch {
         editor.innerHTML = '';
@@ -368,7 +506,7 @@ export function openWord(ctx, { fileId = null } = {}) {
     if (dirty && !confirm('Descartar alterações não salvas e importar este arquivo?')) return;
     const { mammoth } = await ensureLibs();
     const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: ['u => u'] });
+    const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: MAMMOTH_STYLE_MAP });
     editor.innerHTML = sanitizeHtml(result.value);
     currentFileId = null;
     status.dataset.name = file.name.replace(/\.docx$/i, '') + ' (importado).docx';

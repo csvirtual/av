@@ -1,6 +1,6 @@
-// Planilha: grade de células editáveis com fórmulas de verdade (SOMA,
-// MÉDIA, MÍNIMO, MÁXIMO, CONT.VALORES em inglês — SUM/AVERAGE/MIN/MAX/
-// COUNT — mais os operadores aritméticos usuais), lendo e salvando .xlsx
+// Planilha: grade de células editáveis com fórmulas de verdade
+// (SUM/AVERAGE/MIN/MAX/COUNT/IF/ROUND/ABS/CONCATENATE, operadores
+// aritméticos e de comparação, texto entre aspas), lendo e salvando .xlsx
 // real. A grade/edição/motor de fórmulas é 100% nosso (tokenizer, parser e
 // avaliador com detecção de referência circular, escritos aqui mesmo); só
 // a leitura/escrita do arquivo .xlsx em si usa a biblioteca SheetJS
@@ -72,16 +72,18 @@ function colRowFromRef(ref) {
 // ---------- Motor de fórmulas (tokenizer + parser + avaliador) ----------
 function tokenize(src) {
   const tokens = [];
-  const re = /(\d+\.?\d*)|([A-Za-z]+[0-9]+)|([A-Za-z]+)|([()+\-*/^,:])/g;
+  const re = /"([^"]*)"|(\d+\.?\d*)|([A-Za-z]+[0-9]+)|([A-Za-z]+)|(<=|>=|<>|[()+\-*/^,:=<>])/g;
   let m;
   while ((m = re.exec(src))) {
-    if (m[1] !== undefined) tokens.push({ type: 'num', value: parseFloat(m[1]) });
-    else if (m[2] !== undefined) tokens.push({ type: 'ref', value: m[2].toUpperCase() });
-    else if (m[3] !== undefined) tokens.push({ type: 'name', value: m[3].toUpperCase() });
-    else tokens.push({ type: 'op', value: m[4] });
+    if (m[1] !== undefined) tokens.push({ type: 'str', value: m[1] });
+    else if (m[2] !== undefined) tokens.push({ type: 'num', value: parseFloat(m[2]) });
+    else if (m[3] !== undefined) tokens.push({ type: 'ref', value: m[3].toUpperCase() });
+    else if (m[4] !== undefined) tokens.push({ type: 'name', value: m[4].toUpperCase() });
+    else tokens.push({ type: 'op', value: m[5] });
   }
   return tokens;
 }
+const COMPARISON_OPS = ['=', '<>', '<', '>', '<=', '>='];
 
 function parseFormula(tokens) {
   let pos = 0;
@@ -91,6 +93,14 @@ function parseFormula(tokens) {
   function expectOp(op) {
     const t = next();
     if (!isOp(t, op)) throw new Error(`Esperado "${op}" na fórmula`);
+  }
+  function parseComparison() {
+    let node = parseExpression();
+    while (COMPARISON_OPS.some((op) => isOp(peek(), op))) {
+      const op = next().value;
+      node = { type: 'binop', op, left: node, right: parseExpression() };
+    }
+    return node;
   }
   function parseExpression() {
     let node = parseTerm();
@@ -127,6 +137,7 @@ function parseFormula(tokens) {
     const t = peek();
     if (!t) throw new Error('Fórmula incompleta');
     if (t.type === 'num') { next(); return { type: 'num', value: t.value }; }
+    if (t.type === 'str') { next(); return { type: 'str', value: t.value }; }
     if (t.type === 'ref') { next(); return { type: 'ref', ref: t.value }; }
     if (t.type === 'name') {
       next();
@@ -157,9 +168,9 @@ function parseFormula(tokens) {
       const to = next().value;
       return { type: 'range', from, to };
     }
-    return parseExpression();
+    return parseComparison();
   }
-  const result = parseExpression();
+  const result = parseComparison();
   if (pos !== tokens.length) throw new Error('Fórmula com sobra de tokens');
   return result;
 }
@@ -173,6 +184,29 @@ function evaluateSheet(cells) {
     if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
     return 0;
   }
+  function toText(v) {
+    if (typeof v === 'boolean') return v ? 'VERDADEIRO' : 'FALSO';
+    return v == null ? '' : String(v);
+  }
+  function compareValues(a, b, op) {
+    const numA = typeof a === 'number' || (typeof a === 'string' && a.trim() !== '' && !Number.isNaN(Number(a)));
+    const numB = typeof b === 'number' || (typeof b === 'string' && b.trim() !== '' && !Number.isNaN(Number(b)));
+    let cmp;
+    if (numA && numB) {
+      const na = Number(a), nb = Number(b);
+      cmp = na < nb ? -1 : na > nb ? 1 : 0;
+    } else {
+      const sa = toText(a), sb = toText(b);
+      cmp = sa < sb ? -1 : sa > sb ? 1 : 0;
+    }
+    if (op === '=') return cmp === 0;
+    if (op === '<>') return cmp !== 0;
+    if (op === '<') return cmp < 0;
+    if (op === '>') return cmp > 0;
+    if (op === '<=') return cmp <= 0;
+    if (op === '>=') return cmp >= 0;
+    throw new Error('Operador de comparação desconhecido');
+  }
   function rangeRefs(from, to) {
     const a = colRowFromRef(from), b = colRowFromRef(to);
     const refs = [];
@@ -184,6 +218,7 @@ function evaluateSheet(cells) {
   function evalNode(node) {
     switch (node.type) {
       case 'num': return node.value;
+      case 'str': return node.value;
       case 'ref': {
         const v = getValue(node.ref);
         if (typeof v === 'string' && v.startsWith('#')) throw new Error(v);
@@ -194,6 +229,9 @@ function evaluateSheet(cells) {
         return node.op === '-' ? -v : v;
       }
       case 'binop': {
+        if (COMPARISON_OPS.includes(node.op)) {
+          return compareValues(evalNode(node.left), evalNode(node.right), node.op);
+        }
         const l = toNumber(evalNode(node.left));
         const r = toNumber(evalNode(node.right));
         if (node.op === '+') return l + r;
@@ -204,17 +242,42 @@ function evaluateSheet(cells) {
         throw new Error('Operador desconhecido');
       }
       case 'call': {
+        const name = node.name;
+        if (name === 'IF') {
+          if (node.args.length < 2 || node.args.length > 3) throw new Error('IF espera 2 ou 3 argumentos');
+          const cond = evalNode(node.args[0]);
+          const truthy = typeof cond === 'boolean' ? cond : toNumber(cond) !== 0;
+          if (truthy) return evalNode(node.args[1]);
+          return node.args.length === 3 ? evalNode(node.args[2]) : false;
+        }
+        if (name === 'ROUND') {
+          if (node.args.length !== 2) throw new Error('ROUND espera 2 argumentos');
+          const num = toNumber(evalNode(node.args[0]));
+          const digits = toNumber(evalNode(node.args[1]));
+          const factor = Math.pow(10, digits);
+          return Math.round(num * factor) / factor;
+        }
+        if (name === 'ABS') {
+          if (node.args.length !== 1) throw new Error('ABS espera 1 argumento');
+          return Math.abs(toNumber(evalNode(node.args[0])));
+        }
+        if (name === 'CONCATENATE') {
+          return node.args.map((arg) => {
+            if (arg.type === 'range') return rangeRefs(arg.from, arg.to).map((ref) => toText(getValue(ref))).join('');
+            return toText(evalNode(arg));
+          }).join('');
+        }
         const values = [];
         for (const arg of node.args) {
           if (arg.type === 'range') rangeRefs(arg.from, arg.to).forEach((ref) => values.push(toNumber(getValue(ref))));
           else values.push(toNumber(evalNode(arg)));
         }
-        if (node.name === 'SUM') return values.reduce((a, b) => a + b, 0);
-        if (node.name === 'AVERAGE') return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
-        if (node.name === 'MIN') return values.length ? Math.min(...values) : 0;
-        if (node.name === 'MAX') return values.length ? Math.max(...values) : 0;
-        if (node.name === 'COUNT') return values.length;
-        throw new Error(`Função desconhecida: ${node.name}`);
+        if (name === 'SUM') return values.reduce((a, b) => a + b, 0);
+        if (name === 'AVERAGE') return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        if (name === 'MIN') return values.length ? Math.min(...values) : 0;
+        if (name === 'MAX') return values.length ? Math.max(...values) : 0;
+        if (name === 'COUNT') return values.length;
+        throw new Error(`Função desconhecida: ${name}`);
       }
       case 'range':
         throw new Error('Intervalo só é válido dentro de uma função');
@@ -263,7 +326,8 @@ function buildWorksheet(XLSXLib, cells, computed) {
     maxRow = Math.max(maxRow, row);
     const value = computed[ref];
     if (String(raw).startsWith('=')) {
-      ws[ref] = { t: typeof value === 'number' ? 'n' : 's', v: value, f: String(raw).slice(1) };
+      const t = typeof value === 'number' ? 'n' : typeof value === 'boolean' ? 'b' : 's';
+      ws[ref] = { t, v: value, f: String(raw).slice(1) };
     } else {
       const num = Number(raw);
       ws[ref] = (String(raw).trim() !== '' && !Number.isNaN(num)) ? { t: 'n', v: num } : { t: 's', v: String(raw) };
@@ -317,6 +381,8 @@ export function openSheet(ctx, { fileId = null } = {}) {
       <button data-action="save" title="Salvar">💾 Salvar</button>
       <button data-action="save-as" title="Salvar como">💾 Salvar como</button>
       <button data-action="import" title="Importar .xlsx do computador">📥 Importar .xlsx</button>
+      <span class="sheet-sep"></span>
+      <button data-action="freeze" title="Congelar a linha 1 (fica visível ao rolar a planilha)">🧊 Congelar linha 1</button>
       <input type="file" data-role="import-input" accept=".xlsx" class="hidden">
     </div>
     <div class="sheet-formula-bar">
@@ -382,6 +448,19 @@ export function openSheet(ctx, { fileId = null } = {}) {
     table.appendChild(tbody);
     gridWrap.innerHTML = '';
     gridWrap.appendChild(table);
+    applyFreezeState();
+  }
+
+  // "Congelar linha 1": mantém a primeira linha de dados visível ao rolar,
+  // como o "Congelar Painel Superior" do Excel. O offset é medido na hora
+  // (não fixo em CSS) pra funcionar com qualquer tamanho de fonte/zoom.
+  let headerFrozen = false;
+  function applyFreezeState() {
+    const table = gridWrap.querySelector('.sheet-table');
+    if (!table) return;
+    table.classList.toggle('frozen-header', headerFrozen);
+    const theadRow = table.querySelector('thead tr');
+    if (theadRow) table.style.setProperty('--sheet-head-h', `${theadRow.getBoundingClientRect().height}px`);
   }
 
   function onCellFocus(ref) {
@@ -424,7 +503,8 @@ export function openSheet(ctx, { fileId = null } = {}) {
     Object.keys(gridInputs).forEach((ref) => {
       if (gridInputs[ref] === document.activeElement) return; // deixa a célula em edição (com foco de verdade) mostrando a fórmula crua
       const value = computed[ref];
-      gridInputs[ref].value = value === undefined ? '' : String(value);
+      if (value === undefined) gridInputs[ref].value = '';
+      else gridInputs[ref].value = typeof value === 'boolean' ? (value ? 'VERDADEIRO' : 'FALSO') : String(value);
     });
   }
 
@@ -507,6 +587,13 @@ export function openSheet(ctx, { fileId = null } = {}) {
     updateTitle();
   });
   root.querySelector('[data-action="save"]').addEventListener('click', saveCurrent);
+  const freezeBtn = root.querySelector('[data-action="freeze"]');
+  freezeBtn.addEventListener('click', () => {
+    headerFrozen = !headerFrozen;
+    freezeBtn.textContent = headerFrozen ? '🧊 Descongelar linha 1' : '🧊 Congelar linha 1';
+    freezeBtn.classList.toggle('active', headerFrozen);
+    applyFreezeState();
+  });
   root.querySelector('[data-action="save-as"]').addEventListener('click', saveAs);
   root.querySelector('[data-action="import"]').addEventListener('click', () => importInput.click());
   importInput.addEventListener('change', async () => {

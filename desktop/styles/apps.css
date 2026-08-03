@@ -127,6 +127,21 @@
 .word-toolbar button:hover { background: var(--hover); }
 .word-toolbar button.active { background: var(--accent-2); color: #fff; }
 .word-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
+.word-toolbar select {
+  border: none; background: none; padding: var(--space-2) 6px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text);
+}
+.word-toolbar select:hover { background: var(--hover); }
+.word-color-label {
+  display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text); cursor: pointer;
+  padding: var(--space-2) 6px; border-radius: var(--radius-sm);
+}
+.word-color-label:hover { background: var(--hover); }
+.word-color-label input[type="color"] { width: 18px; height: 18px; border: none; padding: 0; background: none; cursor: pointer; }
+.word-page .mammoth-hl-yellow { background-color: #ffff00; }
+.word-page .mammoth-hl-green { background-color: #00ff00; }
+.word-page .mammoth-hl-cyan { background-color: #00ffff; }
+.word-page .mammoth-hl-magenta { background-color: #ff00ff; }
 .word-page-wrap { flex: 1; overflow-y: auto; padding: var(--space-5); background: var(--hover); }
 .word-page {
   max-width: 720px; min-height: 100%; margin: 0 auto; padding: 48px 56px;
@@ -175,6 +190,13 @@
 }
 .sheet-table td input:focus { background: var(--hover); box-shadow: inset 0 0 0 2px var(--accent-2); }
 .sheet-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
+.sheet-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
+.sheet-toolbar button.active { background: var(--accent-2); color: #fff; }
+.sheet-table.frozen-header tbody tr:first-child th,
+.sheet-table.frozen-header tbody tr:first-child td {
+  position: sticky; top: var(--sheet-head-h, 30px); z-index: 1; background: var(--win-bg);
+}
+.sheet-table.frozen-header tbody tr:first-child th { z-index: 2; background: var(--panel-bg); }
 
 /* ---------- Player de Vídeo (VLC-like) ---------- */
 .video-app { display: flex; flex-direction: column; height: 100%; background: #111; }
@@ -277,10 +299,22 @@
   cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap;
 }
 .pres-toolbar button:hover { background: var(--hover); }
+.pres-toolbar select {
+  border: none; background: none; padding: var(--space-2) 6px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text);
+}
+.pres-toolbar select:hover { background: var(--hover); }
+.pres-color-label {
+  display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text); cursor: pointer;
+  padding: var(--space-2) 6px; border-radius: var(--radius-sm);
+}
+.pres-color-label:hover { background: var(--hover); }
+.pres-color-label input[type="color"] { width: 18px; height: 18px; border: none; padding: 0; background: none; cursor: pointer; }
 .pres-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
 .pres-bg-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); }
 .pres-bg-label input[type="color"] { width: 24px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
 .pres-toolbar-spacer { flex: 1; }
+.pres-slide-body img, .pres-present-body img { max-width: 100%; max-height: 220px; display: block; }
 .pres-body { flex: 1; display: flex; min-height: 0; }
 .pres-sidebar { width: 180px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--panel-bg); flex-shrink: 0; }
 .pres-slide-list { flex: 1; overflow-y: auto; padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }

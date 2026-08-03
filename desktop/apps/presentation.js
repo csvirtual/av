@@ -7,10 +7,12 @@
 //   - Leitura de um .pptx existente é feita por um leitor próprio (não tem
 //     biblioteca de leitura de pptx pronta e mantida pro navegador, como
 //     existe pro .docx): usa o JSZip (que já vem dentro do bundle do
-//     pptxgenjs) pra abrir o .pptx como zip e ler o XML de cada slide.
-//     Limitação real: extrai texto (título/corpo) e negrito, mas não
-//     imagens, posições exatas ou formatação avançada — um "best effort"
-//     de importação, não um leitor completo de OOXML.
+//     pptxgenjs) pra abrir o .pptx como zip, ler o XML de cada slide e
+//     resolver as imagens (<p:pic>) via o .rels do slide + a mídia real em
+//     ppt/media/. Limitação real: extrai texto (título/corpo), negrito/
+//     itálico/sublinhado/cor/tamanho e imagens, mas não posições exatas,
+//     tabelas ou formatação avançada — um "best effort" de importação, não
+//     um leitor completo de OOXML.
 export const PRESENTATION_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
 let libsPromise = null;
@@ -49,6 +51,14 @@ function dataUrlToArrayBuffer(dataUrl) {
 
 function escapeHtml(str) {
   return str.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function colorToHex(colorStr) {
+  if (!colorStr) return null;
+  if (colorStr.startsWith('#')) return colorStr.slice(1).toUpperCase();
+  const m = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return null;
+  return [1, 2, 3].map((i) => parseInt(m[i], 10).toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
 // O corpo do slide é guardado como o innerHTML bruto do contenteditable (pra
@@ -96,6 +106,25 @@ function runsFromInline(node, base = {}) {
     if (tag === 'b' || tag === 'strong') next.bold = true;
     if (tag === 'i' || tag === 'em') next.italic = true;
     if (tag === 'u') next.underline = { style: 'sng' };
+    const style = child.style;
+    // Com styleWithCSS ligado (necessário pro seletor de tamanho/cor da
+    // fonte), o próprio botão de negrito/itálico/sublinhado da barra passa a
+    // gerar um <span style="..."> em vez de <b>/<i>/<u> — reconhece os dois
+    // formatos, senão esses botões parariam de exportar pro .pptx.
+    if (style?.fontWeight) {
+      const fw = String(style.fontWeight).toLowerCase();
+      if (fw === 'bold' || fw === 'bolder' || Number(fw) >= 700) next.bold = true;
+    }
+    if (style?.fontStyle === 'italic') next.italic = true;
+    if (style?.textDecorationLine?.includes('underline') || style?.textDecoration?.includes('underline')) next.underline = { style: 'sng' };
+    if (style?.fontSize) {
+      const pt = parseFloat(style.fontSize);
+      if (pt) next.fontSize = Math.round(pt);
+    }
+    if (style?.color) {
+      const hex = colorToHex(style.color);
+      if (hex) next.color = hex;
+    }
     runs.push(...runsFromInline(child, next));
   });
   return runs;
@@ -145,6 +174,10 @@ function bodyHtmlToPptxRuns(bodyEl) {
   return runs.length ? runs : [{ text: '', options: {} }];
 }
 
+function extractImageSrcs(bodyEl) {
+  return Array.from(bodyEl.querySelectorAll('img')).map((img) => img.getAttribute('src')).filter(Boolean);
+}
+
 async function slidesToPptxDataUrl(PptxGenJS, slides) {
   const pres = new PptxGenJS();
   pres.defineLayout({ name: 'WIDE', width: 10, height: 5.63 });
@@ -157,10 +190,21 @@ async function slidesToPptxDataUrl(PptxGenJS, slides) {
     }
     const wrapper = document.createElement('div');
     wrapper.innerHTML = slide.bodyHtml || '';
+    const images = extractImageSrcs(wrapper).slice(0, 3);
     const runs = bodyHtmlToPptxRuns(wrapper);
-    if (runs.some((r) => r.text.trim())) {
-      s.addText(runs, { x: 0.5, y: 1.5, w: 9, h: 3.8, fontSize: 18, color: '333333', valign: 'top' });
+    const hasText = runs.some((r) => r.text.trim());
+    if (hasText) {
+      s.addText(runs, { x: 0.5, y: 1.5, w: 9, h: images.length ? 2.2 : 3.8, fontSize: 18, color: '333333', valign: 'top' });
     }
+    // Imagens viram formas próprias (addImage), separadas do texto — o
+    // formato .pptx não tem como misturar imagem inline dentro de um "run"
+    // de texto, então empilhamos elas lado a lado abaixo do texto (ou
+    // centralizadas, se o slide não tiver texto nenhum).
+    const imgY = hasText ? 3.9 : 1.4;
+    const imgW = 2.6, imgH = 1.9, gap = 0.25;
+    images.forEach((src, i) => {
+      s.addImage({ data: src, x: 0.5 + i * (imgW + gap), y: imgY, w: imgW, h: imgH });
+    });
   });
   const blob = await pres.write({ outputType: 'blob' });
   return blobToDataUrl(blob);
@@ -183,6 +227,40 @@ function htmlOfRuns(runEls) {
   }).join('');
 }
 
+// Relacionamentos do slide (ppt/slides/_rels/slideN.xml.rels) mapeiam o
+// r:embed de cada imagem pro caminho real dela dentro do zip
+// (ppt/media/imageN.png) — sem isso não dá pra saber qual arquivo de mídia
+// corresponde a qual <p:pic> no XML do slide.
+async function loadSlideRels(zip, slideFileName) {
+  const base = slideFileName.split('/').pop();
+  const relsFile = zip.files[`ppt/slides/_rels/${base}.rels`];
+  if (!relsFile) return {};
+  const doc = new DOMParser().parseFromString(await relsFile.async('text'), 'application/xml');
+  const map = {};
+  Array.from(doc.getElementsByTagNameNS('*', 'Relationship')).forEach((rel) => {
+    const id = rel.getAttribute('Id');
+    const target = rel.getAttribute('Target');
+    if (id && target) map[id] = target;
+  });
+  return map;
+}
+function resolveMediaPath(target) {
+  const stack = [];
+  `ppt/slides/${target}`.split('/').forEach((part) => {
+    if (part === '..') stack.pop();
+    else if (part !== '.' && part !== '') stack.push(part);
+  });
+  return stack.join('/');
+}
+const IMAGE_MIME_BY_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp' };
+async function loadImageDataUrl(zip, mediaPath) {
+  const file = zip.files[mediaPath];
+  if (!file) return null;
+  const ext = (mediaPath.split('.').pop() || '').toLowerCase();
+  const mime = IMAGE_MIME_BY_EXT[ext] || 'application/octet-stream';
+  return `data:${mime};base64,${await file.async('base64')}`;
+}
+
 // Um .pptx real marca o título via um placeholder de verdade
 // (<p:ph type="title">), mas o addText() simples do pptxgenjs (usado pra
 // gerar os nossos próprios arquivos) não cria placeholder nenhum — só uma
@@ -190,7 +268,7 @@ function htmlOfRuns(runEls) {
 // arquivos sem título nenhum ao reabrir. Como tanto o PowerPoint quanto o
 // pptxgenjs colocam a forma do título primeiro no XML do slide, usar "a
 // primeira forma com texto é o título" funciona pros dois casos.
-function parseSlideXml(xml) {
+async function parseSlideXml(xml, zip, relsMap) {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const shapes = Array.from(doc.getElementsByTagNameNS('*', 'sp'));
   let title = '';
@@ -211,11 +289,23 @@ function parseSlideXml(xml) {
     const htmlLines = paragraphs
       .map((p) => htmlOfRuns(p.getElementsByTagNameNS('*', 'r')))
       .filter((line) => line.trim() !== '');
-    bodyParas.push(...htmlLines);
+    bodyParas.push(...htmlLines.map((l) => `<p>${l}</p>`));
   });
+  // Imagens (<p:pic>) ficam fora dos <p:sp> de texto — resolve cada uma via
+  // o rId dela nos relacionamentos do slide e embute como data: URL.
+  const pics = Array.from(doc.getElementsByTagNameNS('*', 'pic'));
+  for (const pic of pics) {
+    const blip = pic.getElementsByTagNameNS('*', 'blip')[0];
+    const rId = blip && (blip.getAttribute('r:embed')
+      || blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed'));
+    const target = rId && relsMap[rId];
+    if (!target) continue;
+    const dataUrl = await loadImageDataUrl(zip, resolveMediaPath(target));
+    if (dataUrl) bodyParas.push(`<p><img src="${dataUrl}"></p>`);
+  }
   return {
     title,
-    bodyHtml: bodyParas.length ? bodyParas.map((l) => `<p>${l}</p>`).join('') : '<p></p>',
+    bodyHtml: bodyParas.length ? bodyParas.join('') : '<p></p>',
     bg: '#ffffff',
   };
 }
@@ -227,7 +317,9 @@ async function pptxArrayBufferToSlides(JSZip, arrayBuffer) {
     .sort((a, b) => parseInt(a.match(/(\d+)/)[1], 10) - parseInt(b.match(/(\d+)/)[1], 10));
   const slides = [];
   for (const name of slideFiles) {
-    slides.push(parseSlideXml(await zip.files[name].async('text')));
+    const relsMap = await loadSlideRels(zip, name);
+    const xml = await zip.files[name].async('text');
+    slides.push(await parseSlideXml(xml, zip, relsMap));
   }
   return slides.length ? slides : [emptySlide()];
 }
@@ -253,11 +345,23 @@ export function openPresentation(ctx, { fileId = null } = {}) {
       <button data-cmd="italic" title="Itálico"><i>I</i></button>
       <button data-cmd="underline" title="Sublinhado"><u>S</u></button>
       <button data-cmd="insertUnorderedList" title="Lista com marcadores">• Lista</button>
+      <select data-role="font-size" title="Tamanho da fonte" aria-label="Tamanho da fonte">
+        <option value="">Tamanho</option>
+        <option value="14">14</option>
+        <option value="18">18</option>
+        <option value="24">24</option>
+        <option value="28">28</option>
+        <option value="32">32</option>
+        <option value="40">40</option>
+      </select>
+      <label class="pres-color-label" title="Cor do texto">A<input type="color" data-role="text-color" value="#000000"></label>
+      <button data-action="insert-image" title="Inserir imagem">🖼️ Imagem</button>
       <span class="pres-sep"></span>
       <label class="pres-bg-label">Fundo <input type="color" data-role="bg-color" value="#ffffff"></label>
       <span class="pres-toolbar-spacer"></span>
       <button data-action="present" title="Apresentar (tela cheia)">▶ Apresentar</button>
       <input type="file" data-role="import-input" accept=".pptx" class="hidden">
+      <input type="file" data-role="image-input" accept="image/*" class="hidden">
     </div>
     <div class="pres-body">
       <div class="pres-sidebar">
@@ -294,9 +398,11 @@ export function openPresentation(ctx, { fileId = null } = {}) {
   const bgColorEl = root.querySelector('[data-role="bg-color"]');
   const status = root.querySelector('[data-role="status"]');
   const importInput = root.querySelector('[data-role="import-input"]');
+  const imageInput = root.querySelector('[data-role="image-input"]');
   const presentOverlay = root.querySelector('[data-role="present-overlay"]');
   const presentSlideEl = root.querySelector('[data-role="present-slide"]');
   document.execCommand('defaultParagraphSeparator', false, 'p');
+  document.execCommand('styleWithCSS', false, true);
 
   function updateTitle() {
     const name = status.dataset.name || 'Nova apresentação';
@@ -378,6 +484,46 @@ export function openPresentation(ctx, { fileId = null } = {}) {
       saveEditorIntoSlide();
       markDirty();
     });
+  });
+
+  const fontSizeEl = root.querySelector('[data-role="font-size"]');
+  fontSizeEl.addEventListener('change', () => {
+    const pt = fontSizeEl.value;
+    if (!pt) return;
+    bodyEl.focus();
+    document.execCommand('fontSize', false, '7');
+    bodyEl.querySelectorAll('span').forEach((span) => {
+      if (span.style.fontSize === 'xxx-large') span.style.fontSize = `${pt}pt`;
+    });
+    bodyEl.querySelectorAll('font[size="7"]').forEach((f) => {
+      const span = document.createElement('span');
+      span.style.fontSize = `${pt}pt`;
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.replaceWith(span);
+    });
+    fontSizeEl.value = '';
+    saveEditorIntoSlide();
+    markDirty();
+  });
+
+  const textColorEl = root.querySelector('[data-role="text-color"]');
+  textColorEl.addEventListener('input', () => {
+    bodyEl.focus();
+    document.execCommand('foreColor', false, textColorEl.value);
+    saveEditorIntoSlide();
+    markDirty();
+  });
+
+  root.querySelector('[data-action="insert-image"]').addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', async () => {
+    const file = imageInput.files[0];
+    imageInput.value = '';
+    if (!file) return;
+    const dataUrl = await blobToDataUrl(file);
+    bodyEl.focus();
+    document.execCommand('insertImage', false, dataUrl);
+    saveEditorIntoSlide();
+    markDirty();
   });
   root.querySelector('[data-action="new"]').addEventListener('click', () => {
     if (dirty && !confirm('Descartar alterações não salvas?')) return;
