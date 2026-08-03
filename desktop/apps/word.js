@@ -11,6 +11,8 @@
 // Isso significa que um arquivo criado aqui e baixado pelo Explorador
 // ("Baixar para o computador") já abre de verdade no Word/LibreOffice/Google
 // Docs, sem conversão nenhuma no meio.
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
+
 export const WORD_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 // O mammoth (usado pra reabrir um .docx) por padrão ignora formatação
@@ -481,7 +483,7 @@ export function openWord(ctx, { fileId = null } = {}) {
   }
 
   async function saveAs() {
-    let name = prompt('Nome do arquivo:', status.dataset.name || 'Novo Documento.docx');
+    let name = await showPrompt('Nome do arquivo:', status.dataset.name || 'Novo Documento.docx', { title: 'Salvar como', container: win.el });
     if (!name || !name.trim()) return;
     name = name.trim();
     if (!/\.docx$/i.test(name)) name += '.docx';
@@ -502,8 +504,8 @@ export function openWord(ctx, { fileId = null } = {}) {
     ctx.refreshDesktop();
   }
 
-  root.querySelector('[data-action="new"]').addEventListener('click', () => {
-    if (dirty && !confirm('Descartar alterações não salvas?')) return;
+  root.querySelector('[data-action="new"]').addEventListener('click', async () => {
+    if (dirty && !(await showConfirm('Descartar alterações não salvas?', { title: 'Novo documento', okLabel: 'Descartar', danger: true, container: win.el }))) return;
     currentFileId = null;
     editor.innerHTML = '';
     delete status.dataset.name;
@@ -518,7 +520,7 @@ export function openWord(ctx, { fileId = null } = {}) {
     const file = importInput.files[0];
     importInput.value = '';
     if (!file) return;
-    if (dirty && !confirm('Descartar alterações não salvas e importar este arquivo?')) return;
+    if (dirty && !(await showConfirm('Descartar alterações não salvas e importar este arquivo?', { title: 'Importar arquivo', okLabel: 'Descartar e importar', danger: true, container: win.el }))) return;
     const { mammoth } = await ensureLibs();
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.convertToHtml({ arrayBuffer }, { styleMap: MAMMOTH_STYLE_MAP });

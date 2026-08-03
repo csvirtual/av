@@ -319,3 +319,45 @@ body.sleeping #desktop { filter: brightness(0); }
 
 /* ---------- Context menu ---------- */
 #context-menu { min-width: 200px; }
+
+/* ---------- Diálogos do sistema (confirmar / avisar / pedir texto) ----------
+   Substituem confirm()/alert()/prompt() nativos do navegador — que não
+   seguem o tema do SO e não centralizam de forma confiável dentro da janela
+   do app — por um modal na mesma linguagem visual do resto do sistema
+   (core/services/dialogs.js). Sempre centralizado dentro do container
+   informado: a janela do app que chamou, ou a tela toda quando não há uma
+   janela específica envolvida. */
+.dialog-overlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  animation: dialog-fade-in var(--duration-fast) var(--ease-standard);
+}
+.dialog-box {
+  background: var(--panel-bg); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--space-5); width: 360px; max-width: calc(100% - 32px);
+  box-shadow: var(--elevation-4);
+  animation: dialog-scale-in var(--duration-normal) var(--ease-decelerate);
+}
+.dialog-title { margin: 0 0 var(--space-3); font-size: 15px; font-weight: 600; color: var(--text); }
+.dialog-message { margin: 0 0 var(--space-4); font-size: 13px; line-height: 1.5; color: var(--text); white-space: pre-line; }
+.dialog-input {
+  display: block; width: 100%; box-sizing: border-box; margin: 0 0 var(--space-4);
+  padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--win-bg); color: var(--text); font-size: 13px;
+}
+.dialog-input:focus { border-color: var(--accent-2); outline: none; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.dialog-btn { border: none; border-radius: var(--radius-sm); padding: 8px 18px; font-size: 13px; cursor: pointer; outline: none; }
+.dialog-btn-secondary { background: var(--hover); color: var(--text); }
+.dialog-btn-primary { background: var(--accent-2); color: #fff; }
+.dialog-btn-primary:hover { background: #0078d4; }
+.dialog-btn-danger { background: #e81123; color: #fff; }
+.dialog-btn-danger:hover { background: #c50f1f; }
+.dialog-btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+:root[data-theme='contrast'] .dialog-box { border: 2px solid #fff; }
+:root[data-theme='contrast'] .dialog-btn-primary,
+:root[data-theme='contrast'] .dialog-btn-danger { border: 2px solid #fff; }
+
+@keyframes dialog-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialog-scale-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }

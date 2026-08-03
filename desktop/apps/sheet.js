@@ -12,6 +12,8 @@
 // .xlsx importado com dados fora desse intervalo tem essas células
 // ignoradas. Fórmulas suportam apenas os intervalos/funções acima, não a
 // linguagem de fórmulas completa do Excel.
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
+
 export const SHEET_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 const COLS = 18; // A..R
@@ -555,7 +557,7 @@ export function openSheet(ctx, { fileId = null } = {}) {
     ctx.refreshDesktop();
   }
   async function saveAs() {
-    let name = prompt('Nome do arquivo:', status.dataset.name || 'Nova Planilha.xlsx');
+    let name = await showPrompt('Nome do arquivo:', status.dataset.name || 'Nova Planilha.xlsx', { title: 'Salvar como', container: win.el });
     if (!name || !name.trim()) return;
     name = name.trim();
     if (!/\.xlsx$/i.test(name)) name += '.xlsx';
@@ -575,8 +577,8 @@ export function openSheet(ctx, { fileId = null } = {}) {
     ctx.refreshDesktop();
   }
 
-  root.querySelector('[data-action="new"]').addEventListener('click', () => {
-    if (dirty && !confirm('Descartar alterações não salvas?')) return;
+  root.querySelector('[data-action="new"]').addEventListener('click', async () => {
+    if (dirty && !(await showConfirm('Descartar alterações não salvas?', { title: 'Nova planilha', okLabel: 'Descartar', danger: true, container: win.el }))) return;
     currentFileId = null;
     cells = {};
     currentRef = null;
@@ -600,7 +602,7 @@ export function openSheet(ctx, { fileId = null } = {}) {
     const file = importInput.files[0];
     importInput.value = '';
     if (!file) return;
-    if (dirty && !confirm('Descartar alterações não salvas e importar este arquivo?')) return;
+    if (dirty && !(await showConfirm('Descartar alterações não salvas e importar este arquivo?', { title: 'Importar arquivo', okLabel: 'Descartar e importar', danger: true, container: win.el }))) return;
     const { XLSXLib } = await ensureLibs();
     const arrayBuffer = await file.arrayBuffer();
     cells = xlsxArrayBufferToCells(XLSXLib, arrayBuffer);

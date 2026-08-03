@@ -31,6 +31,7 @@ import { openTaskManager } from './apps/task-manager.js';
 import { trashGlyph, USERS_GLYPH, PC_GLYPH, PHOTO_GLYPH } from './core/icons.js';
 import { showSystemProperties } from './core/services/system-properties.js';
 import { listRealEntryNames } from './core/services/backup.js';
+import { showConfirm, showAlert, showPrompt } from './core/services/dialogs.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -134,11 +135,11 @@ const ctx = {
   addAccount: async () => {
     const accounts = await listAccounts();
     if (accounts.length >= MAX_ACCOUNTS) {
-      alert(`Este dispositivo já tem o máximo de ${MAX_ACCOUNTS} contas.`);
+      await showAlert(`Este dispositivo já tem o máximo de ${MAX_ACCOUNTS} contas.`);
       return;
     }
     if ((await getActiveAccountRole()) !== 'admin') {
-      alert('Apenas um administrador pode adicionar contas.');
+      await showAlert('Apenas um administrador pode adicionar contas.');
       return;
     }
     WM.closeAllWindows();
@@ -285,7 +286,8 @@ async function refreshTrashState() {
 }
 
 async function emptyTrashFromDesktop() {
-  if (!confirm('Excluir permanentemente todos os itens da Lixeira?')) return;
+  const ok = await showConfirm('Excluir permanentemente todos os itens da Lixeira?', { title: 'Esvaziar Lixeira', okLabel: 'Excluir', danger: true });
+  if (!ok) return;
   const items = await fs.getChildren(seed.trashId);
   for (const item of items) await fs.deleteNodePermanently(item.id);
   refreshTrashState();
@@ -431,15 +433,16 @@ async function removeAccountFlow(id) {
   const account = accounts.find((a) => a.id === id);
   if (!account) return false;
   if (account.primary) {
-    alert('A conta do Administrador Geral não pode ser removida.');
+    await showAlert('A conta do Administrador Geral não pode ser removida.');
     return false;
   }
   const activeAccount = accounts.find((a) => a.id === getActiveAccount());
   if (activeAccount?.role !== 'admin') {
-    alert('Apenas um administrador pode remover contas.');
+    await showAlert('Apenas um administrador pode remover contas.');
     return false;
   }
-  if (!confirm(`Remover a conta "${account.name}" e todos os seus arquivos permanentemente? Isso não pode ser desfeito.`)) return false;
+  const ok = await showConfirm(`Remover a conta "${account.name}" e todos os seus arquivos permanentemente? Isso não pode ser desfeito.`, { title: 'Remover conta', okLabel: 'Remover', danger: true });
+  if (!ok) return false;
   const rootId = await kv.getFor(id, 'rootId');
   if (rootId) await fs.deleteNodePermanently(rootId);
   await kv.removeAllFor(id);
@@ -453,7 +456,7 @@ async function setAccountRoleFlow(id, role) {
   if (!target || target.primary) return false;
   const activeAccount = accounts.find((a) => a.id === getActiveAccount());
   if (activeAccount?.role !== 'admin') {
-    alert('Apenas um administrador pode alterar o tipo de outra conta.');
+    await showAlert('Apenas um administrador pode alterar o tipo de outra conta.');
     return false;
   }
   await updateAccountRecord(id, { role });
@@ -911,7 +914,7 @@ $('#lock-recovery-form').addEventListener('submit', async (e) => {
   updateLockClockVisibility();
   $('#lock-pass').value = '';
   hide($('#lock-error'));
-  alert('Senha redefinida com sucesso. Faça login com a nova senha.');
+  await showAlert('Senha redefinida com sucesso. Faça login com a nova senha.');
 });
 
 // ---------------- Facilidade de Acesso (telas de configuração/bloqueio) ----------------
@@ -1039,7 +1042,7 @@ let uacResolve = null;
 
 async function showUacPrompt() {
   if ((await getActiveAccountRole()) !== 'admin') {
-    alert('Só um administrador pode redefinir este dispositivo.');
+    await showAlert('Só um administrador pode redefinir este dispositivo.');
     return false;
   }
   const accounts = await listAccounts();
@@ -1423,13 +1426,14 @@ function escapeHtml(str) {
 }
 
 async function renameIcon(node) {
-  const name = prompt('Novo nome:', node.name);
+  const name = await showPrompt('Novo nome:', node.name, { title: 'Renomear' });
   if (!name || !name.trim()) return;
   await fs.rename(node.id, name.trim());
   renderDesktopIcons();
 }
 async function deleteIcon(node) {
-  if (!confirm(`Mover "${node.name}" para a Lixeira?`)) return;
+  const ok = await showConfirm(`Mover "${node.name}" para a Lixeira?`, { title: 'Excluir' });
+  if (!ok) return;
   await fs.trash(node.id, seed.trashId);
   renderDesktopIcons();
 }
@@ -2037,9 +2041,9 @@ function renderTaskView() {
     label.textContent = d.name;
     label.title = 'Clique para renomear';
     label.setAttribute('aria-label', `Renomear ${d.name}`);
-    label.addEventListener('click', (e) => {
+    label.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const name = prompt('Nome da área de trabalho:', d.name);
+      const name = await showPrompt('Nome da área de trabalho:', d.name, { title: 'Renomear área de trabalho' });
       if (name && name.trim()) {
         WM.renameDesktop(d.id, name.trim());
         renderTaskView();

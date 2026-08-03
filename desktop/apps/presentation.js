@@ -14,6 +14,7 @@
 //     tabelas ou formatação avançada — um "best effort" de importação, não
 //     um leitor completo de OOXML.
 import { PHOTO_GLYPH } from '../core/icons.js';
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
 
 export const PRESENTATION_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
@@ -543,8 +544,8 @@ export function openPresentation(ctx, { fileId = null } = {}) {
     saveEditorIntoSlide();
     markDirty();
   });
-  root.querySelector('[data-action="new"]').addEventListener('click', () => {
-    if (dirty && !confirm('Descartar alterações não salvas?')) return;
+  root.querySelector('[data-action="new"]').addEventListener('click', async () => {
+    if (dirty && !(await showConfirm('Descartar alterações não salvas?', { title: 'Nova apresentação', okLabel: 'Descartar', danger: true, container: win.el }))) return;
     currentFileId = null;
     slides = [emptySlide()];
     currentIndex = 0;
@@ -614,7 +615,7 @@ export function openPresentation(ctx, { fileId = null } = {}) {
   }
   async function saveAs() {
     saveEditorIntoSlide();
-    let name = prompt('Nome do arquivo:', status.dataset.name || 'Nova Apresentação.pptx');
+    let name = await showPrompt('Nome do arquivo:', status.dataset.name || 'Nova Apresentação.pptx', { title: 'Salvar como', container: win.el });
     if (!name || !name.trim()) return;
     name = name.trim();
     if (!/\.pptx$/i.test(name)) name += '.pptx';
@@ -640,7 +641,7 @@ export function openPresentation(ctx, { fileId = null } = {}) {
     const file = importInput.files[0];
     importInput.value = '';
     if (!file) return;
-    if (dirty && !confirm('Descartar alterações não salvas e importar este arquivo?')) return;
+    if (dirty && !(await showConfirm('Descartar alterações não salvas e importar este arquivo?', { title: 'Importar arquivo', okLabel: 'Descartar e importar', danger: true, container: win.el }))) return;
     const { JSZip } = await ensureLibs();
     try {
       slides = await pptxArrayBufferToSlides(JSZip, await file.arrayBuffer());
