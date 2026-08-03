@@ -80,6 +80,16 @@ csos/
     autologin.conf.template # modelo do drop-in de autologin (usuário é substituído pelo install.sh)
 ```
 
+## Nota sobre Ubuntu e snap
+
+No Ubuntu (desde a 20.04), o pacote `chromium` do `apt` é só um pacote de
+transição que aciona a instalação do snap por baixo — se a máquina não tiver
+`snapd` ou não tiver rede pra loja de snaps, o `apt install` "funciona" mas
+nenhum binário de verdade fica disponível. O `install.sh` detecta esse caso
+e para com um erro claro (em vez de deixar a máquina reiniciar pra uma tela
+preta sem navegador). Numa base Debian isso não acontece — lá `chromium` é
+um pacote real via `apt`.
+
 ## Limitações honestas
 
 - Não troca o kernel, não é uma distro "from scratch" — é Debian/Ubuntu de
