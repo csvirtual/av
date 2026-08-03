@@ -152,7 +152,7 @@ async function refreshAvatars() {
 
 function fileGlyph(node) {
   if (node.type === 'folder') {
-    if (node.id === seed?.usersId) return '👥';
+    if (node.id === seed?.usersId) return '👤';
     if (node.id === seed?.trashId) return trashGlyph();
     return '📁';
   }
