@@ -31,8 +31,22 @@ function formatBytes(bytes) {
   return `${mb.toFixed(1)} MB`;
 }
 
+// Configurações é de instância única, igual ao app real do Windows: chamar
+// openSettings() de novo enquanto já tem uma janela aberta (por exemplo, o
+// menu Iniciar E a tela de segurança automática da 1ª instalação, quase ao
+// mesmo tempo) só troca a aba dessa mesma janela e a traz pra frente — não
+// abre uma segunda janela duplicada.
+let activeSettingsInstance = null;
+
 export function openSettings(ctx, { tab = 'personalization' } = {}) {
   const { windows, getTheme, setTheme, getWallpaper, setWallpaper, changePassword } = ctx;
+
+  if (activeSettingsInstance && windows.listProcesses().some((p) => p.id === activeSettingsInstance.id)) {
+    const proc = windows.listProcesses().find((p) => p.id === activeSettingsInstance.id);
+    if (proc.minimized || !proc.focused) windows.toggleMinimize(proc.id);
+    activeSettingsInstance.switchToTab(tab);
+    return activeSettingsInstance.win;
+  }
 
   const root = document.createElement('div');
   root.className = 'settings';
@@ -397,7 +411,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <h2>Conta</h2>
       <div class="settings-avatar-lg" data-role="avatar-preview">${avatarPreviewHTML(name, avatar)}</div>
       <p style="font-size:13px;color:var(--text-dim)">Usuário: <strong>${name}</strong></p>
-      <p style="font-size:13px;color:var(--text-dim)">Tipo de conta: <strong>${escapeAttr(me ? roleLabelFor(me) : 'Usuário comum')}</strong></p>
+      <p style="font-size:13px;color:var(--text-dim)">Tipo de conta: <span class="role-badge">${escapeAttr(me ? roleLabelFor(me) : 'Usuário comum')}</span></p>
       <input type="file" accept="image/*" data-role="avatar-upload" class="hidden">
       <div style="display:flex;gap:8px;margin:10px 0 4px">
         <button class="btn" data-action="change-photo">Alterar foto</button>
@@ -501,7 +515,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0';
         row.innerHTML = `
           <span class="avatar-sm">${avatarPreviewHTML(acc.name, acc.avatar)}</span>
-          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}<br><span style="color:var(--text-dim);font-size:11px">${escapeAttr(roleLabelFor(acc))}</span></span>
+          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}<br><span class="role-badge">${escapeAttr(roleLabelFor(acc))}</span></span>
         `;
         const switchBtn = document.createElement('button');
         switchBtn.className = 'btn';
@@ -542,6 +556,18 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   }
 
   // ---------------- Privacidade ----------------
+  function securityItem(icon, title, desc) {
+    return `
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-top:14px;max-width:460px">
+        <span style="font-size:20px;line-height:1.3">${icon}</span>
+        <div>
+          <p style="font-size:13px;font-weight:600;margin:0 0 2px">${title}</p>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:0">${desc}</p>
+        </div>
+      </div>
+    `;
+  }
+
   function renderPrivacy() {
     content.innerHTML = `
       <h2>Seus dados</h2>
@@ -550,6 +576,16 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         papel de parede e todas as outras configurações ficam salvos só neste
         dispositivo (IndexedDB) — nada é enviado a um servidor.
       </p>
+
+      <h2 style="margin-top:24px">Segurança deste sistema</h2>
+      <p style="font-size:12px;color:var(--text-dim);max-width:460px">Camadas de proteção que já estão ativas, sem precisar configurar nada:</p>
+      ${securityItem('🔐', 'Criptografia dos arquivos', 'O conteúdo de cada arquivo é cifrado com AES-256-GCM antes de ser salvo. A chave de cada conta é derivada da sua senha (PBKDF2-SHA256, 150 mil repetições) — sem a senha certa, o conteúdo salvo não pode ser lido.')}
+      ${securityItem('🔑', 'Senha nunca fica em texto puro', 'Sua senha nunca é gravada como digitada. Só é guardado um hash com sal (PBKDF2-SHA256) — nem examinando o armazenamento local dá pra recuperar a senha original.')}
+      ${securityItem('⏱️', 'Bloqueio contra tentativas repetidas', 'Depois de algumas tentativas erradas seguidas na tela de bloqueio, o sistema passa a exigir uma espera cada vez maior antes da próxima tentativa, dificultando adivinhação por força bruta.')}
+      ${securityItem('🪪', 'Chave de ativação protegida', 'O serial de ativação exigido na primeira instalação não existe em texto puro em nenhum lugar do código — só o resultado de um hash reforçado (PBKDF2, 1 milhão de repetições), tornando inviável descobrir a chave a partir dos arquivos do site.')}
+      ${securityItem('🧱', 'Isolamento do Navegador', 'As páginas abertas no app Navegador rodam numa área isolada (sandbox) — sem acesso à área de trabalho, aos seus arquivos ou às outras janelas abertas.')}
+      ${securityItem('🌐', 'Cabeçalhos de segurança', 'O site aplica Content-Security-Policy e outros cabeçalhos que bloqueiam scripts, estilos e conexões de origens não autorizadas.')}
+
       <h2 style="margin-top:24px">Apagar dados</h2>
       <p style="font-size:13px;color:var(--text-dim);max-width:440px">
         Isso apaga permanentemente todos os seus arquivos, senha e preferências
@@ -598,17 +634,18 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     about: renderAbout,
   };
 
+  function switchToTab(tabName) {
+    root.querySelectorAll('.settings-nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tabName));
+    (renderers[tabName] || renderPersonalization)();
+  }
+
   root.querySelectorAll('.settings-nav button').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      root.querySelectorAll('.settings-nav button').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderers[btn.dataset.tab]();
-    });
+    btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
   });
 
-  root.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
-  root.querySelectorAll('.settings-nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-  (renderers[tab] || renderPersonalization)();
+  switchToTab(tab);
+  activeSettingsInstance = { id: win.id, win, switchToTab };
+  win.onClose(() => { activeSettingsInstance = null; });
 
   return win;
 }
