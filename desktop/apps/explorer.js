@@ -8,14 +8,14 @@ import { SHEET_MIME } from './sheet.js';
 import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
-import { trashGlyph, USERS_GLYPH, COPY_GLYPH } from '../core/icons.js';
+import { trashGlyph, USERS_GLYPH, COPY_GLYPH, PC_GLYPH, PHOTO_GLYPH } from '../core/icons.js';
 import { showSystemProperties } from '../core/services/system-properties.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
 function fileGlyph(node) {
   const mime = node.mimeType || '';
-  if (mime.startsWith('image/')) return '🖼️';
+  if (mime.startsWith('image/')) return PHOTO_GLYPH;
   if (mime === WORD_MIME) return '📘';
   if (mime === SHEET_MIME) return '📗';
   if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
@@ -112,10 +112,10 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   root.className = 'explorer';
   root.innerHTML = `
     <div class="explorer-sidebar">
-      <div class="side-item" data-nav="this-pc">🖥️ Este Computador</div>
-      <div class="side-item" data-nav="desktop">🖥️ Área de Trabalho</div>
+      <div class="side-item" data-nav="this-pc">${PC_GLYPH} Este Computador</div>
+      <div class="side-item" data-nav="desktop">${PC_GLYPH} Área de Trabalho</div>
       <div class="side-item" data-nav="documents">📄 Documentos</div>
-      <div class="side-item" data-nav="pictures">🖼️ Imagens</div>
+      <div class="side-item" data-nav="pictures">${PHOTO_GLYPH} Imagens</div>
       <div class="side-item" data-nav="downloads">⬇️ Downloads</div>
       <div class="side-item" data-nav="trash"><span data-role="trash-glyph">🗑️</span> Lixeira</div>
     </div>
@@ -344,9 +344,9 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH
           : node.id === seed.usersId ? USERS_GLYPH
           : node.id === seed.trashId ? trashGlyph()
-          : node.id === seed.desktopId ? '🖥️'
+          : node.id === seed.desktopId ? PC_GLYPH
           : node.id === seed.documentsId ? '📄'
-          : node.id === seed.picturesId ? '🖼️'
+          : node.id === seed.picturesId ? PHOTO_GLYPH
           : node.id === seed.downloadsId ? '⬇️'
           : '📁')
         : fileGlyph(node);

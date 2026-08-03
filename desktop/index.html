@@ -66,7 +66,13 @@
       <p class="auth-sub">Como podemos te chamar?</p>
       <input type="text" id="setup-name" placeholder="Seu nome" aria-label="Seu nome" maxlength="40">
       <input type="file" id="setup-photo" accept="image/*" class="hidden" aria-label="Escolher foto de perfil">
-      <button type="button" class="oobe-photo-btn" id="setup-photo-btn">🖼️ Escolher foto</button>
+      <!-- SVG igual ao PHOTO_GLYPH de core/icons.js — HTML estático não pode
+           importar do módulo JS, então fica duplicado aqui de propósito. -->
+      <button type="button" class="oobe-photo-btn" id="setup-photo-btn"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true" style="vertical-align:-0.15em">
+        <rect x="3" y="5" width="26" height="22" rx="2.5" fill="#eaf3ff" stroke="#9aa1a9" stroke-width="1"/>
+        <circle cx="11" cy="13" r="3" fill="#ffce54"/>
+        <path d="M4 25l7.5-8 5 5 6-7.5 8.5 9.5v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" fill="#3f9bff"/>
+      </svg> Escolher foto</button>
       <p class="auth-sub oobe-role-note" data-role="oobe-role-note"></p>
     </div>
 
