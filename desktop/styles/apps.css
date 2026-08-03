@@ -126,6 +126,7 @@
 }
 .word-toolbar button:hover { background: var(--hover); }
 .word-toolbar button.active { background: var(--accent-2); color: #fff; }
+.word-toolbar button:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 .word-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
 .word-toolbar select {
   border: none; background: none; padding: var(--space-2) 6px; border-radius: var(--radius-sm);
@@ -153,6 +154,15 @@
 .word-page h3 { font-size: 17px; margin: 0.6em 0 0.3em; }
 .word-page p { margin: 0 0 0.8em; }
 .word-page ul, .word-page ol { margin: 0 0 0.8em; padding-left: 1.6em; }
+.word-page img { max-width: 100%; height: auto; display: block; margin: 0.4em 0; }
+.word-page table {
+  width: 100%; border-collapse: collapse; margin: 0 0 0.8em;
+  font-family: -apple-system, Segoe UI, sans-serif; font-size: 14px;
+}
+.word-page table td, .word-page table th {
+  border: 1px solid #999; padding: 6px 10px; vertical-align: top; min-width: 24px;
+}
+.word-page table td p, .word-page table th p { margin: 0; }
 .word-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }
 
 /* ---------- Planilha (Excel-like) ---------- */
