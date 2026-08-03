@@ -228,6 +228,24 @@ body:has(#account-picker-screen:not(.hidden)) .ease-of-access-btn {
 .uac-actions { display: flex; justify-content: center; gap: var(--space-3); margin-top: var(--space-4); width: 100%; }
 .uac-actions .auth-btn { margin-top: 0; padding: 8px 18px; }
 
+/* ---------- Seleção de disco (antes da formatação) ---------- */
+.disk-select-card { width: 340px; }
+.disk-select-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  margin-top: var(--space-3);
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff; text-align: left; cursor: pointer;
+}
+.disk-select-row:hover { background: rgba(255, 255, 255, 0.1); }
+.disk-select-row.selected { border-color: #3f9bff; background: rgba(63, 155, 255, 0.16); }
+.disk-select-icon { font-size: 26px; flex-shrink: 0; }
+.disk-select-info { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+.disk-select-sub { font-size: 11px; color: rgba(255, 255, 255, 0.65); }
+.disk-select-check { font-size: 16px; color: #3f9bff; opacity: 0; flex-shrink: 0; }
+.disk-select-row.selected .disk-select-check { opacity: 1; }
+
 /* ---------- Formatação / redefinição do dispositivo ---------- */
 .wipe-screen { background: #000; color: #fff; }
 .wipe-box { width: 92%; max-width: 560px; text-align: center; }

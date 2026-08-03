@@ -300,6 +300,28 @@
   </div>
 </div>
 
+<!-- Tela de seleção de disco pra formatar (entre a autorização do
+     administrador e a formatação em si — igual ao Windows real: você
+     escolhe qual disco quer formatar antes de começar). -->
+<div id="disk-select-screen" class="screen hidden">
+  <div class="auth-card disk-select-card">
+    <h1>Selecionar disco</h1>
+    <p class="auth-sub">Escolha qual disco você deseja formatar.</p>
+    <button type="button" class="disk-select-row" id="disk-select-row" aria-pressed="false">
+      <span class="disk-select-icon" aria-hidden="true">💽</span>
+      <span class="disk-select-info">
+        <strong>Disco Local (C:)</strong>
+        <span class="disk-select-sub">Unidade do sistema</span>
+      </span>
+      <span class="disk-select-check" aria-hidden="true">✓</span>
+    </button>
+    <div class="oobe-nav">
+      <button type="button" class="auth-link" data-action="disk-select-cancel">Cancelar</button>
+      <button type="button" class="auth-btn" id="disk-select-confirm-btn" disabled>Formatar disco</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tela de formatação/redefinição do dispositivo -->
 <div id="wipe-screen" class="screen hidden wipe-screen">
   <div class="wipe-box">
