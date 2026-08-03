@@ -357,8 +357,22 @@ async function showLockScreenFor(account) {
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
   show($('.lock-clock'));
+  // "Trocar de usuário" só faz sentido (e só aparece) quando existe outra
+  // conta pra onde voltar — em um dispositivo de conta única não há pra
+  // onde "trocar", então o botão fica escondido.
+  const accounts = await listAccounts();
+  $('#lock-switch-user-btn').classList.toggle('hidden', accounts.length <= 1);
   show($('#lock-screen'));
   $('#lock-pass').focus();
+}
+
+async function backToAccountPicker() {
+  hide($('#lock-screen'));
+  $('#lock-pass').value = '';
+  $('#lock-error').classList.add('hidden');
+  const accounts = await listAccounts();
+  renderAccountPicker(accounts);
+  show($('#account-picker-screen'));
 }
 
 async function selectAccount(accountId) {
@@ -817,6 +831,7 @@ $('#recovery-back-btn').addEventListener('click', () => {
   show($('#lock-form'));
   show($('.lock-clock'));
 });
+$('#lock-switch-user-btn').addEventListener('click', () => backToAccountPicker());
 $('#lock-recovery-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = $('#recovery-email').value.trim();
@@ -905,15 +920,11 @@ function lockNow() {
   recordLogoff(getActiveAccount());
   WM.closeAllWindows();
   hide($('#desktop'));
-  $('#lock-username').textContent = '';
-  kv.get('user.name', 'Usuário').then((n) => ($('#lock-username').textContent = n));
-  refreshAvatars();
   playLockChime();
   // A chave que decifra os arquivos só existe em memória durante a sessão —
   // some daqui até a senha ser digitada de novo com sucesso.
   clearSessionDek();
-  show($('#lock-screen'));
-  $('#lock-pass').focus();
+  showLockScreenFor({});
 }
 
 function sleepNow() {
