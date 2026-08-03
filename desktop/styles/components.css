@@ -59,6 +59,15 @@
   background: var(--hover); display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
+
+/* ---------- Selo de papel da conta (Administrador Geral / Usuário comum) ---------- */
+.role-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--accent-2); color: #fff;
+  padding: 2px 10px; border-radius: var(--radius-pill);
+  margin-top: 3px;
+}
 .settings-avatar-lg { width: 88px; height: 88px; border-radius: 50%; overflow: hidden; margin-bottom: var(--space-3); }
 .settings-avatar-lg .avatar-initial { font-size: 36px; }
 

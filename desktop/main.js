@@ -631,6 +631,12 @@ async function handleOobeNext() {
     hide(err);
     await finalizeOobeAccount({ email, pass });
   } else if (step === 'done') {
+    // OOBE_STEPS só inclui 'activation' na instalação bem inicial (1ª conta
+    // do dispositivo, a que vira Administrador Geral) — reaproveita esse
+    // mesmo sinal pra decidir se é a hora de mostrar a tela de segurança
+    // automaticamente, uma única vez, assim que a pessoa chega na área de
+    // trabalho pela primeira vez.
+    const wasFirstInstall = OOBE_STEPS.includes('activation');
     hide($('#setup-screen'));
     await enterDesktop();
     pushNotification({
@@ -639,6 +645,9 @@ async function handleOobeNext() {
       title: `Bem-vindo, ${oobeChoices.name}!`,
       body: 'Sua conta foi criada. Explore o menu Iniciar para conhecer os aplicativos.',
     });
+    if (wasFirstInstall) {
+      setTimeout(() => openSettings(ctx, { tab: 'privacy' }), 900);
+    }
     return;
   }
   if (oobeStepIndex < OOBE_STEPS.length - 1) showOobeStep(oobeStepIndex + 1);
