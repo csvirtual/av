@@ -39,6 +39,17 @@
   <div class="boot-spinner"></div>
 </div>
 
+<!-- Aba duplicada: só uma aba deste "sistema operacional" pode ficar ativa
+     por vez (ver checagem via BroadcastChannel em main.js). -->
+<div id="duplicate-tab-screen" class="screen hidden">
+  <div class="auth-card">
+    <h1>Já em uso</h1>
+    <p class="auth-sub">O sistema operacional já está completamente carregado em outra aba.</p>
+    <p class="auth-sub">Esta aba será fechada automaticamente em <strong id="duplicate-tab-count">5</strong> segundos.</p>
+    <p id="duplicate-tab-fallback" class="auth-sub hidden" style="color:#ffb454">Não foi possível fechar esta aba automaticamente — você já pode fechá-la manualmente com segurança.</p>
+  </div>
+</div>
+
 <!-- Configuração inicial (OOBE): assistente em várias etapas, usado tanto
      na primeira conta quanto ao adicionar uma nova conta local depois. -->
 <div id="setup-screen" class="screen hidden">

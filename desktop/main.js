@@ -2159,5 +2159,83 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-initTaskSwitcher();
-boot();
+// ---------------- Bloqueio de abas duplicadas ----------------
+// Só uma aba deste "sistema operacional" pode ficar ativa por vez — evita
+// duas sessões brigando pela mesma chave de criptografia em memória,
+// notificações duplicadas etc. Usa BroadcastChannel (mensageria ao vivo
+// entre abas da mesma origem) em vez de localStorage com heartbeat: se a
+// aba primária fechar, ela simplesmente para de responder — sem precisar
+// expirar nada.
+const TAB_LOCK_CHANNEL = 'win11-web-tab-lock';
+const myTabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+let isPrimaryTab = false;
+const tabChannel = ('BroadcastChannel' in window) ? new BroadcastChannel(TAB_LOCK_CHANNEL) : null;
+
+function initTabLock() {
+  return new Promise((resolve) => {
+    if (!tabChannel) { isPrimaryTab = true; resolve(true); return; }
+    let settled = false;
+    let sawCompetingClaim = false;
+    tabChannel.addEventListener('message', (e) => {
+      const msg = e.data;
+      if (!msg) return;
+      if (msg.type === 'ping' && isPrimaryTab) tabChannel.postMessage({ type: 'pong' });
+      if (msg.type === 'pong' && !settled) { settled = true; resolve(false); }
+      // Empate: outra aba também não viu ninguém e está se anunciando como
+      // primária ao mesmo tempo (duas abas abertas juntas, ex.: "Duplicar
+      // aba") — quem tiver o id "menor" nessa comparação (arbitrária, mas
+      // determinística e igual nas duas pontas) vence, a outra recua.
+      if (msg.type === 'claim' && !isPrimaryTab && msg.id !== myTabId && msg.id < myTabId) {
+        sawCompetingClaim = true;
+      }
+    });
+    tabChannel.postMessage({ type: 'ping' });
+    // Mensagens entre abas da mesma origem via BroadcastChannel chegam em
+    // poucos milissegundos — essa espera só existe pra dar tempo de uma
+    // resposta chegar, não precisa ser longa (e ela atrasa o boot de TODA
+    // abertura do app, mesmo quando não há nenhuma outra aba).
+    setTimeout(() => {
+      if (settled) return;
+      tabChannel.postMessage({ type: 'claim', id: myTabId });
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        if (sawCompetingClaim) { resolve(false); return; }
+        isPrimaryTab = true;
+        resolve(true);
+      }, 60);
+    }, 120);
+  });
+}
+
+function showDuplicateTabScreen() {
+  hide($('#boot-screen'));
+  show($('#duplicate-tab-screen'));
+  let seconds = 5;
+  const countEl = $('#duplicate-tab-count');
+  const timer = setInterval(() => {
+    seconds -= 1;
+    if (seconds <= 0) {
+      clearInterval(timer);
+      countEl.textContent = '0';
+      window.close();
+      // Navegadores só deixam um script fechar abas abertas por ele mesmo
+      // (via window.open) — uma aba digitada/duplicada/em link normal não
+      // fecha assim, e window.close() falha em silêncio. Se depois de um
+      // instante a aba continuar aqui, avisa em vez de deixar a contagem
+      // zerada sem explicação nenhuma.
+      setTimeout(() => show($('#duplicate-tab-fallback')), 400);
+      return;
+    }
+    countEl.textContent = String(seconds);
+  }, 1000);
+}
+
+initTabLock().then((primary) => {
+  if (primary) {
+    initTaskSwitcher();
+    boot();
+  } else {
+    showDuplicateTabScreen();
+  }
+});
