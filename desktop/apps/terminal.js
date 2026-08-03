@@ -12,7 +12,7 @@ export function openTerminal(ctx) {
     <div class="terminal-output" data-role="output"></div>
     <div class="terminal-inputline">
       <span class="terminal-prompt" data-role="prompt">C:\\&gt;</span>
-      <input type="text" class="terminal-input" data-role="input" autocomplete="off" spellcheck="false">
+      <input type="text" class="terminal-input" data-role="input" autocomplete="off" spellcheck="false" enterkeyhint="send">
     </div>
   `;
 

@@ -38,7 +38,7 @@
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   font-size: 14px;
-  text-align: left;
+  text-align: center;
   outline: none;
 }
 .auth-card input::placeholder { color: rgba(255, 255, 255, 0.65); }
