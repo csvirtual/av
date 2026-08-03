@@ -1131,9 +1131,51 @@ $('#wipe-backup-input').addEventListener('change', async () => {
   location.reload();
 });
 
+/** Depois de autorizado pelo UAC, mostra a tela de seleção de disco (igual
+ * ao Windows real: você escolhe manualmente qual disco formatar antes de
+ * começar) — só chama runWipeFormatScreen() se o usuário selecionar o
+ * disco e confirmar clicando em "Formatar disco". */
+function showDiskSelectScreen() {
+  const row = $('#disk-select-row');
+  const confirmBtn = $('#disk-select-confirm-btn');
+  row.classList.remove('selected');
+  row.setAttribute('aria-pressed', 'false');
+  confirmBtn.disabled = true;
+  show($('#disk-select-screen'));
+  return new Promise((resolve) => {
+    function onRowClick() {
+      const nowSelected = !row.classList.contains('selected');
+      row.classList.toggle('selected', nowSelected);
+      row.setAttribute('aria-pressed', String(nowSelected));
+      confirmBtn.disabled = !nowSelected;
+    }
+    function onConfirm() {
+      if (confirmBtn.disabled) return;
+      cleanup();
+      hide($('#disk-select-screen'));
+      resolve(true);
+    }
+    function onCancel() {
+      cleanup();
+      hide($('#disk-select-screen'));
+      resolve(false);
+    }
+    function cleanup() {
+      row.removeEventListener('click', onRowClick);
+      confirmBtn.removeEventListener('click', onConfirm);
+      $('[data-action="disk-select-cancel"]').removeEventListener('click', onCancel);
+    }
+    row.addEventListener('click', onRowClick);
+    confirmBtn.addEventListener('click', onConfirm);
+    $('[data-action="disk-select-cancel"]').addEventListener('click', onCancel);
+  });
+}
+
 async function startWipeFlow() {
   const authorized = await showUacPrompt();
   if (!authorized) return;
+  const diskConfirmed = await showDiskSelectScreen();
+  if (!diskConfirmed) return;
   await runWipeFormatScreen();
 }
 
