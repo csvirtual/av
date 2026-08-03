@@ -3,6 +3,25 @@
 // baixar arquivos virtuais de volta para o computador real, recortar/copiar/
 // colar, selecionar múltiplos itens, ver propriedades e ordenar/alternar a
 // visualização (grade/lista).
+import { WORD_MIME } from './word.js';
+import { SHEET_MIME } from './sheet.js';
+import { VIDEO_MIME_PREFIX } from './video-player.js';
+import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
+import { PRESENTATION_MIME } from './presentation.js';
+import { trashGlyph } from '../core/icons.js';
+
+// Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
+// Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
+function fileGlyph(node) {
+  const mime = node.mimeType || '';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime === WORD_MIME) return '📘';
+  if (mime === SHEET_MIME) return '📗';
+  if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
+  if (mime.startsWith(AUDIO_MIME_PREFIX)) return AUDIO_GLYPH;
+  if (mime === PRESENTATION_MIME) return '📙';
+  return '📄';
+}
 
 // Ícone de disco (próprio, sem usar o arquivo/ícone proprietário da
 // Microsoft) para diferenciar "Disco Local (C:)" de uma pasta comum.
@@ -97,12 +116,11 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       <div class="side-item" data-nav="documents">📄 Documentos</div>
       <div class="side-item" data-nav="pictures">🖼️ Imagens</div>
       <div class="side-item" data-nav="downloads">⬇️ Downloads</div>
-      <div class="side-item" data-nav="trash">🗑️ Lixeira</div>
+      <div class="side-item" data-nav="trash"><span data-role="trash-glyph">🗑️</span> Lixeira</div>
     </div>
     <div class="explorer-main">
       <div class="explorer-toolbar">
-        <button data-action="new-folder">📁 Nova pasta</button>
-        <button data-action="new-file">📄 Novo arquivo</button>
+        <button data-action="new">➕ Novo</button>
         <button data-action="upload">⬆️ Importar do PC</button>
         <button data-action="rename">✏️ Renomear</button>
         <button data-action="copy">🗐 Copiar</button>
@@ -234,6 +252,8 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
 
   async function render() {
     root.querySelector('.trash-only').classList.toggle('hidden', !trashMode);
+    const trashHasItems = (await fs.getChildren(seed.trashId)).length > 0;
+    root.querySelector('[data-role="trash-glyph"]').innerHTML = trashGlyph(trashHasItems);
     root.querySelectorAll('.side-item').forEach((item) => {
       const map = { 'this-pc': seed.rootId, desktop: seed.desktopId, documents: seed.documentsId, pictures: seed.picturesId, downloads: seed.downloadsId, trash: seed.trashId };
       item.classList.toggle('active', map[item.dataset.nav] === currentFolderId);
@@ -285,7 +305,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       item.dataset.id = node.id;
       const glyph = node.type === 'folder'
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
-        : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄');
+        : fileGlyph(node);
 
       if (viewMode === 'list') {
         const typeLabel = node.type === 'folder' ? 'Pasta de arquivos' : (node.mimeType || 'Arquivo');
@@ -355,6 +375,13 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       items.push({ label: multi ? `🗑️ Excluir (${selectedIds.size})` : '🗑️ Excluir', onClick: () => confirmAnd(() => deleteSelectionToTrash(), `Mover ${multi ? 'os itens selecionados' : `"${node.name}"`} para a Lixeira?`) });
       if (!multi && node.type === 'file') {
         items.push({ label: '⬇️ Baixar para o computador', onClick: () => downloadNode(node) });
+        items.push({
+          label: '🗂️ Abrir com',
+          onClick: () => simpleContextMenu(x, y, (ctx.openWithApps || []).map((app) => ({
+            label: `${app.glyph} ${app.label}`,
+            onClick: () => app.open(node),
+          }))),
+        });
       }
       if (!multi) items.push({ label: 'ℹ️ Propriedades', onClick: () => showProperties(node) });
     }
@@ -414,6 +441,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     for (const n of nodes) await fs.deleteNodePermanently(n.id);
     clearSelection();
     render();
+    ctx.refreshDesktop();
   }
 
   async function restoreSelection() {
@@ -536,24 +564,59 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     root.appendChild(overlay);
   }
 
-  root.querySelector('[data-action="new-folder"]').addEventListener('click', async () => {
-    await fs.createNode({ parentId: currentFolderId, name: 'Nova pasta', type: 'folder' });
+  root.querySelector('[data-action="new"]').addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    simpleContextMenu(rect.left, rect.bottom, [
+      { label: '📁 Pasta', onClick: () => newFolder() },
+      { label: '📄 Documento de Texto', onClick: () => newTextFile() },
+      { label: '📘 Documento (.docx)', onClick: () => newWordFile() },
+      { label: '📗 Planilha (.xlsx)', onClick: () => newSheetFile() },
+      { label: '📙 Apresentação (.pptx)', onClick: () => newPresentationFile() },
+    ]);
+  });
+  async function newFolder() {
+    await fs.createNode({ parentId: currentFolderId, name: await uniqueNameInFolder(fs, currentFolderId, 'Nova pasta'), type: 'folder' });
     render();
     ctx.refreshDesktop();
-  });
-  root.querySelector('[data-action="new-file"]').addEventListener('click', async () => {
-    await fs.createNode({ parentId: currentFolderId, name: 'Novo Documento de Texto.txt', type: 'file', content: '' });
+  }
+  async function newTextFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Novo Documento de Texto.txt');
+    await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '' });
     render();
     ctx.refreshDesktop();
-  });
+  }
+  async function newWordFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Novo Documento.docx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: WORD_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
+  async function newSheetFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Nova Planilha.xlsx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: SHEET_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
+  async function newPresentationFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Nova Apresentação.pptx');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: PRESENTATION_MIME });
+    render();
+    ctx.refreshDesktop();
+    openFile(node);
+  }
   root.querySelector('[data-action="upload"]').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
     const imported = [];
     for (const file of fileInput.files) {
-      // Imagens precisam entrar como data URL (base64) — lê-las como texto
-      // (como os outros arquivos) corromperia o binário.
-      const isImage = (file.type || '').startsWith('image/');
-      const content = isImage ? await readAsDataURL(file) : await file.text().catch(() => '');
+      // Qualquer arquivo binário (imagem, vídeo, .docx, .xlsx, etc.) precisa
+      // entrar como data URL (base64) — lê-lo como texto corromperia os
+      // bytes. Só arquivos realmente textuais usam file.text() direto (o
+      // Bloco de Notas não sabe exibir uma data URL).
+      const isText = (file.type || '').startsWith('text/') || file.type === 'application/json'
+        || (!file.type && /\.(txt|md|csv|json|log|xml|ya?ml|ini|conf)$/i.test(file.name));
+      const content = isText ? await file.text().catch(() => '') : await readAsDataURL(file);
       await fs.createNode({ parentId: currentFolderId, name: file.name, type: 'file', content, mimeType: file.type || 'text/plain' });
       imported.push(file.name);
     }
@@ -596,6 +659,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     const items = await fs.getChildren(seed.trashId);
     for (const item of items) await fs.deleteNodePermanently(item.id);
     render();
+    ctx.refreshDesktop();
     if (items.length) {
       ctx.notify?.({
         appId: 'explorer',

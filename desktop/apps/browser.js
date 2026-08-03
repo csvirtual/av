@@ -1,13 +1,40 @@
 // Navegador: abas, favoritos e histórico reais (persistidos), como um
-// navegador de verdade. Limitação inerente à web: como é uma janela dentro
-// do próprio site, só consegue exibir páginas que permitem ser incorporadas
-// em outro site (a maioria dos grandes bloqueia isso por segurança, ex:
-// X-Frame-Options/CSP) — quando isso acontece (ou o site demora demais pra
-// responder), mostra um aviso real e o botão "Abrir em nova aba" de
-// verdade, em vez de deixar uma página em branco sem explicação.
+// navegador de verdade. A maioria dos grandes sites recusa ser incorporada
+// direto num iframe de outro domínio (X-Frame-Options/CSP: frame-ancestors)
+// — isso é aplicado pelo navegador do visitante antes de qualquer JS nosso
+// rodar, então não dá pra contornar por aqui. Por isso toda navegação passa
+// por um proxy reverso (netlify/functions/proxy.js) que busca a página no
+// servidor, remove esses cabeçalhos e entrega o conteúdo pelo nosso próprio
+// domínio. Continua havendo casos reais que não funcionam (sites que exigem
+// sessão/login do domínio original, ou SPAs que chamam APIs por caminho
+// absoluto fora do domínio) — quando isso acontece mostra um aviso real e o
+// botão "Abrir em nova aba" de verdade, em vez de deixar uma página em
+// branco sem explicação.
 const HOME_URL = 'https://www.wikipedia.org';
+const PROXY_ENDPOINT = '/.netlify/functions/proxy';
 const MAX_HISTORY = 200;
-const LOAD_TIMEOUT_MS = 7000;
+const LOAD_TIMEOUT_MS = 12000;
+
+// Ícone próprio (esfera azul com onda), no espírito do Microsoft Edge sem
+// usar o logo proprietário da Microsoft — mesmo cuidado já tomado com o
+// ícone do Disco Local (C:) no Explorador.
+export const BROWSER_GLYPH = `<svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true">
+  <defs>
+    <linearGradient id="browserGlyphG1" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#37e0ff"/>
+      <stop offset="0.55" stop-color="#1a8ef2"/>
+      <stop offset="1" stop-color="#0b3fae"/>
+    </linearGradient>
+    <linearGradient id="browserGlyphG2" x1="6" y1="26" x2="26" y2="6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a2f7a"/>
+      <stop offset="1" stop-color="#1f6fe0"/>
+    </linearGradient>
+  </defs>
+  <circle cx="16" cy="16" r="15" fill="url(#browserGlyphG1)"/>
+  <path d="M7 19.5C9 12 15 8 22 9.5c-6-2.5-14-1-17.5 5C2.5 18.5 4 23 8 24.5 6.7 23 6 21 7 19.5Z" fill="#eaf6ff"/>
+  <path d="M25 12.5c-5-2-11 .5-12.5 6.5-1 4 1 8 5.5 8.5 4 .5 8-2 9-6.5 1-4.5-1-9-2-8.5Z" fill="url(#browserGlyphG2)"/>
+  <circle cx="22.5" cy="18" r="3.6" fill="#59d9ff"/>
+</svg>`;
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,11 +45,11 @@ function normalizeUrl(input) {
   if (!v) return null;
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+([/:?#].*)?$/.test(v)) return `https://${v}`;
-  // Mojeek é uma das poucas buscas grandes que não bloqueia ser exibida
-  // num iframe de outro site (Google/Bing/DuckDuckGo bloqueiam via
-  // X-Frame-Options) — assim uma pesquisa digitada tem chance real de
-  // funcionar aqui dentro, e não só quando se digita uma URL direta.
-  return `https://www.mojeek.com/search?q=${encodeURIComponent(v)}`;
+  return `https://www.google.com/search?q=${encodeURIComponent(v)}`;
+}
+
+function proxiedUrl(target) {
+  return `${PROXY_ENDPOINT}?url=${encodeURIComponent(target)}`;
 }
 
 function shortTitle(url) {
@@ -58,7 +85,7 @@ export function openBrowser(ctx, { url } = {}) {
         <span>Carregando…</span>
       </div>
       <div class="browser-status browser-status-blocked hidden" data-role="blocked">
-        <p>Este site não respondeu a tempo ou não permite ser exibido dentro de outro app (proteção do próprio site contra incorporação, ex: X-Frame-Options).</p>
+        <p>Não foi possível exibir este site aqui dentro (ele pode exigir login, demorou demais para responder, ou aponta pra um endereço bloqueado).</p>
         <button data-action="open-real-tab" class="btn">⤴ Abrir em uma aba de verdade</button>
       </div>
     </div>
@@ -68,7 +95,7 @@ export function openBrowser(ctx, { url } = {}) {
   const win = windows.createWindow({
     appId: 'browser',
     title: 'Navegador',
-    icon: '🌐',
+    icon: BROWSER_GLYPH,
     width: 780,
     height: 520,
     content: root,
@@ -158,16 +185,25 @@ export function openBrowser(ctx, { url } = {}) {
     const iframe = document.createElement('iframe');
     iframe.className = 'browser-frame hidden';
     iframe.referrerPolicy = 'no-referrer';
+    // Sem "allow-same-origin": o conteúdo do site visitado passa a rodar
+    // numa origem opaca própria, isolada de verdade da nossa — sem isso, como
+    // o proxy serve tudo pelo NOSSO domínio, um site malicioso carregado aqui
+    // enxergaria window.parent e o IndexedDB inteiro do app (senha, arquivos
+    // de todas as contas) como se fossem dele mesmo. allow-scripts/forms/
+    // popups continuam liberados pra sites de verdade funcionarem; sem
+    // allow-top-navigation, o site não consegue navegar a janela toda embora.
+    iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox');
     pages.appendChild(iframe);
     const tab = { id, iframe, url: '', title: 'Nova guia', history: [], historyIndex: -1, status: null, loadTimer: null };
-    // O listener só é preso depois do appendChild, então o "load" implícito
-    // do about:blank inicial (disparado pela própria inserção no DOM) já
-    // passou antes de existir alguém ouvindo — todo evento "load" que este
-    // listener de fato recebe corresponde a uma navegação real (inicial,
-    // recarregar, voltar ou avançar).
+    // Com o sandbox acima, o iframe vira cross-origin de verdade — não dá
+    // mais pra ler contentDocument direto. O proxy (netlify/functions/
+    // proxy.js) injeta um scriptzinho em toda página que passa por ele
+    // (inclusive nas próprias páginas de erro do proxy) que manda o título e
+    // o status de erro pra cá via postMessage; o listener global registrado
+    // mais abaixo (window.addEventListener('message', ...)) recebe e associa
+    // à aba certa comparando event.source com o contentWindow do iframe.
     iframe.addEventListener('load', () => {
       clearTimeout(tab.loadTimer);
-      setTabStatus(tab, null);
     });
     tabs.push(tab);
     switchTab(id);
@@ -208,7 +244,7 @@ export function openBrowser(ctx, { url } = {}) {
     if (!target) return;
     tab.url = target;
     tab.title = shortTitle(target);
-    tab.iframe.src = target;
+    tab.iframe.src = proxiedUrl(target);
     address.value = target;
     win.setTitle(`${tab.title} - Navegador`);
     if (pushHistory) {
@@ -343,8 +379,35 @@ export function openBrowser(ctx, { url } = {}) {
     }
   }
   window.addEventListener('keydown', onKeydown);
+
+  // Canal de comunicação com o conteúdo (agora sandboxed/cross-origin) dos
+  // iframes: só aceita mensagens cujo `source` seja exatamente o
+  // contentWindow de uma aba nossa (comparação de referência de objeto, não
+  // depende de checar `origin` — o iframe é de origem opaca mesmo, então
+  // `event.origin` viria como a string "null"). Isso garante que só as
+  // páginas que ESTE app carregou conseguem falar com este handler, mesmo
+  // sem allow-same-origin.
+  function onProxyMessage(e) {
+    if (!e.data || e.data.source !== 'app-browser-proxy') return;
+    const tab = tabs.find((t) => t.iframe.contentWindow === e.source);
+    if (!tab) return;
+    clearTimeout(tab.loadTimer);
+    if (e.data.proxyError) {
+      setTabStatus(tab, 'blocked');
+      return;
+    }
+    setTabStatus(tab, null);
+    if (e.data.title) {
+      tab.title = e.data.title;
+      renderTabbar();
+      if (tab.id === activeId) win.setTitle(`${tab.title} - Navegador`);
+    }
+  }
+  window.addEventListener('message', onProxyMessage);
+
   win.onClose(() => {
     window.removeEventListener('keydown', onKeydown);
+    window.removeEventListener('message', onProxyMessage);
     tabs.forEach((t) => clearTimeout(t.loadTimer));
   });
 

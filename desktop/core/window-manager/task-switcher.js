@@ -31,7 +31,7 @@ function render() {
     item.dataset.index = i;
     const icon = document.createElement('div');
     icon.className = 'task-switcher-icon';
-    icon.textContent = w.icon;
+    WM.setGlyph(icon, w.icon);
     const title = document.createElement('div');
     title.className = 'task-switcher-title';
     title.textContent = w.title;

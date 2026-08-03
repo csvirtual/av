@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- Reforço da mesma política de netlify.toml pra quando o app é servido
+     sem os cabeçalhos HTTP dele (ex: hospedagem estática simples, ou
+     ambiente de desenvolvimento local) — frame-ancestors/sandbox não têm
+     efeito vindo de <meta> (só via cabeçalho HTTP de verdade), o resto sim. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Windows 11 — Área de Trabalho</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles/tokens.css">
@@ -55,7 +60,8 @@
       <p class="auth-sub">Como podemos te chamar?</p>
       <input type="text" id="setup-name" placeholder="Seu nome" aria-label="Seu nome" maxlength="40">
       <input type="file" id="setup-photo" accept="image/*" class="hidden" aria-label="Escolher foto de perfil">
-      <button type="button" class="btn" id="setup-photo-btn" style="background:rgba(255,255,255,0.12);color:#fff;margin-top:8px">Escolher foto</button>
+      <button type="button" class="oobe-photo-btn" id="setup-photo-btn">🖼️ Escolher foto</button>
+      <p class="auth-sub oobe-role-note" data-role="oobe-role-note"></p>
     </div>
 
     <div class="oobe-step hidden" data-step="security">
@@ -102,6 +108,7 @@
     </form>
     <form id="lock-recovery-form" autocomplete="off" class="hidden">
       <p class="auth-sub" style="margin:0 0 12px">Informe o e-mail cadastrado para redefinir sua senha.</p>
+      <p class="auth-sub" style="margin:0 0 12px;color:#ffb454">⚠ Seus arquivos são cifrados com a senha atual. Redefinir a senha sem ela cria uma nova chave — os arquivos salvos antes disso ficarão ilegíveis, mesmo depois de definir a senha nova.</p>
       <input type="email" id="recovery-email" placeholder="E-mail cadastrado" aria-label="E-mail cadastrado" required>
       <input type="password" id="recovery-pass" placeholder="Nova senha" aria-label="Nova senha" minlength="4" required>
       <input type="password" id="recovery-pass2" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" minlength="4" required>

@@ -1,9 +1,12 @@
 import { kv, setActiveAccount, getActiveAccount, hasLegacyAccountData, migrateLegacyDataToAccount } from './core/state/kv-store.js';
 import { fs, ensureSeed } from './core/state/filesystem.js';
-import { setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
+import {
+  setPassword, verifyPassword, changePasswordKnowingOld, getEmail, setEmail, resetPasswordWithEmail,
+} from './core/services/auth.js';
+import { clearSessionDek } from './core/services/crypto.js';
 import {
   listAccounts, addAccountRecord, updateAccountRecord, removeAccountRecord,
-  setLastActiveAccountId, newAccountId,
+  setLastActiveAccountId, newAccountId, MAX_ACCOUNTS,
 } from './core/services/accounts.js';
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, playNotifyChime, volumeControl } from './core/services/sounds.js';
@@ -12,12 +15,18 @@ import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openPhotos } from './apps/photos.js';
+import { openWord, WORD_MIME } from './apps/word.js';
+import { openSheet, SHEET_MIME } from './apps/sheet.js';
+import { openVideoPlayer, VIDEO_GLYPH, VIDEO_MIME_PREFIX } from './apps/video-player.js';
+import { openAudioPlayer, AUDIO_GLYPH, AUDIO_MIME_PREFIX } from './apps/audio-player.js';
+import { openPresentation, PRESENTATION_MIME } from './apps/presentation.js';
 import { openSettings, WALLPAPERS } from './apps/settings.js';
-import { openBrowser } from './apps/browser.js';
+import { openBrowser, BROWSER_GLYPH } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
+import { trashGlyph } from './core/icons.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -36,24 +45,40 @@ function hidePanel(el) {
 let seed = null;
 let bootTime = Date.now();
 
+// Apps que sabem abrir um arquivo (aparecem no menu "Abrir com" do
+// Explorador e dos ícones da área de trabalho) — de propósito não inclui
+// Calculadora nem Terminal, que não abrem arquivo nenhum.
+const OPEN_WITH_APPS = [
+  { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', open: (node) => openNotepad(ctx, { fileId: node.id }) },
+  { id: 'word', label: 'Documento', glyph: '📘', open: (node) => openWord(ctx, { fileId: node.id }) },
+  { id: 'sheet', label: 'Planilha', glyph: '📗', open: (node) => openSheet(ctx, { fileId: node.id }) },
+  { id: 'photos', label: 'Fotos', glyph: '🖼️', open: (node) => openPhotos(ctx, { fileId: node.id }) },
+  { id: 'video-player', label: 'Player de Vídeo', glyph: '🎬', open: (node) => openVideoPlayer(ctx, { fileId: node.id }) },
+  { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, open: (node) => openAudioPlayer(ctx, { fileId: node.id }) },
+  { id: 'presentation', label: 'Apresentação', glyph: '📙', open: (node) => openPresentation(ctx, { fileId: node.id }) },
+];
+
 const ctx = {
   fs,
   kv,
   windows: WM,
   get seed() { return seed; },
   openFile,
-  refreshDesktop: () => renderDesktopIcons(),
+  get openWithApps() { return OPEN_WITH_APPS.filter((app) => !isAppDisabled(app.id)); },
+  getAppCatalog: () => PINNED_APPS,
+  isAppDisabled,
+  setAppDisabled,
+  refreshDesktop: () => refreshTrashState(),
   getTheme,
   setTheme,
   getWallpaper,
   setWallpaper,
   verifyPassword,
-  changePassword: async (oldP, newP) => {
-    const ok = await verifyPassword(oldP);
-    if (!ok) return false;
-    await setPassword(newP);
-    return true;
-  },
+  // Preserva a mesma chave de criptografia dos arquivos (só re-embrulha com
+  // a senha nova) — ao contrário de simplesmente chamar setPassword() de
+  // novo, que geraria uma chave nova e tornaria ilegível tudo que já foi
+  // salvo cifrado.
+  changePassword: (oldP, newP) => changePasswordKnowingOld(oldP, newP),
   getAvatar: () => kv.get('user.avatar', null),
   setAvatar: async (dataUrl) => {
     await kv.set('user.avatar', dataUrl);
@@ -83,7 +108,18 @@ const ctx = {
   notify: (n) => pushNotification(n),
   getActiveAccountId: () => getActiveAccount(),
   listAccounts,
-  addAccount: () => {
+  getActiveAccountRole,
+  maxAccounts: MAX_ACCOUNTS,
+  addAccount: async () => {
+    const accounts = await listAccounts();
+    if (accounts.length >= MAX_ACCOUNTS) {
+      alert(`Este dispositivo já tem o máximo de ${MAX_ACCOUNTS} contas.`);
+      return;
+    }
+    if ((await getActiveAccountRole()) !== 'admin') {
+      alert('Apenas um administrador pode adicionar contas.');
+      return;
+    }
     WM.closeAllWindows();
     WM.resetDesktops();
     hide($('#desktop'));
@@ -91,7 +127,13 @@ const ctx = {
   },
   switchToAccount: (id) => switchToSpecificAccount(id),
   removeAccount: (id) => removeAccountFlow(id),
+  setAccountRole: (id, role) => setAccountRoleFlow(id, role),
 };
+
+async function getActiveAccountRole() {
+  const accounts = await listAccounts();
+  return accounts.find((a) => a.id === getActiveAccount())?.role || 'standard';
+}
 
 function avatarHTML(name, avatarDataUrl) {
   if (avatarDataUrl) return `<img class="avatar-img" src="${escapeHtml(avatarDataUrl)}" alt="">`;
@@ -106,10 +148,27 @@ async function refreshAvatars() {
   document.querySelectorAll('#lock-avatar, #start-avatar').forEach((el) => (el.innerHTML = html));
 }
 
+function fileGlyph(node) {
+  if (node.type === 'folder') return '📁';
+  const mime = node.mimeType || '';
+  if (mime.startsWith('image/')) return '🖼️';
+  if (mime === WORD_MIME) return '📘';
+  if (mime === SHEET_MIME) return '📗';
+  if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
+  if (mime.startsWith(AUDIO_MIME_PREFIX)) return AUDIO_GLYPH;
+  if (mime === PRESENTATION_MIME) return '📙';
+  return '📄';
+}
+
 function openFile(node) {
   if (!node) return;
   if (node.type === 'folder') openExplorer(ctx, { startFolderId: node.id });
   else if ((node.mimeType || '').startsWith('image/')) openPhotos(ctx, { fileId: node.id });
+  else if (node.mimeType === WORD_MIME || /\.docx$/i.test(node.name)) openWord(ctx, { fileId: node.id });
+  else if (node.mimeType === SHEET_MIME || /\.xlsx$/i.test(node.name)) openSheet(ctx, { fileId: node.id });
+  else if ((node.mimeType || '').startsWith(VIDEO_MIME_PREFIX)) openVideoPlayer(ctx, { fileId: node.id });
+  else if ((node.mimeType || '').startsWith(AUDIO_MIME_PREFIX)) openAudioPlayer(ctx, { fileId: node.id });
+  else if (node.mimeType === PRESENTATION_MIME || /\.pptx$/i.test(node.name)) openPresentation(ctx, { fileId: node.id });
   else openNotepad(ctx, { fileId: node.id });
 }
 
@@ -163,6 +222,37 @@ async function setTimeFormat(value) {
   updateClocks();
 }
 
+// ---------------- Apps desativados (Configurações > Aplicativos) ----------------
+// "Desativar" nunca apaga nada de verdade — só tira o app do Menu Iniciar,
+// da busca e do "Abrir com", e some da barra de tarefas se estava fixado
+// lá. Janelas já abertas desse app continuam funcionando normalmente.
+let disabledApps = [];
+function isAppDisabled(id) {
+  return disabledApps.includes(id);
+}
+async function setAppDisabled(id, disabled) {
+  disabledApps = disabled ? [...new Set([...disabledApps, id])] : disabledApps.filter((a) => a !== id);
+  await kv.set('apps.disabled', disabledApps);
+  // Não mexe em taskbar.pinned nem em desktop.appShortcuts — desativar só
+  // esconde (via filtro na hora de renderizar), nunca desfixa de verdade,
+  // pra reativar trazer tudo de volta exatamente como estava antes, sem
+  // precisar fixar/enviar pra área de trabalho de novo.
+  renderTaskbarApps();
+  renderStartMenu();
+  renderDesktopIcons();
+}
+
+// ---------------- Ícone da Lixeira (muda com o conteúdo, como no Windows) ----------------
+let trashHasItems = false;
+async function refreshTrashState() {
+  trashHasItems = (await fs.getChildren(seed.trashId)).length > 0;
+  const rb = PINNED_APPS.find((a) => a.id === 'recycle-bin');
+  if (rb) rb.glyph = trashGlyph(trashHasItems);
+  renderDesktopIcons();
+  renderTaskbarApps();
+  renderStartMenu();
+}
+
 // ---------------- Boot sequence ----------------
 /** Aplica tudo que é específico da conta (tema, papel de parede, escala,
  * movimento reduzido, formato de hora) e semeia o sistema de arquivos DELA
@@ -178,6 +268,8 @@ async function loadAccountEnvironment(accountId) {
   document.documentElement.style.zoom = await getScale();
   motion.setReducedMotionOverride(await getReduceMotion());
   timeFormat = await kv.get('settings.timeFormat', '24h');
+  disabledApps = await kv.get('apps.disabled', []);
+  await refreshTrashState();
 }
 
 /** Instalações de antes do suporte a múltiplas contas tinham tudo salvo em
@@ -191,7 +283,10 @@ async function tryMigrateLegacyAccount() {
   setActiveAccount(id);
   const name = await kv.get('user.name', 'Usuário');
   const avatar = await kv.get('user.avatar', null);
-  await addAccountRecord({ id, name, avatar });
+  // Instalação de antes do sistema de contas: essa era a única conta do
+  // dispositivo, então vira o Administrador Geral permanente, como a
+  // primeira conta criada em qualquer instalação nova.
+  await addAccountRecord({ id, name, avatar, role: 'admin', primary: true });
   await setLastActiveAccountId(id);
   return id;
 }
@@ -226,6 +321,8 @@ async function boot() {
 async function showLockScreenFor(account) {
   $('#lock-username').textContent = await kv.get('user.name', account?.name || 'Usuário');
   await refreshAvatars();
+  const lockUntil = await kv.get('auth.lockUntil', 0);
+  if (lockUntil > Date.now()) startLockoutCountdown(lockUntil);
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
@@ -248,6 +345,15 @@ async function removeAccountFlow(id) {
   const accounts = await listAccounts();
   const account = accounts.find((a) => a.id === id);
   if (!account) return false;
+  if (account.primary) {
+    alert('A conta do Administrador Geral não pode ser removida.');
+    return false;
+  }
+  const activeAccount = accounts.find((a) => a.id === getActiveAccount());
+  if (activeAccount?.role !== 'admin') {
+    alert('Apenas um administrador pode remover contas.');
+    return false;
+  }
   if (!confirm(`Remover a conta "${account.name}" e todos os seus arquivos permanentemente? Isso não pode ser desfeito.`)) return false;
   const rootId = await kv.getFor(id, 'rootId');
   if (rootId) await fs.deleteNodePermanently(rootId);
@@ -256,10 +362,28 @@ async function removeAccountFlow(id) {
   return true;
 }
 
+async function setAccountRoleFlow(id, role) {
+  const accounts = await listAccounts();
+  const target = accounts.find((a) => a.id === id);
+  if (!target || target.primary) return false;
+  const activeAccount = accounts.find((a) => a.id === getActiveAccount());
+  if (activeAccount?.role !== 'admin') {
+    alert('Apenas um administrador pode alterar o tipo de outra conta.');
+    return false;
+  }
+  await updateAccountRecord(id, { role });
+  return true;
+}
+
 function accountAvatarTileHTML(account) {
   if (account.avatar) return `<img src="${escapeHtml(account.avatar)}" alt="">`;
   const initial = (account.name || '?').trim().charAt(0).toUpperCase() || '?';
   return escapeHtml(initial);
+}
+
+function accountRoleLabel(account) {
+  if (account.primary) return 'Administrador Geral';
+  return account.role === 'admin' ? 'Administrador' : 'Usuário comum';
 }
 
 function renderAccountPicker(accounts) {
@@ -272,20 +396,33 @@ function renderAccountPicker(accounts) {
     const label = document.createElement('span');
     label.textContent = account.name;
     tile.appendChild(label);
+    const roleLabel = document.createElement('span');
+    roleLabel.className = 'account-tile-role';
+    roleLabel.textContent = accountRoleLabel(account);
+    tile.appendChild(roleLabel);
     tile.addEventListener('click', () => selectAccount(account.id));
     grid.appendChild(tile);
   });
-  const addTile = document.createElement('button');
-  addTile.className = 'account-tile add-account';
-  addTile.innerHTML = '<span>+</span>';
-  const addLabel = document.createElement('span');
-  addLabel.textContent = 'Adicionar conta';
-  addTile.appendChild(addLabel);
-  addTile.addEventListener('click', () => {
-    hide($('#account-picker-screen'));
-    startOobe();
-  });
-  grid.appendChild(addTile);
+  // Segue o limite de MAX_ACCOUNTS contas do dispositivo: some o "+" quando
+  // já existem 3, em vez de deixar chegar no OOBE pra só então bloquear.
+  if (accounts.length < MAX_ACCOUNTS) {
+    const addTile = document.createElement('button');
+    addTile.className = 'account-tile add-account';
+    addTile.innerHTML = '<span>+</span>';
+    const addLabel = document.createElement('span');
+    addLabel.textContent = 'Adicionar conta';
+    addTile.appendChild(addLabel);
+    addTile.addEventListener('click', () => {
+      hide($('#account-picker-screen'));
+      startOobe();
+    });
+    grid.appendChild(addTile);
+  } else {
+    const limitNote = document.createElement('p');
+    limitNote.className = 'account-picker-limit-note';
+    limitNote.textContent = `Limite de ${MAX_ACCOUNTS} contas atingido neste dispositivo.`;
+    grid.appendChild(limitNote);
+  }
 }
 
 async function switchUser() {
@@ -323,7 +460,7 @@ function renderOobeWallpaperOptions() {
   });
 }
 
-function startOobe() {
+async function startOobe() {
   oobeAccountId = newAccountId();
   setActiveAccount(oobeAccountId);
   oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
@@ -335,6 +472,13 @@ function startOobe() {
   $('#setup-avatar').innerHTML = avatarHTML('', null);
   document.querySelectorAll('.oobe-theme-btn').forEach((b) => b.classList.toggle('selected', b.dataset.oobeTheme === oobeChoices.theme));
   renderOobeWallpaperOptions();
+  const isFirstAccount = (await listAccounts()).length === 0;
+  const roleNote = $('[data-role="oobe-role-note"]');
+  if (roleNote) {
+    roleNote.textContent = isFirstAccount
+      ? 'Esta será a conta de Administrador Geral deste dispositivo.'
+      : 'Esta conta nasce como usuário comum — o administrador pode torná-la administradora depois, nas Configurações.';
+  }
   showOobeStep(0);
   show($('#setup-screen'));
 }
@@ -370,7 +514,17 @@ async function finalizeOobeAccount({ email, pass }) {
   if (oobeChoices.avatar) await kv.set('user.avatar', oobeChoices.avatar);
   seed = await ensureSeed();
   if (seed?.userFolderId) await fs.rename(seed.userFolderId, oobeChoices.name);
-  await addAccountRecord({ id: oobeAccountId, name: oobeChoices.name, avatar: oobeChoices.avatar });
+  // A primeira conta do dispositivo nasce como Administrador Geral
+  // permanente; as próximas nascem como usuário comum (o admin pode
+  // promover depois, pelas Configurações).
+  const isFirstAccount = (await listAccounts()).length === 0;
+  await addAccountRecord({
+    id: oobeAccountId,
+    name: oobeChoices.name,
+    avatar: oobeChoices.avatar,
+    role: isFirstAccount ? 'admin' : 'standard',
+    primary: isFirstAccount,
+  });
   await setLastActiveAccountId(oobeAccountId);
 }
 
@@ -450,19 +604,77 @@ $('#setup-photo').addEventListener('change', () => {
 });
 
 // ---------------- Lock screen ----------------
+// Trava progressiva contra tentativas repetidas de senha: as 3 primeiras
+// tentativas erradas não têm custo nenhum (gente erra por engano), a partir
+// da 4ª cada erro dobra o tempo de espera até um teto de 5 minutos. Isso é
+// contornável por quem tem acesso ao devtools (é tudo client-side, sem
+// backend pra aplicar isso de verdade) — mas barra tentativa repetida pela
+// UI normal, que é o cenário real de alguém pegando o dispositivo destravado
+// e tentando adivinhar a senha na tela de bloqueio.
+const LOCKOUT_FREE_ATTEMPTS = 3;
+const LOCKOUT_BASE_SECONDS = 5;
+const LOCKOUT_MAX_SECONDS = 300;
+let lockoutCountdownTimer = null;
+
+function lockoutSecondsFor(failedCount) {
+  const extra = failedCount - LOCKOUT_FREE_ATTEMPTS;
+  if (extra <= 0) return 0;
+  return Math.min(LOCKOUT_BASE_SECONDS * 2 ** (extra - 1), LOCKOUT_MAX_SECONDS);
+}
+
+function setLockFormDisabled(disabled) {
+  $('#lock-pass').disabled = disabled;
+  $('#lock-form button[type="submit"]').disabled = disabled;
+}
+
+function startLockoutCountdown(untilTs) {
+  clearInterval(lockoutCountdownTimer);
+  const err = $('#lock-error');
+  setLockFormDisabled(true);
+  function tick() {
+    const remaining = Math.ceil((untilTs - Date.now()) / 1000);
+    if (remaining <= 0) {
+      clearInterval(lockoutCountdownTimer);
+      setLockFormDisabled(false);
+      hide(err);
+      return;
+    }
+    err.textContent = `Muitas tentativas incorretas. Tente novamente em ${remaining}s.`;
+    show(err);
+  }
+  tick();
+  lockoutCountdownTimer = setInterval(tick, 1000);
+}
+
 $('#lock-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const lockUntil = await kv.get('auth.lockUntil', 0);
+  if (lockUntil > Date.now()) {
+    startLockoutCountdown(lockUntil);
+    return;
+  }
   const pass = $('#lock-pass').value;
   const ok = await verifyPassword(pass);
   const err = $('#lock-error');
   if (ok) {
+    await kv.set('auth.failedAttempts', 0);
+    await kv.remove('auth.lockUntil');
     hide($('#lock-screen'));
     $('#lock-pass').value = '';
     hide(err);
     await setLastActiveAccountId(getActiveAccount());
     enterDesktop();
   } else {
-    show(err);
+    const failedCount = (await kv.get('auth.failedAttempts', 0)) + 1;
+    await kv.set('auth.failedAttempts', failedCount);
+    const seconds = lockoutSecondsFor(failedCount);
+    if (seconds > 0) {
+      const until = Date.now() + seconds * 1000;
+      await kv.set('auth.lockUntil', until);
+      startLockoutCountdown(until);
+    } else {
+      show(err);
+    }
   }
 });
 
@@ -571,6 +783,9 @@ function lockNow() {
   kv.get('user.name', 'Usuário').then((n) => ($('#lock-username').textContent = n));
   refreshAvatars();
   playLockChime();
+  // A chave que decifra os arquivos só existe em memória durante a sessão —
+  // some daqui até a senha ser digitada de novo com sucesso.
+  clearSessionDek();
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
@@ -663,10 +878,31 @@ async function checkSystemNotifications() {
   }
 }
 
+// Atalhos de apps enviados pro desktop a partir do Menu Iniciar — não são
+// arquivo/pasta nenhum no sistema de arquivos virtual, só um appId
+// lembrado aqui. Filtrados pelos mesmos apps desativados (some da área de
+// trabalho junto com o Menu Iniciar/busca/Abrir com, volta ao reativar).
+async function getDesktopAppShortcuts() {
+  return kv.get('desktop.appShortcuts', []);
+}
+async function setDesktopAppShortcuts(list) {
+  await kv.set('desktop.appShortcuts', list);
+}
+async function sendAppToDesktop(appId) {
+  const list = await getDesktopAppShortcuts();
+  if (!list.includes(appId)) await setDesktopAppShortcuts([...list, appId]);
+  renderDesktopIcons();
+}
+async function removeDesktopAppShortcut(appId) {
+  const list = await getDesktopAppShortcuts();
+  await setDesktopAppShortcuts(list.filter((id) => id !== appId));
+  renderDesktopIcons();
+}
+
 function fixedIcons() {
   return [
     { id: 'this-pc', label: 'Este Computador', glyph: '🖥️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.rootId }) },
-    { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
+    { id: 'recycle-bin', label: 'Lixeira', glyph: trashGlyph(trashHasItems), fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
   ];
 }
 
@@ -712,12 +948,25 @@ async function renderDesktopIcons() {
   const container = $('#desktop-icons');
   container.innerHTML = '';
   const children = await fs.getChildren(seed.desktopId);
+  const appShortcuts = await getDesktopAppShortcuts();
   const icons = [
     ...fixedIcons(),
+    ...appShortcuts
+      .filter((appId) => !isAppDisabled(appId))
+      .map((appId) => PINNED_APPS.find((a) => a.id === appId))
+      .filter(Boolean)
+      .map((app) => ({
+        id: `shortcut-${app.id}`,
+        label: app.label,
+        glyph: app.glyph,
+        isShortcut: true,
+        appId: app.id,
+        onOpen: app.onOpen,
+      })),
     ...children.map((node) => ({
       id: node.id,
       label: node.name,
-      glyph: node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄'),
+      glyph: fileGlyph(node),
       node,
       onOpen: () => openFile(node),
     })),
@@ -728,7 +977,7 @@ async function renderDesktopIcons() {
   icons.forEach((icon, idx) => {
     const el = document.createElement('div');
     el.className = 'desktop-icon';
-    el.innerHTML = `<div class="icon-glyph">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
+    el.innerHTML = `<div class="icon-glyph${icon.isShortcut ? ' is-shortcut' : ''}">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
     const pos = positions[icon.id] || gridPosition(idx);
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
@@ -750,11 +999,22 @@ async function renderDesktopIcons() {
       e.preventDefault();
       e.stopPropagation();
       const items = [{ label: 'Abrir', onClick: () => icon.onOpen() }];
-      if (!icon.fixed) {
+      if (icon.isShortcut) {
+        items.push({ label: '✕ Remover da área de trabalho', onClick: () => removeDesktopAppShortcut(icon.appId) });
+      } else if (!icon.fixed) {
         items.push(
           { label: 'Renomear', onClick: () => renameIcon(icon.node) },
           { label: 'Excluir', onClick: () => deleteIcon(icon.node) }
         );
+      }
+      if (icon.node?.type === 'file') {
+        items.push({
+          label: '🗂️ Abrir com',
+          onClick: () => showContextMenu(e.clientX, e.clientY, ctx.openWithApps.map((app) => ({
+            label: `${app.glyph} ${app.label}`,
+            onClick: () => app.open(icon.node),
+          }))),
+        });
       }
       showContextMenu(e.clientX, e.clientY, items);
     });
@@ -872,28 +1132,56 @@ document.addEventListener('keydown', (e) => {
 
 // ---------------- Taskbar / Start menu ----------------
 const PINNED_APPS = [
-  { id: 'explorer', label: 'Explorador', glyph: '📁', onOpen: () => openExplorer(ctx) },
-  { id: 'browser', label: 'Navegador', glyph: '🌐', onOpen: () => openBrowser(ctx) },
+  { id: 'explorer', label: 'Explorador', glyph: '📁', core: true, onOpen: () => openExplorer(ctx) },
+  { id: 'browser', label: 'Navegador', glyph: BROWSER_GLYPH, onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
+  { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
+  { id: 'sheet', label: 'Planilha', glyph: '📗', onOpen: () => openSheet(ctx) },
+  { id: 'video-player', label: 'Player de Vídeo', glyph: VIDEO_GLYPH, onOpen: () => openVideoPlayer(ctx) },
+  { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, onOpen: () => openAudioPlayer(ctx) },
+  { id: 'presentation', label: 'Apresentação', glyph: '📙', onOpen: () => openPresentation(ctx) },
   { id: 'calculator', label: 'Calculadora', glyph: '🧮', onOpen: () => openCalculator(ctx) },
   { id: 'clock', label: 'Relógio e Calendário', glyph: '🕒', onOpen: () => openClock(ctx) },
   { id: 'terminal', label: 'Terminal', glyph: '💻', onOpen: () => openTerminal(ctx) },
   { id: 'taskmanager', label: 'Gerenciador de Tarefas', glyph: '📊', onOpen: () => openTaskManager(ctx) },
-  { id: 'settings', label: 'Configurações', glyph: '⚙️', onOpen: () => openSettings(ctx) },
-  { id: 'recycle-bin', label: 'Lixeira', glyph: '🗑️', onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
+  { id: 'settings', label: 'Configurações', glyph: '⚙️', core: true, onOpen: () => openSettings(ctx) },
+  { id: 'recycle-bin', label: 'Lixeira', glyph: trashGlyph(trashHasItems), core: true, hideFromPrograms: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
 ];
 
 function renderStartMenu() {
   const grid = $('#start-pinned');
   grid.innerHTML = '';
-  PINNED_APPS.forEach((app) => {
+  PINNED_APPS.filter((app) => !isAppDisabled(app.id)).forEach((app) => {
     const btn = document.createElement('button');
     btn.className = 'start-app';
     btn.innerHTML = `<span class="glyph">${app.glyph}</span><span>${app.label}</span>`;
     btn.addEventListener('click', () => {
       hidePanel($('#start-menu'));
       app.onOpen();
+    });
+    btn.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pinned = await getPinnedTaskbarApps();
+      const isPinned = pinned.includes(app.id);
+      const shortcuts = await getDesktopAppShortcuts();
+      const onDesktop = shortcuts.includes(app.id);
+      showContextMenu(e.clientX, e.clientY, [
+        { label: '📂 Abrir', onClick: () => { hidePanel($('#start-menu')); app.onOpen(); } },
+        {
+          label: isPinned ? '📌 Desafixar da barra de tarefas' : '📌 Fixar na barra de tarefas',
+          onClick: async () => {
+            const next = isPinned ? pinned.filter((id) => id !== app.id) : [...pinned, app.id];
+            await setPinnedTaskbarApps(next);
+            renderTaskbarApps();
+          },
+        },
+        {
+          label: onDesktop ? '🖵 Remover da área de trabalho' : '🖵 Enviar para a área de trabalho',
+          onClick: () => (onDesktop ? removeDesktopAppShortcut(app.id) : sendAppToDesktop(app.id)),
+        },
+      ]);
     });
     grid.appendChild(btn);
   });
@@ -1004,7 +1292,7 @@ function renderSearchResults({ appMatches, settingMatches, fileMatches }, query)
   addSection('Aplicativos', appMatches, (app) => searchResultRow(app.glyph, app.label, 'Aplicativo', () => app.onOpen()));
   addSection('Configurações', settingMatches, (s) => searchResultRow('⚙️', s.label, 'Configuração', () => openSettings(ctx, { tab: s.tab })));
   addSection('Arquivos e pastas', fileMatches, (node) =>
-    searchResultRow(node.type === 'folder' ? '📁' : ((node.mimeType || '').startsWith('image/') ? '🖼️' : '📄'), node.name, 'Arquivo/pasta', () => openFile(node))
+    searchResultRow(fileGlyph(node), node.name, 'Arquivo/pasta', () => openFile(node))
   );
 
   if (!appMatches.length && !settingMatches.length && !fileMatches.length) {
@@ -1019,7 +1307,7 @@ let searchToken = 0;
 async function runGlobalSearch(rawQuery) {
   const myToken = ++searchToken;
   const q = rawQuery.trim().toLowerCase();
-  const appMatches = PINNED_APPS.filter((a) => a.label.toLowerCase().includes(q));
+  const appMatches = PINNED_APPS.filter((a) => !isAppDisabled(a.id) && a.label.toLowerCase().includes(q));
   const settingMatches = SETTINGS_SEARCH_INDEX.filter((s) => s.label.toLowerCase().includes(q));
   const fileMatches = await searchFiles(q);
   if (myToken !== searchToken) return; // busca mais recente já chegou primeiro
@@ -1470,7 +1758,7 @@ function buildTaskbarAppButton(app, appWindows, isPinned) {
   btn.dataset.app = app.id;
   btn.title = appWindows.length > 1 ? `${app.label} (+${appWindows.length - 1})` : app.label;
   btn.setAttribute('aria-label', app.label);
-  btn.textContent = app.glyph;
+  WM.setGlyph(btn, app.glyph);
   btn.addEventListener('click', () => {
     if (focusOrToggleApp(app.id)) return;
     app.onOpen?.();
@@ -1497,7 +1785,7 @@ async function renderTaskbarApps() {
 
   pinned.forEach((appId) => {
     const app = PINNED_APPS.find((a) => a.id === appId);
-    if (!app) return;
+    if (!app || isAppDisabled(appId)) return;
     holder.appendChild(buildTaskbarAppButton(app, byApp.get(appId) || [], true));
     byApp.delete(appId);
   });

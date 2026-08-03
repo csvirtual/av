@@ -39,6 +39,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   root.innerHTML = `
     <div class="settings-nav">
       <button data-tab="system">🖥️ Sistema</button>
+      <button data-tab="apps">📦 Aplicativos</button>
       <button data-tab="personalization" class="active">🎨 Personalização</button>
       <button data-tab="time">🕒 Hora e idioma</button>
       <button data-tab="accessibility">♿ Acessibilidade</button>
@@ -112,6 +113,69 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       msg.textContent = 'Cache limpo. Os seus arquivos e configurações não foram afetados.';
       msg.className = 'settings-msg ok';
     });
+  }
+
+  // ---------------- Aplicativos (desativar/reativar) ----------------
+  // "Desativar" nunca desinstala de verdade (não existe onde desinstalar
+  // pra — são apps do próprio sistema) — só tira o app do Menu Iniciar, da
+  // busca e do "Abrir com", e desafixa da barra de tarefas se estava lá.
+  // Reativar traz de volta em todos esses lugares. Explorador e
+  // Configurações não têm essa opção, do mesmo jeito que o Windows de
+  // verdade não deixa desinstalar o próprio Explorador de Arquivos.
+  const PROGRAM_PUBLISHER = 'Windows 11 Web Desktop';
+  function fakeSizeFor(appId) {
+    let hash = 0;
+    for (const ch of appId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    const mb = 6 + (hash % 190);
+    const decimal = hash % 10;
+    return `${mb},${decimal} MB`;
+  }
+
+  function renderPrograms() {
+    const apps = ctx.getAppCatalog()
+      .filter((app) => !app.hideFromPrograms)
+      .slice()
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+
+    content.innerHTML = `
+      <h2>Aplicativos instalados</h2>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
+        Desativar um aplicativo o remove do Menu Iniciar, da busca e do "Abrir com" — não apaga nada, e pode ser reativado a qualquer momento.
+      </p>
+      <input type="text" data-role="program-search" placeholder="Pesquisar aplicativos" style="margin-bottom:12px">
+      <div class="program-list" data-role="program-list"></div>
+    `;
+
+    const listEl = content.querySelector('[data-role="program-list"]');
+    function renderList(filterText) {
+      const q = (filterText || '').trim().toLowerCase();
+      const filtered = apps.filter((app) => app.label.toLowerCase().includes(q));
+      listEl.innerHTML = filtered.length ? '' : '<p class="settings-msg" style="margin:0">Nenhum aplicativo encontrado.</p>';
+      filtered.forEach((app) => {
+        const enabled = !ctx.isAppDisabled(app.id);
+        const row = document.createElement('div');
+        row.className = 'program-row';
+        row.innerHTML = `
+          <span class="program-glyph">${app.glyph}</span>
+          <div class="program-info">
+            <div class="program-name">${escapeAttr(app.label)}</div>
+            <div class="program-meta">${escapeAttr(PROGRAM_PUBLISHER)} • ${fakeSizeFor(app.id)}${app.core ? ' • Aplicativo do sistema' : ''}</div>
+          </div>
+          <label class="toggle-switch" title="${app.core ? 'Aplicativos do sistema não podem ser desativados' : (enabled ? 'Desativar' : 'Ativar')}">
+            <input type="checkbox" ${enabled ? 'checked' : ''} ${app.core ? 'disabled' : ''}>
+            <span class="toggle-switch-track"></span>
+          </label>
+        `;
+        if (!app.core) {
+          row.querySelector('input').addEventListener('change', async (e) => {
+            await ctx.setAppDisabled(app.id, !e.target.checked);
+          });
+        }
+        listEl.appendChild(row);
+      });
+    }
+    renderList('');
+    content.querySelector('[data-role="program-search"]').addEventListener('input', (e) => renderList(e.target.value));
   }
 
   // ---------------- Personalização ----------------
@@ -284,14 +348,24 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   }
 
   // ---------------- Contas ----------------
+  function roleLabelFor(account) {
+    if (account.primary) return 'Administrador Geral';
+    return account.role === 'admin' ? 'Administrador' : 'Usuário comum';
+  }
+
   async function renderAccount() {
     const name = await ctx.kv.get('user.name', 'Usuário');
     const avatar = await ctx.getAvatar();
     const email = await ctx.kv.get('auth.email', '');
+    const accounts = await ctx.listAccounts();
+    const activeId = ctx.getActiveAccountId();
+    const me = accounts.find((a) => a.id === activeId);
+    const isAdmin = await ctx.getActiveAccountRole() === 'admin';
     content.innerHTML = `
       <h2>Conta</h2>
       <div class="settings-avatar-lg" data-role="avatar-preview">${avatarPreviewHTML(name, avatar)}</div>
       <p style="font-size:13px;color:var(--text-dim)">Usuário: <strong>${name}</strong></p>
+      <p style="font-size:13px;color:var(--text-dim)">Tipo de conta: <strong>${escapeAttr(me ? roleLabelFor(me) : 'Usuário comum')}</strong></p>
       <input type="file" accept="image/*" data-role="avatar-upload" class="hidden">
       <div style="display:flex;gap:8px;margin:10px 0 4px">
         <button class="btn" data-action="change-photo">Alterar foto</button>
@@ -313,8 +387,13 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <p class="settings-msg" data-role="pass-msg"></p>
 
       <h2 style="margin-top:20px">Outras contas neste dispositivo</h2>
+      <p style="font-size:12px;color:var(--text-dim)">Este dispositivo permite no máximo ${ctx.maxAccounts} contas (${accounts.length}/${ctx.maxAccounts}).</p>
       <div data-role="other-accounts"></div>
-      <button class="btn" data-action="add-account" style="background:var(--hover);color:var(--text);margin-top:8px">+ Adicionar conta</button>
+      ${isAdmin
+        ? (accounts.length < ctx.maxAccounts
+          ? `<button class="btn" data-action="add-account" style="background:var(--hover);color:var(--text);margin-top:8px">+ Adicionar conta</button>`
+          : `<p class="settings-msg" style="margin-top:8px">Limite de ${ctx.maxAccounts} contas atingido.</p>`)
+        : `<p class="settings-msg" style="margin-top:8px">Apenas um administrador pode adicionar ou remover contas.</p>`}
     `;
     await renderOtherAccounts();
     content.querySelector('[data-action="save-email"]').addEventListener('click', async () => {
@@ -384,33 +463,50 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         holder.appendChild(p);
         return;
       }
+      const isAdminNow = await ctx.getActiveAccountRole() === 'admin';
       others.forEach((acc) => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0';
         row.innerHTML = `
           <span class="avatar-sm">${avatarPreviewHTML(acc.name, acc.avatar)}</span>
-          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}</span>
+          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}<br><span style="color:var(--text-dim);font-size:11px">${escapeAttr(roleLabelFor(acc))}</span></span>
         `;
         const switchBtn = document.createElement('button');
         switchBtn.className = 'btn';
         switchBtn.style.cssText = 'background:var(--hover);color:var(--text)';
         switchBtn.textContent = 'Trocar para';
         switchBtn.addEventListener('click', () => ctx.switchToAccount(acc.id));
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn';
-        removeBtn.style.cssText = 'background:#e81123';
-        removeBtn.textContent = 'Remover';
-        removeBtn.addEventListener('click', async () => {
-          const removed = await ctx.removeAccount(acc.id);
-          if (removed) renderOtherAccounts();
-        });
         row.appendChild(switchBtn);
-        row.appendChild(removeBtn);
+        // Só o Administrador Geral é permanente — as outras 2 contas podem
+        // ser promovidas/rebaixadas por quem já for administrador.
+        if (isAdminNow && !acc.primary) {
+          const roleBtn = document.createElement('button');
+          roleBtn.className = 'btn';
+          roleBtn.style.cssText = 'background:var(--hover);color:var(--text)';
+          const nextRole = acc.role === 'admin' ? 'standard' : 'admin';
+          roleBtn.textContent = nextRole === 'admin' ? 'Tornar administrador' : 'Tornar usuário comum';
+          roleBtn.addEventListener('click', async () => {
+            const ok = await ctx.setAccountRole(acc.id, nextRole);
+            if (ok) renderOtherAccounts();
+          });
+          row.appendChild(roleBtn);
+        }
+        if (isAdminNow && !acc.primary) {
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn';
+          removeBtn.style.cssText = 'background:#e81123';
+          removeBtn.textContent = 'Remover';
+          removeBtn.addEventListener('click', async () => {
+            const removed = await ctx.removeAccount(acc.id);
+            if (removed) renderOtherAccounts();
+          });
+          row.appendChild(removeBtn);
+        }
         holder.appendChild(row);
       });
     }
 
-    content.querySelector('[data-action="add-account"]').addEventListener('click', () => ctx.addAccount());
+    content.querySelector('[data-action="add-account"]')?.addEventListener('click', () => ctx.addAccount());
   }
 
   // ---------------- Privacidade ----------------
@@ -461,6 +557,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
 
   const renderers = {
     system: renderSystem,
+    apps: renderPrograms,
     personalization: renderPersonalization,
     time: renderTime,
     accessibility: renderAccessibility,
