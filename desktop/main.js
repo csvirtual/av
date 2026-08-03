@@ -447,22 +447,32 @@ let oobeStepIndex = 0;
 let oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
 let oobeSerialValidated = false;
 
-// A chave de produto fixa nunca fica em texto puro em lugar nenhum do
-// código — só o hash SHA-256 (com sal) dela. Isso não é segurança de
-// servidor de verdade (é tudo client-side, sem como ser), mas impede que
-// abrir o arquivo-fonte revele a chave de cara.
-const ACTIVATION_SALT = '0bcc39f029d7a8e8db05f3c8d138cb22';
-const ACTIVATION_HASH = 'ec7581b338bb7b7b891df6f4f191a07216098ca51ed8288ed69964664bfd11ba';
-
-async function sha256Hex(str) {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+// Chave alfanumérica fixa de 12 caracteres (A-Z/0-9, sem 0/O/1/I pra evitar
+// confusão visual). Nunca fica em texto puro em lugar nenhum do código —
+// só o resultado de PBKDF2-SHA256 com sal e 1 milhão de iterações. Não é
+// segurança de servidor de verdade (é tudo client-side, sem como ser —
+// quem tiver acesso ao JS sempre consegue contornar a checagem em si), mas
+// pra quem tentasse quebrar por força bruta o hash gravado, cada tentativa
+// custa de verdade essa 1 milhão de iterações (algumas centenas de
+// milissegundos), não um hash simples que uma GPU calcula aos bilhões por
+// segundo — mesmo espírito de proteção usado pra senha de conta de verdade
+// (ver core/services/auth.js).
+const ACTIVATION_SALT = 'a0ff1c326bb133d85d54233cfb92f540';
+const ACTIVATION_HASH = 'f0c949de15220a5d0df0dabf27cd69deb2f7acc5af866dbed3745ce170cb08f7';
+const ACTIVATION_ITERATIONS = 1000000;
 
 async function verifySerial(rawInput) {
-  const digits = (rawInput || '').replace(/\D/g, '');
-  if (digits.length !== 12) return false;
-  return (await sha256Hex(ACTIVATION_SALT + digits)) === ACTIVATION_HASH;
+  const chars = (rawInput || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (chars.length !== 12) return false;
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(chars), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: enc.encode(ACTIVATION_SALT), iterations: ACTIVATION_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  );
+  const hex = Array.from(new Uint8Array(bits)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hex === ACTIVATION_HASH;
 }
 
 function renderOobeWallpaperOptions() {
@@ -638,8 +648,8 @@ $('#setup-name').addEventListener('input', (e) => {
   $('#setup-avatar').innerHTML = avatarHTML(e.target.value, oobeChoices.avatar);
 });
 $('#setup-serial').addEventListener('input', (e) => {
-  const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
-  e.target.value = digits.match(/.{1,3}/g)?.join('-') || digits;
+  const chars = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  e.target.value = chars.match(/.{1,3}/g)?.join('-') || chars;
   oobeSerialValidated = false;
   hide($('#setup-serial-msg'));
 });
