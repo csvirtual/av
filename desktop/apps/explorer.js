@@ -8,7 +8,7 @@ import { SHEET_MIME } from './sheet.js';
 import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
-import { trashGlyph, USERS_GLYPH } from '../core/icons.js';
+import { trashGlyph, USERS_GLYPH, COPY_GLYPH } from '../core/icons.js';
 import { showSystemProperties } from '../core/services/system-properties.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
@@ -124,7 +124,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         <button data-action="new">➕ Novo</button>
         <button data-action="upload">⬆️ Importar do PC</button>
         <button data-action="rename">✏️ Renomear</button>
-        <button data-action="copy">🗐 Copiar</button>
+        <button data-action="copy">${COPY_GLYPH} Copiar</button>
         <button data-action="cut">✂️ Recortar</button>
         <button data-action="paste">📋 Colar</button>
         <button data-action="delete">🗑️ Excluir</button>
@@ -412,7 +412,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         items.push({ label: '📂 Abrir', onClick: () => (node.type === 'folder' ? navigate(node.id) : openFile(node)) });
       }
       items.push(
-        { label: '🗐 Copiar', onClick: () => copySelection('copy') },
+        { label: `${COPY_GLYPH} Copiar`, onClick: () => copySelection('copy') },
         { label: '✂️ Recortar', onClick: () => copySelection('cut') }
       );
       if (!multi) items.push({ label: '✏️ Renomear', onClick: () => doRename(node) });
@@ -449,7 +449,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     items.forEach((it) => {
       const btn = document.createElement('button');
       btn.setAttribute('role', 'menuitem');
-      btn.textContent = it.label;
+      btn.innerHTML = it.label;
       btn.addEventListener('click', () => { it.onClick(); menu.remove(); });
       menu.appendChild(btn);
     });
