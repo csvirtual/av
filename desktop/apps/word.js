@@ -140,6 +140,11 @@ const BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul'
 const HEADING_MAP = { h1: 'HEADING_1', h2: 'HEADING_2', h3: 'HEADING_3' };
 const ALIGN_MAP = { left: 'LEFT', center: 'CENTER', right: 'RIGHT', justify: 'BOTH' };
 const NUMBERING_REF = 'lista-numerada';
+// px na tela (aplicados como padding do .word-page) — convertidos pra twips
+// (1/20 de ponto; 1440 twips = 1 polegada = 96px) na hora de exportar, que é
+// a unidade real que o .docx usa pra margem de página.
+const MARGIN_PRESETS = { normal: { v: 48, h: 56 }, narrow: { v: 24, h: 24 }, wide: { v: 72, h: 110 } };
+function pxToTwips(px) { return Math.round((px / 96) * 1440); }
 
 function colorToHex(colorStr) {
   if (!colorStr) return null;
@@ -224,21 +229,26 @@ function alignmentFor(DocxLib, el) {
   return ALIGN_MAP[key] ? DocxLib.AlignmentType[ALIGN_MAP[key]] : undefined;
 }
 
-function blockToParagraphs(DocxLib, el) {
+// `extra` (ex.: { pageBreakBefore: true }, vindo de uma quebra de página
+// manual logo antes deste bloco) só se aplica ao PRIMEIRO parágrafo
+// resultante — uma lista com quebra de página antes quebra antes do
+// primeiro item, não antes de cada item da lista.
+function blockToParagraphs(DocxLib, el, extra = {}) {
   const tag = el.tagName.toLowerCase();
   if (tag === 'ul' || tag === 'ol') {
     const items = Array.from(el.children).filter((c) => c.tagName.toLowerCase() === 'li');
     if (!items.length) return [];
-    return items.map((li) => new DocxLib.Paragraph({
+    return items.map((li, i) => new DocxLib.Paragraph({
       children: runsFromInline(DocxLib, li),
       alignment: alignmentFor(DocxLib, li),
       ...(tag === 'ul' ? { bullet: { level: 0 } } : { numbering: { reference: NUMBERING_REF, level: 0 } }),
+      ...(i === 0 ? extra : {}),
     }));
   }
   if (HEADING_MAP[tag]) {
-    return [new DocxLib.Paragraph({ children: runsFromInline(DocxLib, el), heading: DocxLib.HeadingLevel[HEADING_MAP[tag]], alignment: alignmentFor(DocxLib, el) })];
+    return [new DocxLib.Paragraph({ children: runsFromInline(DocxLib, el), heading: DocxLib.HeadingLevel[HEADING_MAP[tag]], alignment: alignmentFor(DocxLib, el), ...extra })];
   }
-  return [new DocxLib.Paragraph({ children: runsFromInline(DocxLib, el), alignment: alignmentFor(DocxLib, el) })];
+  return [new DocxLib.Paragraph({ children: runsFromInline(DocxLib, el), alignment: alignmentFor(DocxLib, el), ...extra })];
 }
 
 // Converte uma <table> do editor numa Table de verdade do .docx. Cada célula
@@ -282,21 +292,34 @@ function tableToDocxTable(DocxLib, tableEl) {
 function scanBlocks(DocxLib, containerEl) {
   const blocks = [];
   let pending = [];
+  // Uma quebra de página manual (marcador .word-page-break) não é conteúdo
+  // — ela só marca o PRÓXIMO bloco de verdade com pageBreakBefore.
+  let breakPending = false;
   function flushPending() {
     if (!pending.length) return;
     const wrapper = document.createElement('p');
     pending.forEach((n) => wrapper.appendChild(n.cloneNode(true)));
-    blocks.push(...blockToParagraphs(DocxLib, wrapper));
+    const extra = breakPending ? { pageBreakBefore: true } : {};
+    breakPending = false;
+    blocks.push(...blockToParagraphs(DocxLib, wrapper, extra));
     pending = [];
   }
   containerEl.childNodes.forEach((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('word-page-break')) {
+      flushPending(); // conteúdo solto ANTES da quebra não deve herdar a quebra
+      breakPending = true;
+      return;
+    }
     if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'table') {
       flushPending();
       const table = tableToDocxTable(DocxLib, node);
       if (table) blocks.push(table);
+      breakPending = false; // quebra antes de uma tabela não é suportada nesta versão
     } else if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName.toLowerCase())) {
       flushPending();
-      blocks.push(...blockToParagraphs(DocxLib, node));
+      const extra = breakPending ? { pageBreakBefore: true } : {};
+      breakPending = false;
+      blocks.push(...blockToParagraphs(DocxLib, node, extra));
     } else if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
       // espaço em branco solto entre blocos (comum em HTML colado de fora) nunca é conteúdo real
     } else {
@@ -307,9 +330,21 @@ function scanBlocks(DocxLib, containerEl) {
   return blocks;
 }
 
-async function editorToDocxDataUrl(DocxLib, editorEl) {
+async function editorToDocxDataUrl(DocxLib, editorEl, pageSetup = {}) {
+  const { marginPreset = 'normal', headerText = '', footerText = '', pageNumberEnabled = false } = pageSetup;
   const blocks = scanBlocks(DocxLib, editorEl);
   if (!blocks.length) blocks.push(new DocxLib.Paragraph({}));
+  const margin = MARGIN_PRESETS[marginPreset] || MARGIN_PRESETS.normal;
+
+  const footerRuns = [];
+  if (footerText) footerRuns.push(new DocxLib.TextRun(pageNumberEnabled ? `${footerText}  ` : footerText));
+  // PageNumber.CURRENT/TOTAL_PAGES viram campos de verdade no .docx — o
+  // Word/LibreOffice de verdade calcula e atualiza os números sozinho ao
+  // abrir/paginar o arquivo; não é um número fixo escrito aqui.
+  if (pageNumberEnabled) {
+    footerRuns.push(new DocxLib.TextRun({ children: ['Página ', DocxLib.PageNumber.CURRENT, ' de ', DocxLib.PageNumber.TOTAL_PAGES] }));
+  }
+
   const documentDef = new DocxLib.Document({
     numbering: {
       config: [{
@@ -317,7 +352,18 @@ async function editorToDocxDataUrl(DocxLib, editorEl) {
         levels: [{ level: 0, format: DocxLib.LevelFormat.DECIMAL, text: '%1.', alignment: DocxLib.AlignmentType.START }],
       }],
     },
-    sections: [{ children: blocks }],
+    sections: [{
+      properties: {
+        page: { margin: { top: pxToTwips(margin.v), bottom: pxToTwips(margin.v), left: pxToTwips(margin.h), right: pxToTwips(margin.h) } },
+      },
+      headers: headerText
+        ? { default: new DocxLib.Header({ children: [new DocxLib.Paragraph({ children: [new DocxLib.TextRun(headerText)] })] }) }
+        : undefined,
+      footers: (footerText || pageNumberEnabled)
+        ? { default: new DocxLib.Footer({ children: [new DocxLib.Paragraph({ children: footerRuns, alignment: DocxLib.AlignmentType.CENTER })] }) }
+        : undefined,
+      children: blocks,
+    }],
   });
   const blob = await DocxLib.Packer.toBlob(documentDef);
   return blobToDataUrl(blob);
@@ -383,11 +429,25 @@ export function openWord(ctx, { fileId = null } = {}) {
       <button data-action="table-add-col" title="Adicionar coluna à direita">➕ Coluna</button>
       <button data-action="table-del-row" title="Excluir linha atual">➖ Linha</button>
       <button data-action="table-del-col" title="Excluir coluna atual">➖ Coluna</button>
+      <span class="word-sep"></span>
+      <select data-role="margins" title="Margens da página" aria-label="Margens da página">
+        <option value="normal">Margens: Normal</option>
+        <option value="narrow">Margens: Estreita</option>
+        <option value="wide">Margens: Larga</option>
+      </select>
+      <button data-action="insert-page-break" title="Inserir quebra de página">⤓ Quebra de página</button>
       <input type="file" data-role="import-input" accept=".docx" class="hidden">
       <input type="file" data-role="image-input" accept="image/*" class="hidden">
     </div>
     <div class="word-page-wrap">
-      <div class="word-page" contenteditable="true" spellcheck="true"></div>
+      <div class="word-page-sheet">
+        <input type="text" class="word-header-input" data-role="header" placeholder="Cabeçalho (opcional)">
+        <div class="word-page" contenteditable="true" spellcheck="true"></div>
+        <div class="word-footer-row">
+          <input type="text" class="word-footer-input" data-role="footer" placeholder="Rodapé (opcional)">
+          <label class="word-page-number-toggle"><input type="checkbox" data-role="page-number-toggle"> Nº de página</label>
+        </div>
+      </div>
     </div>
     <div class="word-status" data-role="status">Novo documento</div>
   `;
@@ -402,8 +462,13 @@ export function openWord(ctx, { fileId = null } = {}) {
   });
 
   const editor = root.querySelector('.word-page');
+  const sheet = root.querySelector('.word-page-sheet');
   const status = root.querySelector('[data-role="status"]');
   const importInput = root.querySelector('[data-role="import-input"]');
+  const headerInput = root.querySelector('[data-role="header"]');
+  const footerInput = root.querySelector('[data-role="footer"]');
+  const pageNumberToggle = root.querySelector('[data-role="page-number-toggle"]');
+  const marginsSelect = root.querySelector('[data-role="margins"]');
   document.execCommand('defaultParagraphSeparator', false, 'p');
   // Sem isso, foreColor/hiliteColor no Chrome geram <font color> em vez de
   // <span style="...">, que é o que o exportador pro .docx sabe ler.
@@ -677,6 +742,45 @@ export function openWord(ctx, { fileId = null } = {}) {
     markDirty();
   });
 
+  // ---------------- Layout da página (margens, cabeçalho/rodapé, quebra) ----------------
+  // Margens/cabeçalho/rodapé/nº de página não sobrevivem a reabrir um .docx
+  // (o mammoth foca em conteúdo, não em layout de página) — cada documento
+  // recém-aberto ou criado volta pro padrão "Normal" sem cabeçalho/rodapé,
+  // igual à exportação em si: real na hora de salvar, mas não fingimos ler
+  // de volta o que não temos como ler de verdade.
+  function applyMargins() {
+    const preset = MARGIN_PRESETS[marginsSelect.value] || MARGIN_PRESETS.normal;
+    editor.style.padding = `${preset.v}px ${preset.h}px`;
+  }
+  applyMargins();
+  marginsSelect.addEventListener('change', () => { applyMargins(); markDirty(); });
+  headerInput.addEventListener('input', markDirty);
+  footerInput.addEventListener('input', markDirty);
+  pageNumberToggle.addEventListener('change', markDirty);
+
+  function buildPageBreakMarker() {
+    const marker = document.createElement('div');
+    marker.className = 'word-page-break';
+    marker.contentEditable = 'false';
+    marker.textContent = 'Quebra de página';
+    return marker;
+  }
+  root.querySelector('[data-action="insert-page-break"]').addEventListener('click', () => {
+    editor.focus();
+    const marker = buildPageBreakMarker();
+    const anchor = topLevelNodeAtCursor();
+    const after = document.createElement('p');
+    after.innerHTML = '<br>';
+    if (anchor) {
+      anchor.after(marker);
+    } else {
+      editor.appendChild(marker);
+    }
+    marker.after(after);
+    placeCursorIn(after, true);
+    markDirty();
+  });
+
   // execCommand('fontSize') só aceita a escala antiga 1-7 (xx-small..xx-large),
   // não um tamanho em pt de verdade — o truque padrão é aplicar o "7" (maior
   // da escala, fácil de achar de volta) e trocar pelo tamanho real que a
@@ -729,11 +833,20 @@ export function openWord(ctx, { fileId = null } = {}) {
     return libs;
   }
 
+  function resetPageSetup() {
+    marginsSelect.value = 'normal';
+    applyMargins();
+    headerInput.value = '';
+    footerInput.value = '';
+    pageNumberToggle.checked = false;
+  }
+
   async function loadFile(id) {
     const node = await fs.getNode(id);
     if (!node) return;
     currentFileId = id;
     status.dataset.name = node.name;
+    resetPageSetup();
     if (!node.content) {
       editor.innerHTML = '';
     } else if (!node.content.startsWith('data:')) {
@@ -758,10 +871,19 @@ export function openWord(ctx, { fileId = null } = {}) {
     updateWordCount();
   }
 
+  function currentPageSetup() {
+    return {
+      marginPreset: marginsSelect.value,
+      headerText: headerInput.value.trim(),
+      footerText: footerInput.value.trim(),
+      pageNumberEnabled: pageNumberToggle.checked,
+    };
+  }
+
   async function saveCurrent() {
     if (!currentFileId) return saveAs();
     const { DocxLib } = await ensureLibs();
-    const dataUrl = await editorToDocxDataUrl(DocxLib, editor);
+    const dataUrl = await editorToDocxDataUrl(DocxLib, editor, currentPageSetup());
     await fs.updateNode(currentFileId, { content: dataUrl, mimeType: WORD_MIME });
     dirty = false;
     updateTitle();
@@ -775,7 +897,7 @@ export function openWord(ctx, { fileId = null } = {}) {
     name = name.trim();
     if (!/\.docx$/i.test(name)) name += '.docx';
     const { DocxLib } = await ensureLibs();
-    const dataUrl = await editorToDocxDataUrl(DocxLib, editor);
+    const dataUrl = await editorToDocxDataUrl(DocxLib, editor, currentPageSetup());
     const existing = await fs.findChildByName(seed.documentsId, name);
     if (existing) {
       await fs.updateNode(existing.id, { content: dataUrl, mimeType: WORD_MIME });
@@ -796,6 +918,7 @@ export function openWord(ctx, { fileId = null } = {}) {
     currentFileId = null;
     editor.innerHTML = '';
     delete status.dataset.name;
+    resetPageSetup();
     dirty = false;
     updateTitle();
     updateWordCount();
@@ -814,6 +937,7 @@ export function openWord(ctx, { fileId = null } = {}) {
     editor.innerHTML = sanitizeHtml(result.value);
     currentFileId = null;
     status.dataset.name = file.name.replace(/\.docx$/i, '') + ' (importado).docx';
+    resetPageSetup();
     dirty = true;
     updateTitle();
     updateWordCount();

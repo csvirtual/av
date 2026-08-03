@@ -144,10 +144,30 @@
 .word-page .mammoth-hl-cyan { background-color: #00ffff; }
 .word-page .mammoth-hl-magenta { background-color: #ff00ff; }
 .word-page-wrap { flex: 1; overflow-y: auto; padding: var(--space-5); background: var(--hover); }
-.word-page {
-  max-width: 720px; min-height: 100%; margin: 0 auto; padding: 48px 56px;
+.word-page-sheet {
+  max-width: 720px; min-height: 100%; margin: 0 auto;
   background: #fff; color: #1a1a1a; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  font-family: 'Cambria', Georgia, serif; font-size: 15px; line-height: 1.6; outline: none;
+  display: flex; flex-direction: column;
+}
+.word-page {
+  flex: 1; padding: 48px 56px;
+  color: inherit; font-family: 'Cambria', Georgia, serif; font-size: 15px; line-height: 1.6; outline: none;
+}
+.word-header-input, .word-footer-input {
+  border: none; background: none; color: #888; font-family: 'Cambria', Georgia, serif;
+  font-size: 12px; padding: 10px 56px 0; outline: none;
+}
+.word-footer-input { padding: 0 56px 10px; flex: 1; }
+.word-header-input::placeholder, .word-footer-input::placeholder { color: #bbb; }
+.word-footer-row { display: flex; align-items: center; gap: var(--space-2); }
+.word-page-number-toggle {
+  display: flex; align-items: center; gap: 4px; font-size: 11px; color: #999;
+  padding: 0 56px 10px 0; cursor: pointer; white-space: nowrap;
+}
+.word-page-break {
+  position: relative; margin: 20px 0; padding-top: 9px; border-top: 1px dashed #999;
+  text-align: center; user-select: none;
+  font-size: 10px; color: #999; font-family: -apple-system, Segoe UI, sans-serif;
 }
 .word-page h1 { font-size: 26px; margin: 0.6em 0 0.3em; }
 .word-page h2 { font-size: 21px; margin: 0.6em 0 0.3em; }
