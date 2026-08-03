@@ -106,7 +106,37 @@ function blobToDataUrl(blob) {
   });
 }
 
-const BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote']);
+// O .docx só aceita um punhado de formatos de imagem (png/jpg/gif/bmp) —
+// qualquer outro formato que o navegador aceite (webp, svg, avif...) é
+// redesenhado num canvas e reexportado como PNG antes de virar ImageRun,
+// pra exportação nunca quebrar por causa do formato do arquivo escolhido.
+const DOCX_IMAGE_TYPES = { png: 'png', jpeg: 'jpg', jpg: 'jpg', gif: 'gif', bmp: 'bmp' };
+const MAX_DOCX_IMAGE_WIDTH = 550; // px — cabe na largura útil de uma página A4/Carta
+function imageRunFromImg(DocxLib, img) {
+  const src = img.getAttribute('src') || '';
+  const mimeMatch = src.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,/);
+  const mime = mimeMatch ? mimeMatch[1].toLowerCase() : '';
+  let dataUrl = src;
+  let type = DOCX_IMAGE_TYPES[mime];
+  if (!type) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width || 1;
+    canvas.height = img.naturalHeight || img.height || 1;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    dataUrl = canvas.toDataURL('image/png');
+    type = 'png';
+  }
+  const naturalW = img.naturalWidth || img.width || 300;
+  const naturalH = img.naturalHeight || img.height || 200;
+  const scale = naturalW > MAX_DOCX_IMAGE_WIDTH ? MAX_DOCX_IMAGE_WIDTH / naturalW : 1;
+  return new DocxLib.ImageRun({
+    type,
+    data: dataUrlToArrayBuffer(dataUrl),
+    transformation: { width: Math.round(naturalW * scale), height: Math.round(naturalH * scale) },
+  });
+}
+
+const BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'table']);
 const HEADING_MAP = { h1: 'HEADING_1', h2: 'HEADING_2', h3: 'HEADING_3' };
 const ALIGN_MAP = { left: 'LEFT', center: 'CENTER', right: 'RIGHT', justify: 'BOTH' };
 const NUMBERING_REF = 'lista-numerada';
@@ -152,6 +182,7 @@ function runsFromInline(DocxLib, node, base = {}) {
     if (child.nodeType !== Node.ELEMENT_NODE) return;
     const tag = child.tagName.toLowerCase();
     if (tag === 'br') { runs.push(new DocxLib.TextRun({ break: 1 })); return; }
+    if (tag === 'img') { runs.push(imageRunFromImg(DocxLib, child)); return; }
     const next = { ...base };
     if (tag === 'b' || tag === 'strong') next.bold = true;
     if (tag === 'i' || tag === 'em') next.italic = true;
@@ -210,23 +241,62 @@ function blockToParagraphs(DocxLib, el) {
   return [new DocxLib.Paragraph({ children: runsFromInline(DocxLib, el), alignment: alignmentFor(DocxLib, el) })];
 }
 
-// Percorre os filhos diretos do editor: elementos de bloco viram parágrafos
-// próprios; texto/inline soltos (ex: a primeira linha antes do primeiro
-// Enter) são agrupados num parágrafo implícito.
-function topLevelToParagraphs(DocxLib, editorEl) {
-  const paragraphs = [];
+// Converte uma <table> do editor numa Table de verdade do .docx. Cada célula
+// vira uma TableCell cujo conteúdo é escaneado como bloco (reaproveita
+// scanBlocks, então uma célula pode ter mais de um parágrafo) — suporta
+// mesclagem horizontal (colspan) porque é só um número por célula, mas não
+// mesclagem vertical (rowspan), que exigiria acompanhar o estado entre
+// linhas; uma célula com rowspan > 1 simplesmente aparece como célula normal
+// em cada linha em que o HTML de origem (nosso próprio editor ou o do
+// mammoth) a repetir.
+function tableToDocxTable(DocxLib, tableEl) {
+  const rows = Array.from(tableEl.querySelectorAll('tr'));
+  if (!rows.length) return null;
+  const docRows = rows
+    .map((tr) => {
+      const cells = Array.from(tr.children).filter((c) => ['td', 'th'].includes(c.tagName.toLowerCase()));
+      if (!cells.length) return null;
+      return new DocxLib.TableRow({
+        children: cells.map((cell) => {
+          const cellBlocks = scanBlocks(DocxLib, cell);
+          return new DocxLib.TableCell({
+            children: cellBlocks.length ? cellBlocks : [new DocxLib.Paragraph({})],
+            columnSpan: cell.colSpan > 1 ? cell.colSpan : undefined,
+            width: { size: Math.round(100 / cells.length), type: DocxLib.WidthType.PERCENTAGE },
+          });
+        }),
+      });
+    })
+    .filter(Boolean);
+  if (!docRows.length) return null;
+  return new DocxLib.Table({ rows: docRows, width: { size: 100, type: DocxLib.WidthType.PERCENTAGE } });
+}
+
+// Percorre os filhos diretos de um container (o editor inteiro, ou o
+// conteúdo de uma célula de tabela): elementos de bloco viram parágrafos
+// próprios, tabelas viram Table de verdade, e texto/inline soltos (ex: a
+// primeira linha antes do primeiro Enter) são agrupados num parágrafo
+// implícito. Devolve uma lista mista de Paragraph e Table, na ordem em que
+// apareceram — é isso que sections[0].children (ou os children de uma
+// TableCell) aceitam.
+function scanBlocks(DocxLib, containerEl) {
+  const blocks = [];
   let pending = [];
   function flushPending() {
     if (!pending.length) return;
     const wrapper = document.createElement('p');
     pending.forEach((n) => wrapper.appendChild(n.cloneNode(true)));
-    paragraphs.push(...blockToParagraphs(DocxLib, wrapper));
+    blocks.push(...blockToParagraphs(DocxLib, wrapper));
     pending = [];
   }
-  editorEl.childNodes.forEach((node) => {
-    if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName.toLowerCase())) {
+  containerEl.childNodes.forEach((node) => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.tagName.toLowerCase() === 'table') {
       flushPending();
-      paragraphs.push(...blockToParagraphs(DocxLib, node));
+      const table = tableToDocxTable(DocxLib, node);
+      if (table) blocks.push(table);
+    } else if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName.toLowerCase())) {
+      flushPending();
+      blocks.push(...blockToParagraphs(DocxLib, node));
     } else if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
       // espaço em branco solto entre blocos (comum em HTML colado de fora) nunca é conteúdo real
     } else {
@@ -234,12 +304,12 @@ function topLevelToParagraphs(DocxLib, editorEl) {
     }
   });
   flushPending();
-  return paragraphs;
+  return blocks;
 }
 
 async function editorToDocxDataUrl(DocxLib, editorEl) {
-  const paragraphs = topLevelToParagraphs(DocxLib, editorEl);
-  if (!paragraphs.length) paragraphs.push(new DocxLib.Paragraph({}));
+  const blocks = scanBlocks(DocxLib, editorEl);
+  if (!blocks.length) blocks.push(new DocxLib.Paragraph({}));
   const documentDef = new DocxLib.Document({
     numbering: {
       config: [{
@@ -247,7 +317,7 @@ async function editorToDocxDataUrl(DocxLib, editorEl) {
         levels: [{ level: 0, format: DocxLib.LevelFormat.DECIMAL, text: '%1.', alignment: DocxLib.AlignmentType.START }],
       }],
     },
-    sections: [{ children: paragraphs }],
+    sections: [{ children: blocks }],
   });
   const blob = await DocxLib.Packer.toBlob(documentDef);
   return blobToDataUrl(blob);
@@ -306,7 +376,15 @@ export function openWord(ctx, { fileId = null } = {}) {
       <button data-align="center" title="Centralizar">Centro</button>
       <button data-align="right" title="Alinhar à direita">Dir</button>
       <button data-align="justify" title="Justificar">Just</button>
+      <span class="word-sep"></span>
+      <button data-action="insert-image" title="Inserir imagem">🖼️ Imagem</button>
+      <button data-action="insert-table" title="Inserir tabela">▦ Tabela</button>
+      <button data-action="table-add-row" title="Adicionar linha abaixo">➕ Linha</button>
+      <button data-action="table-add-col" title="Adicionar coluna à direita">➕ Coluna</button>
+      <button data-action="table-del-row" title="Excluir linha atual">➖ Linha</button>
+      <button data-action="table-del-col" title="Excluir coluna atual">➖ Coluna</button>
       <input type="file" data-role="import-input" accept=".docx" class="hidden">
+      <input type="file" data-role="image-input" accept="image/*" class="hidden">
     </div>
     <div class="word-page-wrap">
       <div class="word-page" contenteditable="true" spellcheck="true"></div>
@@ -358,6 +436,15 @@ export function openWord(ctx, { fileId = null } = {}) {
     let blockTag = 'p';
     try { blockTag = (document.queryCommandValue('formatBlock') || 'p').toLowerCase(); } catch { /* ignora */ }
     root.querySelectorAll('[data-block]').forEach((btn) => btn.classList.toggle('active', btn.dataset.block === blockTag));
+
+    // Botões de linha/coluna só fazem sentido com o cursor dentro de uma
+    // tabela — igual ao Word de verdade, que esconde/desabilita a faixa de
+    // ferramentas de tabela fora dela.
+    const insideTable = !!currentTableCell();
+    ['table-add-row', 'table-add-col', 'table-del-row', 'table-del-col'].forEach((action) => {
+      const btn = root.querySelector(`[data-action="${action}"]`);
+      if (btn) btn.disabled = !insideTable;
+    });
   }
 
   editor.addEventListener('input', () => { markDirty(); });
@@ -388,6 +475,206 @@ export function openWord(ctx, { fileId = null } = {}) {
       document.execCommand(cmd);
       markDirty();
     });
+  });
+
+  // ---------------- Imagens ----------------
+  // Mesmo cuidado de posição do cursor que a inserção de tabela: o seletor
+  // de arquivo do sistema também rouba o foco da página, então a posição é
+  // capturada no clique do botão (antes de abrir o seletor) e restaurada só
+  // depois que o arquivo escolhido termina de ser lido.
+  let savedImageRange = null;
+  const imageInput = root.querySelector('[data-role="image-input"]');
+  root.querySelector('[data-action="insert-image"]').addEventListener('click', () => {
+    savedImageRange = captureEditorRange();
+    imageInput.click();
+  });
+  imageInput.addEventListener('change', async () => {
+    const file = imageInput.files[0];
+    imageInput.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    const dataUrl = await blobToDataUrl(file);
+    editor.focus();
+    restoreEditorRange(savedImageRange);
+    document.execCommand('insertImage', false, dataUrl);
+    markDirty();
+  });
+
+  // ---------------- Tabelas ----------------
+  // Cada célula recém-criada guarda um parágrafo vazio de verdade (<p><br>)
+  // em vez de ficar completamente vazia — contenteditable se comporta mal
+  // (cursor não entra, Enter faz coisa estranha) numa célula sem nenhum nó
+  // de bloco dentro.
+  function buildTableCell() {
+    const cell = document.createElement('td');
+    cell.innerHTML = '<p><br></p>';
+    return cell;
+  }
+  function buildTableElement(rows, cols) {
+    const table = document.createElement('table');
+    table.className = 'word-table';
+    const tbody = document.createElement('tbody');
+    for (let r = 0; r < rows; r++) {
+      const tr = document.createElement('tr');
+      for (let c = 0; c < cols; c++) tr.appendChild(buildTableCell());
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+  function placeCursorIn(el, atStart = true) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(atStart);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  // Inserir imagem/tabela sempre passa por um diálogo ou seletor de arquivo
+  // no meio do caminho — e isso rouba o foco da página. Focar o editor de
+  // novo depois, sem mais nada, faz o navegador colocar o cursor de volta
+  // no INÍCIO do documento em vez de onde a pessoa realmente estava editando
+  // (perda de posição clássica de contenteditable). Por isso a posição é
+  // capturada ANTES de abrir o diálogo e restaurada explicitamente depois,
+  // ao contrário de simplesmente reler a seleção atual nesse momento.
+  function captureEditorRange() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
+    return null;
+  }
+  function restoreEditorRange(savedRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    if (savedRange && editor.contains(savedRange.startContainer)) {
+      sel.addRange(savedRange);
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.addRange(range);
+  }
+  // Sobe da posição do cursor até achar o filho DIRETO do editor que contém
+  // esse ponto — é em relação a esse nó (não à posição exata dentro dele)
+  // que a tabela é inserida como irmã, nunca como filha. Sem isso, o cursor
+  // parado dentro de um <p> vazio (o que sobra depois de um Enter) faz
+  // range.insertNode() botar a tabela DENTRO desse parágrafo em vez de ao
+  // lado dele — <table> aninhado num <p> é HTML inválido e visualmente
+  // aparecia fora de ordem.
+  function topLevelNodeAtCursor() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    let node = sel.getRangeAt(0).startContainer;
+    if (!editor.contains(node)) return null;
+    while (node.parentNode !== editor) {
+      node = node.parentNode;
+      if (!node) return null;
+    }
+    return node;
+  }
+  function currentTableCell() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    let node = sel.getRangeAt(0).startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    if (!node || !editor.contains(node)) return null;
+    return node.closest ? node.closest('td, th') : null;
+  }
+
+  root.querySelector('[data-action="insert-table"]').addEventListener('click', async () => {
+    const savedRange = captureEditorRange();
+    const spec = await showPrompt('Tamanho da tabela (linhas x colunas):', '3x3', { title: 'Inserir tabela', container: win.el });
+    if (!spec) return;
+    const m = spec.match(/(\d+)\s*[x×]\s*(\d+)/i);
+    const rows = Math.min(Math.max(parseInt(m?.[1] ?? '3', 10) || 3, 1), 20);
+    const cols = Math.min(Math.max(parseInt(m?.[2] ?? '3', 10) || 3, 1), 10);
+    editor.focus();
+    restoreEditorRange(savedRange);
+    const table = buildTableElement(rows, cols);
+    const after = document.createElement('p');
+    after.innerHTML = '<br>';
+    const anchor = topLevelNodeAtCursor();
+    if (anchor) {
+      anchor.after(table);
+    } else {
+      editor.appendChild(table);
+    }
+    table.after(after);
+    placeCursorIn(table.querySelector('td, th'));
+    markDirty();
+    refreshToolbarState();
+  });
+
+  root.querySelector('[data-action="table-add-row"]').addEventListener('click', () => {
+    const cell = currentTableCell();
+    const row = cell?.closest('tr');
+    if (!row) return;
+    const newRow = document.createElement('tr');
+    for (let c = 0; c < row.children.length; c++) newRow.appendChild(buildTableCell());
+    row.after(newRow);
+    markDirty();
+    refreshToolbarState();
+  });
+  root.querySelector('[data-action="table-add-col"]').addEventListener('click', () => {
+    const cell = currentTableCell();
+    const table = cell?.closest('table');
+    if (!cell || !table) return;
+    const colIndex = Array.from(cell.parentElement.children).indexOf(cell);
+    table.querySelectorAll('tr').forEach((tr) => {
+      const ref = tr.children[colIndex];
+      const newCell = buildTableCell();
+      if (ref) ref.after(newCell); else tr.appendChild(newCell);
+    });
+    markDirty();
+    refreshToolbarState();
+  });
+  root.querySelector('[data-action="table-del-row"]').addEventListener('click', () => {
+    const cell = currentTableCell();
+    const row = cell?.closest('tr');
+    const table = row?.closest('table');
+    if (!row || !table) return;
+    if (table.querySelectorAll('tr').length <= 1) table.remove();
+    else row.remove();
+    markDirty();
+    refreshToolbarState();
+  });
+  root.querySelector('[data-action="table-del-col"]').addEventListener('click', () => {
+    const cell = currentTableCell();
+    const table = cell?.closest('table');
+    if (!cell || !table) return;
+    const colIndex = Array.from(cell.parentElement.children).indexOf(cell);
+    const rows = table.querySelectorAll('tr');
+    if (rows[0].children.length <= 1) { table.remove(); markDirty(); refreshToolbarState(); return; }
+    rows.forEach((tr) => tr.children[colIndex]?.remove());
+    markDirty();
+    refreshToolbarState();
+  });
+
+  // Tab dentro de uma célula pula pra próxima (Shift+Tab pra anterior), como
+  // no Word de verdade — sem isso o Tab do navegador sairia do editor
+  // inteiro em vez de navegar entre células.
+  editor.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const cell = currentTableCell();
+    if (!cell) return;
+    e.preventDefault();
+    const table = cell.closest('table');
+    let cells = Array.from(table.querySelectorAll('td, th'));
+    const idx = cells.indexOf(cell);
+    let target;
+    if (e.shiftKey) {
+      target = cells[idx - 1];
+    } else if (idx === cells.length - 1) {
+      const row = cell.closest('tr');
+      const newRow = document.createElement('tr');
+      for (let c = 0; c < row.children.length; c++) newRow.appendChild(buildTableCell());
+      row.after(newRow);
+      cells = Array.from(table.querySelectorAll('td, th'));
+      target = cells[idx + 1];
+    } else {
+      target = cells[idx + 1];
+    }
+    if (target) placeCursorIn(target);
+    markDirty();
   });
 
   // execCommand('fontSize') só aceita a escala antiga 1-7 (xx-small..xx-large),
