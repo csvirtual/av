@@ -8,13 +8,7 @@ import { SHEET_MIME } from './sheet.js';
 import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
-import { trashGlyph } from '../core/icons.js';
-
-// Ícone das pastas especiais (Usuários) que merecem se diferenciar de uma
-// pasta comum, igual ao Disco Local (C:) já feito acima. Emoji de 2010
-// (um dos mais antigos que existem), de propósito — é o que tem a garantia
-// de compatibilidade mais ampla possível, até em aparelhos bem antigos.
-const USERS_GLYPH = '👤';
+import { trashGlyph, USERS_GLYPH } from '../core/icons.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
