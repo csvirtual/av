@@ -179,6 +179,7 @@ function fileGlyph(node) {
     if (node.id === seed?.desktopId) return PC_GLYPH;
     if (node.id === seed?.documentsId) return '📄';
     if (node.id === seed?.picturesId) return PHOTO_GLYPH;
+    if (node.id === seed?.videosId) return '🎬';
     if (node.id === seed?.downloadsId) return '⬇️';
     return '📁';
   }
