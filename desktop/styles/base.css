@@ -10,7 +10,14 @@ html, body {
   user-select: none;
 }
 
-button, input { font-family: inherit; }
+button, input, select { font-family: inherit; }
+
+/* Sem isso, o <select> herda cor de texto clara (tema escuro/alto
+   contraste) mas o navegador abre a lista de opções com fundo claro
+   nativo por padrão — texto quase invisível até passar o mouse (que aí
+   sim aplica o destaque nativo de hover). Estilando <option> direto
+   resolve em qualquer <select> do app, sem precisar repetir por tela. */
+select option { background: var(--win-bg); color: var(--text); }
 
 .hidden { display: none !important; }
 

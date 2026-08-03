@@ -180,6 +180,19 @@
   </div>
 </div>
 
+<!-- Energia (reiniciar/desligar) nas telas de seleção de conta e de
+     bloqueio — canto inferior esquerdo, espelhando a Facilidade de Acesso. -->
+<button id="pre-login-power-btn" class="pre-login-power-btn" type="button" title="Energia" aria-label="Opções de energia">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+    <path d="M12 3v8"></path>
+    <path d="M6.5 6.5a7 7 0 1 0 11 0"></path>
+  </svg>
+</button>
+<div id="pre-login-power-menu" class="panel small hidden">
+  <button data-action="restart">↻ Reiniciar</button>
+  <button data-action="shutdown"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" style="vertical-align:-2px"><path d="M12 3v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M7 6a8 8 0 1 0 10 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Desligar</button>
+</div>
+
 <!-- Área de trabalho -->
 <div id="desktop" class="screen hidden">
   <div id="wallpaper"></div>

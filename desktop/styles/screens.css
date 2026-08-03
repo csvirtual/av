@@ -175,6 +175,30 @@ body:has(#account-picker-screen:not(.hidden)) .ease-of-access-btn {
   display: flex;
 }
 
+/* Energia (reiniciar/desligar) nas mesmas telas de pré-login, espelhada
+   no canto inferior esquerdo — mesma altura, tamanho e distância da borda
+   que a Facilidade de Acesso, seguindo o mesmo estilo de botão da página. */
+.pre-login-power-btn {
+  display: none;
+  position: fixed;
+  left: 24px; bottom: 24px;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+}
+.pre-login-power-btn:hover { background: rgba(255, 255, 255, 0.26); }
+#pre-login-power-menu { z-index: 31; }
+
+body:has(#lock-screen:not(.hidden)) .pre-login-power-btn,
+body:has(#account-picker-screen:not(.hidden)) .pre-login-power-btn {
+  display: flex;
+}
+
 /* Alto contraste também nas telas cheias de autenticação: elas usam cores
    fixas (não os tokens de tema) para manter o fundo azul do "Windows", então
    precisam de uma sobreposição própria para o alto contraste ter efeito

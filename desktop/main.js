@@ -938,6 +938,24 @@ document.querySelectorAll('.eoa-scale-btn').forEach((btn) => {
   });
 });
 
+// ---------------- Energia (telas de seleção de conta/bloqueio) ----------------
+$('#pre-login-power-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = $('#pre-login-power-menu');
+  if (!menu.classList.contains('hidden')) {
+    hidePanel(menu);
+    return;
+  }
+  positionPanelNearButton(menu, $('#pre-login-power-btn'), 'left');
+});
+$('#pre-login-power-menu').addEventListener('click', (e) => {
+  const action = e.target.closest('button')?.dataset.action;
+  if (!action) return;
+  hidePanel($('#pre-login-power-menu'));
+  if (action === 'restart') restartNow();
+  if (action === 'shutdown') shutdownNow();
+});
+
 function updateClocks() {
   const now = new Date();
   const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: timeFormat === '12h' });
@@ -1466,7 +1484,7 @@ function showContextMenu(x, y, items) {
   showPanel(menu);
 }
 
-function positionPanelNearButton(panel, btn) {
+function positionPanelNearButton(panel, btn, align = 'right') {
   panel.style.left = '-9999px';
   panel.style.top = '-9999px';
   panel.style.bottom = 'auto';
@@ -1475,7 +1493,7 @@ function positionPanelNearButton(panel, btn) {
   show(panel);
   const btnRect = btn.getBoundingClientRect();
   const panelRect = panel.getBoundingClientRect();
-  let left = btnRect.right - panelRect.width;
+  let left = align === 'left' ? btnRect.left : btnRect.right - panelRect.width;
   left = Math.min(left, window.innerWidth - panelRect.width - 8);
   left = Math.max(8, left);
   const top = Math.max(8, btnRect.top - panelRect.height - 8);
@@ -1492,6 +1510,7 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#volume-menu') && !e.target.closest('#tray-volume-btn')) hidePanel($('#volume-menu'));
   if (!e.target.closest('#calendar-flyout') && !e.target.closest('#tray-clock')) hidePanel($('#calendar-flyout'));
   if (!e.target.closest('#ease-of-access-menu') && !e.target.closest('#ease-of-access-btn')) hidePanel($('#ease-of-access-menu'));
+  if (!e.target.closest('#pre-login-power-menu') && !e.target.closest('#pre-login-power-btn')) hidePanel($('#pre-login-power-menu'));
   if (!e.target.closest('#notification-center') && !e.target.closest('#tray-notif-btn')) hidePanel($('#notification-center'));
   if (!e.target.closest('#task-view') && !e.target.closest('#task-view-btn')) hidePanel($('#task-view'));
 });
@@ -1502,7 +1521,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const panelSelectors = [
     '#context-menu', '#notification-center', '#calendar-flyout',
-    '#volume-menu', '#ease-of-access-menu', '#account-menu', '#power-menu', '#start-menu', '#task-view',
+    '#volume-menu', '#ease-of-access-menu', '#pre-login-power-menu', '#account-menu', '#power-menu', '#start-menu', '#task-view',
   ];
   for (const sel of panelSelectors) {
     const el = $(sel);
