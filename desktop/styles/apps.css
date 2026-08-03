@@ -648,3 +648,57 @@
 .taskmgr-sub { font-size: 11px; color: var(--text-dim); }
 .taskmgr-row .btn { font-size: 12px; padding: 6px 12px; flex-shrink: 0; }
 .taskmgr-current { font-size: 13px; color: var(--text-dim); margin-top: var(--space-2); }
+
+/* ---------- Paint ---------- */
+.paint-app { display: flex; flex-direction: column; height: 100%; background: var(--win-bg); }
+.paint-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.paint-toolbar button {
+  border: none; background: none; padding: var(--space-2) 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text); white-space: nowrap;
+}
+.paint-toolbar button:hover { background: var(--hover); }
+.paint-toolbar button.active { background: var(--accent-2); color: #fff; }
+.paint-sep { width: 1px; align-self: stretch; background: var(--border); margin: 0 var(--space-1); }
+.paint-size-label {
+  display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text);
+}
+.paint-size-label select {
+  border: none; background: none; padding: var(--space-2) 6px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 12px; color: var(--text);
+}
+.paint-size-label select:hover { background: var(--hover); }
+.paint-palette-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border);
+}
+.paint-current-color {
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); flex-shrink: 0;
+}
+.paint-palette-row input[type="color"] {
+  width: 26px; height: 26px; border: none; padding: 0; background: none; cursor: pointer; flex-shrink: 0;
+}
+.paint-palette { display: flex; flex-wrap: wrap; gap: 4px; }
+.paint-swatch {
+  width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border);
+  cursor: pointer; padding: 0;
+}
+.paint-swatch:hover { transform: scale(1.15); }
+.paint-canvas-wrap { flex: 1; overflow: auto; background: var(--hover); padding: var(--space-5); }
+.paint-canvas-stage { position: relative; display: inline-block; }
+.paint-canvas-stage canvas {
+  display: block; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  touch-action: none; cursor: crosshair;
+}
+.paint-text-input {
+  position: absolute; border: 1px dashed #3f9bff; background: rgba(255, 255, 255, 0.85);
+  padding: 0 2px; outline: none; font-family: sans-serif; min-width: 60px;
+}
+.paint-selection-box {
+  position: absolute; border: 1px dashed #3f9bff; background: rgba(63, 155, 255, 0.12);
+  pointer-events: none;
+}
+.paint-status { padding: var(--space-1) var(--space-3); font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border); }

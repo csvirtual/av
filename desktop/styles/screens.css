@@ -31,13 +31,26 @@
   box-shadow: var(--elevation-3);
 }
 /* Fica ancorado no canto superior esquerdo do card, fora do fluxo normal —
-   não empurra o avatar/nome pra baixo, igual um botão "voltar" de canto. */
-#lock-switch-user-btn {
+   não empurra o avatar/nome pra baixo. Mesmo estilo do botão de Facilidade
+   de Acesso (círculo translúcido) já usado nesta mesma tela, por
+   consistência visual. */
+.lock-switch-user-btn {
   position: absolute;
-  top: 14px;
-  left: 16px;
-  margin: 0;
+  top: 12px;
+  left: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
+.lock-switch-user-btn:hover { background: rgba(255, 255, 255, 0.26); }
+.lock-switch-user-btn svg { width: 16px; height: 16px; }
 .auth-card h1 { font-size: 20px; font-weight: 500; margin: 0 0 18px; }
 .auth-sub { font-size: 13px; opacity: 0.85; margin: -10px 0 18px; }
 .oobe-role-note { margin-top: 14px; font-style: italic; }

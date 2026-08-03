@@ -149,6 +149,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     browser: './apps/browser.js',
     notepad: './apps/notepad.js',
     photos: './apps/photos.js',
+    paint: './apps/paint.js',
     word: './apps/word.js',
     sheet: './apps/sheet.js',
     'video-player': './apps/video-player.js',
@@ -420,6 +421,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <div style="display:flex;gap:8px;margin:10px 0 4px">
         <button class="btn" data-action="change-photo">Alterar foto</button>
         <button class="btn" style="background:var(--hover);color:var(--text)" data-action="use-initial">Usar inicial</button>
+        <button class="btn" style="background:var(--hover);color:var(--text)" data-action="rename">Alterar nome</button>
       </div>
       <h2 style="margin-top:20px">E-mail de recuperação</h2>
       <p style="font-size:13px;color:var(--text-dim);max-width:380px;line-height:1.5">
@@ -497,6 +499,12 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     content.querySelector('[data-action="use-initial"]').addEventListener('click', async () => {
       await ctx.setAvatar(null);
       preview.innerHTML = avatarPreviewHTML(name, null);
+    });
+    content.querySelector('[data-action="rename"]').addEventListener('click', async () => {
+      const newName = prompt('Novo nome:', name);
+      if (!newName || !newName.trim() || newName.trim() === name) return;
+      await ctx.setName(newName.trim());
+      renderAccount();
     });
 
     async function renderOtherAccounts() {
