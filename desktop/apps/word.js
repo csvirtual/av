@@ -54,17 +54,32 @@ function escapeHtmlText(text) {
 
 // Sanitização defensiva do HTML que vem do mammoth (arquivo .docx importado
 // pode ter sido criado por qualquer programa) antes de jogar em innerHTML.
+// Regras extras além de tirar as tags perigosas: bloqueia href/src com
+// javascript:/vbscript:, bloqueia src="data:..." que não seja imagem (uma
+// imagem em base64 é conteúdo legítimo — o resto de data: não tem porque
+// aparecer aqui), e só derruba o atributo style="..." inteiro se ele
+// contiver algo além de formatação de texto de verdade (url()/expression()/
+// @import/-moz-binding são vetores conhecidos de injeção via CSS) — não dá
+// pra bloquear style="..." sempre, porque é assim que a própria barra de
+// ferramentas (cor/tamanho/realce) aplica formatação legítima.
+const DANGEROUS_STYLE_RE = /url\s*\(|expression\s*\(|-moz-binding|behavior\s*:|@import|javascript:/i;
 function sanitizeHtml(html) {
   const template = document.createElement('template');
   template.innerHTML = html;
-  const strip = ['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta'];
+  const strip = ['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'svg', 'math', 'base', 'form'];
   (function walk(node) {
     Array.from(node.childNodes).forEach((child) => {
       if (child.nodeType !== Node.ELEMENT_NODE) return;
       const tag = child.tagName.toLowerCase();
       if (strip.includes(tag)) { child.remove(); return; }
       Array.from(child.attributes).forEach((attr) => {
-        if (/^on/i.test(attr.name) || (attr.name === 'href' && /^javascript:/i.test(attr.value))) child.removeAttribute(attr.name);
+        const name = attr.name.toLowerCase();
+        const value = attr.value;
+        if (/^on/i.test(name)) { child.removeAttribute(attr.name); return; }
+        if ((name === 'href' || name === 'src') && /^(javascript|vbscript):/i.test(value)) { child.removeAttribute(attr.name); return; }
+        if (name === 'src' && /^data:/i.test(value) && !/^data:image\//i.test(value)) { child.removeAttribute(attr.name); return; }
+        if (name === 'href' && /^data:/i.test(value)) { child.removeAttribute(attr.name); return; }
+        if (name === 'style' && DANGEROUS_STYLE_RE.test(value)) { child.removeAttribute(attr.name); }
       });
       walk(child);
     });

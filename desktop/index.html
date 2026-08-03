@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- Reforço da mesma política de netlify.toml pra quando o app é servido
+     sem os cabeçalhos HTTP dele (ex: hospedagem estática simples, ou
+     ambiente de desenvolvimento local) — frame-ancestors/sandbox não têm
+     efeito vindo de <meta> (só via cabeçalho HTTP de verdade), o resto sim. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Windows 11 — Área de Trabalho</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles/tokens.css">
