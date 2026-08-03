@@ -348,14 +348,24 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   }
 
   // ---------------- Contas ----------------
+  function roleLabelFor(account) {
+    if (account.primary) return 'Administrador Geral';
+    return account.role === 'admin' ? 'Administrador' : 'Usuário comum';
+  }
+
   async function renderAccount() {
     const name = await ctx.kv.get('user.name', 'Usuário');
     const avatar = await ctx.getAvatar();
     const email = await ctx.kv.get('auth.email', '');
+    const accounts = await ctx.listAccounts();
+    const activeId = ctx.getActiveAccountId();
+    const me = accounts.find((a) => a.id === activeId);
+    const isAdmin = await ctx.getActiveAccountRole() === 'admin';
     content.innerHTML = `
       <h2>Conta</h2>
       <div class="settings-avatar-lg" data-role="avatar-preview">${avatarPreviewHTML(name, avatar)}</div>
       <p style="font-size:13px;color:var(--text-dim)">Usuário: <strong>${name}</strong></p>
+      <p style="font-size:13px;color:var(--text-dim)">Tipo de conta: <strong>${escapeAttr(me ? roleLabelFor(me) : 'Usuário comum')}</strong></p>
       <input type="file" accept="image/*" data-role="avatar-upload" class="hidden">
       <div style="display:flex;gap:8px;margin:10px 0 4px">
         <button class="btn" data-action="change-photo">Alterar foto</button>
@@ -377,8 +387,13 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <p class="settings-msg" data-role="pass-msg"></p>
 
       <h2 style="margin-top:20px">Outras contas neste dispositivo</h2>
+      <p style="font-size:12px;color:var(--text-dim)">Este dispositivo permite no máximo ${ctx.maxAccounts} contas (${accounts.length}/${ctx.maxAccounts}).</p>
       <div data-role="other-accounts"></div>
-      <button class="btn" data-action="add-account" style="background:var(--hover);color:var(--text);margin-top:8px">+ Adicionar conta</button>
+      ${isAdmin
+        ? (accounts.length < ctx.maxAccounts
+          ? `<button class="btn" data-action="add-account" style="background:var(--hover);color:var(--text);margin-top:8px">+ Adicionar conta</button>`
+          : `<p class="settings-msg" style="margin-top:8px">Limite de ${ctx.maxAccounts} contas atingido.</p>`)
+        : `<p class="settings-msg" style="margin-top:8px">Apenas um administrador pode adicionar ou remover contas.</p>`}
     `;
     await renderOtherAccounts();
     content.querySelector('[data-action="save-email"]').addEventListener('click', async () => {
@@ -448,33 +463,50 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
         holder.appendChild(p);
         return;
       }
+      const isAdminNow = await ctx.getActiveAccountRole() === 'admin';
       others.forEach((acc) => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0';
         row.innerHTML = `
           <span class="avatar-sm">${avatarPreviewHTML(acc.name, acc.avatar)}</span>
-          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}</span>
+          <span style="flex:1;font-size:13px">${escapeAttr(acc.name)}<br><span style="color:var(--text-dim);font-size:11px">${escapeAttr(roleLabelFor(acc))}</span></span>
         `;
         const switchBtn = document.createElement('button');
         switchBtn.className = 'btn';
         switchBtn.style.cssText = 'background:var(--hover);color:var(--text)';
         switchBtn.textContent = 'Trocar para';
         switchBtn.addEventListener('click', () => ctx.switchToAccount(acc.id));
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn';
-        removeBtn.style.cssText = 'background:#e81123';
-        removeBtn.textContent = 'Remover';
-        removeBtn.addEventListener('click', async () => {
-          const removed = await ctx.removeAccount(acc.id);
-          if (removed) renderOtherAccounts();
-        });
         row.appendChild(switchBtn);
-        row.appendChild(removeBtn);
+        // Só o Administrador Geral é permanente — as outras 2 contas podem
+        // ser promovidas/rebaixadas por quem já for administrador.
+        if (isAdminNow && !acc.primary) {
+          const roleBtn = document.createElement('button');
+          roleBtn.className = 'btn';
+          roleBtn.style.cssText = 'background:var(--hover);color:var(--text)';
+          const nextRole = acc.role === 'admin' ? 'standard' : 'admin';
+          roleBtn.textContent = nextRole === 'admin' ? 'Tornar administrador' : 'Tornar usuário comum';
+          roleBtn.addEventListener('click', async () => {
+            const ok = await ctx.setAccountRole(acc.id, nextRole);
+            if (ok) renderOtherAccounts();
+          });
+          row.appendChild(roleBtn);
+        }
+        if (isAdminNow && !acc.primary) {
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn';
+          removeBtn.style.cssText = 'background:#e81123';
+          removeBtn.textContent = 'Remover';
+          removeBtn.addEventListener('click', async () => {
+            const removed = await ctx.removeAccount(acc.id);
+            if (removed) renderOtherAccounts();
+          });
+          row.appendChild(removeBtn);
+        }
         holder.appendChild(row);
       });
     }
 
-    content.querySelector('[data-action="add-account"]').addEventListener('click', () => ctx.addAccount());
+    content.querySelector('[data-action="add-account"]')?.addEventListener('click', () => ctx.addAccount());
   }
 
   // ---------------- Privacidade ----------------

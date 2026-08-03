@@ -5,13 +5,21 @@
 // qualquer conta (kv.global).
 import { kv } from '../state/kv-store.js';
 
+// O Windows real não impõe um teto embutido pra contas locais, mas foi
+// pedido explicitamente um limite de 3 perfis neste clone: a primeira conta
+// criada no dispositivo (marcada `primary: true`) é o Administrador Geral,
+// permanente e nunca removível/rebaixável; as próximas 2 nascem como
+// "usuário comum" (`role: 'standard'`) e podem ser promovidas/rebaixadas
+// pelas Configurações — mas só por quem já é administrador.
+export const MAX_ACCOUNTS = 3;
+
 export async function listAccounts() {
   return kv.global.get('accounts', []);
 }
 
-export async function addAccountRecord({ id, name, avatar = null }) {
+export async function addAccountRecord({ id, name, avatar = null, role = 'standard', primary = false }) {
   const accounts = await listAccounts();
-  accounts.push({ id, name, avatar });
+  accounts.push({ id, name, avatar, role, primary });
   await kv.global.set('accounts', accounts);
 }
 

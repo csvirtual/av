@@ -3,7 +3,7 @@ import { fs, ensureSeed } from './core/state/filesystem.js';
 import { setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
 import {
   listAccounts, addAccountRecord, updateAccountRecord, removeAccountRecord,
-  setLastActiveAccountId, newAccountId,
+  setLastActiveAccountId, newAccountId, MAX_ACCOUNTS,
 } from './core/services/accounts.js';
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, playNotifyChime, volumeControl } from './core/services/sounds.js';
@@ -106,7 +106,18 @@ const ctx = {
   notify: (n) => pushNotification(n),
   getActiveAccountId: () => getActiveAccount(),
   listAccounts,
-  addAccount: () => {
+  getActiveAccountRole,
+  maxAccounts: MAX_ACCOUNTS,
+  addAccount: async () => {
+    const accounts = await listAccounts();
+    if (accounts.length >= MAX_ACCOUNTS) {
+      alert(`Este dispositivo já tem o máximo de ${MAX_ACCOUNTS} contas.`);
+      return;
+    }
+    if ((await getActiveAccountRole()) !== 'admin') {
+      alert('Apenas um administrador pode adicionar contas.');
+      return;
+    }
     WM.closeAllWindows();
     WM.resetDesktops();
     hide($('#desktop'));
@@ -114,7 +125,13 @@ const ctx = {
   },
   switchToAccount: (id) => switchToSpecificAccount(id),
   removeAccount: (id) => removeAccountFlow(id),
+  setAccountRole: (id, role) => setAccountRoleFlow(id, role),
 };
+
+async function getActiveAccountRole() {
+  const accounts = await listAccounts();
+  return accounts.find((a) => a.id === getActiveAccount())?.role || 'standard';
+}
 
 function avatarHTML(name, avatarDataUrl) {
   if (avatarDataUrl) return `<img class="avatar-img" src="${escapeHtml(avatarDataUrl)}" alt="">`;
@@ -264,7 +281,10 @@ async function tryMigrateLegacyAccount() {
   setActiveAccount(id);
   const name = await kv.get('user.name', 'Usuário');
   const avatar = await kv.get('user.avatar', null);
-  await addAccountRecord({ id, name, avatar });
+  // Instalação de antes do sistema de contas: essa era a única conta do
+  // dispositivo, então vira o Administrador Geral permanente, como a
+  // primeira conta criada em qualquer instalação nova.
+  await addAccountRecord({ id, name, avatar, role: 'admin', primary: true });
   await setLastActiveAccountId(id);
   return id;
 }
@@ -321,6 +341,15 @@ async function removeAccountFlow(id) {
   const accounts = await listAccounts();
   const account = accounts.find((a) => a.id === id);
   if (!account) return false;
+  if (account.primary) {
+    alert('A conta do Administrador Geral não pode ser removida.');
+    return false;
+  }
+  const activeAccount = accounts.find((a) => a.id === getActiveAccount());
+  if (activeAccount?.role !== 'admin') {
+    alert('Apenas um administrador pode remover contas.');
+    return false;
+  }
   if (!confirm(`Remover a conta "${account.name}" e todos os seus arquivos permanentemente? Isso não pode ser desfeito.`)) return false;
   const rootId = await kv.getFor(id, 'rootId');
   if (rootId) await fs.deleteNodePermanently(rootId);
@@ -329,10 +358,28 @@ async function removeAccountFlow(id) {
   return true;
 }
 
+async function setAccountRoleFlow(id, role) {
+  const accounts = await listAccounts();
+  const target = accounts.find((a) => a.id === id);
+  if (!target || target.primary) return false;
+  const activeAccount = accounts.find((a) => a.id === getActiveAccount());
+  if (activeAccount?.role !== 'admin') {
+    alert('Apenas um administrador pode alterar o tipo de outra conta.');
+    return false;
+  }
+  await updateAccountRecord(id, { role });
+  return true;
+}
+
 function accountAvatarTileHTML(account) {
   if (account.avatar) return `<img src="${escapeHtml(account.avatar)}" alt="">`;
   const initial = (account.name || '?').trim().charAt(0).toUpperCase() || '?';
   return escapeHtml(initial);
+}
+
+function accountRoleLabel(account) {
+  if (account.primary) return 'Administrador Geral';
+  return account.role === 'admin' ? 'Administrador' : 'Usuário comum';
 }
 
 function renderAccountPicker(accounts) {
@@ -345,20 +392,33 @@ function renderAccountPicker(accounts) {
     const label = document.createElement('span');
     label.textContent = account.name;
     tile.appendChild(label);
+    const roleLabel = document.createElement('span');
+    roleLabel.className = 'account-tile-role';
+    roleLabel.textContent = accountRoleLabel(account);
+    tile.appendChild(roleLabel);
     tile.addEventListener('click', () => selectAccount(account.id));
     grid.appendChild(tile);
   });
-  const addTile = document.createElement('button');
-  addTile.className = 'account-tile add-account';
-  addTile.innerHTML = '<span>+</span>';
-  const addLabel = document.createElement('span');
-  addLabel.textContent = 'Adicionar conta';
-  addTile.appendChild(addLabel);
-  addTile.addEventListener('click', () => {
-    hide($('#account-picker-screen'));
-    startOobe();
-  });
-  grid.appendChild(addTile);
+  // Segue o limite de MAX_ACCOUNTS contas do dispositivo: some o "+" quando
+  // já existem 3, em vez de deixar chegar no OOBE pra só então bloquear.
+  if (accounts.length < MAX_ACCOUNTS) {
+    const addTile = document.createElement('button');
+    addTile.className = 'account-tile add-account';
+    addTile.innerHTML = '<span>+</span>';
+    const addLabel = document.createElement('span');
+    addLabel.textContent = 'Adicionar conta';
+    addTile.appendChild(addLabel);
+    addTile.addEventListener('click', () => {
+      hide($('#account-picker-screen'));
+      startOobe();
+    });
+    grid.appendChild(addTile);
+  } else {
+    const limitNote = document.createElement('p');
+    limitNote.className = 'account-picker-limit-note';
+    limitNote.textContent = `Limite de ${MAX_ACCOUNTS} contas atingido neste dispositivo.`;
+    grid.appendChild(limitNote);
+  }
 }
 
 async function switchUser() {
@@ -396,7 +456,7 @@ function renderOobeWallpaperOptions() {
   });
 }
 
-function startOobe() {
+async function startOobe() {
   oobeAccountId = newAccountId();
   setActiveAccount(oobeAccountId);
   oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
@@ -408,6 +468,13 @@ function startOobe() {
   $('#setup-avatar').innerHTML = avatarHTML('', null);
   document.querySelectorAll('.oobe-theme-btn').forEach((b) => b.classList.toggle('selected', b.dataset.oobeTheme === oobeChoices.theme));
   renderOobeWallpaperOptions();
+  const isFirstAccount = (await listAccounts()).length === 0;
+  const roleNote = $('[data-role="oobe-role-note"]');
+  if (roleNote) {
+    roleNote.textContent = isFirstAccount
+      ? 'Esta será a conta de Administrador Geral deste dispositivo.'
+      : 'Esta conta nasce como usuário comum — o administrador pode torná-la administradora depois, nas Configurações.';
+  }
   showOobeStep(0);
   show($('#setup-screen'));
 }
@@ -443,7 +510,17 @@ async function finalizeOobeAccount({ email, pass }) {
   if (oobeChoices.avatar) await kv.set('user.avatar', oobeChoices.avatar);
   seed = await ensureSeed();
   if (seed?.userFolderId) await fs.rename(seed.userFolderId, oobeChoices.name);
-  await addAccountRecord({ id: oobeAccountId, name: oobeChoices.name, avatar: oobeChoices.avatar });
+  // A primeira conta do dispositivo nasce como Administrador Geral
+  // permanente; as próximas nascem como usuário comum (o admin pode
+  // promover depois, pelas Configurações).
+  const isFirstAccount = (await listAccounts()).length === 0;
+  await addAccountRecord({
+    id: oobeAccountId,
+    name: oobeChoices.name,
+    avatar: oobeChoices.avatar,
+    role: isFirstAccount ? 'admin' : 'standard',
+    primary: isFirstAccount,
+  });
   await setLastActiveAccountId(oobeAccountId);
 }
 
