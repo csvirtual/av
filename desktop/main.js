@@ -1093,11 +1093,15 @@ async function runWipeFormatScreen() {
   const fill = $('#wipe-fill');
   const pctEl = $('#wipe-pct');
   const log = $('#wipe-log');
+  const title = $('#wipe-title');
   const finishBtn = $('#wipe-finish-btn');
   log.innerHTML = '';
+  fill.classList.remove('reversing');
   fill.style.transition = 'none';
   fill.style.width = '0%';
   pctEl.textContent = '0% concluído';
+  title.textContent = 'Formatando Disco Local (C:)';
+  show(finishBtn);
   finishBtn.textContent = 'Abortar';
   show($('#wipe-screen'));
 
@@ -1134,11 +1138,71 @@ async function runWipeFormatScreen() {
   finishBtn.textContent = 'Finalizar';
 }
 
+/** Ao abortar no meio da formatação, em vez de sumir com a tela na hora, a
+ * barra de progresso "roda pra trás" a partir do ponto em que estava,
+ * desfazendo visualmente cada linha do log na ordem inversa (a última
+ * coisa "apagada" é a primeira a ser "restaurada") — nada foi de fato
+ * apagado até aqui (só a partir do clique em Finalizar), então isso é só
+ * a encenação honesta de que a formatação nunca chegou a valer. */
+async function runWipeAbortReversal() {
+  const fill = $('#wipe-fill');
+  const pctEl = $('#wipe-pct');
+  const log = $('#wipe-log');
+  const title = $('#wipe-title');
+  const finishBtn = $('#wipe-finish-btn');
+
+  hide(finishBtn);
+  fill.classList.add('reversing');
+  title.textContent = 'Revertendo formatação do Disco Local (C:)';
+
+  // Lê a largura REAL renderizada (não o alvo do style.width) — enquanto o
+  // caso "sem entradas reais" anima de 0% a 100% numa única transição longa
+  // de 60s, o style.width já aponta pro alvo final antes de a transição
+  // visual terminar, então só o retângulo na tela reflete o ponto de
+  // verdade em que a formatação estava quando o Abortar foi clicado.
+  const track = fill.parentElement;
+  const trackWidth = track.getBoundingClientRect().width || 1;
+  const startPct = Math.round((fill.getBoundingClientRect().width / trackWidth) * 100);
+  const lines = Array.from(log.children);
+  const totalMs = Math.min(4500, Math.max(700, startPct * 35));
+  const stepMs = totalMs / Math.max(lines.length, 1);
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const restored = lines[i].textContent
+      .replace(/^Limpando configuração/, 'Restaurando configuração')
+      .replace(/^Limpando pasta/, 'Recriando pasta')
+      .replace(/^Apagando arquivo/, 'Recuperando arquivo')
+      .replace(/\.\.\.$/, ' — revertido.');
+    lines[i].textContent = restored;
+    lines[i].classList.add('reverted');
+    log.scrollTop = log.scrollHeight;
+    const remainingPct = Math.round((i / lines.length) * startPct);
+    fill.style.transition = `width ${stepMs}ms linear`;
+    fill.style.width = `${remainingPct}%`;
+    pctEl.textContent = `${remainingPct}% concluído — desfazendo...`;
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+
+  fill.style.transition = 'width 300ms linear';
+  fill.style.width = '0%';
+  pctEl.textContent = 'Reversão concluída.';
+  title.textContent = 'Disco Local (C:)';
+  const doneLine = document.createElement('div');
+  doneLine.className = 'reverted-final';
+  doneLine.textContent = '✓ Nenhuma alteração foi salva — o disco permanece intacto.';
+  log.appendChild(doneLine);
+  log.scrollTop = log.scrollHeight;
+
+  await new Promise((r) => setTimeout(r, 900));
+  fill.classList.remove('reversing');
+  hide($('#wipe-screen'));
+}
+
 $('#wipe-finish-btn').addEventListener('click', async () => {
   if (wipeRunning) {
     wipeAborted = true;
     wipeRunning = false;
-    hide($('#wipe-screen'));
+    await runWipeAbortReversal();
     return;
   }
   const keys = await caches.keys();
