@@ -713,9 +713,9 @@ async function handleOobeNext() {
   } else if (step === 'done') {
     // OOBE_STEPS só inclui 'activation' na instalação bem inicial (1ª conta
     // do dispositivo, a que vira Administrador Geral) — reaproveita esse
-    // mesmo sinal pra decidir se é a hora de mostrar a tela de segurança
-    // automaticamente, uma única vez, assim que a pessoa chega na área de
-    // trabalho pela primeira vez.
+    // mesmo sinal pra decidir se é a hora de mostrar a sequência de
+    // boas-vindas automática (Sobre -> Propriedades do Sistema), uma única
+    // vez, assim que a pessoa chega na área de trabalho pela primeira vez.
     const wasFirstInstall = OOBE_STEPS.includes('activation');
     hide($('#setup-screen'));
     await enterDesktop();
@@ -726,7 +726,22 @@ async function handleOobeNext() {
       body: 'Sua conta foi criada. Explore o menu Iniciar para conhecer os aplicativos.',
     });
     if (wasFirstInstall) {
-      setTimeout(() => openSettings(ctx, { tab: 'privacy' }), 900);
+      setTimeout(() => {
+        const aboutWin = openSettings(ctx, { tab: 'about' });
+        // Ouve o clique real no botão de fechar desta janela (em vez de
+        // aboutWin.onClose, que dispara pra QUALQUER fechamento — inclusive
+        // um WM.closeAllWindows() de outro fluxo, tipo adicionar conta ou
+        // formatar o dispositivo — e substituiria o próprio onClose que o
+        // Configurações já registra internamente, quebrando sua limpeza).
+        // Além disso, Configurações é instância única: se a pessoa navegar
+        // pra outra aba (ex: Contas) antes de fechar, fechar ali não é mais
+        // "fechar a tela de Sobre" — só mostra as Propriedades se o
+        // fechamento acontecer com a aba Sobre ainda ativa.
+        aboutWin.el.querySelector('[data-action="close"]')?.addEventListener('click', () => {
+          const stillOnAbout = aboutWin.el.querySelector('.settings-nav button.active')?.dataset.tab === 'about';
+          if (stillOnAbout) showSystemProperties(ctx, document.body);
+        }, { once: true });
+      }, 900);
     }
     return;
   }
