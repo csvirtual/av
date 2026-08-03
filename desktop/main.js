@@ -16,6 +16,7 @@ import { init as initTaskSwitcher } from './core/window-manager/task-switcher.js
 import { openExplorer } from './apps/explorer.js';
 import { openNotepad } from './apps/notepad.js';
 import { openPhotos } from './apps/photos.js';
+import { openPaint } from './apps/paint.js';
 import { openWord, WORD_MIME } from './apps/word.js';
 import { openSheet, SHEET_MIME } from './apps/sheet.js';
 import { openVideoPlayer, VIDEO_GLYPH, VIDEO_MIME_PREFIX } from './apps/video-player.js';
@@ -65,6 +66,7 @@ const OPEN_WITH_APPS = [
   { id: 'word', label: 'Documento', glyph: '📘', open: (node) => openWord(ctx, { fileId: node.id }) },
   { id: 'sheet', label: 'Planilha', glyph: '📗', open: (node) => openSheet(ctx, { fileId: node.id }) },
   { id: 'photos', label: 'Fotos', glyph: PHOTO_GLYPH, open: (node) => openPhotos(ctx, { fileId: node.id }) },
+  { id: 'paint', label: 'Paint', glyph: '🎨', open: (node) => openPaint(ctx, { fileId: node.id }) },
   { id: 'video-player', label: 'Player de Vídeo', glyph: '🎬', open: (node) => openVideoPlayer(ctx, { fileId: node.id }) },
   { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, open: (node) => openAudioPlayer(ctx, { fileId: node.id }) },
   { id: 'presentation', label: 'Apresentação', glyph: '📙', open: (node) => openPresentation(ctx, { fileId: node.id }) },
@@ -96,6 +98,13 @@ const ctx = {
     await kv.set('user.avatar', dataUrl);
     await refreshAvatars();
     await updateAccountRecord(getActiveAccount(), { avatar: dataUrl });
+  },
+  setName: async (newName) => {
+    await kv.set('user.name', newName);
+    await updateAccountRecord(getActiveAccount(), { name: newName });
+    if (seed?.userFolderId) await fs.rename(seed.userFolderId, newName);
+    $('#start-username').textContent = newName;
+    await refreshAvatars();
   },
   getAccentColor,
   setAccentColor,
@@ -1468,6 +1477,7 @@ const PINNED_APPS = [
   { id: 'browser', label: 'Navegador', glyph: BROWSER_GLYPH, onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
   { id: 'photos', label: 'Fotos', glyph: PHOTO_GLYPH, onOpen: () => openPhotos(ctx) },
+  { id: 'paint', label: 'Paint', glyph: '🎨', onOpen: () => openPaint(ctx) },
   { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
   { id: 'sheet', label: 'Planilha', glyph: '📗', onOpen: () => openSheet(ctx) },
   { id: 'video-player', label: 'Player de Vídeo', glyph: VIDEO_GLYPH, onOpen: () => openVideoPlayer(ctx) },

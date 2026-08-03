@@ -8,6 +8,7 @@ import { SHEET_MIME } from './sheet.js';
 import { VIDEO_MIME_PREFIX } from './video-player.js';
 import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
+import { openPaint } from './paint.js';
 import { trashGlyph, USERS_GLYPH, COPY_GLYPH, PC_GLYPH, PHOTO_GLYPH } from '../core/icons.js';
 import { showSystemProperties } from '../core/services/system-properties.js';
 
@@ -619,6 +620,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       { label: '📘 Documento (.docx)', onClick: () => newWordFile() },
       { label: '📗 Planilha (.xlsx)', onClick: () => newSheetFile() },
       { label: '📙 Apresentação (.pptx)', onClick: () => newPresentationFile() },
+      { label: '🎨 Imagem (Paint)', onClick: () => newImageFile() },
     ]);
   });
   async function newFolder() {
@@ -652,6 +654,13 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     render();
     ctx.refreshDesktop();
     openFile(node);
+  }
+  async function newImageFile() {
+    const name = await uniqueNameInFolder(fs, currentFolderId, 'Imagem sem título.png');
+    const node = await fs.createNode({ parentId: currentFolderId, name, type: 'file', content: '', mimeType: 'image/png' });
+    render();
+    ctx.refreshDesktop();
+    openPaint(ctx, { fileId: node.id });
   }
   root.querySelector('[data-action="upload"]').addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', async () => {
