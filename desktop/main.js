@@ -7,7 +7,7 @@ import {
 import { clearSessionDek } from './core/services/crypto.js';
 import {
   listAccounts, addAccountRecord, updateAccountRecord, removeAccountRecord,
-  setLastActiveAccountId, newAccountId, MAX_ACCOUNTS,
+  setLastActiveAccountId, newAccountId, MAX_ACCOUNTS, recordLogon, recordLogoff,
 } from './core/services/accounts.js';
 import * as WM from './core/window-manager/window-manager.js';
 import { playStartupChime, playShutdownChime, playLockChime, playNotifyChime, volumeControl } from './core/services/sounds.js';
@@ -28,6 +28,7 @@ import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
 import { trashGlyph, USERS_GLYPH } from './core/icons.js';
+import { listRealEntryNames, isValidBackup, restoreBackup } from './core/services/backup.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -130,6 +131,7 @@ const ctx = {
   removeAccount: (id) => removeAccountFlow(id),
   setAccountRole: (id, role) => setAccountRoleFlow(id, role),
   netUserSetPassword: (name, newPassword) => netUserSetPassword(name, newPassword),
+  startWipeFlow: () => startWipeFlow(),
 };
 
 async function getActiveAccountRole() {
@@ -333,6 +335,12 @@ async function showLockScreenFor(account) {
   await refreshAvatars();
   const lockUntil = await kv.get('auth.lockUntil', 0);
   if (lockUntil > Date.now()) startLockoutCountdown(lockUntil);
+  // Sempre entra pelo formulário de senha normal, com o relógio visível —
+  // nunca deve sobrar um estado de "esqueci minha senha" de uma sessão
+  // anterior (ali o relógio fica escondido de propósito).
+  hide($('#lock-recovery-form'));
+  show($('#lock-form'));
+  show($('.lock-clock'));
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
@@ -344,6 +352,7 @@ async function selectAccount(accountId) {
 }
 
 async function switchToSpecificAccount(id) {
+  await recordLogoff(getActiveAccount());
   WM.closeAllWindows();
   WM.resetDesktops();
   hide($('#desktop'));
@@ -589,6 +598,7 @@ async function finalizeOobeAccount({ email, pass }) {
     primary: isFirstAccount,
   });
   await setLastActiveAccountId(oobeAccountId);
+  await recordLogon(oobeAccountId);
 }
 
 async function handleOobeNext() {
@@ -758,6 +768,7 @@ $('#lock-form').addEventListener('submit', async (e) => {
     $('#lock-pass').value = '';
     hide(err);
     await setLastActiveAccountId(getActiveAccount());
+    await recordLogon(getActiveAccount());
     enterDesktop();
   } else {
     const failedCount = (await kv.get('auth.failedAttempts', 0)) + 1;
@@ -778,6 +789,7 @@ $('#lock-form').addEventListener('submit', async (e) => {
 // (não existe backend) — é uma verificação local, deixada clara na tela.
 $('#lock-hint-btn').addEventListener('click', () => {
   hide($('#lock-form'));
+  hide($('.lock-clock'));
   $('#recovery-email').value = '';
   $('#recovery-pass').value = '';
   $('#recovery-pass2').value = '';
@@ -787,6 +799,7 @@ $('#lock-hint-btn').addEventListener('click', () => {
 $('#recovery-back-btn').addEventListener('click', () => {
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
+  show($('.lock-clock'));
 });
 $('#lock-recovery-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -813,6 +826,7 @@ $('#lock-recovery-form').addEventListener('submit', async (e) => {
   }
   hide($('#lock-recovery-form'));
   show($('#lock-form'));
+  show($('.lock-clock'));
   $('#lock-pass').value = '';
   hide($('#lock-error'));
   alert('Senha redefinida com sucesso. Faça login com a nova senha.');
@@ -872,6 +886,7 @@ setInterval(updateClocks, 1000);
 updateClocks();
 
 function lockNow() {
+  recordLogoff(getActiveAccount());
   WM.closeAllWindows();
   hide($('#desktop'));
   $('#lock-username').textContent = '';
@@ -919,6 +934,145 @@ function shutdownNow() {
 }
 
 $('#power-on-btn').addEventListener('click', () => location.reload());
+
+// ---------------- UAC + formatação/redefinição do dispositivo ----------------
+// Compartilhado entre Configurações > Privacidade ("Apagar dados") e
+// Configurações > Backup ("Redefinir este dispositivo") — mesmo modal de
+// autorização, mesma tela de formatação, chamados via ctx.startWipeFlow().
+let uacResolve = null;
+
+async function showUacPrompt() {
+  if ((await getActiveAccountRole()) !== 'admin') {
+    alert('Só um administrador pode redefinir este dispositivo.');
+    return false;
+  }
+  const accounts = await listAccounts();
+  const me = accounts.find((a) => a.id === getActiveAccount());
+  $('[data-role="uac-avatar"]').innerHTML = accountAvatarTileHTML(me || {});
+  $('[data-role="uac-account-name"]').textContent = me?.name || '';
+  $('#uac-pass').value = '';
+  hide($('#uac-error'));
+  show($('#uac-screen'));
+  $('#uac-pass').focus();
+  return new Promise((resolve) => { uacResolve = resolve; });
+}
+
+function resolveUac(value) {
+  hide($('#uac-screen'));
+  uacResolve?.(value);
+  uacResolve = null;
+}
+
+$('[data-action="uac-cancel"]').addEventListener('click', () => resolveUac(false));
+$('[data-action="uac-confirm"]').addEventListener('click', async () => {
+  const pass = $('#uac-pass').value;
+  const ok = await verifyPassword(pass);
+  if (!ok) {
+    show($('#uac-error'));
+    $('#uac-pass').value = '';
+    $('#uac-pass').focus();
+    return;
+  }
+  resolveUac(true);
+});
+$('#uac-pass').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('[data-action="uac-confirm"]').click();
+});
+
+/** Roda a animação da tela de formatação usando nomes REAIS de arquivos,
+ * pastas e chaves de configuração já existentes no dispositivo (nunca nomes
+ * inventados) — dura 1 minuto ao todo, espalhado entre as entradas
+ * encontradas. Só libera o botão Finalizar no fim. */
+let wipeAborted = false;
+
+async function runWipeFormatScreen() {
+  wipeAborted = false;
+  const fill = $('#wipe-fill');
+  const pctEl = $('#wipe-pct');
+  const log = $('#wipe-log');
+  const finishBtn = $('#wipe-finish-btn');
+  log.innerHTML = '';
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  pctEl.textContent = '0% concluído';
+  finishBtn.disabled = true;
+  show($('#wipe-screen'));
+
+  const entries = await listRealEntryNames();
+  const totalMs = 60000;
+  const steps = Math.max(entries.length, 1);
+  const stepMs = totalMs / steps;
+
+  for (let i = 0; i < entries.length; i++) {
+    if (wipeAborted) return;
+    const entry = entries[i];
+    const verb = entry.kind === 'config' ? 'Removendo configuração'
+      : entry.kind === 'folder' ? 'Removendo pasta'
+      : 'Apagando arquivo';
+    const line = document.createElement('div');
+    line.textContent = `${verb} "${entry.name}"...`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    const donePct = Math.round(((i + 1) / entries.length) * 100);
+    fill.style.transition = `width ${stepMs}ms linear`;
+    fill.style.width = `${donePct}%`;
+    pctEl.textContent = `${donePct}% concluído`;
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+  if (wipeAborted) return;
+  if (!entries.length) {
+    fill.style.transition = `width ${totalMs}ms linear`;
+    fill.style.width = '100%';
+    await new Promise((r) => setTimeout(r, totalMs));
+  }
+  if (wipeAborted) return;
+  pctEl.textContent = 'Formatação concluída.';
+  finishBtn.disabled = false;
+}
+
+$('#wipe-finish-btn').addEventListener('click', async () => {
+  if ($('#wipe-finish-btn').disabled) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.map((k) => caches.delete(k)));
+  indexedDB.deleteDatabase('win11-web-os');
+  location.reload();
+});
+
+// Na tela de formatação, dá pra usar um backup já feito em vez de continuar
+// formatando do zero — interrompe a animação em andamento e restaura o
+// conteúdo do arquivo escolhido no lugar.
+$('#wipe-use-backup-btn').addEventListener('click', () => $('#wipe-backup-input').click());
+$('#wipe-backup-input').addEventListener('change', async () => {
+  const input = $('#wipe-backup-input');
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    alert('Não foi possível ler esse arquivo como um backup válido.');
+    return;
+  }
+  if (!isValidBackup(data)) {
+    alert('Não foi possível ler esse arquivo como um backup válido.');
+    return;
+  }
+  if (!confirm('Restaurar este backup em vez de formatar? Isso substitui tudo o que existe agora neste dispositivo.')) return;
+  wipeAborted = true;
+  $('#wipe-title').textContent = 'Restaurando backup...';
+  $('#wipe-pct').textContent = 'Restaurando...';
+  $('#wipe-log').innerHTML = '';
+  $('#wipe-finish-btn').disabled = true;
+  await restoreBackup(data);
+  location.reload();
+});
+
+async function startWipeFlow() {
+  const authorized = await showUacPrompt();
+  if (!authorized) return;
+  await runWipeFormatScreen();
+}
 
 // ---------------- Desktop ----------------
 async function enterDesktop() {

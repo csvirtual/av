@@ -97,6 +97,15 @@ export function openTerminal(ctx) {
     return `${dd}/${mm}/${d.getFullYear()}  ${hh}:${min}`;
   }
 
+  function formatDuration(ms) {
+    const totalMin = Math.max(0, Math.round(ms / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0) return `${h}h ${m}min`;
+    if (m > 0) return `${m}min`;
+    return 'menos de 1min';
+  }
+
   // Espaço livre de verdade via Storage API, quando o navegador expõe isso
   // (mesma API já usada em main.js pro aviso de armazenamento cheio) — sem
   // isso disponível, omite a informação em vez de inventar um número.
@@ -249,8 +258,17 @@ export function openTerminal(ctx) {
 
       if (!newPassword) {
         // "net user <nome>": mostra as informações reais que temos dessa
-        // conta (não inventa campos como "Comentário"/"Expira em" que o
-        // Windows de verdade tem mas que não fazem sentido aqui).
+        // conta, incluindo histórico de sessão (quando foi criada, último
+        // logon, sessão atual e duração da sessão anterior) — dado sensível
+        // demais pra qualquer um ver, então só administradores acessam,
+        // igual ao Windows real quando um usuário comum tenta ver detalhes
+        // de outra conta.
+        if ((await ctx.getActiveAccountRole()) !== 'admin') {
+          println('Ocorreu o erro do sistema 5.', 'err');
+          println('', 'err');
+          println('Acesso negado.', 'err');
+          return;
+        }
         if (!target) {
           println('Ocorreu o erro do sistema 2221.', 'err');
           println('', 'err');
@@ -259,10 +277,19 @@ export function openTerminal(ctx) {
         }
         const tipo = target.primary ? 'Administrador Geral' : target.role === 'admin' ? 'Administrador' : 'Usuário comum';
         const grupo = target.primary || target.role === 'admin' ? 'Administradores' : 'Usuários';
+        const isActiveNow = target.id === ctx.getActiveAccountId();
         println(`Nome de usuário              ${target.name}`);
         println(`Conta ativa                  Sim`);
         println(`Tipo de conta                ${tipo}`);
         println(`Grupos locais                *${grupo}`);
+        println(`Conta criada em               ${target.createdAt ? formatDirDate(target.createdAt) : 'desconhecido'}`);
+        println(`Último logon                  ${target.lastLogonAt ? formatDirDate(target.lastLogonAt) : 'nunca'}`);
+        if (isActiveNow && target.currentSessionStart) {
+          println(`Sessão atual                  iniciada em ${formatDirDate(target.currentSessionStart)} (${formatDuration(Date.now() - target.currentSessionStart)})`);
+        } else {
+          println(`Sessão atual                  nenhuma (conta não está em uso agora)`);
+        }
+        println(`Duração da última sessão      ${target.lastSessionDurationMs != null ? formatDuration(target.lastSessionDurationMs) : 'ainda não registrada'}`);
         println('O comando foi concluído com êxito.');
         return;
       }

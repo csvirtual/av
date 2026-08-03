@@ -19,7 +19,7 @@ export async function listAccounts() {
 
 export async function addAccountRecord({ id, name, avatar = null, role = 'standard', primary = false }) {
   const accounts = await listAccounts();
-  accounts.push({ id, name, avatar, role, primary });
+  accounts.push({ id, name, avatar, role, primary, createdAt: Date.now() });
   await kv.global.set('accounts', accounts);
 }
 
@@ -46,4 +46,30 @@ export async function setLastActiveAccountId(id) {
 
 export function newAccountId() {
   return crypto.randomUUID();
+}
+
+/** Registra que esta conta acabou de entrar (login/desbloqueio/troca de
+ * conta bem-sucedidos) — grava o horário real, usado pelo comando de
+ * sessão do Terminal. Chamado tanto na criação da conta (primeiro login)
+ * quanto em todo desbloqueio/troca bem-sucedido depois disso. */
+export async function recordLogon(id) {
+  const accounts = await listAccounts();
+  const idx = accounts.findIndex((a) => a.id === id);
+  if (idx === -1) return;
+  accounts[idx] = { ...accounts[idx], lastLogonAt: Date.now(), currentSessionStart: Date.now() };
+  await kv.global.set('accounts', accounts);
+}
+
+/** Registra o fim da sessão atual (bloqueio ou troca pra outra conta) —
+ * calcula e grava a duração real dessa sessão que terminou agora. Se não
+ * havia sessão em andamento (ex.: chamado sem ter feito login antes), não
+ * faz nada. */
+export async function recordLogoff(id) {
+  const accounts = await listAccounts();
+  const idx = accounts.findIndex((a) => a.id === id);
+  if (idx === -1) return;
+  const acc = accounts[idx];
+  if (!acc.currentSessionStart) return;
+  accounts[idx] = { ...acc, lastSessionDurationMs: Date.now() - acc.currentSessionStart, currentSessionStart: null };
+  await kv.global.set('accounts', accounts);
 }

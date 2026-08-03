@@ -1,9 +1,11 @@
 // Configurações: Sistema, Personalização, Hora e idioma, Acessibilidade,
-// Contas, Privacidade e Sobre — cada tela é funcional e persiste no
+// Contas, Backup, Privacidade e Sobre — cada tela é funcional e persiste no
 // IndexedDB deste navegador. Não há telas de Bluetooth/Rede/Jogos/
 // Atualizações: como o app roda inteiramente no navegador, sem acesso a
 // hardware real, essas categorias seriam apenas decorativas — preferimos
 // não incluir telas que não fazem nada de verdade.
+import { exportBackup, restoreBackup, isValidBackup } from '../core/services/backup.js';
+
 function escapeAttr(str) {
   return (str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -58,6 +60,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <button data-tab="time">🕒 Hora e idioma</button>
       <button data-tab="accessibility">♿ Acessibilidade</button>
       <button data-tab="account">👤 Contas</button>
+      <button data-tab="backup">💾 Backup</button>
       <button data-tab="privacy">🔒 Privacidade</button>
       <button data-tab="about">ℹ️ Sobre</button>
     </div>
@@ -555,6 +558,71 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     content.querySelector('[data-action="add-account"]')?.addEventListener('click', () => ctx.addAccount());
   }
 
+  // ---------------- Backup ----------------
+  function renderBackup() {
+    content.innerHTML = `
+      <h2>Fazer backup</h2>
+      <p style="font-size:13px;color:var(--text-dim);max-width:460px;line-height:1.6">
+        Gera um arquivo com uma cópia de tudo — todas as contas, arquivos e configurações
+        deste dispositivo — pra guardar no seu computador. Os arquivos continuam cifrados
+        dentro do backup, então ele só volta a ser útil com as senhas certas.
+      </p>
+      <button class="btn" data-action="backup-now">💾 Fazer backup agora</button>
+      <p class="settings-msg" data-role="backup-msg"></p>
+
+      <h2 style="margin-top:24px">Restaurar</h2>
+      <p style="font-size:13px;color:var(--text-dim);max-width:460px;line-height:1.6">
+        Restaura um backup feito antes — isso substitui tudo o que existe agora neste
+        dispositivo pelo conteúdo do arquivo escolhido.
+      </p>
+      <input type="file" accept="application/json,.json" class="hidden" data-role="restore-input">
+      <button class="btn" style="background:var(--hover);color:var(--text)" data-action="restore-backup">📂 Restaurar de um arquivo de backup</button>
+      <p class="settings-msg" data-role="restore-msg"></p>
+
+      <h2 style="margin-top:24px">Redefinir este dispositivo</h2>
+      <p style="font-size:13px;color:var(--text-dim);max-width:460px;line-height:1.6">
+        Apaga tudo e devolve este dispositivo ao estado de fábrica, como se tivesse
+        acabado de ser instalado. Pede a senha de administrador antes de continuar.
+      </p>
+      <button class="btn" style="background:#e81123" data-action="reset-device">Redefinir este dispositivo</button>
+    `;
+
+    content.querySelector('[data-action="backup-now"]').addEventListener('click', async () => {
+      const msg = content.querySelector('[data-role="backup-msg"]');
+      const data = await exportBackup();
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-win11-web-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      msg.textContent = 'Backup gerado e baixado.';
+      msg.className = 'settings-msg ok';
+    });
+
+    const restoreInput = content.querySelector('[data-role="restore-input"]');
+    content.querySelector('[data-action="restore-backup"]').addEventListener('click', () => restoreInput.click());
+    restoreInput.addEventListener('change', async () => {
+      const msg = content.querySelector('[data-role="restore-msg"]');
+      const file = restoreInput.files[0];
+      restoreInput.value = '';
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!isValidBackup(data)) throw new Error('invalid');
+        if (!confirm('Restaurar este backup substitui TUDO que existe agora neste dispositivo (contas, arquivos, configurações). Continuar?')) return;
+        await restoreBackup(data);
+        location.reload();
+      } catch {
+        msg.textContent = 'Não foi possível ler esse arquivo como um backup válido.';
+        msg.className = 'settings-msg err';
+      }
+    });
+
+    content.querySelector('[data-action="reset-device"]').addEventListener('click', () => ctx.startWipeFlow());
+  }
+
   // ---------------- Privacidade ----------------
   function securityItem(icon, title, desc) {
     return `
@@ -593,13 +661,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       </p>
       <button class="btn" data-action="wipe" style="background:#e81123;margin-top:8px">Apagar todos os dados deste sistema operacional</button>
     `;
-    content.querySelector('[data-action="wipe"]').addEventListener('click', async () => {
-      if (!confirm('Tem certeza? Todos os seus arquivos, senhas e configurações desta instalação serão apagados permanentemente.')) return;
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-      indexedDB.deleteDatabase('win11-web-os');
-      location.reload();
-    });
+    content.querySelector('[data-action="wipe"]').addEventListener('click', () => ctx.startWipeFlow());
   }
 
   // ---------------- Sobre ----------------
@@ -630,6 +692,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     time: renderTime,
     accessibility: renderAccessibility,
     account: renderAccount,
+    backup: renderBackup,
     privacy: renderPrivacy,
     about: renderAbout,
   };
