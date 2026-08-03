@@ -1,4 +1,6 @@
 // Bloco de Notas: edita arquivos de texto do sistema de arquivos virtual.
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
+
 export function openNotepad(ctx, { fileId = null } = {}) {
   const { fs, seed, windows } = ctx;
   let currentFileId = fileId;
@@ -62,7 +64,7 @@ export function openNotepad(ctx, { fileId = null } = {}) {
   }
 
   async function saveAs() {
-    const name = prompt('Nome do arquivo:', 'Novo Documento de Texto.txt');
+    const name = await showPrompt('Nome do arquivo:', 'Novo Documento de Texto.txt', { title: 'Salvar como', container: win.el });
     if (!name || !name.trim()) return;
     const fileName = name.trim();
     const existing = await fs.findChildByName(seed.documentsId, fileName);
@@ -80,8 +82,8 @@ export function openNotepad(ctx, { fileId = null } = {}) {
     ctx.refreshDesktop();
   }
 
-  root.querySelector('[data-action="new"]').addEventListener('click', () => {
-    if (dirty && !confirm('Descartar alterações não salvas?')) return;
+  root.querySelector('[data-action="new"]').addEventListener('click', async () => {
+    if (dirty && !(await showConfirm('Descartar alterações não salvas?', { title: 'Novo documento', okLabel: 'Descartar', danger: true, container: win.el }))) return;
     currentFileId = null;
     textarea.value = '';
     status.textContent = 'Novo documento';

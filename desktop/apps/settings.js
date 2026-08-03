@@ -6,6 +6,7 @@
 // não incluir telas que não fazem nada de verdade.
 import { exportBackup, restoreBackup, isValidBackup } from '../core/services/backup.js';
 import { PC_GLYPH } from '../core/icons.js';
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
 
 function escapeAttr(str) {
   return (str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -501,7 +502,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       preview.innerHTML = avatarPreviewHTML(name, null);
     });
     content.querySelector('[data-action="rename"]').addEventListener('click', async () => {
-      const newName = prompt('Novo nome:', name);
+      const newName = await showPrompt('Novo nome:', name, { title: 'Renomear', container: root });
       if (!newName || !newName.trim() || newName.trim() === name) return;
       await ctx.setName(newName.trim());
       renderAccount();
@@ -620,7 +621,8 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       try {
         const data = JSON.parse(await file.text());
         if (!isValidBackup(data)) throw new Error('invalid');
-        if (!confirm('Restaurar este backup substitui TUDO que existe agora neste dispositivo (contas, arquivos, configurações). Continuar?')) return;
+        const ok = await showConfirm('Restaurar este backup substitui TUDO que existe agora neste dispositivo (contas, arquivos, configurações). Continuar?', { title: 'Restaurar backup', okLabel: 'Restaurar', danger: true, container: root });
+        if (!ok) return;
         await restoreBackup(data);
         location.reload();
       } catch {

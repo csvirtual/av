@@ -11,6 +11,7 @@ import { PRESENTATION_MIME } from './presentation.js';
 import { openPaint } from './paint.js';
 import { trashGlyph, USERS_GLYPH, COPY_GLYPH, PC_GLYPH, PHOTO_GLYPH } from '../core/icons.js';
 import { showSystemProperties } from '../core/services/system-properties.js';
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
 
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
@@ -200,7 +201,8 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   });
 
   async function emptyTrash() {
-    if (!confirm('Excluir permanentemente todos os itens da Lixeira?')) return;
+    const ok = await showConfirm('Excluir permanentemente todos os itens da Lixeira?', { title: 'Esvaziar Lixeira', okLabel: 'Excluir', danger: true, container: root });
+    if (!ok) return;
     const items = await fs.getChildren(seed.trashId);
     for (const item of items) await fs.deleteNodePermanently(item.id);
     render();
@@ -406,7 +408,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     if (trashMode) {
       items.push(
         { label: multi ? `↩️ Restaurar (${selectedIds.size})` : '↩️ Restaurar', onClick: () => restoreSelection() },
-        { label: multi ? `🗑️ Excluir permanentemente (${selectedIds.size})` : '🗑️ Excluir permanentemente', onClick: () => confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : `"${node.name}"`} permanentemente?`) }
+        { label: multi ? `🗑️ Excluir permanentemente (${selectedIds.size})` : '🗑️ Excluir permanentemente', onClick: () => confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : `"${node.name}"`} permanentemente?`, { danger: true }) }
       );
     } else {
       if (!multi) {
@@ -464,12 +466,12 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     });
   }
 
-  function confirmAnd(fn, msg) {
-    if (confirm(msg)) fn();
+  function confirmAnd(fn, msg, { danger = false } = {}) {
+    showConfirm(msg, { title: 'Excluir', okLabel: 'Excluir', danger, container: root }).then((ok) => { if (ok) fn(); });
   }
 
   async function doRename(node) {
-    const name = prompt('Novo nome:', node.name);
+    const name = await showPrompt('Novo nome:', node.name, { title: 'Renomear', container: root });
     if (!name || !name.trim()) return;
     await fs.rename(node.id, name.trim());
     render();
@@ -700,7 +702,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     if (!selectedIds.size) return;
     const multi = selectedIds.size > 1;
     if (trashMode) {
-      confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : 'o item selecionado'} permanentemente?`);
+      confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : 'o item selecionado'} permanentemente?`, { danger: true });
     } else {
       confirmAnd(() => deleteSelectionToTrash(), `Mover ${multi ? 'os itens selecionados' : 'o item selecionado'} para a Lixeira?`);
     }
@@ -739,7 +741,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
     else if (mod && e.key.toLowerCase() === 'a') { selectedIds = new Set(currentChildren.map((n) => n.id)); updateSelectionUI(); e.preventDefault(); }
     else if (e.key === 'Delete' && selectedIds.size) {
       const multi = selectedIds.size > 1;
-      if (trashMode) confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : 'o item selecionado'} permanentemente?`);
+      if (trashMode) confirmAnd(() => deleteSelectionPermanently(), `Excluir ${multi ? 'os itens selecionados' : 'o item selecionado'} permanentemente?`, { danger: true });
       else confirmAnd(() => deleteSelectionToTrash(), `Mover ${multi ? 'os itens selecionados' : 'o item selecionado'} para a Lixeira?`);
       e.preventDefault();
     } else if (e.key === 'F2' && selectedIds.size === 1) {

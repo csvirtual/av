@@ -3,6 +3,8 @@
 // (linha/retângulo/elipse), seleção com mover, texto, conta-gotas,
 // desfazer/refazer, e salva como PNG de verdade no sistema de arquivos
 // virtual (ou baixa pro computador real).
+import { showConfirm, showPrompt } from '../core/services/dialogs.js';
+
 const PALETTE = [
   '#000000', '#7f7f7f', '#880015', '#ed1c24', '#ff7f27', '#fffc00', '#22b14c', '#00a2e8',
   '#3f48cc', '#a349a4', '#ffffff', '#c3c3c3', '#b97a57', '#ffaec9', '#99d9ea', '#c8bfe7',
@@ -261,7 +263,7 @@ export function openPaint(ctx, { fileId } = {}) {
     ctx.refreshDesktop();
   }
   async function saveAs() {
-    let name = prompt('Nome do arquivo:', fileName || 'Imagem sem título.png');
+    let name = await showPrompt('Nome do arquivo:', fileName || 'Imagem sem título.png', { title: 'Salvar como', container: win.el });
     if (!name || !name.trim()) return;
     name = name.trim();
     if (!/\.png$/i.test(name)) name += '.png';
@@ -288,9 +290,9 @@ export function openPaint(ctx, { fileId } = {}) {
   }
 
   root.querySelector('[data-action="new"]').addEventListener('click', async () => {
-    if (dirty && !confirm('Descartar alterações não salvas?')) return;
-    const w = clampDimension(prompt('Largura da nova imagem (px):', String(DEFAULT_WIDTH)), DEFAULT_WIDTH);
-    const h = clampDimension(prompt('Altura da nova imagem (px):', String(DEFAULT_HEIGHT)), DEFAULT_HEIGHT);
+    if (dirty && !(await showConfirm('Descartar alterações não salvas?', { title: 'Nova imagem', okLabel: 'Descartar', danger: true, container: win.el }))) return;
+    const w = clampDimension(await showPrompt('Largura da nova imagem (px):', String(DEFAULT_WIDTH), { title: 'Nova imagem', container: win.el }), DEFAULT_WIDTH);
+    const h = clampDimension(await showPrompt('Altura da nova imagem (px):', String(DEFAULT_HEIGHT), { title: 'Nova imagem', container: win.el }), DEFAULT_HEIGHT);
     currentFileId = null;
     fileName = null;
     blankCanvas(w, h);
