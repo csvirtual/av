@@ -1102,8 +1102,8 @@ async function runWipeFormatScreen() {
   for (let i = 0; i < entries.length; i++) {
     if (wipeAborted) return;
     const entry = entries[i];
-    const verb = entry.kind === 'config' ? 'Removendo configuração'
-      : entry.kind === 'folder' ? 'Removendo pasta'
+    const verb = entry.kind === 'config' ? 'Limpando configuração'
+      : entry.kind === 'folder' ? 'Limpando pasta'
       : 'Apagando arquivo';
     const line = document.createElement('div');
     line.textContent = `${verb} "${entry.name}"...`;
