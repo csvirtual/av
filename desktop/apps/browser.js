@@ -11,7 +11,13 @@
 // botão "Abrir em nova aba" de verdade, em vez de deixar uma página em
 // branco sem explicação.
 const HOME_URL = 'https://www.wikipedia.org';
-const PROXY_ENDPOINT = '/.netlify/functions/proxy';
+// O site principal agora é servido pelo GitHub Pages; só a função de proxy
+// (netlify/functions/proxy.js) continua rodando no Netlify, já que Pages não
+// executa código de servidor. Por isso precisa ser uma URL completa (de
+// outro domínio) em vez de um caminho relativo — ajuste aqui se o site do
+// Netlify usado só pra essa função tiver um domínio diferente de
+// "cscpl.netlify.app".
+const PROXY_ENDPOINT = 'https://cscpl.netlify.app/.netlify/functions/proxy';
 const MAX_HISTORY = 200;
 const LOAD_TIMEOUT_MS = 12000;
 

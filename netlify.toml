@@ -1,30 +1,9 @@
+# O site em si é servido pelo GitHub Pages agora — este projeto Netlify
+# existe só pra rodar netlify/functions/proxy.js (a função de proxy usada
+# pelo app Navegador pra abrir sites que bloqueiam ser exibidos em iframe;
+# Pages não executa código de servidor, então essa parte precisa continuar
+# em algum lugar que rode funções). Os cabeçalhos de segurança do site
+# (CSP etc.) ficaram só na <meta> de desktop/index.html, já que aqui não
+# tem mais página nenhuma sendo servida pra aplicar cabeçalho HTTP.
 [build]
   functions = "netlify/functions"
-
-# Cabeçalhos de segurança pra todo o app (não afetam o proxy do Navegador,
-# que responde com seus próprios cabeçalhos em netlify/functions/proxy.js —
-# de propósito, já que ele serve conteúdo de terceiros com regras
-# diferentes). CSP explicada abaixo, diretiva por diretiva.
-[[headers]]
-  for = "/*"
-  [headers.values]
-    # script-src sem 'unsafe-inline'/'unsafe-eval': o app não usa nenhum
-    # <script> inline nem eval — só <script type="module" src="main.js">,
-    # então dá pra travar isso de verdade sem quebrar nada.
-    # style-src precisa de 'unsafe-inline' porque o app gera bastante
-    # style="..." inline via JS (não são strings de usuário, são valores
-    # fixos do próprio código) — travar isso exigiria reescrever toda a UI
-    # pra usar só classes CSS, fora do escopo aqui.
-    # img-src/media-src incluem data:/blob: porque fotos, vídeos, áudios e
-    # downloads do Explorador são gravados/gerados como data: URL ou
-    # blob: URL, não arquivos servidos por HTTP.
-    # frame-src 'self' permite o iframe do Navegador (que carrega
-    # /.netlify/functions/proxy, do mesmo domínio) — o conteúdo de
-    # terceiros ali dentro já é isolado à parte pelo sandbox do iframe
-    # (ver desktop/apps/browser.js), não por essa CSP.
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
-    X-Frame-Options = "SAMEORIGIN"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
