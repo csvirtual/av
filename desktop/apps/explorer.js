@@ -10,6 +10,10 @@ import { AUDIO_MIME_PREFIX, AUDIO_GLYPH } from './audio-player.js';
 import { PRESENTATION_MIME } from './presentation.js';
 import { trashGlyph } from '../core/icons.js';
 
+// Ícone das pastas especiais (Usuários) que merecem se diferenciar de uma
+// pasta comum, igual ao Disco Local (C:) já feito acima.
+const USERS_GLYPH = '👥';
+
 // Ícone de um arquivo (não pasta) pelo mimeType — a distinção pasta comum vs.
 // Disco Local (C:) fica no chamador, que tem acesso ao `seed`.
 function fileGlyph(node) {
@@ -112,7 +116,7 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
   root.innerHTML = `
     <div class="explorer-sidebar">
       <div class="side-item" data-nav="this-pc">🖥️ Este Computador</div>
-      <div class="side-item" data-nav="desktop">🖵 Área de Trabalho</div>
+      <div class="side-item" data-nav="desktop">🖥️ Área de Trabalho</div>
       <div class="side-item" data-nav="documents">📄 Documentos</div>
       <div class="side-item" data-nav="pictures">🖼️ Imagens</div>
       <div class="side-item" data-nav="downloads">⬇️ Downloads</div>
@@ -304,7 +308,10 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
       item.className = viewMode === 'list' ? 'file-row' : 'file-item';
       item.dataset.id = node.id;
       const glyph = node.type === 'folder'
-        ? (node.id === seed.cDriveId ? DRIVE_GLYPH : '📁')
+        ? (node.id === seed.cDriveId ? DRIVE_GLYPH
+          : node.id === seed.usersId ? USERS_GLYPH
+          : node.id === seed.trashId ? trashGlyph()
+          : '📁')
         : fileGlyph(node);
 
       if (viewMode === 'list') {

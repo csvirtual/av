@@ -151,7 +151,11 @@ async function refreshAvatars() {
 }
 
 function fileGlyph(node) {
-  if (node.type === 'folder') return '📁';
+  if (node.type === 'folder') {
+    if (node.id === seed?.usersId) return '👥';
+    if (node.id === seed?.trashId) return trashGlyph();
+    return '📁';
+  }
   const mime = node.mimeType || '';
   if (mime.startsWith('image/')) return '🖼️';
   if (mime === WORD_MIME) return '📘';
@@ -984,10 +988,33 @@ function fixedIcons() {
   ];
 }
 
+// Preenche em colunas (de cima pra baixo, depois pra direita — igual ao
+// Windows real) mas limitando o número de colunas ao que cabe de verdade
+// na largura da tela, senão em telas estreitas (celular) as colunas depois
+// da 3ª/4ª ficam fora da área visível e os ícones "somem".
 function gridPosition(idx) {
+  const colWidth = 100;
   const rowHeight = 100;
-  const maxRows = Math.max(3, Math.floor((window.innerHeight - 100) / rowHeight));
-  return { x: 16 + Math.floor(idx / maxRows) * 100, y: 16 + (idx % maxRows) * rowHeight };
+  const container = $('#desktop-icons');
+  const availW = (container?.clientWidth || window.innerWidth) - 16;
+  const availH = (container?.clientHeight || window.innerHeight) - 16;
+  const maxRows = Math.max(3, Math.floor(availH / rowHeight));
+  const maxCols = Math.max(1, Math.floor(availW / colWidth));
+  const col = Math.floor(idx / maxRows) % maxCols;
+  const band = Math.floor(idx / (maxRows * maxCols));
+  const row = idx % maxRows;
+  return { x: 16 + col * colWidth, y: 16 + row * rowHeight + band * (maxRows * rowHeight) };
+}
+
+// Garante que um ícone (posição salva de um arraste anterior, possivelmente
+// numa tela bem maior) sempre fique dentro da área visível atual — sem
+// isso, um ícone reposicionado num monitor grande simplesmente some ao
+// abrir a mesma conta num celular.
+function clampIconPosition(pos) {
+  const container = $('#desktop-icons');
+  const maxX = Math.max(16, (container?.clientWidth || window.innerWidth) - 88 - 8);
+  const maxY = Math.max(16, (container?.clientHeight || window.innerHeight) - 88 - 8);
+  return { x: Math.min(Math.max(pos.x, 8), maxX), y: Math.min(Math.max(pos.y, 8), maxY) };
 }
 
 async function getAutoArrange() {
@@ -1056,7 +1083,7 @@ async function renderDesktopIcons() {
     const el = document.createElement('div');
     el.className = 'desktop-icon';
     el.innerHTML = `<div class="icon-glyph${icon.isShortcut ? ' is-shortcut' : ''}">${icon.glyph}</div><div class="icon-label">${escapeHtml(icon.label)}</div>`;
-    const pos = positions[icon.id] || gridPosition(idx);
+    const pos = clampIconPosition(positions[icon.id] || gridPosition(idx));
     el.style.left = `${pos.x}px`;
     el.style.top = `${pos.y}px`;
 
@@ -1256,7 +1283,7 @@ function renderStartMenu() {
           },
         },
         {
-          label: onDesktop ? '🖵 Remover da área de trabalho' : '🖵 Enviar para a área de trabalho',
+          label: onDesktop ? '🖥️ Remover da área de trabalho' : '🖥️ Enviar para a área de trabalho',
           onClick: () => (onDesktop ? removeDesktopAppShortcut(app.id) : sendAppToDesktop(app.id)),
         },
       ]);
@@ -1906,6 +1933,16 @@ async function applyDisplayPreferences() {
 
 applyDisplayPreferences();
 window.addEventListener('pointerdown', () => applyDisplayPreferences(), { once: true });
+
+// Reflui os ícones da área de trabalho quando a tela muda de tamanho ou
+// gira (ex.: celular na horizontal) — sem isso, um layout calculado pra um
+// tamanho de tela fica desalinhado ou com ícones fora da área visível
+// depois de uma rotação/redimensionamento.
+let resizeReflowTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeReflowTimer);
+  resizeReflowTimer = setTimeout(() => renderDesktopIcons(), 200);
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
