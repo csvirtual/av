@@ -2,6 +2,7 @@ import { kv, setActiveAccount, getActiveAccount, hasLegacyAccountData, migrateLe
 import { fs, ensureSeed } from './core/state/filesystem.js';
 import {
   setPassword, verifyPassword, changePasswordKnowingOld, getEmail, setEmail, resetPasswordWithEmail,
+  adminResetPassword,
 } from './core/services/auth.js';
 import { clearSessionDek } from './core/services/crypto.js';
 import {
@@ -128,6 +129,7 @@ const ctx = {
   switchToAccount: (id) => switchToSpecificAccount(id),
   removeAccount: (id) => removeAccountFlow(id),
   setAccountRole: (id, role) => setAccountRoleFlow(id, role),
+  netUserSetPassword: (name, newPassword) => netUserSetPassword(name, newPassword),
 };
 
 async function getActiveAccountRole() {
@@ -373,6 +375,20 @@ async function setAccountRoleFlow(id, role) {
   }
   await updateAccountRecord(id, { role });
   return true;
+}
+
+/** Usado pelo comando `net user <nome> <senha>` do Terminal (apps/terminal.js).
+ * Devolve um motivo em vez de só true/false pra o Terminal poder mostrar a
+ * mensagem de erro certa (a mesma distinção que o `net user` de verdade
+ * do Windows faz: usuário não encontrado vs. acesso negado). */
+async function netUserSetPassword(name, newPassword) {
+  const accounts = await listAccounts();
+  const target = accounts.find((a) => a.name.toLowerCase() === (name || '').toLowerCase());
+  if (!target) return 'not-found';
+  const activeAccount = accounts.find((a) => a.id === getActiveAccount());
+  if (activeAccount?.role !== 'admin') return 'forbidden';
+  await adminResetPassword(target.id, newPassword);
+  return 'ok';
 }
 
 function accountAvatarTileHTML(account) {

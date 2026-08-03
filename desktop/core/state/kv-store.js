@@ -52,6 +52,13 @@ export const kv = {
     return rawGet(`acct:${accountId}:${key}`, fallback);
   },
 
+  /** Grava uma chave em OUTRA conta sem trocar o contexto ativo — usado
+   * pelo comando `net user` do Terminal, que deixa um administrador
+   * redefinir a senha de outra conta local sem precisar entrar nela. */
+  async setFor(accountId, key, value) {
+    return rawSet(`acct:${accountId}:${key}`, value);
+  },
+
   /** Apaga todas as chaves pertencentes a uma conta (usado ao remover uma
    * conta local). Não apaga os arquivos dela — isso é feito à parte, via
    * fs.deleteNodePermanently a partir do rootId dessa conta. */

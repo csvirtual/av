@@ -111,6 +111,26 @@ export async function changePasswordKnowingOld(oldPassword, newPassword) {
   return true;
 }
 
+/** Redefine a senha de OUTRA conta sem conhecer a senha antiga dela — usado
+ * pelo comando `net user <nome> <senha>` do Terminal, disponível só pra
+ * quem já é administrador (a checagem de permissão é feita por quem
+ * chama isto, não aqui). Como não tem como desembrulhar a DEK antiga sem a
+ * senha antiga, gera uma DEK nova pra essa conta — mesmo compromisso do
+ * "Esqueci minha senha": os arquivos que ela já tinha cifrado ficam
+ * ilegíveis depois disso. */
+export async function adminResetPassword(targetAccountId, newPassword) {
+  const salt = bufToHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
+  const hash = await deriveHash(newPassword, salt);
+  await kv.setFor(targetAccountId, 'auth.salt', salt);
+  await kv.setFor(targetAccountId, 'auth.hash', hash);
+
+  const dek = await generateDek();
+  const dekSalt = generateSalt();
+  const wrapped = await wrapDek(dek, newPassword, dekSalt);
+  await kv.setFor(targetAccountId, 'auth.dekSalt', bytesToB64(dekSalt));
+  await kv.setFor(targetAccountId, 'auth.wrappedDek', wrapped);
+}
+
 export async function getEmail() {
   return kv.get('auth.email', '');
 }
