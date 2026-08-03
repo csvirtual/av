@@ -101,6 +101,7 @@ export function openPaint(ctx, { fileId } = {}) {
 
   const canvas = root.querySelector('[data-role="canvas"]');
   const stage = root.querySelector('[data-role="stage"]');
+  const canvasWrap = root.querySelector('[data-role="canvas-wrap"]');
   const status = root.querySelector('[data-role="status"]');
   const paletteEl = root.querySelector('[data-role="palette"]');
   const currentColorEl = root.querySelector('[data-role="current-color"]');
@@ -213,6 +214,32 @@ export function openPaint(ctx, { fileId } = {}) {
       img.src = dataUrl;
     });
   }
+
+  // Ao contrário do Paint de verdade (que tem dimensões fixas e explícitas),
+  // aqui a tela em branco recém-criada acompanha o tamanho da janela — mas só
+  // enquanto ainda não foi desenhada nem salva/aberta como arquivo, pra nunca
+  // esticar silenciosamente as dimensões de uma imagem real do usuário.
+  const CANVAS_WRAP_PADDING = 40; // 2x var(--space-5), ver .paint-canvas-wrap
+  function growCanvasToFit() {
+    if (currentFileId || dirty) return;
+    const availW = Math.round(canvasWrap.clientWidth - CANVAS_WRAP_PADDING);
+    const availH = Math.round(canvasWrap.clientHeight - CANVAS_WRAP_PADDING);
+    const targetW = Math.min(MAX_DIMENSION, Math.max(canvas.width, availW));
+    const targetH = Math.min(MAX_DIMENSION, Math.max(canvas.height, availH));
+    if (targetW === canvas.width && targetH === canvas.height) return;
+    const snapshot = g.getImageData(0, 0, canvas.width, canvas.height);
+    canvas.width = targetW;
+    canvas.height = targetH;
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.putImageData(snapshot, 0, 0);
+    history = [];
+    historyIndex = -1;
+    pushHistory();
+    updateStatus();
+  }
+  const canvasResizeObserver = ('ResizeObserver' in window) ? new ResizeObserver(() => growCanvasToFit()) : null;
+  if (canvasResizeObserver) canvasResizeObserver.observe(canvasWrap);
 
   async function openExisting(id) {
     const node = await fs.getNode(id);
@@ -521,7 +548,10 @@ export function openPaint(ctx, { fileId } = {}) {
     }
   }
   window.addEventListener('keydown', onKeydown);
-  win.onClose(() => window.removeEventListener('keydown', onKeydown));
+  win.onClose(() => {
+    window.removeEventListener('keydown', onKeydown);
+    if (canvasResizeObserver) canvasResizeObserver.disconnect();
+  });
 
   if (currentFileId) openExisting(currentFileId);
   else blankCanvas(DEFAULT_WIDTH, DEFAULT_HEIGHT);
