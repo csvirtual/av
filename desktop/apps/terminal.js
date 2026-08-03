@@ -40,12 +40,24 @@ export function openTerminal(ctx) {
     output.scrollTop = output.scrollHeight;
   }
 
+  // No Windows real, mesmo numa instalação em português, o Explorer só
+  // TRADUZ o nome das pastas conhecidas pra exibição — a pasta física no
+  // disco continua em inglês, e é isso que o cmd.exe mostra de verdade
+  // (dir, cd, prompt). O Explorador deste app mostra os nomes em
+  // português (igual ao Explorer real); o Terminal usa os nomes reais.
+  const KNOWN_FOLDER_EN = {
+    'Usuários': 'Users',
+    'Área de Trabalho': 'Desktop',
+    'Documentos': 'Documents',
+    'Imagens': 'Pictures',
+  };
+
   // Reduz o caminho da árvore virtual (que começa em "Este Computador" >
   // "Disco Local (C:)" > ...) pro formato de letra de unidade que um
-  // prompt de comando de verdade mostra — "C:\Usuários\Nome\...".
+  // prompt de comando de verdade mostra — "C:\Users\Nome\...".
   async function currentPathLabel() {
     const path = await fs.getPath(cwd);
-    const segments = path.slice(1).map((n, i) => (i === 0 ? 'C:' : n.name));
+    const segments = path.slice(1).map((n, i) => (i === 0 ? 'C:' : (KNOWN_FOLDER_EN[n.name] || n.name)));
     if (segments.length <= 1) return 'C:\\';
     return segments.join('\\');
   }
