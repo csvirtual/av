@@ -287,8 +287,6 @@ body:has(#account-picker-screen:not(.hidden)) .pre-login-power-btn {
   border-radius: var(--radius-sm); padding: var(--space-3);
 }
 .wipe-log div { padding: 1px 0; }
-.wipe-use-backup-link { display: block; margin: var(--space-4) auto 0; color: rgba(255, 255, 255, 0.75); }
 .wipe-finish-btn {
   position: absolute; right: 28px; bottom: 28px; width: auto; padding: 10px 28px;
 }
-.wipe-finish-btn:disabled { opacity: 0.4; cursor: default; }
