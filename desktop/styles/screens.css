@@ -18,6 +18,7 @@
 .lock-date { font-size: 20px; opacity: 0.9; }
 
 .auth-card {
+  position: relative;
   background: rgba(0, 0, 0, 0.28);
   backdrop-filter: var(--blur-regular);
   border-radius: var(--radius-xl);
@@ -28,6 +29,14 @@
   overflow-y: auto;
   text-align: center;
   box-shadow: var(--elevation-3);
+}
+/* Fica ancorado no canto superior esquerdo do card, fora do fluxo normal —
+   não empurra o avatar/nome pra baixo, igual um botão "voltar" de canto. */
+#lock-switch-user-btn {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  margin: 0;
 }
 .auth-card h1 { font-size: 20px; font-weight: 500; margin: 0 0 18px; }
 .auth-sub { font-size: 13px; opacity: 0.85; margin: -10px 0 18px; }
@@ -54,11 +63,21 @@
   color: #fff;
   font-size: 14px;
   cursor: pointer;
+  outline: none;
 }
 .auth-btn:hover { background: #0078d4; }
 .auth-link {
   background: none; border: none; color: #cfe8ff;
   font-size: 12px; cursor: pointer; margin-top: var(--space-1);
+  outline: none;
+}
+/* Contorno de foco só aparece pra quem navega por teclado (Tab) — no
+   clique/toque normal, sem o anel nativo do navegador ao redor do botão,
+   que destoava do resto do visual. Mantém acessível: quem usa teclado
+   ainda enxerga onde está o foco. */
+.auth-btn:focus-visible, .auth-link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
 }
 .auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
 .auth-success { color: #7ee787; font-size: 12px; margin: 0; }
