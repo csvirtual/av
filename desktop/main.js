@@ -1,6 +1,9 @@
 import { kv, setActiveAccount, getActiveAccount, hasLegacyAccountData, migrateLegacyDataToAccount } from './core/state/kv-store.js';
 import { fs, ensureSeed } from './core/state/filesystem.js';
-import { setPassword, verifyPassword, getEmail, setEmail, resetPasswordWithEmail } from './core/services/auth.js';
+import {
+  setPassword, verifyPassword, changePasswordKnowingOld, getEmail, setEmail, resetPasswordWithEmail,
+} from './core/services/auth.js';
+import { clearSessionDek } from './core/services/crypto.js';
 import {
   listAccounts, addAccountRecord, updateAccountRecord, removeAccountRecord,
   setLastActiveAccountId, newAccountId, MAX_ACCOUNTS,
@@ -71,12 +74,11 @@ const ctx = {
   getWallpaper,
   setWallpaper,
   verifyPassword,
-  changePassword: async (oldP, newP) => {
-    const ok = await verifyPassword(oldP);
-    if (!ok) return false;
-    await setPassword(newP);
-    return true;
-  },
+  // Preserva a mesma chave de criptografia dos arquivos (só re-embrulha com
+  // a senha nova) — ao contrário de simplesmente chamar setPassword() de
+  // novo, que geraria uma chave nova e tornaria ilegível tudo que já foi
+  // salvo cifrado.
+  changePassword: (oldP, newP) => changePasswordKnowingOld(oldP, newP),
   getAvatar: () => kv.get('user.avatar', null),
   setAvatar: async (dataUrl) => {
     await kv.set('user.avatar', dataUrl);
@@ -319,6 +321,8 @@ async function boot() {
 async function showLockScreenFor(account) {
   $('#lock-username').textContent = await kv.get('user.name', account?.name || 'Usuário');
   await refreshAvatars();
+  const lockUntil = await kv.get('auth.lockUntil', 0);
+  if (lockUntil > Date.now()) startLockoutCountdown(lockUntil);
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }
@@ -600,19 +604,77 @@ $('#setup-photo').addEventListener('change', () => {
 });
 
 // ---------------- Lock screen ----------------
+// Trava progressiva contra tentativas repetidas de senha: as 3 primeiras
+// tentativas erradas não têm custo nenhum (gente erra por engano), a partir
+// da 4ª cada erro dobra o tempo de espera até um teto de 5 minutos. Isso é
+// contornável por quem tem acesso ao devtools (é tudo client-side, sem
+// backend pra aplicar isso de verdade) — mas barra tentativa repetida pela
+// UI normal, que é o cenário real de alguém pegando o dispositivo destravado
+// e tentando adivinhar a senha na tela de bloqueio.
+const LOCKOUT_FREE_ATTEMPTS = 3;
+const LOCKOUT_BASE_SECONDS = 5;
+const LOCKOUT_MAX_SECONDS = 300;
+let lockoutCountdownTimer = null;
+
+function lockoutSecondsFor(failedCount) {
+  const extra = failedCount - LOCKOUT_FREE_ATTEMPTS;
+  if (extra <= 0) return 0;
+  return Math.min(LOCKOUT_BASE_SECONDS * 2 ** (extra - 1), LOCKOUT_MAX_SECONDS);
+}
+
+function setLockFormDisabled(disabled) {
+  $('#lock-pass').disabled = disabled;
+  $('#lock-form button[type="submit"]').disabled = disabled;
+}
+
+function startLockoutCountdown(untilTs) {
+  clearInterval(lockoutCountdownTimer);
+  const err = $('#lock-error');
+  setLockFormDisabled(true);
+  function tick() {
+    const remaining = Math.ceil((untilTs - Date.now()) / 1000);
+    if (remaining <= 0) {
+      clearInterval(lockoutCountdownTimer);
+      setLockFormDisabled(false);
+      hide(err);
+      return;
+    }
+    err.textContent = `Muitas tentativas incorretas. Tente novamente em ${remaining}s.`;
+    show(err);
+  }
+  tick();
+  lockoutCountdownTimer = setInterval(tick, 1000);
+}
+
 $('#lock-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const lockUntil = await kv.get('auth.lockUntil', 0);
+  if (lockUntil > Date.now()) {
+    startLockoutCountdown(lockUntil);
+    return;
+  }
   const pass = $('#lock-pass').value;
   const ok = await verifyPassword(pass);
   const err = $('#lock-error');
   if (ok) {
+    await kv.set('auth.failedAttempts', 0);
+    await kv.remove('auth.lockUntil');
     hide($('#lock-screen'));
     $('#lock-pass').value = '';
     hide(err);
     await setLastActiveAccountId(getActiveAccount());
     enterDesktop();
   } else {
-    show(err);
+    const failedCount = (await kv.get('auth.failedAttempts', 0)) + 1;
+    await kv.set('auth.failedAttempts', failedCount);
+    const seconds = lockoutSecondsFor(failedCount);
+    if (seconds > 0) {
+      const until = Date.now() + seconds * 1000;
+      await kv.set('auth.lockUntil', until);
+      startLockoutCountdown(until);
+    } else {
+      show(err);
+    }
   }
 });
 
@@ -721,6 +783,9 @@ function lockNow() {
   kv.get('user.name', 'Usuário').then((n) => ($('#lock-username').textContent = n));
   refreshAvatars();
   playLockChime();
+  // A chave que decifra os arquivos só existe em memória durante a sessão —
+  // some daqui até a senha ser digitada de novo com sucesso.
+  clearSessionDek();
   show($('#lock-screen'));
   $('#lock-pass').focus();
 }

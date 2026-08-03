@@ -41,9 +41,30 @@ function isPrivateIp(ip) {
   }
   if (net.isIPv6(ip)) {
     const v = ip.toLowerCase();
-    return v === '::1' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80');
+    if (v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80')) return true;
+    const mapped = ipv4FromMappedIPv6(v);
+    if (mapped) return isPrivateIp(mapped);
+    return false;
   }
   return false;
+}
+
+// Endereço IPv4 "mapeado" dentro de IPv6 — sem reconhecer isso,
+// ::ffff:127.0.0.1 escaparia do bloqueio por não bater com nenhum prefixo
+// IPv6 privado acima. O Node normaliza pra dois formatos possíveis
+// dependendo de como o valor chegou: "::ffff:a.b.c.d" (dotted) ou
+// "::ffff:XXXX:YYYY" (dois grupos hex de 16 bits — é o que a WHATWG URL usa
+// quando o host vem de uma URL tipo "http://[::ffff:127.0.0.1]/").
+function ipv4FromMappedIPv6(v) {
+  let m = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (m) return m[1];
+  m = v.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (m) {
+    const hi = parseInt(m[1], 16);
+    const lo = parseInt(m[2], 16);
+    return [(hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff].join('.');
+  }
+  return null;
 }
 
 // Bloqueia hosts privados/locais pra este proxy não virar uma porta de
@@ -59,8 +80,21 @@ async function assertSafeUrl(rawUrl) {
     throw new Error('URL inválida.');
   }
   if (!/^https?:$/.test(u.protocol)) throw new Error('Apenas endereços http/https são permitidos.');
-  const hostname = u.hostname.toLowerCase();
+  // Pra um literal IPv6 na URL (http://[::1]/), a própria WHATWG URL mantém
+  // os colchetes dentro de u.hostname ("[::1]") — sem removê-los aqui,
+  // net.isIP/isIPv6 nunca reconhecem o valor como IP nenhum e a checagem de
+  // IP privado abaixo nunca roda de verdade (o bloqueio "funcionava" só de
+  // efeito colateral, porque o dns.lookup barra um hostname com colchetes).
+  const hostname = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (BLOCKED_HOSTNAMES.has(hostname)) throw new Error('Este endereço não pode ser acessado.');
+  // Bloqueia formas alternativas de escrever um IPv4 (inteiro decimal puro
+  // como "2130706433", ou hexadecimal como "0x7f000001") que alguns
+  // resolvedores de sistema ainda aceitam por baixo dos panos — sem isso,
+  // dns.lookup poderia devolver um IP interno pra um hostname desse formato
+  // sem passar pelo bloqueio de IP literal logo abaixo.
+  if (/^0x[0-9a-f]+$/i.test(hostname) || /^\d+$/.test(hostname)) {
+    throw new Error('Este endereço não pode ser acessado.');
+  }
   if (net.isIP(hostname)) {
     if (isPrivateIp(hostname)) throw new Error('Este endereço não pode ser acessado.');
     return u;
@@ -117,11 +151,35 @@ function rewriteHtml(html, baseHref) {
   return out;
 }
 
+// Injetado em toda resposta (páginas reais e nossas próprias páginas de
+// erro): o app embute o conteúdo proxiado num iframe sandboxed SEM
+// allow-same-origin (ver desktop/apps/browser.js), então o app não consegue
+// mais ler contentDocument direto — esse scriptzinho manda o título e se é
+// uma página de erro nossa via postMessage, que funciona através de
+// fronteiras de origem mesmo com o sandbox (é pra isso que postMessage
+// existe). Não manda nada sensível, só título e um booleano.
+const REPORTER_SCRIPT = `<script>(function(){
+function report(){try{window.parent.postMessage({source:'app-browser-proxy',proxyError:document.documentElement.getAttribute('data-proxy-error')==='1',title:document.title||''},'*');}catch(e){}}
+report();
+document.addEventListener('DOMContentLoaded',report);
+window.addEventListener('load',report);
+var t=document.querySelector('title');
+if(t){try{new MutationObserver(report).observe(t,{childList:true,characterData:true,subtree:true});}catch(e){}}
+document.addEventListener('visibilitychange',report);
+})();</script>`;
+
+function injectReporter(html) {
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => `${m}${REPORTER_SCRIPT}`);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${REPORTER_SCRIPT}</head>`);
+  return `${REPORTER_SCRIPT}${html}`;
+}
+
 function errorResponse(message) {
+  const body = `<!DOCTYPE html><html data-proxy-error="1"><head><meta charset="utf-8">${REPORTER_SCRIPT}</head><body style="font:14px sans-serif;padding:2rem;color:#444">${escapeHtml(message)}</body></html>`;
   return {
     statusCode: 502,
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
-    body: `<!DOCTYPE html><html data-proxy-error="1"><head><meta charset="utf-8"></head><body style="font:14px sans-serif;padding:2rem;color:#444">${escapeHtml(message)}</body></html>`,
+    body,
   };
 }
 
@@ -171,7 +229,7 @@ exports.handler = async (event) => {
     return {
       statusCode: upstream.status,
       headers: { ...headers, 'Content-Type': 'text/html; charset=utf-8' },
-      body: rewriteHtml(buf.toString('utf-8'), upstream.url),
+      body: injectReporter(rewriteHtml(buf.toString('utf-8'), upstream.url)),
     };
   }
 

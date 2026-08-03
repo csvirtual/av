@@ -185,31 +185,25 @@ export function openBrowser(ctx, { url } = {}) {
     const iframe = document.createElement('iframe');
     iframe.className = 'browser-frame hidden';
     iframe.referrerPolicy = 'no-referrer';
+    // Sem "allow-same-origin": o conteúdo do site visitado passa a rodar
+    // numa origem opaca própria, isolada de verdade da nossa — sem isso, como
+    // o proxy serve tudo pelo NOSSO domínio, um site malicioso carregado aqui
+    // enxergaria window.parent e o IndexedDB inteiro do app (senha, arquivos
+    // de todas as contas) como se fossem dele mesmo. allow-scripts/forms/
+    // popups continuam liberados pra sites de verdade funcionarem; sem
+    // allow-top-navigation, o site não consegue navegar a janela toda embora.
+    iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox');
     pages.appendChild(iframe);
     const tab = { id, iframe, url: '', title: 'Nova guia', history: [], historyIndex: -1, status: null, loadTimer: null };
-    // O listener só é preso depois do appendChild, então o "load" implícito
-    // do about:blank inicial (disparado pela própria inserção no DOM) já
-    // passou antes de existir alguém ouvindo — todo evento "load" que este
-    // listener de fato recebe corresponde a uma navegação real (inicial,
-    // recarregar, voltar ou avançar).
+    // Com o sandbox acima, o iframe vira cross-origin de verdade — não dá
+    // mais pra ler contentDocument direto. O proxy (netlify/functions/
+    // proxy.js) injeta um scriptzinho em toda página que passa por ele
+    // (inclusive nas próprias páginas de erro do proxy) que manda o título e
+    // o status de erro pra cá via postMessage; o listener global registrado
+    // mais abaixo (window.addEventListener('message', ...)) recebe e associa
+    // à aba certa comparando event.source com o contentWindow do iframe.
     iframe.addEventListener('load', () => {
       clearTimeout(tab.loadTimer);
-      // A resposta do proxy vem do nosso próprio domínio, então
-      // contentDocument é acessível de verdade (não é cross-origin) — dá
-      // pra saber se o proxy sinalizou erro e pra pegar o título real da
-      // página em vez de só o hostname.
-      let doc = null;
-      try { doc = tab.iframe.contentDocument; } catch { /* nunca deveria acontecer, é same-origin */ }
-      if (doc?.documentElement?.dataset?.proxyError) {
-        setTabStatus(tab, 'blocked');
-        return;
-      }
-      setTabStatus(tab, null);
-      if (doc?.title) {
-        tab.title = doc.title;
-        renderTabbar();
-        if (tab.id === activeId) win.setTitle(`${tab.title} - Navegador`);
-      }
     });
     tabs.push(tab);
     switchTab(id);
@@ -385,8 +379,35 @@ export function openBrowser(ctx, { url } = {}) {
     }
   }
   window.addEventListener('keydown', onKeydown);
+
+  // Canal de comunicação com o conteúdo (agora sandboxed/cross-origin) dos
+  // iframes: só aceita mensagens cujo `source` seja exatamente o
+  // contentWindow de uma aba nossa (comparação de referência de objeto, não
+  // depende de checar `origin` — o iframe é de origem opaca mesmo, então
+  // `event.origin` viria como a string "null"). Isso garante que só as
+  // páginas que ESTE app carregou conseguem falar com este handler, mesmo
+  // sem allow-same-origin.
+  function onProxyMessage(e) {
+    if (!e.data || e.data.source !== 'app-browser-proxy') return;
+    const tab = tabs.find((t) => t.iframe.contentWindow === e.source);
+    if (!tab) return;
+    clearTimeout(tab.loadTimer);
+    if (e.data.proxyError) {
+      setTabStatus(tab, 'blocked');
+      return;
+    }
+    setTabStatus(tab, null);
+    if (e.data.title) {
+      tab.title = e.data.title;
+      renderTabbar();
+      if (tab.id === activeId) win.setTitle(`${tab.title} - Navegador`);
+    }
+  }
+  window.addEventListener('message', onProxyMessage);
+
   win.onClose(() => {
     window.removeEventListener('keydown', onKeydown);
+    window.removeEventListener('message', onProxyMessage);
     tabs.forEach((t) => clearTimeout(t.loadTimer));
   });
 

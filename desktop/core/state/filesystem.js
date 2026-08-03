@@ -1,22 +1,56 @@
 // Sistema de arquivos virtual (pastas/arquivos) sobre IndexedDB, usado pela
 // área de trabalho, Explorador de Arquivos e demais apps.
+//
+// Conteúdo de arquivo é cifrado em repouso (AES-256-GCM, ver
+// core/services/crypto.js) de forma transparente: createNode/updateNode
+// cifram antes de gravar, getNode/getChildren decifram antes de devolver —
+// todo o resto do app continua enxergando `node.content` como texto puro
+// sempre, sem precisar saber que existe criptografia nenhuma.
 import { tx, reqToPromise } from './database.js';
 import { kv } from './kv-store.js';
+import { getSessionDek, encryptText, decryptText } from '../services/crypto.js';
 
 function uid() {
   return crypto.randomUUID();
 }
 
+async function encryptContent(content) {
+  const dek = getSessionDek();
+  // Sem chave de sessão ainda (só acontece na semeadura inicial de uma
+  // conta pré-existente, antes de qualquer login — nunca com arquivo de
+  // usuário de verdade, só pastas com content vazio) ou conteúdo vazio: não
+  // tem o que cifrar, grava como está.
+  if (!dek || typeof content !== 'string' || content === '') return content;
+  return encryptText(dek, content);
+}
+
+async function decryptContent(content) {
+  if (content == null || typeof content !== 'object' || !content.__enc) return content;
+  const dek = getSessionDek();
+  // Não deveria acontecer em uso normal (todo acesso a arquivo de verdade é
+  // pós-login), mas devolve string vazia em vez do objeto cifrado cru —
+  // qualquer código chamador espera `content` como string sempre.
+  if (!dek) return '';
+  try {
+    return await decryptText(dek, content);
+  } catch {
+    return '';
+  }
+}
+
 export const fs = {
   async getNode(id) {
     const store = await tx('nodes', 'readonly');
-    return reqToPromise(store.get(id));
+    const node = await reqToPromise(store.get(id));
+    if (node) node.content = await decryptContent(node.content);
+    return node;
   },
 
   async getChildren(parentId) {
     const store = await tx('nodes', 'readonly');
     const idx = store.index('byParent');
     const rows = await reqToPromise(idx.getAll(parentId));
+    for (const row of rows) row.content = await decryptContent(row.content);
     return rows.sort((a, b) => {
       if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
       return a.name.localeCompare(b.name, 'pt-BR');
@@ -31,13 +65,14 @@ export const fs = {
       parentId,
       name,
       type, // 'folder' | 'file'
-      content,
+      content: await encryptContent(content),
       mimeType,
       createdAt: now,
       modifiedAt: now,
       trashed: false,
     };
     await reqToPromise(store.add(node));
+    node.content = content; // devolve pro chamador em texto puro, não cifrado
     return node;
   },
 
@@ -45,8 +80,11 @@ export const fs = {
     const store = await tx('nodes', 'readwrite');
     const node = await reqToPromise(store.get(id));
     if (!node) return null;
-    Object.assign(node, patch, { modifiedAt: Date.now() });
+    const finalPatch = { ...patch };
+    if ('content' in finalPatch) finalPatch.content = await encryptContent(finalPatch.content);
+    Object.assign(node, finalPatch, { modifiedAt: Date.now() });
     await reqToPromise(store.put(node));
+    node.content = await decryptContent(node.content); // devolve pro chamador em texto puro
     return node;
   },
 

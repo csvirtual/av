@@ -1,5 +1,5 @@
 // Cache básico para permitir instalar como app e abrir mesmo sem internet.
-const CACHE_NAME = 'win11-web-v29';
+const CACHE_NAME = 'win11-web-v30';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,8 @@ const ASSETS = [
   './core/icons.js',
   './core/state/filesystem.js',
   './core/services/auth.js',
+  './core/services/crypto.js',
+  './core/services/accounts.js',
   './core/services/sounds.js',
   './core/window-manager/window-manager.js',
   './core/window-manager/snap-zones.js',

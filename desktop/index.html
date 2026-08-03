@@ -103,6 +103,7 @@
     </form>
     <form id="lock-recovery-form" autocomplete="off" class="hidden">
       <p class="auth-sub" style="margin:0 0 12px">Informe o e-mail cadastrado para redefinir sua senha.</p>
+      <p class="auth-sub" style="margin:0 0 12px;color:#ffb454">⚠ Seus arquivos são cifrados com a senha atual. Redefinir a senha sem ela cria uma nova chave — os arquivos salvos antes disso ficarão ilegíveis, mesmo depois de definir a senha nova.</p>
       <input type="email" id="recovery-email" placeholder="E-mail cadastrado" aria-label="E-mail cadastrado" required>
       <input type="password" id="recovery-pass" placeholder="Nova senha" aria-label="Nova senha" minlength="4" required>
       <input type="password" id="recovery-pass2" placeholder="Confirmar nova senha" aria-label="Confirmar nova senha" minlength="4" required>
