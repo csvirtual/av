@@ -1,6 +1,8 @@
 // Fotos: visualizador de imagens do sistema de arquivos virtual, com
 // navegação entre imagens da mesma pasta, definir como plano de fundo e
 // baixar de volta para o computador real.
+import { PHOTO_GLYPH } from '../core/icons.js';
+
 export function openPhotos(ctx, { fileId } = {}) {
   const { fs, windows } = ctx;
   let currentId = fileId;
@@ -14,7 +16,7 @@ export function openPhotos(ctx, { fileId } = {}) {
       <button data-action="next" aria-label="Próxima imagem" title="Próxima">▶</button>
       <span class="photos-name" data-role="name"></span>
       <div class="photos-toolbar-spacer"></div>
-      <button data-action="wallpaper">🖼️ Definir como plano de fundo</button>
+      <button data-action="wallpaper">${PHOTO_GLYPH} Definir como plano de fundo</button>
       <button data-action="download">⬇️ Baixar</button>
     </div>
     <div class="photos-viewport">
@@ -26,7 +28,7 @@ export function openPhotos(ctx, { fileId } = {}) {
   const win = windows.createWindow({
     appId: 'photos',
     title: 'Fotos',
-    icon: '🖼️',
+    icon: PHOTO_GLYPH,
     width: 720,
     height: 520,
     content: root,
@@ -69,7 +71,7 @@ export function openPhotos(ctx, { fileId } = {}) {
     const node = await fs.getNode(currentId);
     if (!node) return;
     await ctx.setWallpaper(node.content);
-    ctx.notify?.({ appId: 'photos', icon: '🖼️', title: 'Plano de fundo atualizado', body: node.name });
+    ctx.notify?.({ appId: 'photos', icon: PHOTO_GLYPH, title: 'Plano de fundo atualizado', body: node.name });
   });
   root.querySelector('[data-action="download"]').addEventListener('click', async () => {
     if (!currentId) return;

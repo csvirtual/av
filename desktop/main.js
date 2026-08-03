@@ -27,7 +27,7 @@ import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
 import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
-import { trashGlyph, USERS_GLYPH } from './core/icons.js';
+import { trashGlyph, USERS_GLYPH, PC_GLYPH, PHOTO_GLYPH } from './core/icons.js';
 import { showSystemProperties } from './core/services/system-properties.js';
 import { listRealEntryNames, isValidBackup, restoreBackup } from './core/services/backup.js';
 
@@ -55,7 +55,7 @@ const OPEN_WITH_APPS = [
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', open: (node) => openNotepad(ctx, { fileId: node.id }) },
   { id: 'word', label: 'Documento', glyph: '📘', open: (node) => openWord(ctx, { fileId: node.id }) },
   { id: 'sheet', label: 'Planilha', glyph: '📗', open: (node) => openSheet(ctx, { fileId: node.id }) },
-  { id: 'photos', label: 'Fotos', glyph: '🖼️', open: (node) => openPhotos(ctx, { fileId: node.id }) },
+  { id: 'photos', label: 'Fotos', glyph: PHOTO_GLYPH, open: (node) => openPhotos(ctx, { fileId: node.id }) },
   { id: 'video-player', label: 'Player de Vídeo', glyph: '🎬', open: (node) => openVideoPlayer(ctx, { fileId: node.id }) },
   { id: 'audio-player', label: 'Player de Áudio', glyph: AUDIO_GLYPH, open: (node) => openAudioPlayer(ctx, { fileId: node.id }) },
   { id: 'presentation', label: 'Apresentação', glyph: '📙', open: (node) => openPresentation(ctx, { fileId: node.id }) },
@@ -157,14 +157,14 @@ function fileGlyph(node) {
   if (node.type === 'folder') {
     if (node.id === seed?.usersId) return USERS_GLYPH;
     if (node.id === seed?.trashId) return trashGlyph();
-    if (node.id === seed?.desktopId) return '🖥️';
+    if (node.id === seed?.desktopId) return PC_GLYPH;
     if (node.id === seed?.documentsId) return '📄';
-    if (node.id === seed?.picturesId) return '🖼️';
+    if (node.id === seed?.picturesId) return PHOTO_GLYPH;
     if (node.id === seed?.downloadsId) return '⬇️';
     return '📁';
   }
   const mime = node.mimeType || '';
-  if (mime.startsWith('image/')) return '🖼️';
+  if (mime.startsWith('image/')) return PHOTO_GLYPH;
   if (mime === WORD_MIME) return '📘';
   if (mime === SHEET_MIME) return '📗';
   if (mime.startsWith(VIDEO_MIME_PREFIX)) return '🎬';
@@ -1166,7 +1166,7 @@ async function removeDesktopAppShortcut(appId) {
 
 function fixedIcons() {
   return [
-    { id: 'this-pc', label: 'Este Computador', glyph: '🖥️', fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.rootId }) },
+    { id: 'this-pc', label: 'Este Computador', glyph: PC_GLYPH, fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.rootId }) },
     { id: 'recycle-bin', label: 'Lixeira', glyph: trashGlyph(trashHasItems), fixed: true, onOpen: () => openExplorer(ctx, { startFolderId: seed.trashId, isTrash: true }) },
   ];
 }
@@ -1429,7 +1429,7 @@ const PINNED_APPS = [
   { id: 'explorer', label: 'Explorador', glyph: '📁', core: true, onOpen: () => openExplorer(ctx) },
   { id: 'browser', label: 'Navegador', glyph: BROWSER_GLYPH, onOpen: () => openBrowser(ctx) },
   { id: 'notepad', label: 'Bloco de Notas', glyph: '📝', onOpen: () => openNotepad(ctx) },
-  { id: 'photos', label: 'Fotos', glyph: '🖼️', onOpen: () => openPhotos(ctx) },
+  { id: 'photos', label: 'Fotos', glyph: PHOTO_GLYPH, onOpen: () => openPhotos(ctx) },
   { id: 'word', label: 'Documento', glyph: '📘', onOpen: () => openWord(ctx) },
   { id: 'sheet', label: 'Planilha', glyph: '📗', onOpen: () => openSheet(ctx) },
   { id: 'video-player', label: 'Player de Vídeo', glyph: VIDEO_GLYPH, onOpen: () => openVideoPlayer(ctx) },

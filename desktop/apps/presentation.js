@@ -13,6 +13,8 @@
 //     itálico/sublinhado/cor/tamanho e imagens, mas não posições exatas,
 //     tabelas ou formatação avançada — um "best effort" de importação, não
 //     um leitor completo de OOXML.
+import { PHOTO_GLYPH } from '../core/icons.js';
+
 export const PRESENTATION_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 
 let libsPromise = null;
@@ -371,7 +373,7 @@ export function openPresentation(ctx, { fileId = null } = {}) {
         <option value="40">40</option>
       </select>
       <label class="pres-color-label" title="Cor do texto">A<input type="color" data-role="text-color" value="#000000"></label>
-      <button data-action="insert-image" title="Inserir imagem">🖼️ Imagem</button>
+      <button data-action="insert-image" title="Inserir imagem">${PHOTO_GLYPH} Imagem</button>
       <span class="pres-sep"></span>
       <label class="pres-bg-label">Fundo <input type="color" data-role="bg-color" value="#ffffff"></label>
       <span class="pres-toolbar-spacer"></span>

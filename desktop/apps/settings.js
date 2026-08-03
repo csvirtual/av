@@ -5,6 +5,7 @@
 // hardware real, essas categorias seriam apenas decorativas — preferimos
 // não incluir telas que não fazem nada de verdade.
 import { exportBackup, restoreBackup, isValidBackup } from '../core/services/backup.js';
+import { PC_GLYPH } from '../core/icons.js';
 
 function escapeAttr(str) {
   return (str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,7 +55,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
   root.className = 'settings';
   root.innerHTML = `
     <div class="settings-nav">
-      <button data-tab="system">🖥️ Sistema</button>
+      <button data-tab="system">${PC_GLYPH} Sistema</button>
       <button data-tab="apps">📦 Aplicativos</button>
       <button data-tab="personalization" class="active">🎨 Personalização</button>
       <button data-tab="time">🕒 Hora e idioma</button>
@@ -260,7 +261,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
       <h2 style="margin-top:24px">Orientação da tela</h2>
       <p style="font-size:12px;color:var(--text-dim);margin:-6px 0 8px">Ao instalar como aplicativo, a tela gira e trava no modo escolhido.</p>
       <div class="theme-toggle" data-role="orientation-toggle">
-        <button data-orientation="landscape">🖥️ Paisagem</button>
+        <button data-orientation="landscape">${PC_GLYPH} Paisagem</button>
         <button data-orientation="portrait">📱 Retrato</button>
         <button data-orientation="auto">🔄 Automática</button>
       </div>
