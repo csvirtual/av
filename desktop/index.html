@@ -70,6 +70,13 @@
       <p class="auth-sub oobe-role-note" data-role="oobe-role-note"></p>
     </div>
 
+    <div class="oobe-step hidden" data-step="activation">
+      <h1>Ativar o Windows</h1>
+      <p class="auth-sub">Digite a chave de produto de 12 dígitos pra ativar o sistema.</p>
+      <input type="text" id="setup-serial" placeholder="XXX-XXX-XXX-XXX" aria-label="Chave de produto" maxlength="15" autocomplete="off" spellcheck="false">
+      <p id="setup-serial-msg" class="auth-error hidden"></p>
+    </div>
+
     <div class="oobe-step hidden" data-step="security">
       <h1>Proteja sua conta</h1>
       <p class="auth-sub">Crie uma senha e informe um e-mail para recuperação.</p>

@@ -58,6 +58,7 @@
   font-size: 12px; cursor: pointer; margin-top: var(--space-1);
 }
 .auth-error { color: #ffb3b3; font-size: 12px; margin: 0; }
+.auth-success { color: #7ee787; font-size: 12px; margin: 0; }
 
 /* ---------- OOBE (assistente de configuração em várias etapas) ---------- */
 .oobe-card { width: 340px; max-width: calc(100vw - 24px); }

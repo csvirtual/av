@@ -436,10 +436,34 @@ async function switchUser() {
 }
 
 // ---------------- OOBE (configuração inicial em várias etapas) ----------------
-const OOBE_STEPS = ['theme', 'wallpaper', 'account', 'security', 'done'];
+// A etapa de ativação (chave de produto) só existe na primeíssima conta do
+// dispositivo — como o Windows real, ativar acontece uma vez só; adicionar
+// uma 2ª ou 3ª conta local depois não pede a chave de novo.
+const OOBE_STEPS_BASE = ['theme', 'wallpaper', 'account', 'security', 'done'];
+const OOBE_STEPS_FIRST_INSTALL = ['theme', 'wallpaper', 'account', 'activation', 'security', 'done'];
+let OOBE_STEPS = OOBE_STEPS_BASE;
 let oobeAccountId = null;
 let oobeStepIndex = 0;
 let oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
+let oobeSerialValidated = false;
+
+// A chave de produto fixa nunca fica em texto puro em lugar nenhum do
+// código — só o hash SHA-256 (com sal) dela. Isso não é segurança de
+// servidor de verdade (é tudo client-side, sem como ser), mas impede que
+// abrir o arquivo-fonte revele a chave de cara.
+const ACTIVATION_SALT = '0bcc39f029d7a8e8db05f3c8d138cb22';
+const ACTIVATION_HASH = 'ec7581b338bb7b7b891df6f4f191a07216098ca51ed8288ed69964664bfd11ba';
+
+async function sha256Hex(str) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(bytes)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function verifySerial(rawInput) {
+  const digits = (rawInput || '').replace(/\D/g, '');
+  if (digits.length !== 12) return false;
+  return (await sha256Hex(ACTIVATION_SALT + digits)) === ACTIVATION_HASH;
+}
 
 function renderOobeWallpaperOptions() {
   const grid = $('[data-role="oobe-wallpapers"]');
@@ -464,15 +488,20 @@ async function startOobe() {
   oobeAccountId = newAccountId();
   setActiveAccount(oobeAccountId);
   oobeChoices = { theme: 'dark', wallpaper: WALLPAPERS[0].value, name: '', avatar: null };
+  oobeSerialValidated = false;
   $('#setup-name').value = '';
   $('#setup-email').value = '';
   $('#setup-pass').value = '';
   $('#setup-pass2').value = '';
+  $('#setup-serial').value = '';
+  $('#setup-serial').disabled = false;
   hide($('#setup-error'));
+  hide($('#setup-serial-msg'));
   $('#setup-avatar').innerHTML = avatarHTML('', null);
   document.querySelectorAll('.oobe-theme-btn').forEach((b) => b.classList.toggle('selected', b.dataset.oobeTheme === oobeChoices.theme));
   renderOobeWallpaperOptions();
   const isFirstAccount = (await listAccounts()).length === 0;
+  OOBE_STEPS = isFirstAccount ? OOBE_STEPS_FIRST_INSTALL : OOBE_STEPS_BASE;
   const roleNote = $('[data-role="oobe-role-note"]');
   if (roleNote) {
     roleNote.textContent = isFirstAccount
@@ -532,6 +561,23 @@ async function handleOobeNext() {
   const step = OOBE_STEPS[oobeStepIndex];
   if (step === 'account') {
     oobeChoices.name = $('#setup-name').value.trim() || 'Usuário';
+  } else if (step === 'activation') {
+    const msg = $('#setup-serial-msg');
+    if (!oobeSerialValidated) {
+      const ok = await verifySerial($('#setup-serial').value);
+      if (!ok) {
+        msg.textContent = 'Chave de produto inválida.';
+        msg.className = 'auth-error';
+        show(msg);
+        return;
+      }
+      msg.textContent = 'Sistema ativado com êxito.';
+      msg.className = 'auth-success';
+      show(msg);
+      oobeSerialValidated = true;
+      $('#setup-serial').disabled = true;
+      return; // mostra a confirmação primeiro; só avança no próximo clique
+    }
   } else if (step === 'security') {
     const email = $('#setup-email').value.trim();
     const pass = $('#setup-pass').value;
@@ -590,6 +636,12 @@ document.querySelectorAll('.oobe-theme-btn').forEach((btn) => {
 });
 $('#setup-name').addEventListener('input', (e) => {
   $('#setup-avatar').innerHTML = avatarHTML(e.target.value, oobeChoices.avatar);
+});
+$('#setup-serial').addEventListener('input', (e) => {
+  const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+  e.target.value = digits.match(/.{1,3}/g)?.join('-') || digits;
+  oobeSerialValidated = false;
+  hide($('#setup-serial-msg'));
 });
 $('#setup-photo-btn').addEventListener('click', () => $('#setup-photo').click());
 $('#setup-photo').addEventListener('change', () => {
