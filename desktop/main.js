@@ -154,6 +154,10 @@ function fileGlyph(node) {
   if (node.type === 'folder') {
     if (node.id === seed?.usersId) return '👤';
     if (node.id === seed?.trashId) return trashGlyph();
+    if (node.id === seed?.desktopId) return '🖥️';
+    if (node.id === seed?.documentsId) return '📄';
+    if (node.id === seed?.picturesId) return '🖼️';
+    if (node.id === seed?.downloadsId) return '⬇️';
     return '📁';
   }
   const mime = node.mimeType || '';

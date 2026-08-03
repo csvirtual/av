@@ -313,6 +313,10 @@ export function openExplorer(ctx, { startFolderId, isTrash = false } = {}) {
         ? (node.id === seed.cDriveId ? DRIVE_GLYPH
           : node.id === seed.usersId ? USERS_GLYPH
           : node.id === seed.trashId ? trashGlyph()
+          : node.id === seed.desktopId ? '🖥️'
+          : node.id === seed.documentsId ? '📄'
+          : node.id === seed.picturesId ? '🖼️'
+          : node.id === seed.downloadsId ? '⬇️'
           : '📁')
         : fileGlyph(node);
 
