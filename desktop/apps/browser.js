@@ -24,21 +24,21 @@ const LOAD_TIMEOUT_MS = 12000;
 // Ícone próprio (esfera azul com onda), no espírito do Microsoft Edge sem
 // usar o logo proprietário da Microsoft — mesmo cuidado já tomado com o
 // ícone do Disco Local (C:) no Explorador.
+//
+// Cores sólidas em vez de <linearGradient> de propósito: este SVG é
+// injetado em vários lugares ao mesmo tempo (menu Iniciar, barra de
+// tarefas, barra de título da janela) — um gradiente com id fixo (ex.:
+// url(#g1)) quebra nesse cenário, porque HTML exige id único no documento
+// inteiro. Com várias cópias do mesmo id soltas no DOM, a referência
+// aponta pra "primeira" ocorrência; se essa cópia específica for removida
+// (o menu Iniciar fecha e limpa seu conteúdo, por exemplo), o preenchimento
+// das cópias restantes fica órfão e simplesmente some — o ícone "bugado"
+// de forma inconsistente que dependia de qual elemento tinha sido
+// renderizado (e removido) primeiro.
 export const BROWSER_GLYPH = `<svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true">
-  <defs>
-    <linearGradient id="browserGlyphG1" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#37e0ff"/>
-      <stop offset="0.55" stop-color="#1a8ef2"/>
-      <stop offset="1" stop-color="#0b3fae"/>
-    </linearGradient>
-    <linearGradient id="browserGlyphG2" x1="6" y1="26" x2="26" y2="6" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0a2f7a"/>
-      <stop offset="1" stop-color="#1f6fe0"/>
-    </linearGradient>
-  </defs>
-  <circle cx="16" cy="16" r="15" fill="url(#browserGlyphG1)"/>
+  <circle cx="16" cy="16" r="15" fill="#1a8ef2"/>
   <path d="M7 19.5C9 12 15 8 22 9.5c-6-2.5-14-1-17.5 5C2.5 18.5 4 23 8 24.5 6.7 23 6 21 7 19.5Z" fill="#eaf6ff"/>
-  <path d="M25 12.5c-5-2-11 .5-12.5 6.5-1 4 1 8 5.5 8.5 4 .5 8-2 9-6.5 1-4.5-1-9-2-8.5Z" fill="url(#browserGlyphG2)"/>
+  <path d="M25 12.5c-5-2-11 .5-12.5 6.5-1 4 1 8 5.5 8.5 4 .5 8-2 9-6.5 1-4.5-1-9-2-8.5Z" fill="#17408f"/>
   <circle cx="22.5" cy="18" r="3.6" fill="#59d9ff"/>
 </svg>`;
 
