@@ -30,7 +30,7 @@ import { openTerminal } from './apps/terminal.js';
 import { openTaskManager } from './apps/task-manager.js';
 import { trashGlyph, USERS_GLYPH, PC_GLYPH, PHOTO_GLYPH } from './core/icons.js';
 import { showSystemProperties } from './core/services/system-properties.js';
-import { listRealEntryNames, isValidBackup, restoreBackup } from './core/services/backup.js';
+import { listRealEntryNames } from './core/services/backup.js';
 
 const $ = (sel) => document.querySelector(sel);
 const show = (el) => el.classList.remove('hidden');
@@ -1078,11 +1078,14 @@ $('#uac-pass').addEventListener('keydown', (e) => {
 /** Roda a animação da tela de formatação usando nomes REAIS de arquivos,
  * pastas e chaves de configuração já existentes no dispositivo (nunca nomes
  * inventados) — dura 1 minuto ao todo, espalhado entre as entradas
- * encontradas. Só libera o botão Finalizar no fim. */
+ * encontradas. O botão vira "Abortar" enquanto roda (cancela sem apagar
+ * nada de verdade) e volta a "Finalizar" quando termina. */
 let wipeAborted = false;
+let wipeRunning = false;
 
 async function runWipeFormatScreen() {
   wipeAborted = false;
+  wipeRunning = true;
   const fill = $('#wipe-fill');
   const pctEl = $('#wipe-pct');
   const log = $('#wipe-log');
@@ -1091,7 +1094,7 @@ async function runWipeFormatScreen() {
   fill.style.transition = 'none';
   fill.style.width = '0%';
   pctEl.textContent = '0% concluído';
-  finishBtn.disabled = true;
+  finishBtn.textContent = 'Abortar';
   show($('#wipe-screen'));
 
   const entries = await listRealEntryNames();
@@ -1122,45 +1125,21 @@ async function runWipeFormatScreen() {
     await new Promise((r) => setTimeout(r, totalMs));
   }
   if (wipeAborted) return;
+  wipeRunning = false;
   pctEl.textContent = 'Formatação concluída.';
-  finishBtn.disabled = false;
+  finishBtn.textContent = 'Finalizar';
 }
 
 $('#wipe-finish-btn').addEventListener('click', async () => {
-  if ($('#wipe-finish-btn').disabled) return;
+  if (wipeRunning) {
+    wipeAborted = true;
+    wipeRunning = false;
+    hide($('#wipe-screen'));
+    return;
+  }
   const keys = await caches.keys();
   await Promise.all(keys.map((k) => caches.delete(k)));
   indexedDB.deleteDatabase('win11-web-os');
-  location.reload();
-});
-
-// Na tela de formatação, dá pra usar um backup já feito em vez de continuar
-// formatando do zero — interrompe a animação em andamento e restaura o
-// conteúdo do arquivo escolhido no lugar.
-$('#wipe-use-backup-btn').addEventListener('click', () => $('#wipe-backup-input').click());
-$('#wipe-backup-input').addEventListener('change', async () => {
-  const input = $('#wipe-backup-input');
-  const file = input.files[0];
-  input.value = '';
-  if (!file) return;
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch {
-    alert('Não foi possível ler esse arquivo como um backup válido.');
-    return;
-  }
-  if (!isValidBackup(data)) {
-    alert('Não foi possível ler esse arquivo como um backup válido.');
-    return;
-  }
-  if (!confirm('Restaurar este backup em vez de formatar? Isso substitui tudo o que existe agora neste dispositivo.')) return;
-  wipeAborted = true;
-  $('#wipe-title').textContent = 'Restaurando backup...';
-  $('#wipe-pct').textContent = 'Restaurando...';
-  $('#wipe-log').innerHTML = '';
-  $('#wipe-finish-btn').disabled = true;
-  await restoreBackup(data);
   location.reload();
 });
 
