@@ -61,13 +61,21 @@ chmod +x config/hooks/live/0100-csos-setup.hook.chroot
 #    "none"). Instalar no disco é feito depois, de dentro da própria
 #    sessão live, com csos-install-to-disk — mais leve e mais rápido de
 #    gerar do que embutir o instalador completo do Debian.
+#
+#    --apt-recommends false: um kiosk não precisa de terminal, dicionários
+#    de spellcheck etc. que vêm só como "recomendado" de outros pacotes —
+#    além de deixar a imagem mais leve, evita puxar pacotes recomendados
+#    que às vezes ficam temporariamente incompatíveis entre si num
+#    espelho Debian específico (ex: xinit recomenda xterm, que depende de
+#    luit, que pode entrar em conflito de versão com x11-utils).
 # ---------------------------------------------------------------------
-log "rodando lb config (bookworm, amd64, live, sem debian-installer)..."
+log "rodando lb config (bookworm, amd64, live, sem debian-installer, sem recommends)..."
 lb config \
   --distribution bookworm \
   --architectures amd64 \
   --binary-images iso-hybrid \
   --archive-areas "main contrib non-free non-free-firmware" \
+  --apt-recommends false \
   --iso-application "C&S OS" \
   --iso-publisher "csvirtual/av" \
   --iso-volume "C&S OS 1.0"

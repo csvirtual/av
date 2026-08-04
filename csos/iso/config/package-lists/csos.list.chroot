@@ -3,6 +3,11 @@
 # é só o que csos-install-to-disk precisa pra particionar o disco e
 # instalar o bootloader — nada de peso extra tipo o Debian Installer.
 xserver-xorg
+# Explícitos por causa de --apt-recommends false (build.sh): sem isto, o
+# driver de vídeo/entrada de algumas máquinas viria só como "recomendado"
+# de xserver-xorg, e não seria instalado.
+xserver-xorg-video-all
+xserver-xorg-input-all
 xinit
 x11-xserver-utils
 chromium
