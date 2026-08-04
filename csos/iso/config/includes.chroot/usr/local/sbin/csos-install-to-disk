@@ -1,0 +1,97 @@
+#!/bin/bash
+# Copia o sistema live (já rodando como kiosk, configurado em tempo de
+# build) pro disco — sem wizard, sem perguntas de idioma/fuso/partição
+# manual: assume o disco inteiro. É o instalador leve do C&S OS, no lugar
+# do Debian Installer oficial (mais pesado e genérico demais pra um
+# aparelho de único propósito).
+#
+# Rode isto de DENTRO da própria sessão live (console de manutenção —
+# Ctrl+Alt+F2, autologin já configurado). Nunca rode isto a partir de um
+# sistema operando sobre o disco alvo.
+#
+# Uso: sudo csos-install-to-disk /dev/sdX
+set -euo pipefail
+
+DEVICE="${1:-}"
+TARGET=/mnt/csos-install
+
+log() { printf '[csos-install-to-disk] %s\n' "$1"; }
+die() { printf '[csos-install-to-disk] ERRO: %s\n' "$1" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die "precisa rodar como root (sudo)."
+[ -n "$DEVICE" ] || die "uso: csos-install-to-disk /dev/sdX"
+[ -b "$DEVICE" ] || die "'$DEVICE' não é um dispositivo de bloco."
+mountpoint -q "$TARGET" 2>/dev/null && die "$TARGET já está montado — rode 'umount -R $TARGET' antes."
+grep -q "^${DEVICE}[0-9p]" /proc/mounts && die "'$DEVICE' tem partições montadas agora — desmonte antes."
+
+DEV_SIZE="$(lsblk -ndo SIZE "$DEVICE" 2>/dev/null || echo '?')"
+log "ATENÇÃO: isto vai APAGAR TUDO em $DEVICE (tamanho: $DEV_SIZE)."
+if [ "${FORCE:-0}" != "1" ]; then
+  read -r -p "Digite EXATAMENTE 'apagar $DEVICE' pra confirmar: " CONFIRM
+  [ "$CONFIRM" = "apagar $DEVICE" ] || die "confirmação não bateu — nada foi feito."
+fi
+
+# nvme0n1 -> partições nvme0n1p1/p2/p3; sda -> sda1/sda2/sda3.
+case "$DEVICE" in
+  *nvme*|*mmcblk*) PART_SUFFIX="p" ;;
+  *) PART_SUFFIX="" ;;
+esac
+EFI_PART="${DEVICE}${PART_SUFFIX}2"
+ROOT_PART="${DEVICE}${PART_SUFFIX}3"
+
+log "particionando $DEVICE (GPT: bios_grub 1M + EFI 512M + raiz ext4)..."
+wipefs -a "$DEVICE"
+sgdisk --zap-all "$DEVICE"
+sgdisk -n1:0:+1M   -t1:ef02 -c1:bios_grub "$DEVICE"
+sgdisk -n2:0:+512M -t2:ef00 -c2:efi       "$DEVICE"
+sgdisk -n3:0:0     -t3:8300 -c3:csos-root "$DEVICE"
+partprobe "$DEVICE"
+udevadm settle
+
+log "formatando partições..."
+mkfs.vfat -F32 -n CSOS-EFI "$EFI_PART"
+mkfs.ext4 -F -L csos-root "$ROOT_PART"
+
+log "montando em $TARGET..."
+mkdir -p "$TARGET"
+mount "$ROOT_PART" "$TARGET"
+mkdir -p "$TARGET/boot/efi"
+mount "$EFI_PART" "$TARGET/boot/efi"
+
+log "copiando o sistema live pro disco (rsync -aAX, pode demorar)..."
+rsync -aAX --info=progress2 \
+  --exclude='/proc/*' --exclude='/sys/*' --exclude='/dev/*' --exclude='/run/*' \
+  --exclude='/tmp/*' --exclude='/mnt/*' --exclude='/media/*' \
+  / "$TARGET/"
+
+for d in dev dev/pts proc sys run; do
+  mkdir -p "$TARGET/$d"
+  mount --bind "/$d" "$TARGET/$d"
+done
+
+log "removendo pacotes específicos de mídia live (live-boot, live-config...)..."
+chroot "$TARGET" apt-get purge -y --autoremove \
+  live-boot live-boot-initramfs-tools live-config live-config-systemd live-tools 2>/dev/null || true
+
+log "gerando /etc/fstab novo (UUIDs reais do disco instalado)..."
+ROOT_UUID="$(blkid -s UUID -o value "$ROOT_PART")"
+EFI_UUID="$(blkid -s UUID -o value "$EFI_PART")"
+cat > "$TARGET/etc/fstab" <<EOF
+UUID=$ROOT_UUID  /          ext4  errors=remount-ro  0 1
+UUID=$EFI_UUID   /boot/efi  vfat  umask=0077          0 1
+EOF
+
+log "instalando o GRUB (BIOS legado + UEFI, os dois no mesmo disco)..."
+chroot "$TARGET" update-initramfs -u -k all
+chroot "$TARGET" grub-install --target=i386-pc "$DEVICE"
+chroot "$TARGET" grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable --bootloader-id=csos
+chroot "$TARGET" update-grub
+
+log "desmontando..."
+for d in dev/pts dev run sys proc; do umount -R "$TARGET/$d" 2>/dev/null || true; done
+umount -R "$TARGET/boot/efi"
+umount -R "$TARGET"
+
+log ""
+log "Pronto. Desligue, remova a mídia de instalação e ligue de novo — a"
+log "máquina deve bootar direto do disco em tela cheia no C&S OS."

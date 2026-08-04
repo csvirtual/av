@@ -3,8 +3,9 @@
 # durante "lb build" (não em cada boot da máquina final). É o equivalente,
 # feito em tempo de build, ao que csos/install.sh faz em tempo de execução
 # numa máquina Debian/Ubuntu já instalada: cria o usuário de kiosk,
-# autologin na tty1, .xinitrc/.bash_profile, habilita o servidor local e
-# aplica o branding do C&S OS.
+# autologin na tty1 (kiosk) e na tty2 (console de manutenção, pra rodar o
+# csos-install-to-disk), .xinitrc/.bash_profile, habilita o servidor
+# local e aplica o branding do C&S OS.
 #
 # __CSOS_USER__/__CSOS_PORT__ são substituídos por build.sh antes de este
 # arquivo virar config/hooks/live/0100-csos-setup.hook.chroot.
@@ -39,6 +40,16 @@ echo "[csos-hook] configurando .xinitrc de '$APP_USER'..."
 sed -e "s#__CSOS_APP_DIR__#$APP_DIR#g" "$APP_DIR/csos/kiosk/xinitrc" > "$APP_HOME/.xinitrc"
 chmod +x "$APP_HOME/.xinitrc"
 chown "$APP_USER":"$APP_USER" "$APP_HOME/.xinitrc"
+
+echo "[csos-hook] configurando autologin de '$APP_USER' na tty2 (console de manutenção)..."
+mkdir -p /etc/systemd/system/getty@tty2.service.d
+sed -e "s#__CSOS_USER__#$APP_USER#g" \
+  "$APP_DIR/csos/config/autologin.conf.template" > /etc/systemd/system/getty@tty2.service.d/csos-autologin.conf
+
+echo "[csos-hook] liberando 'sudo csos-install-to-disk' sem senha pra '$APP_USER'..."
+echo "$APP_USER ALL=(root) NOPASSWD: /usr/local/sbin/csos-install-to-disk" > /etc/sudoers.d/csos-install
+chmod 0440 /etc/sudoers.d/csos-install
+visudo -cf /etc/sudoers.d/csos-install
 
 echo "[csos-hook] configurando autostart do X em .bash_profile..."
 PROFILE="$APP_HOME/.bash_profile"

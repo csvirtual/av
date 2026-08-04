@@ -1,7 +1,7 @@
 #!/bin/bash
-# Gera o .iso instalável do C&S OS (Debian Live 12 "bookworm" + Debian
-# Installer embutido) a partir deste repositório. Ver README.md desta
-# pasta antes de rodar.
+# Gera o .iso instalável do C&S OS (Debian Live 12 "bookworm", leve —
+# sem o Debian Installer oficial, usa o csos-install-to-disk próprio) a
+# partir deste repositório. Ver README.md desta pasta antes de rodar.
 #
 # Precisa de uma máquina Debian/Ubuntu de verdade com privilégio de root
 # de fato (chroot/mount/loopback) e o pacote live-build instalado — não
@@ -56,17 +56,18 @@ sed -e "s#__CSOS_USER__#$APP_USER#g" \
 chmod +x config/hooks/live/0100-csos-setup.hook.chroot
 
 # ---------------------------------------------------------------------
-# 4. lb config — Debian 12 bookworm, amd64, iso híbrido com instalador
-#    embutido (menu "Live" e "Install" no boot da imagem).
+# 4. lb config — Debian 12 bookworm, amd64, iso híbrido, SEM o Debian
+#    Installer oficial (--debian-installer não é passado; default é
+#    "none"). Instalar no disco é feito depois, de dentro da própria
+#    sessão live, com csos-install-to-disk — mais leve e mais rápido de
+#    gerar do que embutir o instalador completo do Debian.
 # ---------------------------------------------------------------------
-log "rodando lb config (bookworm, amd64, live+installer)..."
+log "rodando lb config (bookworm, amd64, live, sem debian-installer)..."
 lb config \
   --distribution bookworm \
   --architectures amd64 \
   --binary-images iso-hybrid \
   --archive-areas "main contrib non-free non-free-firmware" \
-  --debian-installer live \
-  --debian-installer-gui false \
   --iso-application "C&S OS" \
   --iso-publisher "csvirtual/av" \
   --iso-volume "C&S OS 1.0"

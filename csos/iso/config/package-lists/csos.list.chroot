@@ -1,8 +1,20 @@
-# Pacotes instalados na imagem, além do que --debian-installer live já traz.
-# Mesmo conjunto que csos/install.sh instala numa máquina já pronta.
+# Pacotes instalados na imagem. O grupo kiosk é o mesmo conjunto que
+# csos/install.sh instala numa máquina já pronta; o grupo "instalador"
+# é só o que csos-install-to-disk precisa pra particionar o disco e
+# instalar o bootloader — nada de peso extra tipo o Debian Installer.
 xserver-xorg
 xinit
 x11-xserver-utils
 chromium
 python3
 curl
+sudo
+
+# csos-install-to-disk
+gdisk
+dosfstools
+parted
+rsync
+grub-pc-bin
+grub-efi-amd64-bin
+grub-common
