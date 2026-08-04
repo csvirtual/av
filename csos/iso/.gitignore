@@ -1,0 +1,23 @@
+# Gerado por build.sh a partir do resto do repositório — não versionar
+# duplicado.
+/config/includes.chroot/opt/csos-app/
+/config/includes.chroot/etc/systemd/system/csos-webserver.service
+/config/hooks/live/0100-csos-setup.hook.chroot
+
+# Artefatos e cache do próprio live-build.
+/config/binary
+/config/bootstrap
+/config/chroot
+/config/common
+/config/source
+/.build/
+/cache/
+/chroot/
+/binary.*/
+/*.iso
+/*.img
+/*.zsync
+/*.contents
+/*.packages
+/*.buildlog
+/*.files

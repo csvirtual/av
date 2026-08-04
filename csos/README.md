@@ -14,15 +14,21 @@ Linux de verdade (kernel, systemd, pacotes reais) — só a "cara" que a pessoa
 vê ao ligar é substituída por um navegador em modo kiosk apontado pro nosso
 app.
 
-## Por que não um `.iso` de verdade
+## Por que este diretório não gera um `.iso` sozinho
 
 Gerar uma imagem de disco instalável (via `live-build`, `archiso` etc.)
 exige um toolchain pesado (debootstrap, squashfs-tools, xorriso...) e só dá
 pra validar de verdade testando o boot numa VM ou máquina real — nenhuma das
 duas coisas existe neste ambiente de desenvolvimento isolado. Os scripts
-aqui, em vez disso, são pensados pra rodar (e serem revisados/testados passo
-a passo) numa máquina Debian/Ubuntu de verdade — física ou numa VM — que
-você já tenha à mão.
+aqui são pensados pra rodar (e serem revisados/testados passo a passo) numa
+máquina Debian/Ubuntu de verdade — física ou numa VM — que você já tenha à
+mão, provisionando-a como está descrito abaixo.
+
+Se o que você quer é uma **imagem `.iso` instalável de verdade** (gravar num
+pendrive, instalar do zero num disco), veja `csos/iso/` — usa a mesma lógica
+deste diretório, empacotada com `live-build` sobre Debian 12. Também nunca
+foi construída de fato neste ambiente pela mesma razão (precisa de
+root/chroot reais); veja as limitações honestas em `csos/iso/README.md`.
 
 ## O que o `install.sh` faz
 

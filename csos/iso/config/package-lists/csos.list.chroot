@@ -1,0 +1,8 @@
+# Pacotes instalados na imagem, além do que --debian-installer live já traz.
+# Mesmo conjunto que csos/install.sh instala numa máquina já pronta.
+xserver-xorg
+xinit
+x11-xserver-utils
+chromium
+python3
+curl

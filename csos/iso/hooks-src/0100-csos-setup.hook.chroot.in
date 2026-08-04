@@ -1,0 +1,58 @@
+#!/bin/sh
+# Hook de build do live-build — roda DENTRO do chroot da imagem, uma vez
+# durante "lb build" (não em cada boot da máquina final). É o equivalente,
+# feito em tempo de build, ao que csos/install.sh faz em tempo de execução
+# numa máquina Debian/Ubuntu já instalada: cria o usuário de kiosk,
+# autologin na tty1, .xinitrc/.bash_profile, habilita o servidor local e
+# aplica o branding do C&S OS.
+#
+# __CSOS_USER__/__CSOS_PORT__ são substituídos por build.sh antes de este
+# arquivo virar config/hooks/live/0100-csos-setup.hook.chroot.
+set -eu
+
+APP_USER="__CSOS_USER__"
+APP_DIR="/opt/csos-app"
+
+echo "[csos-hook] usuário de kiosk: $APP_USER"
+if ! id "$APP_USER" >/dev/null 2>&1; then
+  useradd -m -s /bin/bash "$APP_USER"
+fi
+
+echo "[csos-hook] ajustando dono de $APP_DIR..."
+chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
+chmod +x "$APP_DIR/csos/kiosk/start-kiosk.sh" "$APP_DIR/csos/kiosk/xinitrc"
+
+echo "[csos-hook] habilitando csos-webserver.service..."
+systemctl enable csos-webserver.service
+
+echo "[csos-hook] aplicando branding do C&S OS em /etc/os-release..."
+cp "$APP_DIR/csos/branding/os-release" /etc/os-release
+
+echo "[csos-hook] configurando autologin de '$APP_USER' na tty1..."
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+sed -e "s#__CSOS_USER__#$APP_USER#g" \
+  "$APP_DIR/csos/config/autologin.conf.template" > /etc/systemd/system/getty@tty1.service.d/csos-autologin.conf
+
+APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
+
+echo "[csos-hook] configurando .xinitrc de '$APP_USER'..."
+sed -e "s#__CSOS_APP_DIR__#$APP_DIR#g" "$APP_DIR/csos/kiosk/xinitrc" > "$APP_HOME/.xinitrc"
+chmod +x "$APP_HOME/.xinitrc"
+chown "$APP_USER":"$APP_USER" "$APP_HOME/.xinitrc"
+
+echo "[csos-hook] configurando autostart do X em .bash_profile..."
+PROFILE="$APP_HOME/.bash_profile"
+touch "$PROFILE"
+cat >> "$PROFILE" <<'EOF'
+# >>> C&S OS kiosk autostart >>>
+# Sobe o Chromium em modo kiosk automaticamente ao logar na tty1 — não faz
+# nada em outras ttys nem numa sessão SSH, pra não travar quem entrar
+# remotamente.
+if [ -z "${DISPLAY:-}" ] && [ "$(tty)" = "/dev/tty1" ]; then
+  exec startx -- -nocursor
+fi
+# <<< C&S OS kiosk autostart <<<
+EOF
+chown "$APP_USER":"$APP_USER" "$PROFILE"
+
+echo "[csos-hook] pronto."
