@@ -5,7 +5,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_USER="${APP_USER:-${SUDO_USER:-}}"
 APP_DIR="${APP_DIR:-/opt/csos-app}"
 BACKUP_ROOT="/var/lib/csos-backup"
 
@@ -13,6 +12,14 @@ log() { printf '[csos-uninstall] %s\n' "$1"; }
 die() { printf '[csos-uninstall] ERRO: %s\n' "$1" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "precisa rodar como root (sudo)."
+
+# Sem APP_USER explícito, usa o usuário que o install.sh registrou da
+# última vez — assim "sudo ./uninstall.sh" sem variável nenhuma já desfaz
+# a instalação certa na maioria dos casos.
+if [ -z "${APP_USER:-}" ] && [ -e "$BACKUP_ROOT/app_user" ]; then
+  APP_USER="$(cat "$BACKUP_ROOT/app_user")"
+fi
+APP_USER="${APP_USER:-${SUDO_USER:-}}"
 [ -n "$APP_USER" ] || die "defina APP_USER=usuario (o mesmo usado no install.sh)."
 
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6 || true)"
@@ -78,5 +85,7 @@ if [ "${REMOVE_APP_DIR:-0}" = "1" ] && [ -d "$APP_DIR" ]; then
 else
   log "mantendo $APP_DIR (passe REMOVE_APP_DIR=1 pra remover também)."
 fi
+
+rm -f "$BACKUP_ROOT/app_user"
 
 log "Pronto. Reinicie a máquina pra voltar ao login normal."

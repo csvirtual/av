@@ -33,6 +33,19 @@ APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 
 mkdir -p "$BACKUP_ROOT"
 
+# Uma instalação anterior pode ter sido feita pra outro usuário — rodar de
+# novo com um APP_USER diferente deixaria autologin/serviço apontando pro
+# usuário novo, mas o .xinitrc/.bash_profile do usuário antigo continuariam
+# com a configuração de kiosk, um estado inconsistente e confuso de
+# diagnosticar depois. Trava isso cedo, com uma mensagem clara.
+if [ -e "$BACKUP_ROOT/app_user" ]; then
+  PREV_USER="$(cat "$BACKUP_ROOT/app_user")"
+  if [ "$PREV_USER" != "$APP_USER" ]; then
+    die "esta máquina já foi provisionada pro usuário '$PREV_USER'. Rode 'sudo APP_USER=$PREV_USER ./uninstall.sh' antes de provisionar de novo com APP_USER=$APP_USER."
+  fi
+fi
+echo "$APP_USER" > "$BACKUP_ROOT/app_user"
+
 log "usuário do kiosk: $APP_USER (home: $APP_HOME)"
 log "diretório do app: $APP_DIR"
 log "porta local: $PORT"

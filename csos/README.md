@@ -57,7 +57,13 @@ Se `APP_USER` não for informado, usa `$SUDO_USER` (o usuário que chamou
 `sudo`). Depois de rodar, reinicie a máquina — ela deve logar sozinha na
 tty1 e abrir direto em tela cheia no C&S OS.
 
-Pra desfazer tudo:
+Trocar de usuário numa máquina já provisionada exige desinstalar primeiro
+— `install.sh` guarda qual usuário foi usado da última vez e recusa rodar
+de novo com um `APP_USER` diferente sem isso, pra não deixar autologin e
+`.xinitrc` apontando pra usuários diferentes.
+
+Pra desfazer tudo (usa automaticamente o mesmo `APP_USER` do último
+`install.sh`, sem precisar informar de novo):
 
 ```sh
 sudo ./uninstall.sh
