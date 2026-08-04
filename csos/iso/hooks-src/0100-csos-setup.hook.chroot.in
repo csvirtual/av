@@ -17,6 +17,13 @@ APP_DIR="/opt/csos-app"
 echo "[csos-hook] usuário de kiosk: $APP_USER"
 if ! id "$APP_USER" >/dev/null 2>&1; then
   useradd -m -s /bin/bash "$APP_USER"
+  # useradd sozinho deixa a conta TRANCADA (campo de senha "!" no shadow) —
+  # diferente de "sem senha". agetty --autologin/"login -f" pula a
+  # digitação de senha, mas o PAM ainda rejeita conta trancada na etapa de
+  # account management, piscando "authentication failure" e reiniciando o
+  # getty em loop. passwd -d apaga o campo de senha de vez (vazio de
+  # verdade), o que o PAM aceita.
+  passwd -d "$APP_USER"
 fi
 
 echo "[csos-hook] ajustando dono de $APP_DIR..."
