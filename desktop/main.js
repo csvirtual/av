@@ -22,7 +22,7 @@ import { openSheet, SHEET_MIME } from './apps/sheet.js';
 import { openVideoPlayer, VIDEO_GLYPH, VIDEO_MIME_PREFIX } from './apps/video-player.js';
 import { openAudioPlayer, AUDIO_GLYPH, AUDIO_MIME_PREFIX } from './apps/audio-player.js';
 import { openPresentation, PRESENTATION_MIME } from './apps/presentation.js';
-import { openSettings, WALLPAPERS } from './apps/settings.js';
+import { openSettings, WALLPAPERS, wallpaperToCSS } from './apps/settings.js';
 import { openBrowser, BROWSER_GLYPH } from './apps/browser.js';
 import { openCalculator } from './apps/calculator.js';
 import { openClock } from './apps/clock.js';
@@ -213,15 +213,14 @@ async function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 async function getWallpaper() {
-  return kv.get('settings.wallpaper', 'linear-gradient(135deg, #0f3057 0%, #1a5088 45%, #2c7fb8 100%)');
+  return kv.get('settings.wallpaper', WALLPAPERS[0].value);
 }
 async function setWallpaper(value) {
   await kv.set('settings.wallpaper', value);
   applyWallpaper(value);
 }
 function applyWallpaper(value) {
-  const isUrl = value.startsWith('data:') || value.startsWith('http');
-  $('#wallpaper').style.background = isUrl ? `center/cover no-repeat url(${value})` : value;
+  $('#wallpaper').style.background = wallpaperToCSS(value);
 }
 
 async function getAccentColor() {
@@ -585,7 +584,7 @@ function renderOobeWallpaperOptions() {
     const swatch = document.createElement('button');
     swatch.type = 'button';
     swatch.className = 'oobe-wallpaper-swatch' + (wp.value === oobeChoices.wallpaper ? ' selected' : '');
-    swatch.style.background = wp.value;
+    swatch.style.background = wallpaperToCSS(wp.value);
     swatch.title = wp.id;
     swatch.addEventListener('click', async () => {
       grid.querySelectorAll('.oobe-wallpaper-swatch').forEach((s) => s.classList.remove('selected'));

@@ -19,12 +19,21 @@ function avatarPreviewHTML(name, avatarDataUrl) {
 }
 
 export const WALLPAPERS = [
+  { id: 'csos-default', value: '../csos/branding/win11cs-wallpaper.png' },
   { id: 'win11-blue', value: 'linear-gradient(135deg, #0f3057 0%, #1a5088 45%, #2c7fb8 100%)' },
   { id: 'sunset', value: 'linear-gradient(135deg, #ff8a65 0%, #ff5e62 50%, #8e2de2 100%)' },
   { id: 'forest', value: 'linear-gradient(135deg, #134e5e 0%, #71b280 100%)' },
   { id: 'midnight', value: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' },
   { id: 'graphite', value: 'linear-gradient(135deg, #232526 0%, #414345 100%)' },
 ];
+
+// Papéis de parede podem ser um gradiente CSS (valor usado direto) ou uma
+// imagem (caminho relativo do wallpaper padrão, ou data: URL de um upload)
+// — que precisa virar `url(...)` pra funcionar como valor de `background`.
+export function wallpaperToCSS(value) {
+  if (value.startsWith('linear-gradient') || value.startsWith('radial-gradient')) return value;
+  return `center/cover no-repeat url(${value})`;
+}
 
 const ACCENT_COLORS = ['#0067c0', '#744da9', '#107c10', '#ca5010', '#c42b1c', '#e3008c', '#008272'];
 
@@ -278,7 +287,7 @@ export function openSettings(ctx, { tab = 'personalization' } = {}) {
     WALLPAPERS.forEach((wp) => {
       const el = document.createElement('div');
       el.className = 'wallpaper-swatch' + (currentWallpaper === wp.value ? ' active' : '');
-      el.style.background = wp.value;
+      el.style.background = wallpaperToCSS(wp.value);
       el.addEventListener('click', async () => {
         await setWallpaper(wp.value);
         renderPersonalization();
