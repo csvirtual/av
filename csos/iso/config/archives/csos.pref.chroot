@@ -1,0 +1,10 @@
+# luit (ferramenta de conversão de locale pra terminais X11 — só usada por
+# emuladores de terminal tipo xterm) puxa uma versão de x11-utils que, no
+# momento em que este build foi escrito, não estava disponível junto no
+# mesmo espelho Debian (erro: "luit : Breaks: x11-utils (< 7.7+6) but
+# 7.7+5 is to be installed"). Um kiosk nunca abre terminal nenhum, então
+# a solução mais simples é impedir o apt de sequer considerar instalar
+# luit — força ele a resolver o resto sem essa dependência.
+Package: luit
+Pin: release *
+Pin-Priority: -1
