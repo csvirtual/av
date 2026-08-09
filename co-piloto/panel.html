@@ -1114,7 +1114,7 @@
 
     <button class="btn-sidebar" id="helpBtn">
       <span class="btn-sidebar-icon">📖</span>
-      <span>Como usar o copiloto</span>
+      <span>Como usar o co-piloto</span>
     </button>
 
     <button class="btn-sidebar" id="privacidadeBtn">
@@ -1217,7 +1217,7 @@
         <div class="no-auto-notice-body">
           <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
           <div class="no-auto-notice-text">
-            O copiloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
+            O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
             isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
             copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
           </div>
@@ -1228,7 +1228,7 @@
     <div id="leadWorkspace" style="display:none;">
       <div class="card" id="centralAvisoBanner" style="display:none; background:var(--purple-soft); border-color:var(--purple);">
         <h2 style="color:var(--purple);">📌 Central de mensagens (@csvirtual)</h2>
-        <div class="hint" style="margin-top:0;">Este lead é fixo e não pode ser excluído. Use-o pra colar mensagens de <b>pacientes diferentes</b> — só preencha o campo "Nome da pessoa desta mensagem" antes de gerar cada resposta, pra o copiloto nunca misturar o contexto de uma pessoa com o de outra.</div>
+        <div class="hint" style="margin-top:0;">Este lead é fixo e não pode ser excluído. Use-o pra colar mensagens de <b>pacientes diferentes</b> — só preencha o campo "Nome da pessoa desta mensagem" antes de gerar cada resposta, pra o co-piloto nunca misturar o contexto de uma pessoa com o de outra.</div>
       </div>
 
       <div class="card" id="leadDataCard">
@@ -1295,7 +1295,7 @@
         <div class="field" id="personNameField" style="display:none;">
           <label>Nome da pessoa desta mensagem</label>
           <input type="text" id="personNameInput" placeholder="ex: Juliana Ferreira">
-          <div class="hint">Obrigatório aqui na central: garante que o copiloto trate esta pessoa isoladamente, sem misturar com as demais.</div>
+          <div class="hint">Obrigatório aqui na central: garante que o co-piloto trate esta pessoa isoladamente, sem misturar com as demais.</div>
         </div>
         <div class="field" style="max-width:320px;">
           <label>Estágio no funil</label>
@@ -1389,7 +1389,7 @@
           <h2>Histórico de respostas <span id="historyCount"></span></h2>
           <button class="btn danger" id="clearHistoryBtn">Limpar histórico</button>
         </div>
-        <div class="hint">Toda resposta gerada pelo copiloto fica registrada aqui: a mensagem do lead que originou, a resposta dada e a data/hora — para você conferir depois.</div>
+        <div class="hint">Toda resposta gerada pelo co-piloto fica registrada aqui: a mensagem do lead que originou, a resposta dada e a data/hora — para você conferir depois.</div>
         <input type="text" id="historySearchInput" class="hist-search-input" placeholder="🔍 Buscar no histórico deste lead...">
         <div class="history-list" id="historyList"></div>
       </div>
@@ -1819,9 +1819,9 @@ Nascimento: 20/01/1992"></textarea>
 
       <div class="backup-section-title">Uso e gasto estimado com tokens</div>
       <div class="backup-section-sub">
-        Cada vez que você clica em "Gerar resposta" ou "Sugerir follow-up", o copiloto consome tokens da IA
+        Cada vez que você clica em "Gerar resposta" ou "Sugerir follow-up", o co-piloto consome tokens da IA
         escolhida (Claude ou Gemini) e isso gera custo na sua conta de API. Aqui você acompanha quanto já
-        consumiu — os números ficam salvos só neste computador, o copiloto não envia isso pra nenhum servidor.
+        consumiu — os números ficam salvos só neste computador, o co-piloto não envia isso pra nenhum servidor.
       </div>
 
       <div class="billing-summary-row">
@@ -1866,7 +1866,7 @@ Nascimento: 20/01/1992"></textarea>
   <div class="modal-dialog modal-dialog-help">
     <div class="modal-header">
       <div style="display:flex; align-items:center; gap:12px;">
-        <h2>📖 Como usar o copiloto</h2>
+        <h2>📖 Como usar o co-piloto</h2>
         <span class="version-monitor" title="Versão instalada do Co-piloto de vendas">
           <span class="version-dot"></span><span id="helpVersionBadgeText">v—</span>
         </span>
@@ -1915,10 +1915,10 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>Cole a última mensagem do lead — digitando, com Ctrl+V, ou pelo botão "📋 Colar da área de transferência" — e clique em "Gerar resposta". O copiloto devolve uma resposta pronta, seguindo as instruções gerais do funil (Configurações → Funil de vendas), calibrada pro estágio selecionado.</p>
+          <p>Cole a última mensagem do lead — digitando, com Ctrl+V, ou pelo botão "📋 Colar da área de transferência" — e clique em "Gerar resposta". O co-piloto devolve uma resposta pronta, seguindo as instruções gerais do funil (Configurações → Funil de vendas), calibrada pro estágio selecionado.</p>
           <p>Antes de gerar, confira o campo "Estágio no funil" do lead — ele entra como contexto pra IA calibrar a resposta, além de alimentar o funil por estágio (estatísticas) e a escolha automática do modelo de IA (<a href="#" class="help-goto" data-secao="11">ver seção 11</a>). O estágio é sempre escolhido por você, nunca adivinhado pela IA: se não tiver certeza de qual etapa a conversa está, use o botão "🔍 Sugerir estágio com IA" — ele analisa a mensagem colada com o nível gratuito de IA e preenche uma sugestão no campo, que você confirma ou troca antes de gerar.</p>
           <p>Emoção do cliente: toda vez que você clica em "Gerar resposta", a IA também lê a emoção predominante do cliente na mensagem (ex: animado, hesitante, frustrado) e mostra um chip 😊 com o resultado.</p>
-          <p>O campo "Informação adicional para esta resposta" é opcional — um contexto pontual que só vale pra aquela geração (ex.: avisar que um horário oferecido não foi confirmado). Junto da resposta, quando fizer sentido, o copiloto sugere uma pergunta pra continuar a conversa. Clique em "Copiar resposta" pra levar o texto pro WhatsApp.</p>
+          <p>O campo "Informação adicional para esta resposta" é opcional — um contexto pontual que só vale pra aquela geração (ex.: avisar que um horário oferecido não foi confirmado). Junto da resposta, quando fizer sentido, o co-piloto sugere uma pergunta pra continuar a conversa. Clique em "Copiar resposta" pra levar o texto pro WhatsApp.</p>
           <p>Nada se perde ao trocar de lead ou fechar o painel — mensagem, contexto e a última resposta ficam salvos por lead. Proteção contra gasto à toa: colar a mesma mensagem que já gerou resposta antes avisa antes de gerar de novo; recolar a conversa com só mensagens novas no final manda pra IA só a parte nova, não a conversa toda. O botão "Ver mensagem do lead", que aparece perto da resposta, pula direto pro item correspondente no histórico.</p>
           <p><b>💬 Chat rápido (C&amp;S BOT)</b> — um chat livre com a IA, pra tirar dúvida rápida sobre como agir ("como eu abordo esse lead agora?", "como respondo essa objeção de preço?", "me dá uma ideia de follow-up") sem precisar colar mensagem nem preencher os campos acima. Abre pelo botão roxo 💬, flutuante no canto inferior direito, ao lado do "voltar ao topo". Reaproveita a mesma infraestrutura: o provedor/chave configurados em Configurações, o mesmo roteamento por estágio (<a href="#" class="help-goto" data-secao="10">ver seção 10</a>) e os mesmos contadores de uso/custo. Se houver um lead selecionado no painel, o contexto dele (nome, objetivo/notas, estágio) entra automaticamente na conversa; sem lead selecionado, responde de forma genérica. Cada nova pergunta reenvia as anteriores desta mesma conversa como contexto — por isso a conversa em andamento (não o histórico salvo) é limpa sempre que você troca de lead.</p>
           <p>A cada mensagem enviada, o chat lê sozinho o estágio e a emoção do cliente a partir do próprio texto (mostrado na barra "🔍 Leitura automática" acima da caixa de digitar) — mesma ideia do "🔍 Sugerir estágio com IA" logo acima, só que automática a cada envio. Se a leitura não bater, dá pra fixar um estágio manualmente no seletor da barra de contexto, valendo pras próximas mensagens desta conversa até você trocar de novo ou trocar de lead. Cada resposta tem um botão "Copiar" e mostra uma legenda discreta de qual chave/modelo respondeu (ex.: "🔀 Gemini · Chave B · nível avançado"). O <b>Histórico do Bot</b>, na tela principal do lead (abaixo do "Histórico de respostas"), guarda toda troca desse chat com aquele lead, com busca e exclusão por item ou tudo de uma vez (<a href="#" class="help-goto" data-secao="7">ver seção 7</a>).</p>
@@ -1949,8 +1949,8 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p><b>Central de mensagens:</b> um lead fixo, @csvirtual, sempre no topo da lista — o espaço pra atender quem já é cliente, sem cadastrar um lead pra cada pessoa. Não pode ser excluído e não entra nas estatísticas gerais. Antes de clicar em "Gerar resposta", preencha "Nome da pessoa desta mensagem" — é assim que o copiloto evita misturar o contexto de pessoas diferentes; o campo se limpa sozinho depois de cada resposta.</p>
-          <p>O campo "Estágio no funil" também aparece aqui — vale só pra ESTA mensagem, nunca fica gravado como "o" estágio do lead compartilhado. Se você já digitou esse mesmo nome antes, o copiloto reconhece e pré-preenche sozinho com o último estágio registrado daquela pessoa. O nome preenchido fica registrado em cada item do histórico (chip 👤), e a busca do histórico também encontra por nome. Atenção: "Limpar histórico" apaga as mensagens de todo mundo que passou por esse lead, não só da última pessoa.</p>
+          <p><b>Central de mensagens:</b> um lead fixo, @csvirtual, sempre no topo da lista — o espaço pra atender quem já é cliente, sem cadastrar um lead pra cada pessoa. Não pode ser excluído e não entra nas estatísticas gerais. Antes de clicar em "Gerar resposta", preencha "Nome da pessoa desta mensagem" — é assim que o co-piloto evita misturar o contexto de pessoas diferentes; o campo se limpa sozinho depois de cada resposta.</p>
+          <p>O campo "Estágio no funil" também aparece aqui — vale só pra ESTA mensagem, nunca fica gravado como "o" estágio do lead compartilhado. Se você já digitou esse mesmo nome antes, o co-piloto reconhece e pré-preenche sozinho com o último estágio registrado daquela pessoa. O nome preenchido fica registrado em cada item do histórico (chip 👤), e a busca do histórico também encontra por nome. Atenção: "Limpar histórico" apaga as mensagens de todo mundo que passou por esse lead, não só da última pessoa.</p>
           <p><b>Campanha ativa:</b> cole as condições da campanha atual (desconto, prazo, parcelamento) pra que a IA leve isso em conta ao responder. O texto fica salvo mesmo com a caixa "Incluir campanha" desmarcada — desmarque quando a campanha acabar, sem perder o texto. Quando ativa, aparece o selo "🎯 Campanha ativa" perto do status da IA, e cada resposta gerada com ela mostra o chip "🎯 Campanha considerada".</p>
         </div>
       </div>
@@ -2019,11 +2019,11 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>O copiloto tem várias camadas de economia — a maioria automática, sem nada pra você configurar.</p>
+          <p>O co-piloto tem várias camadas de economia — a maioria automática, sem nada pra você configurar.</p>
           <ul>
             <li><b>Cache automático</b> — as instruções gerais do funil ficam em cache; a primeira chamada da sessão custa mais, as seguintes custam uma fração do preço.</li>
             <li><b>Detecção de duplicata e contexto incremental</b> — <a href="#" class="help-goto" data-secao="3">ver seção 3</a>.</li>
-            <li><b>Roteamento por estágio</b> (nos dois provedores) — a divisão das etapas é a mesma nos dois: <b>Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e Central de mensagens</b> ficam no nível econômico; <b>Apresentação da solução, Condução ao valor, Objeção e Fechamento</b> — onde a venda se decide — ficam no principal.<br><b>No Gemini</b>, o que troca é a <b>chave</b>: o modelo de cada uma é sempre o que você escolheu, e só a escolha de qual chave entra em ação é automática. Com só uma chave configurada, ela assume todas as etapas. Se a Chave A bater no limite de cota do dia, o copiloto cai pra Chave B automaticamente naquela hora, com o modelo já escolhido pra ela (nunca troca de modelo sozinho).<br><b>No Claude</b>, a chave é uma só e o que troca é o <b>modelo</b>. Deixando o campo "modelo econômico" em <i>Desligado</i>, nada é roteado e o principal atende tudo. A economia costuma ficar entre 15% e 20%: cada modelo mantém o próprio cache de prompt, e cada cache precisa ser gravado uma vez — por isso o ganho não é a diferença cheia de preço entre os dois.</li>
+            <li><b>Roteamento por estágio</b> (nos dois provedores) — a divisão das etapas é a mesma nos dois: <b>Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e Central de mensagens</b> ficam no nível econômico; <b>Apresentação da solução, Condução ao valor, Objeção e Fechamento</b> — onde a venda se decide — ficam no principal.<br><b>No Gemini</b>, o que troca é a <b>chave</b>: o modelo de cada uma é sempre o que você escolheu, e só a escolha de qual chave entra em ação é automática. Com só uma chave configurada, ela assume todas as etapas. Se a Chave A bater no limite de cota do dia, o co-piloto cai pra Chave B automaticamente naquela hora, com o modelo já escolhido pra ela (nunca troca de modelo sozinho).<br><b>No Claude</b>, a chave é uma só e o que troca é o <b>modelo</b>. Deixando o campo "modelo econômico" em <i>Desligado</i>, nada é roteado e o principal atende tudo. A economia costuma ficar entre 15% e 20%: cada modelo mantém o próprio cache de prompt, e cada cache precisa ser gravado uma vez — por isso o ganho não é a diferença cheia de preço entre os dois.</li>
             <li><b>Padrão de fábrica</b> — no Claude, <b>Sonnet 5</b> como principal e <b>Haiku 4.5</b> como econômico, já com o roteamento por etapa ligado. No Gemini, Flash-Lite nas duas chaves. Troque em Configurações quando quiser — se você já tinha um modelo salvo antes desta versão, o seu continua valendo até você abrir Configurações e salvar de novo.</li>
           </ul>
           <p><b>🩺 Health Monitor</b> — a pílula perto do topo mostra, em tempo real, se cada modelo de IA está respondendo e em quanto tempo. Escolha o provedor e o teste roda em todos os modelos daquele provedor de uma vez, usando a chave já configurada — cada modelo é testado 3 vezes com uma mensagem mínima ("oi") e o tempo mostrado é a mediana das 3 medições. Cada linha mostra ok, lento (acima de 4s) ou erro (com a mensagem devolvida pela API). Clicar num modelo aplica ele imediatamente como o modelo em uso no seu perfil, sem precisar abrir Configurações. É um recurso de diagnóstico: só consome cota quando você abre o Health Monitor e escolhe um provedor.</p>

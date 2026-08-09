@@ -212,7 +212,7 @@
     <button class="back-btn" id="backBtn">← Voltar ao Co-piloto</button>
     <p class="privacy-note">Essas informações ficam guardadas só no seu computador, no armazenamento local do Chrome. Não vão para nenhum servidor da <b>C&amp;S Virtual</b> — só para a IA escolhida, na hora de gerar cada resposta.</p>
     <div class="sidebar-foot">
-      Nenhuma automação toca no WhatsApp Web. Tudo aqui é configuração local do seu copiloto.
+      Nenhuma automação toca no WhatsApp Web. Tudo aqui é configuração local do seu co-piloto.
     </div>
   </div>
 
@@ -224,7 +224,7 @@
     </div>
     <div class="topbar">
       <h1>Configurações</h1>
-      <div class="subtitle">Ajuste o provedor de IA e como o copiloto fala pelo seu negócio.</div>
+      <div class="subtitle">Ajuste o provedor de IA e como o co-piloto fala pelo seu negócio.</div>
     </div>
 
     <div class="card" id="cardMinhaConta">
@@ -303,7 +303,7 @@
             <option value="claude-opus-4-8">Opus 4.8 — modelo robusto, focado em raciocínio mais profundo (maior custo)</option>
             <option value="claude-fable-5">Fable 5 — modelo mais avançado da Anthropic, focado em máxima qualidade (custo mais alto de todos)</option>
           </select>
-          <div class="hint">Escolhendo um modelo aqui, o copiloto passa a usar <b>ele</b> nas etapas de menor risco (Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e a Central de mensagens) e o <b>modelo principal</b> só onde a venda se decide (Apresentação da solução, Condução ao valor, Objeção e Fechamento). A chave é a mesma nos dois — muda só o modelo. Em "Desligado", nada é roteado e o modelo principal atende tudo, como sempre.</div>
+          <div class="hint">Escolhendo um modelo aqui, o co-piloto passa a usar <b>ele</b> nas etapas de menor risco (Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e a Central de mensagens) e o <b>modelo principal</b> só onde a venda se decide (Apresentação da solução, Condução ao valor, Objeção e Fechamento). A chave é a mesma nos dois — muda só o modelo. Em "Desligado", nada é roteado e o modelo principal atende tudo, como sempre.</div>
           <div class="hint">Duas observações de custo: a economia costuma ficar entre 15% e 20%, porque cada modelo mantém o próprio cache de prompt e cada cache precisa ser gravado uma vez. E o custo estimado do modelo econômico usa a tabela de referência interna — o campo de "Custo por token" abaixo se aplica ao modelo principal.</div>
         </div>
         <div class="hint">Pegue sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"><b>console.anthropic.com</b></a> → API Keys.</div>
@@ -311,7 +311,7 @@
 
       <div id="geminiFields" style="display:none;">
         <div class="hint" style="margin-bottom:14px;">
-          O Gemini tem nível gratuito — por isso ele usa <b>duas chaves</b>: a <b>Chave A (gratuita)</b>, usada na maior parte das mensagens, e a <b>Chave B (paga)</b>, usada só nas etapas do funil onde vale mais a pena caprichar. O modelo de cada chave é sempre o que você escolher abaixo — isso nunca muda sozinho. A Chave B é opcional — e as duas se cobrem: com as duas preenchidas, o copiloto alterna entre elas por etapa; se só uma estiver preenchida, ela assume todas as etapas sozinha, sempre com o modelo que você escolheu pra ela.
+          O Gemini tem nível gratuito — por isso ele usa <b>duas chaves</b>: a <b>Chave A (gratuita)</b>, usada na maior parte das mensagens, e a <b>Chave B (paga)</b>, usada só nas etapas do funil onde vale mais a pena caprichar. O modelo de cada chave é sempre o que você escolher abaixo — isso nunca muda sozinho. A Chave B é opcional — e as duas se cobrem: com as duas preenchidas, o co-piloto alterna entre elas por etapa; se só uma estiver preenchida, ela assume todas as etapas sozinha, sempre com o modelo que você escolheu pra ela.
         </div>
 
         <div class="routing-status" id="geminiRoutingStatus">
@@ -372,7 +372,7 @@
               <option value="gemini-pro-latest">gemini-pro-latest — sempre a versão mais nova e mais robusta (maior custo)</option>
             </select>
           </div>
-          <div class="hint">Por padrão, a Chave B também vem com o modelo mais econômico selecionado — o roteamento por estágio já concentra as etapas de maior risco nela, então o ganho de robustez fica por sua conta: troque pra um modelo mais robusto aqui só se quiser. Se as duas chaves estiverem preenchidas e a Chave A bater no limite de cota do dia, o copiloto cai sozinho pra Chave B nessa hora, só pra não travar o atendimento — sempre com o modelo que você escolheu pra ela. Se a Chave A ficar em branco, a Chave B assume sozinha todas as etapas, sempre com o modelo escolhido acima pra ela (sem trocar de modelo por etapa).</div>
+          <div class="hint">Por padrão, a Chave B também vem com o modelo mais econômico selecionado — o roteamento por estágio já concentra as etapas de maior risco nela, então o ganho de robustez fica por sua conta: troque pra um modelo mais robusto aqui só se quiser. Se as duas chaves estiverem preenchidas e a Chave A bater no limite de cota do dia, o co-piloto cai sozinho pra Chave B nessa hora, só pra não travar o atendimento — sempre com o modelo que você escolheu pra ela. Se a Chave A ficar em branco, a Chave B assume sozinha todas as etapas, sempre com o modelo escolhido acima pra ela (sem trocar de modelo por etapa).</div>
         </div>
 
         <div class="hint">Pegue suas chaves em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"><b>aistudio.google.com/apikey</b></a> — pode usar a mesma conta pras duas, ou criar um projeto separado pra manter o uso da Chave B fora da cota gratuita da Chave A.</div>
