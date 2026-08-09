@@ -178,51 +178,35 @@ textarea{resize:vertical; min-height:90px; line-height:1.45;}
 }
 .toast.show{opacity:1; transform:translateY(0);}
 
-/* BACK TO TOP */
-.back-to-top{
-  position:fixed; right:20px; bottom:20px; z-index:500;
-  width:46px; height:46px; border-radius:50%;
-  /* Sem borda no CÍRCULO (igual ao botão do chat, .chat-float-btn) — o
-     contorno fica na SETA em si, não no botão. O emoji 💬 do botão do chat
-     já vem com sombreado/contorno nativo dando profundidade; o caractere
-     "↑" sozinho não tem nada disso, então o contorno preto é desenhado nele
-     via -webkit-text-stroke (mesma grossura visual do contorno do emoji). */
-  border:none;
-  background:linear-gradient(135deg, var(--purple), #5F2C82);
-  color:#fff; font-size:20px; font-weight:700; line-height:1; cursor:pointer;
-  -webkit-text-stroke:0.6px rgba(20,8,40,.9);
-  text-shadow:0 1px 2px rgba(0,0,0,.3);
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:0 4px 14px rgba(124,58,168,.35);
-  opacity:0; transform:translateY(10px); pointer-events:none;
-  transition:opacity .2s ease, transform .2s ease, box-shadow .15s ease;
-  font-family:'Manrope', sans-serif;
-}
-.back-to-top.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
-.back-to-top:hover{ box-shadow:0 6px 18px rgba(124,58,168,.45); transform:translateY(-2px); }
-.back-to-top:active{ transform:translateY(0); }
-body.modal-open .back-to-top{ opacity:0; pointer-events:none; }
-
-/* CHAT FLUTUANTE (C&S - BOT) — mesmo estilo e mesmo comportamento do botão
-   "voltar ao topo", posicionado à esquerda dele (46px de largura + 12px de
-   vão). Fica escondido no topo da página e só aparece ao rolar pra baixo
-   (classe .show, alternada no scroll junto com o back-to-top — ver
-   backtotop.js), exatamente como o botão de voltar ao topo. */
-.chat-float-btn{
-  position:fixed; right:78px; bottom:20px; z-index:500;
+/* BACK TO TOP + CHAT FLUTUANTE (C&S - BOT) — mesmo botão base, os dois lado
+   a lado no canto inferior direito (chat 78px da borda, voltar-ao-topo
+   20px — 46px de largura + 12px de vão entre eles). Ambos escondidos no
+   topo da página, aparecem ao rolar pra baixo (classe .show, alternada
+   junto nos dois por backtotop.js).
+   O ÍCONE de cada um é SVG inline (ver o <svg> dentro do botão, em
+   panel.html/backtotop.js), não emoji nem caractere de texto — um emoji
+   (💬) ou glifo de fonte (↑) rendeiriza diferente dependendo do sistema
+   operacional/fonte instalada (às vezes até sem cor nenhuma), então o
+   contorno preto sobre preenchimento branco que os dois têm não ficava
+   consistente entre telas. Um SVG próprio é sempre o mesmo traço, em
+   qualquer lugar — por isso o botão em si não precisa mais de nenhuma
+   propriedade de texto (font-size, text-stroke etc.), só o SVG dentro dele. */
+.back-to-top, .chat-float-btn{
+  position:fixed; bottom:20px; z-index:500;
   width:46px; height:46px; border-radius:50%; border:none;
   background:linear-gradient(135deg, var(--purple), #5F2C82);
-  color:#fff; font-size:19px; line-height:1; cursor:pointer;
+  cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   box-shadow:0 4px 14px rgba(124,58,168,.35);
   opacity:0; transform:translateY(10px); pointer-events:none;
   transition:opacity .2s ease, transform .2s ease, box-shadow .15s ease;
-  font-family:'Manrope', sans-serif;
 }
-.chat-float-btn.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
-.chat-float-btn:hover{ box-shadow:0 6px 18px rgba(124,58,168,.45); transform:translateY(-2px); }
-.chat-float-btn:active{ transform:translateY(0); }
-body.modal-open .chat-float-btn{ opacity:0; pointer-events:none; }
+.back-to-top{ right:20px; }
+.chat-float-btn{ right:78px; }
+.back-to-top.show, .chat-float-btn.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+.back-to-top:hover, .chat-float-btn:hover{ box-shadow:0 6px 18px rgba(124,58,168,.45); transform:translateY(-2px); }
+.back-to-top:active, .chat-float-btn:active{ transform:translateY(0); }
+body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointer-events:none; }
 
 /* MODAL DO CHAT */
 .chat-modal-dialog{ display:flex; flex-direction:column; max-height:78vh; }

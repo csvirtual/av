@@ -13,7 +13,15 @@
     btn.type = 'button';
     btn.title = 'Voltar ao topo';
     btn.setAttribute('aria-label', 'Voltar ao topo');
-    btn.innerHTML = '↑';
+    // SVG inline, não o caractere "↑": um glifo de texto herda a fonte do
+    // sistema, então o contorno/espessura (feito antes via
+    // -webkit-text-stroke) nunca ficava exatamente igual em telas/SOs
+    // diferentes. Como um desenho vetorial próprio, sai sempre idêntico —
+    // mesmo par preenchimento branco / contorno preto do ícone do chat (ver
+    // #chatFloatBtn em panel.html).
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">'
+      + '<path d="M12 4 L19 12 L14.5 12 L14.5 20 L9.5 20 L9.5 12 L5 12 Z" fill="#fff" stroke="#140828" stroke-width="1.3" stroke-linejoin="round"/>'
+      + '</svg>';
     btn.addEventListener('click', function () {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
