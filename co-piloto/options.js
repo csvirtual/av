@@ -500,7 +500,7 @@ async function preencherCampoChaveApi(inputId, valorSalvo, dek){
 }
 
 // Libera um campo BLOQUEADO por preencherCampoChaveApi (chamada pelo botão
-// "Digitar uma chave nova" do aviso que aparece nesse caso) — não recupera a
+// "Digitar uma nova chave" do aviso que aparece nesse caso) — não recupera a
 // chave antiga (não dá: foi cifrada com o DEK de OUTRO perfil/instalação,
 // que esta sessão não tem, e nunca vai ter), só destrava o campo pra uma
 // chave NOVA ser digitada. Ao salvar (saveKeys -> valorChaveApiParaSalvar),
