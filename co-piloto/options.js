@@ -252,11 +252,6 @@ function renderProviderCards(provider){
   document.getElementById('cardGemini').classList.toggle('selected', provider==='gemini');
   document.getElementById('claudeFields').style.display = provider==='claude' ? 'block':'none';
   document.getElementById('geminiFields').style.display = provider==='gemini' ? 'block':'none';
-  // Campos bloqueados pertencem a um provedor específico — reavalia se o
-  // botão "Digitar chave(s) nova(s)" deve aparecer toda vez que a aba
-  // trocar, senão ele podia ficar visível (ou escondido) referente ao
-  // provedor errado depois da troca.
-  atualizarVisibilidadeLiberarChaves();
 }
 
 // Clique num dos cartões: atualiza a tela E já persiste a escolha.
@@ -504,7 +499,8 @@ async function preencherCampoChaveApi(inputId, valorSalvo, dek){
   if(aviso) aviso.style.display = 'flex';
 }
 
-// Libera um campo BLOQUEADO por preencherCampoChaveApi — não recupera a
+// Libera um campo BLOQUEADO por preencherCampoChaveApi (chamada pelo botão
+// "Digitar uma chave nova" do aviso que aparece nesse caso) — não recupera a
 // chave antiga (não dá: foi cifrada com o DEK de OUTRO perfil/instalação,
 // que esta sessão não tem, e nunca vai ter), só destrava o campo pra uma
 // chave NOVA ser digitada. Ao salvar (saveKeys -> valorChaveApiParaSalvar),
@@ -519,44 +515,11 @@ function liberarCampoChaveApi(inputId){
   input.value = '';
   input.placeholder = input.dataset.placeholderOriginal !== undefined ? input.dataset.placeholderOriginal : input.placeholder;
   if(aviso) aviso.style.display = 'none';
+  input.focus();
 }
-
-// IDs dos campos de chave pertencentes a cada provedor — usado tanto pra
-// decidir quando mostrar o botão único "Digitar chave(s) nova(s)" (ver
-// atualizarVisibilidadeLiberarChaves) quanto pra saber quais campos ele
-// libera de uma vez.
-const CAMPOS_CHAVE_POR_PROVIDER = {
-  claude: ['claudeKey'],
-  gemini: ['geminiKeyBasico', 'geminiKeyAvancado']
-};
-
-// Mostra/esconde o botão único "🔓 Digitar chave(s) nova(s)" (ao lado de
-// "Salvar chave e modelo") — só aparece se PELO MENOS UM campo do provedor
-// atualmente selecionado na tela estiver bloqueado agora. Chamada sempre
-// que os campos são preenchidos (init) ou o provedor selecionado muda
-// (renderProviderCards), pra nunca ficar mostrando (ou escondendo) o botão
-// errado depois de trocar de aba Claude/Gemini.
-function atualizarVisibilidadeLiberarChaves(){
-  const btn = document.getElementById('liberarChavesBloqueadasBtn');
-  if(!btn) return;
-  const provider = document.getElementById('cardClaude').classList.contains('selected') ? 'claude' : 'gemini';
-  const campos = CAMPOS_CHAVE_POR_PROVIDER[provider];
-  const algumBloqueado = campos.some((id) => document.getElementById(id).disabled);
-  btn.style.display = algumBloqueado ? '' : 'none';
-}
-
-// Libera de uma vez todos os campos bloqueados do provedor selecionado
-// agora — não mexe nos campos do OUTRO provedor (mesmo que também estejam
-// bloqueados), pra não destravar sem necessidade um campo que a pessoa nem
-// está olhando na tela agora.
-document.getElementById('liberarChavesBloqueadasBtn').addEventListener('click', () => {
-  const provider = document.getElementById('cardClaude').classList.contains('selected') ? 'claude' : 'gemini';
-  CAMPOS_CHAVE_POR_PROVIDER[provider].forEach((id) => {
-    const input = document.getElementById(id);
-    if(input.disabled) liberarCampoChaveApi(id);
-  });
-  atualizarVisibilidadeLiberarChaves();
-  document.getElementById(CAMPOS_CHAVE_POR_PROVIDER[provider][0]).focus();
+['claudeKey', 'geminiKeyBasico', 'geminiKeyAvancado'].forEach((inputId) => {
+  const btn = document.getElementById(inputId + 'LiberarBtn');
+  if(btn) btn.addEventListener('click', () => liberarCampoChaveApi(inputId));
 });
 
 async function init(){
@@ -587,11 +550,6 @@ async function init(){
   await preencherCampoChaveApi('geminiKeyAvancado', data.geminiKeyAvancado, dekAtivo);
   if(data.geminiModeloAvancado) selecionarPreservandoValor(document.getElementById('geminiModeloAvancado'), data.geminiModeloAvancado);
   atualizarRoteamentoStatus();
-  // Só agora, com os três campos já preenchidos/bloqueados de verdade, a
-  // checagem de "algum campo bloqueado?" reflete o estado real — a chamada
-  // dentro de renderProviderCards() acima rodou antes disso, com os campos
-  // ainda vazios (nunca bloqueados por padrão).
-  atualizarVisibilidadeLiberarChaves();
 
   const precosToken = data.precosToken || {};
   const claudeModel = data.claudeModel || 'claude-sonnet-5';
