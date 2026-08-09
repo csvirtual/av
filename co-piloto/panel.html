@@ -1337,6 +1337,10 @@
         <div id="resultChips"></div>
         <div class="suggestion-box" id="suggestionText"></div>
         <div class="next-q" id="nextQuestion"></div>
+        <!-- Qual chave/modelo respondeu esta geração (ver labelRoteamentoIA,
+             panel.js) — visibilidade que antes só dava pra inferir na
+             tabela de custo por modelo, em Configurações. -->
+        <div class="hint" id="roteamentoInfo"></div>
         <div class="actions-row">
           <button class="btn secondary" id="copyBtn">Copiar resposta</button>
           <button class="btn secondary" id="viewLeadMessageBtn">Ver mensagem do lead</button>
@@ -1356,6 +1360,9 @@
           <label>Sugestão de resposta</label>
           <div class="suggestion-box" id="followupResposta"></div>
         </div>
+
+        <!-- Qual chave/modelo respondeu esta geração (ver labelRoteamentoIA, panel.js). -->
+        <div class="hint" id="roteamentoInfoFollowup"></div>
 
         <div class="actions-row">
           <button class="btn secondary" id="copyFollowupBtn">Copiar sugestão de resposta</button>

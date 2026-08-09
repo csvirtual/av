@@ -114,18 +114,25 @@
 
   // ---------- Leitura automática de estágio + emoção ----------
   //
-  // Mesma classificação (mesmo prompt e mesmo nível gratuito do Gemini) que
-  // o botão "🔍 Sugerir estágio com IA" já usa no fluxo principal (ver
-  // sugerirEstagioComIA, panel.js). Não muda estágio salvo de nenhum lead —
-  // é só a leitura de apoio pra calibrar a resposta deste chat e pra ficar
-  // registrada junto dela no Histórico do Bot.
+  // Mesma classificação (mesmo prompt) que o botão "🔍 Sugerir estágio com
+  // IA" já usa no fluxo principal (ver sugerirEstagioComIA, panel.js). Não
+  // muda estágio salvo de nenhum lead — é só a leitura de apoio pra calibrar
+  // a resposta deste chat e pra ficar registrada junto dela no Histórico do
+  // Bot.
+  //
+  // Prioridade: nível básico/gratuito do Gemini (ver resolverCredenciaisGemini)
+  // — é uma classificação simples, não precisa do modelo mais caro. MAS:
+  // diferente do botão manual acima (que avisa e manda pra Configurações se
+  // faltar chave, porque foi um clique explícito), esta leitura roda sozinha
+  // a cada mensagem — sem provedor nenhum configurado, ela só teria que
+  // ficar quieta pra sempre. Por isso, se não houver NENHUMA chave do Gemini
+  // cadastrada, cai pro provedor principal que a instalação realmente tem
+  // configurado (Claude, no modelo econômico se houver um definido) em vez
+  // de desistir — uma instalação 100% Claude não perde este recurso só por
+  // não ter Gemini cadastrado.
   async function classificarEstagioEmocao(texto){
     if(!texto) return null;
-    if(typeof resolverCredenciaisGemini !== 'function' || typeof ESTAGIO_ORDER === 'undefined' || typeof estagioFunilValido !== 'function' || typeof callGemini !== 'function'){
-      return null;
-    }
-    const credenciais = resolverCredenciaisGemini('basico');
-    if(!credenciais.apiKey) return null; // sem chave configurada — silencioso aqui, o envio da pergunta já avisa se faltar
+    if(typeof ESTAGIO_ORDER === 'undefined' || typeof estagioFunilValido !== 'function') return null;
 
     const cachedClassificador = `Você classifica em qual etapa de um funil de vendas consultivas por WhatsApp uma conversa está, e lê a emoção predominante do cliente nela, com base só no trecho mandado. Responda SOMENTE com um JSON válido (sem markdown, sem texto fora do JSON):
 {
@@ -134,16 +141,40 @@
 }
 Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem; Sondagem = descobrindo a dor/objetivo; Validação da dor = já entendeu a dor, ainda não apresentou solução; Apresentação da solução = já explicou o que oferece; Condução ao valor = falando de preço/investimento; Objeção = o lead levantou uma objeção (preço, tempo, confiança, "vou pensar"); Fechamento = perto de confirmar/agendar; Follow-up = lead sumiu, retomando contato; Perdido = recusou claramente ou encerrou sem interesse.`;
 
-    try{
-      const resultado = await callGemini(cachedClassificador, '', texto, credenciais.apiKey, credenciais.model);
-      return {
-        estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
-        emocao: textoDaIA(resultado.emocao_cliente, 40) || null
-      };
-    }catch(err){
-      console.error(err);
-      return null;
+    if(typeof resolverCredenciaisGemini === 'function' && typeof callGemini === 'function'){
+      const credenciais = resolverCredenciaisGemini('basico');
+      if(credenciais.apiKey){
+        try{
+          const resultado = await callGemini(cachedClassificador, '', texto, credenciais.apiKey, credenciais.model);
+          return {
+            estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
+            emocao: textoDaIA(resultado.emocao_cliente, 40) || null
+          };
+        }catch(err){
+          console.error(err);
+          return null; // Gemini configurado mas falhou agora — não insiste no Claude, mesma postura silenciosa de sempre
+        }
+      }
     }
+
+    // Sem nenhuma chave do Gemini: cai pro Claude, se a instalação tiver uma
+    // configurada — no modelo econômico quando existir um definido, senão o
+    // principal (mesma regra de custo de callClaudeComTier).
+    if(typeof providerSettings !== 'undefined' && providerSettings.claudeKey && typeof callClaude === 'function'){
+      const modeloClassificacao = providerSettings.claudeModeloBasico || providerSettings.claudeModel || 'claude-sonnet-5';
+      try{
+        const resultado = await callClaude(cachedClassificador, '', texto, modeloClassificacao);
+        return {
+          estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
+          emocao: textoDaIA(resultado.emocao_cliente, 40) || null
+        };
+      }catch(err){
+        console.error(err);
+        return null;
+      }
+    }
+
+    return null; // nenhum provedor configurado — silencioso, mesmo comportamento de sempre
   }
 
   // Dispara sozinha assim que um texto é COLADO na caixa deste chat — é só
@@ -299,8 +330,14 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
 
     // parseJsonSafely (panel.js) já devolve o texto puro em
     // resposta_sugerida quando a IA não manda JSON — que é o caso normal
-    // aqui, já que o prompt acima pede texto corrido.
-    return textoDaIA(parsed.resposta_sugerida) || '(a IA não retornou nenhum texto)';
+    // aqui, já que o prompt acima pede texto corrido. `meta` (qual
+    // chave/modelo respondeu — ver anexarMetaRoteamento em panel.js) vai
+    // junto pra renderMensagem poder mostrar a legenda, mesma visibilidade
+    // que o painel principal ganhou.
+    return {
+      texto: textoDaIA(parsed.resposta_sugerida) || '(a IA não retornou nenhum texto)',
+      meta: parsed._roteamento || null
+    };
   }
 
   function renderMensagem(role, texto, opts){
@@ -323,6 +360,20 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
           .catch(() => toast('Não consegui copiar — selecione e copie manualmente'));
       });
       box.appendChild(copiarBtn);
+
+      // Legenda pequena com qual chave/modelo respondeu (ver
+      // labelRoteamentoIA/anexarMetaRoteamento, panel.js) — mesma
+      // visibilidade que "Gerar resposta"/"Sugerir follow-up" ganharam no
+      // painel principal.
+      if(opts.meta && typeof labelRoteamentoIA === 'function'){
+        const label = labelRoteamentoIA(opts.meta);
+        if(label){
+          const legenda = document.createElement('div');
+          legenda.className = 'chat-roteamento-info';
+          legenda.textContent = label;
+          box.appendChild(legenda);
+        }
+      }
     }
 
     box.scrollTop = box.scrollHeight;
@@ -352,9 +403,9 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
       await garantirLeituraEstagioParaEnvio(texto);
       atualizarBarraDeContexto();
 
-      const resposta = await pedirRespostaIA(texto);
+      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto);
       loadingEl.remove();
-      renderMensagem('ai', resposta);
+      renderMensagem('ai', resposta, { meta: metaRoteamento });
       chatHistorico.push({ role: 'ai', texto: resposta });
       if(typeof incrementUsage === 'function') await incrementUsage();
 

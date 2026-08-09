@@ -3294,7 +3294,18 @@ async function callClaude(cachedSystem, dynamicContext, userMessage, modeloEscol
     data = await response.json();
   }
 
-  if(data.error){ throw new Error(data.error.message || 'Erro na API da Anthropic'); }
+  if(data.error){
+    const erro = new Error(data.error.message || 'Erro na API da Anthropic');
+    // status HTTP + o `type` estruturado que a Anthropic já manda (ex.:
+    // "rate_limit_error", "overloaded_error") — mais confiável pra quem
+    // chama decidir "isso foi limite de taxa?" do que caçar palavra-chave
+    // no texto de `message`, que é texto livre e pode mudar de redação sem
+    // aviso nenhum (ver callClaudeComTier, que usa isto pro fallback de
+    // modelo).
+    erro.status = response.status || null;
+    erro.anthropicErrorType = data.error.type || null;
+    throw erro;
+  }
   if(data.usage){
     await registrarUsoDeTokens('claude', modelUsado, {
       input: data.usage.input_tokens||0,
@@ -3346,7 +3357,17 @@ async function callGemini(cachedSystem, dynamicContext, userMessage, apiKey, mod
     })
   });
   const data = await response.json();
-  if(data.error){ throw new Error(data.error.message || 'Erro na API do Gemini'); }
+  if(data.error){
+    const erro = new Error(data.error.message || 'Erro na API do Gemini');
+    // status HTTP + o campo `status` estruturado que o Gemini já manda (ex.:
+    // "RESOURCE_EXHAUSTED") — mais confiável pra quem chama decidir "isso
+    // foi cota esgotada?" do que caçar palavra-chave no texto de `message`,
+    // que é texto livre e pode mudar de redação sem aviso nenhum (ver
+    // callGeminiComTier, que usa isto pro fallback Chave A -> B).
+    erro.status = response.status || data.error.code || null;
+    erro.googleStatus = data.error.status || null;
+    throw erro;
+  }
   if(data.usageMetadata){
     await registrarUsoDeTokens('gemini', model, {
       input: data.usageMetadata.promptTokenCount||0,
@@ -3380,6 +3401,34 @@ function escolherTierPorEstagio(lead){
   return ESTAGIOS_TIER_PAGO.includes(estagioAtual) ? 'avancado' : 'basico';
 }
 
+// Anexa qual chave/modelo/nível respondeu a ESTA chamada em cima do objeto
+// JÁ PARSEADO da resposta (nunca cria um wrapper novo) — quem já lê `parsed`
+// pelos campos de sempre (resposta_sugerida, analise_situacao...) continua
+// funcionando sem mudar nada; só quem quiser mostrar "usando tal chave" (ver
+// labelRoteamentoIA, chamada no painel principal e no chat rápido) lê
+// `_roteamento` à parte. Não-enumerável de propósito, pra nunca vazar pro
+// JSON.stringify de algum outro código que serialize `parsed` inteiro sem
+// querer (ex.: log de erro).
+function anexarMetaRoteamento(parsed, meta){
+  try{ Object.defineProperty(parsed, '_roteamento', { value: meta, enumerable: false }); }catch(e){}
+  return parsed;
+}
+
+// Texto curto pra exibir na tela qual chave/modelo gerou a última resposta —
+// visibilidade que antes só dava pra inferir indiretamente na tabela de
+// custo por modelo (Configurações → Custo por token).
+function labelRoteamentoIA(meta){
+  if(!meta) return '';
+  if(meta.provider === 'claude'){
+    return `🔀 Claude · modelo ${meta.tier === 'avancado' ? 'principal' : 'econômico'} (${escapeHtml(meta.model)})`;
+  }
+  if(meta.provider === 'gemini'){
+    const chaveLabel = meta.chave ? `Chave ${meta.chave}` : 'chave única';
+    return `🔀 Gemini · ${chaveLabel} · nível ${meta.tier === 'avancado' ? 'avançado' : 'básico'} (${escapeHtml(meta.model)})`;
+  }
+  return '';
+}
+
 // Mesmo roteamento, no Claude. A diferença estrutural em relação ao Gemini é
 // que aqui existe UMA chave só: o nível troca o MODELO, não a credencial —
 // não há cota gratuita pra proteger, e sim preço por token pra economizar.
@@ -3397,11 +3446,32 @@ async function callClaudeComTier(cachedSystem, dynamicContext, userMessage, lead
   const modeloPrincipal = providerSettings.claudeModel || 'claude-sonnet-5';
   const modeloBasico = providerSettings.claudeModeloBasico;
   if(!modeloBasico || modeloBasico === modeloPrincipal){
-    return callClaude(cachedSystem, dynamicContext, userMessage, modeloPrincipal);
+    const resultado = await callClaude(cachedSystem, dynamicContext, userMessage, modeloPrincipal);
+    return anexarMetaRoteamento(resultado, { provider: 'claude', tier: 'avancado', model: modeloPrincipal, chave: null });
   }
   const tier = escolherTierPorEstagio(lead);
-  return callClaude(cachedSystem, dynamicContext, userMessage,
-    tier === 'avancado' ? modeloPrincipal : modeloBasico);
+  const modeloEscolhido = tier === 'avancado' ? modeloPrincipal : modeloBasico;
+  try{
+    const resultado = await callClaude(cachedSystem, dynamicContext, userMessage, modeloEscolhido);
+    return anexarMetaRoteamento(resultado, { provider: 'claude', tier, model: modeloEscolhido, chave: null });
+  }catch(err){
+    // Mesma ideia do fallback Chave A -> B do Gemini (callGeminiComTier,
+    // logo abaixo): se foi o modelo ECONÔMICO que travou por limite de taxa
+    // — depois de fetchComRetry já ter tentado de novo sozinho 3x — e existe
+    // um modelo principal diferente configurado, tenta UMA vez nele antes de
+    // desistir de vez. Evita que uma etapa de baixo risco (que caiu no nível
+    // econômico só por causa do estágio do lead) trave o atendimento inteiro
+    // só porque aquele modelo específico está congestionado agora.
+    // Reconhece limite de taxa pelo status estruturado (err.status 429 /
+    // err.anthropicErrorType 'rate_limit_error'), não por texto — ver o
+    // mesmo raciocínio no comentário de callGeminiComTier.
+    const limiteDeTaxa = err.status === 429 || err.anthropicErrorType === 'rate_limit_error';
+    if(limiteDeTaxa && modeloEscolhido === modeloBasico){
+      const resultado = await callClaude(cachedSystem, dynamicContext, userMessage, modeloPrincipal);
+      return anexarMetaRoteamento(resultado, { provider: 'claude', tier: 'avancado', model: modeloPrincipal, chave: null });
+    }
+    throw err;
+  }
 }
 
 // Resolve o tier escolhido pra {apiKey, model}. Regra de ouro: o MODELO de
@@ -3432,24 +3502,36 @@ function resolverCredenciaisGemini(tier){
 
 // Ponto de entrada único pras chamadas ao Gemini: escolhe o tier certo pro
 // estágio do lead e chama callGemini() com a chave/modelo resolvidos. Se a
-// chamada usou a Chave A e ela bater na cota gratuita do dia (erro de
-// "quota"/"resource exhausted"), cai automaticamente pra Chave B — só se
-// ela existir e for diferente da que já foi tentada — sempre com o modelo
-// que o humano escolheu pra Chave B. Isso evita travar o atendimento no
-// meio do dia; o modelo em si nunca muda sozinho, só a chave.
+// chamada usou a Chave A e ela bater na cota gratuita do dia, cai
+// automaticamente pra Chave B — só se ela existir e for diferente da que já
+// foi tentada — sempre com o modelo que o humano escolheu pra Chave B. Isso
+// evita travar o atendimento no meio do dia; o modelo em si nunca muda
+// sozinho, só a chave.
 async function callGeminiComTier(cachedSystem, dynamicContext, userMessage, lead){
   const tier = escolherTierPorEstagio(lead);
   const credenciais = resolverCredenciaisGemini(tier);
+  const chaveUsada = credenciais.apiKey === providerSettings.geminiKeyBasico ? 'A'
+    : (credenciais.apiKey === providerSettings.geminiKeyAvancado ? 'B' : null);
   try{
-    return await callGemini(cachedSystem, dynamicContext, userMessage, credenciais.apiKey, credenciais.model);
+    const resultado = await callGemini(cachedSystem, dynamicContext, userMessage, credenciais.apiKey, credenciais.model);
+    return anexarMetaRoteamento(resultado, { provider: 'gemini', tier, model: credenciais.model, chave: chaveUsada });
   }catch(err){
-    const cotaEsgotada = /quota|resource.?exhausted/i.test(err.message || '');
+    // Cota esgotada: reconhece pelo status estruturado que o Gemini já manda
+    // (err.status 429 / err.googleStatus 'RESOURCE_EXHAUSTED') — mais
+    // confiável do que caçar palavra-chave em err.message, que é texto livre
+    // e pode mudar de redação sem aviso nenhum (o que faria este fallback
+    // silenciosamente parar de disparar). A checagem por texto continua como
+    // último recurso, só pra não perder cobertura nalgum formato de erro
+    // mais antigo/atípico que não venha com os campos estruturados.
+    const cotaEsgotada = err.status === 429 || err.googleStatus === 'RESOURCE_EXHAUSTED'
+      || /quota|resource.?exhausted/i.test(err.message || '');
     const chaveB = providerSettings.geminiKeyAvancado;
     const usouChaveA = credenciais.apiKey === providerSettings.geminiKeyBasico;
     const temChaveBDistinta = !!chaveB && chaveB !== credenciais.apiKey;
     if(cotaEsgotada && usouChaveA && temChaveBDistinta){
       const modeloAvancado = providerSettings.geminiModeloAvancado || 'gemini-flash-lite-latest';
-      return await callGemini(cachedSystem, dynamicContext, userMessage, chaveB, modeloAvancado);
+      const resultado = await callGemini(cachedSystem, dynamicContext, userMessage, chaveB, modeloAvancado);
+      return anexarMetaRoteamento(resultado, { provider: 'gemini', tier: 'avancado', model: modeloAvancado, chave: 'B' });
     }
     throw err;
   }
@@ -3679,6 +3761,8 @@ async function analyzeAndSuggest(){
   document.getElementById('suggestionText').textContent = '';
   document.getElementById('resultChips').innerHTML = '';
   document.getElementById('nextQuestion').textContent = '';
+  const roteamentoElInicio = document.getElementById('roteamentoInfo');
+  if(roteamentoElInicio) roteamentoElInicio.textContent = '';
   document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const leadId = lead.id;
@@ -3770,6 +3854,8 @@ async function analyzeAndSuggest(){
       document.getElementById('resultChips').innerHTML = chipsHtml;
       document.getElementById('suggestionText').textContent = textoDaIA(parsed.resposta_sugerida);
       document.getElementById('nextQuestion').textContent = proximaPerguntaTexto;
+      const roteamentoEl = document.getElementById('roteamentoInfo');
+      if(roteamentoEl) roteamentoEl.textContent = labelRoteamentoIA(parsed._roteamento);
     }
 
     // Memoriza a sugestão gerada (pra sobreviver a troca de lead/aba) e
@@ -3857,6 +3943,8 @@ async function suggestFollowupApproach(){
   document.getElementById('followupMomento').innerHTML = '';
   document.getElementById('followupAnalise').textContent = '';
   document.getElementById('followupResposta').textContent = '';
+  const roteamentoFollowupElInicio = document.getElementById('roteamentoInfoFollowup');
+  if(roteamentoFollowupElInicio) roteamentoFollowupElInicio.textContent = '';
   document.getElementById('followupResultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const leadId = lead.id;
@@ -3882,6 +3970,8 @@ async function suggestFollowupApproach(){
       document.getElementById('followupMomento').innerHTML = momentoHtml;
       document.getElementById('followupAnalise').textContent = parsed.analise_situacao || '';
       document.getElementById('followupResposta').textContent = parsed.resposta_sugerida || '';
+      const roteamentoFollowupEl = document.getElementById('roteamentoInfoFollowup');
+      if(roteamentoFollowupEl) roteamentoFollowupEl.textContent = labelRoteamentoIA(parsed._roteamento);
     }
 
     // Memoriza a análise gerada no próprio lead — sem isso, ela desaparecia

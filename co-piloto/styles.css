@@ -247,6 +247,10 @@ body.modal-open .chat-float-btn{ opacity:0; pointer-events:none; }
   align-self:flex-start; margin-top:4px; font-size:11px; background:none; border:none;
   color:var(--purple); cursor:pointer; padding:0; text-decoration:underline;
 }
+/* Legenda de qual chave/modelo respondeu (ver labelRoteamentoIA, panel.js). */
+.chat-roteamento-info{
+  align-self:flex-start; margin-top:2px; font-size:10.5px; color:var(--muted);
+}
 
 /* ÁREA RESTRITA - tela de usuário/senha (usada no modal Avançado e na página de Configurações) */
 .avancado-lock{
