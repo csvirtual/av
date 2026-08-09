@@ -259,7 +259,114 @@ Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem;
 TAREFA:
 Você está batendo um papo rápido e livre, em texto corrido, com a profissional/atendente que usa este copiloto — não é a mensagem de um lead colada do WhatsApp, é uma pergunta ou pedido DELA pra você (ex: "como eu abordo esse lead agora?", "como respondo essa objeção de preço?", "me dá uma ideia de follow-up"). Use o contexto do lead abaixo (se houver) pra calibrar a resposta às INSTRUÇÕES GERAIS DE COMO USAR O FUNIL definidas acima. Responda em texto corrido, direto e curto (no máximo 3 parágrafos curtos), SEM JSON e sem markdown. Quando fizer sentido, inclua dentro da própria resposta a mensagem pronta pra copiar e colar no WhatsApp.
 
-IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que você sugere pro WhatsApp) você é o "C&S - BOT", o assistente de IA deste copiloto de vendas — trate-se sempre no masculino ("estou", "pronto", "certeza disso" etc, nunca "estou pronta" ou variação no feminino). Se a atendente perguntar seu nome, quem você é, ou pedir sua versão, responda como C&S - BOT${versaoAtual() ? ` (versão ${versaoAtual()})` : ''} — sem inventar outro nome. Se perguntarem quem te desenvolveu, quem te criou, ou quem é o desenvolvedor, responda que foi Samuel D S Teixeira, CEO da C&S — sem inventar outro nome. Se perguntarem qual é o motor de inteligência por trás de você, qual IA te dá inteligência, ou qual modelo você usa, responda que roda sobre a API do ${providerSettings.provider === 'claude' ? 'Claude, da Anthropic' : 'Gemini, do Google'} — o provedor configurado agora nas Configurações deste Co-piloto (Configurações → Provedor de IA); se um dia o provedor for trocado lá, você passa a rodar sobre o outro — sem inventar outro nome de modelo nem de empresa.`;
+IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que você sugere pro WhatsApp) você é o "C&S - BOT", o assistente de IA deste copiloto de vendas — trate-se sempre no masculino ("estou", "pronto", "certeza disso" etc, nunca "estou pronta" ou variação no feminino). Se a atendente perguntar seu nome, quem você é, ou pedir sua versão, responda como C&S - BOT${versaoAtual() ? ` (versão ${versaoAtual()})` : ''} — sem inventar outro nome. Se perguntarem quem te desenvolveu, quem te criou, ou quem é o desenvolvedor, responda que foi Samuel D S Teixeira, CEO da C&S — sem inventar outro nome. Se perguntarem qual é o motor de inteligência por trás de você, qual IA te dá inteligência, ou qual modelo você usa, responda que roda sobre a API do ${providerSettings.provider === 'claude' ? 'Claude, da Anthropic' : 'Gemini, do Google'} — o provedor configurado agora nas Configurações deste Co-piloto (Configurações → Provedor de IA); se um dia o provedor for trocado lá, você passa a rodar sobre o outro — sem inventar outro nome de modelo nem de empresa.
+
+DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo trouxer um bloco "CONTEÚDO DE AJUDA", ele veio do próprio guia "Como usar o copiloto" ou da tela de "Privacidade" desta extensão — é fonte confiável, responda a dúvida usando ele, sem inventar nada além do que está escrito ali. Se a pergunta for sobre como usar o Co-piloto ou sobre privacidade e NENHUM bloco desses vier no contexto, é sinal de que a busca automática não achou a seção certa — diga isso com honestidade e sugira abrir "📖 Como usar o copiloto" ou "🔒 Privacidade" na barra lateral, em vez de arriscar uma resposta inventada.`;
+  }
+
+  // ---------- Busca da seção certa em "Como usar"/"Privacidade" (sem IA) ----------
+  //
+  // Objetivo: deixar TODO o conteúdo de ajuda "consultável" pelo bot sem
+  // colar o guia inteiro (~20 mil caracteres) e a Privacidade inteira (~10
+  // mil) no prompt fixo de toda mensagem — isso quase dobraria o bloco hoje
+  // cacheado (o funil já tem ~35 mil) e encareceria toda GRAVAÇÃO de cache
+  // (a cada expiração de 1h), não só a mensagem que precisasse da ajuda.
+  // Em vez disso: um casamento de palavras-chave, em JavaScript puro (zero
+  // chamada de IA, zero custo), decide SE e QUAL seção entra — e só entra
+  // no contexto DINÂMICO desta mensagem específica (nunca no bloco
+  // cacheado), então perguntas sobre o lead/venda (a grande maioria) não
+  // pagam nada por este recurso existir.
+  //
+  // Lê direto do DOM (accordion de #helpBody, divs .privacidade-secao de
+  // #privacidadeModalOverlay) em vez de duplicar o texto aqui — uma fonte
+  // só: editar a ajuda ou a privacidade na tela já atualiza o que o bot lê,
+  // sem precisar lembrar de mexer em dois lugares.
+  // Só formas SEM acento — palavrasRelevantes() já normaliza (tira acento)
+  // antes de comparar, então uma entrada acentuada aqui nunca bateria com
+  // nada.
+  const STOPWORDS_AJUDA = new Set(['de','da','do','das','dos','e','o','a','os','as','um','uma','uns','umas','para','pra','pro','por','com','sem','que','se','no','na','nos','nas','ao','aos','e','sao','foi','ser','tem','seu','sua','seus','suas','meu','minha','este','esta','isso','isto','como','quando','onde','qual','quais','mais','muito','tambem','nao','sim','ou','mas','ja','ainda','entao','ai','ali','la','aqui','voce','vc','eu','ele','ela','eles','elas','nos','me','te','lhe','aquele','aquela','the','of']);
+
+  function normalizarTextoAjuda(s){
+    return (s || '')
+      // tira acento (café -> cafe), pra "é"/"e" etc não atrapalharem o
+      // casamento — \u0300-\u036f é a faixa Unicode dos acentos "soltos"
+      // que o normalize('NFD') separa da letra base.
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function palavrasRelevantes(texto){
+    return normalizarTextoAjuda(texto)
+      .split(/[^a-z0-9]+/)
+      .filter(w => w.length >= 3 && !STOPWORDS_AJUDA.has(w));
+  }
+
+  // Memoizado: o conteúdo de #helpBody/#privacidadeModalOverlay não muda em
+  // tempo de execução (só se a extensão for atualizada, o que já recarrega
+  // a página) — não faz sentido varrer o DOM de novo a cada mensagem.
+  let _secoesAjudaCache = null;
+  function coletarSecoesAjuda(){
+    if(_secoesAjudaCache) return _secoesAjudaCache;
+    const secoes = [];
+
+    document.querySelectorAll('#helpBody .accordion-item[id^="helpSecao"]').forEach(item => {
+      const tituloEl = item.querySelector('.accordion-title');
+      const corpoEl = item.querySelector('.accordion-panel');
+      if(!tituloEl || !corpoEl) return;
+      const titulo = tituloEl.textContent.trim();
+      secoes.push({
+        origem: 'Como usar o copiloto',
+        titulo,
+        texto: corpoEl.textContent.replace(/\s+/g, ' ').trim(),
+        palavrasTitulo: palavrasRelevantes(titulo)
+      });
+    });
+
+    document.querySelectorAll('#privacidadeModalOverlay .privacidade-secao').forEach(item => {
+      const titulo = (item.dataset.titulo || '').trim();
+      if(!titulo) return;
+      secoes.push({
+        origem: 'Privacidade e proteção de dados',
+        titulo,
+        texto: item.textContent.replace(/\s+/g, ' ').trim(),
+        palavrasTitulo: palavrasRelevantes(titulo)
+      });
+    });
+
+    _secoesAjudaCache = secoes;
+    return secoes;
+  }
+
+  // Pontua cada seção pelas palavras da pergunta: bater no TÍTULO vale mais
+  // (é o resumo do assunto da seção) do que bater espalhado no corpo do
+  // texto. Só a seção de maior pontuação entra no contexto — e só se
+  // passar de um mínimo (LIMIAR_RELEVANCIA), pra "oi" ou uma pergunta sobre
+  // o lead não acabarem casando por acaso com alguma palavra solta de
+  // alguma seção.
+  const PESO_TITULO = 3;
+  const PESO_CORPO = 1;
+  const LIMIAR_RELEVANCIA = 3;
+
+  function encontrarSecaoAjudaRelevante(mensagem){
+    const palavrasQuery = palavrasRelevantes(mensagem);
+    if(!palavrasQuery.length) return null;
+
+    let melhor = null;
+    let melhorPontuacao = 0;
+    coletarSecoesAjuda().forEach(secao => {
+      const corpoNormalizado = normalizarTextoAjuda(secao.texto);
+      let pontuacao = 0;
+      palavrasQuery.forEach(palavra => {
+        if(secao.palavrasTitulo.includes(palavra)) pontuacao += PESO_TITULO;
+        else if(corpoNormalizado.includes(palavra)) pontuacao += PESO_CORPO;
+      });
+      if(pontuacao > melhorPontuacao){
+        melhorPontuacao = pontuacao;
+        melhor = secao;
+      }
+    });
+
+    return melhorPontuacao >= LIMIAR_RELEVANCIA ? melhor : null;
   }
 
   // Lê a versão direto do manifest.json (nunca hardcoded aqui), pra nunca
@@ -277,8 +384,10 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
   // Contexto dinâmico: dados do lead selecionado (reaproveita
   // buildContextoDinamicoBloco, de panel.js) + o histórico desta conversa de
   // chat até agora, já que aqui — diferente do "Gerar resposta" — a
-  // conversa pode ter várias idas e voltas.
-  function buildChatDynamicContext(lead){
+  // conversa pode ter várias idas e voltas. `mensagemUsuario` é usada só
+  // pra buscar (ver encontrarSecaoAjudaRelevante acima) uma seção de ajuda
+  // relevante pra ESTA mensagem — nunca entra no bloco cacheado, só aqui.
+  function buildChatDynamicContext(lead, mensagemUsuario){
     const base = lead
       ? buildContextoDinamicoBloco(lead, nomeParaExibir(lead), '', '')
       : 'CONTEXTO ATUAL: nenhum lead está selecionado no painel agora — responda de forma genérica, sem inventar dados de um lead específico.';
@@ -294,12 +403,21 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
         ? `\n\nLEITURA AUTOMÁTICA DESTA MENSAGEM: estágio identificado = ${chatEstagioDetectado || 'não identificado'}; emoção do cliente = ${chatEmocaoDetectada || 'não identificada'}. É uma leitura automática feita a partir do texto desta mensagem — use como apoio pra calibrar o tom e a etapa da sua resposta.`
         : '';
 
-    if(!chatHistorico.length) return base + deteccao;
+    // Só entra se a busca por palavra-chave achou uma seção de ajuda
+    // relevante pra ESTA mensagem (ver encontrarSecaoAjudaRelevante) — na
+    // maioria das mensagens (sobre o lead/venda, não sobre o Co-piloto em
+    // si) isto fica vazio e não adiciona nenhum token.
+    const secaoAjuda = encontrarSecaoAjudaRelevante(mensagemUsuario);
+    const blocoAjuda = secaoAjuda
+      ? `\n\nCONTEÚDO DE AJUDA (seção "${secaoAjuda.titulo}", de "${secaoAjuda.origem}" — use como fonte se a pergunta for sobre isso, ignore se não for):\n${secaoAjuda.texto}`
+      : '';
+
+    if(!chatHistorico.length) return base + deteccao + blocoAjuda;
 
     const historicoTexto = chatHistorico
       .map(m => `${m.role === 'user' ? 'Atendente' : 'Você'}: ${m.texto}`)
       .join('\n');
-    return `${base}${deteccao}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
+    return `${base}${deteccao}${blocoAjuda}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
   }
 
   async function pedirRespostaIA(mensagemUsuario){
@@ -322,7 +440,7 @@ IDENTIDADE DESTE CHAT: aqui (só neste chat rápido, não nas mensagens que voc�
     const leadParaTier = lead || { fixo: false, estagio: 'Primeiro contato' };
 
     const cachedSystem = buildChatCachedSystem();
-    const dynamicContext = buildChatDynamicContext(lead);
+    const dynamicContext = buildChatDynamicContext(lead, mensagemUsuario);
 
     const parsed = provider === 'claude'
       ? await callClaudeComTier(cachedSystem, dynamicContext, mensagemUsuario, leadParaTier)

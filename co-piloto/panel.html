@@ -2099,68 +2099,89 @@ Nascimento: 20/01/1992"></textarea>
       <div class="privacidade-lgpd-destaque">🔒 Acesso ou uso indevido de informação de terceiros pode configurar violação da LGPD (Lei 13.709/2018).</div>
       <p class="hint" style="margin-bottom:18px;">Sabemos que quase ninguém lê um texto de privacidade até o fim — por isso este aqui é direto, sem juridiquês. Ele explica o que o Co-piloto realmente faz com os dados que você cadastra, e por quê, pra você decidir com informação de verdade, não com uma promessa genérica de "seus dados estão seguros".</p>
 
-      <p><b>📍 Onde seus dados ficam</b></p>
-      <p>Em nenhum lugar além deste computador. Tudo é gravado no armazenamento local do Chrome (<code>chrome.storage</code>) — não existe um servidor do Co-piloto recebendo, centralizando ou fazendo backup desses dados em algum lugar. Se você desinstalar a extensão ou trocar de computador, os dados não te acompanham automaticamente: eles simplesmente continuam onde estavam, porque nunca saíram dali. Cada profissional cadastrado também tem seus próprios leads, histórico, funil, campanha e configurações — totalmente isolados dos demais (ver "Acesso, perfis e o que cada um pode fazer" em Como usar).</p>
+      <!-- Cada subtópico embrulhado num .privacidade-secao com data-titulo —
+           mesmo texto de sempre, só com uma "alça" pra ser lido em bloco
+           (ver coletarSecoesAjuda, chatbot.js: o C&S BOT usa isto pra achar
+           e citar a seção certa quando perguntado sobre privacidade, sem
+           precisar mandar o texto inteiro desta tela em toda mensagem). -->
+      <div class="privacidade-secao" data-titulo="📍 Onde seus dados ficam">
+        <p><b>📍 Onde seus dados ficam</b></p>
+        <p>Em nenhum lugar além deste computador. Tudo é gravado no armazenamento local do Chrome (<code>chrome.storage</code>) — não existe um servidor do Co-piloto recebendo, centralizando ou fazendo backup desses dados em algum lugar. Se você desinstalar a extensão ou trocar de computador, os dados não te acompanham automaticamente: eles simplesmente continuam onde estavam, porque nunca saíram dali. Cada profissional cadastrado também tem seus próprios leads, histórico, funil, campanha e configurações — totalmente isolados dos demais (ver "Acesso, perfis e o que cada um pode fazer" em Como usar).</p>
+      </div>
 
-      <p><b>🗂️ O que guardamos</b></p>
-      <p>Só o que é necessário pra você atender melhor:</p>
-      <ul>
-        <li>Dados de cada lead: nome, telefone, e-mail, CEP, data de nascimento, CPF, objetivo, notas e estágio no funil.</li>
-        <li>Histórico de mensagens coladas e respostas geradas por lead, incluindo as conversas do Chat rápido (C&amp;S BOT).</li>
-        <li>Configurações do funil de vendas e campanha ativa.</li>
-        <li>Chaves de API da Anthropic/Google configuradas por cada profissional.</li>
-        <li>Usuário/senha geral (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação (o PIN, no caso do admin) de cada um — nenhuma delas em texto puro (explicamos como, na seção de segurança abaixo). Única exceção: a credencial gerada automaticamente no primeiro uso da instalação fica em texto puro só até você confirmar que a guardou (ou fazer o primeiro login com ela) — depois disso é apagada, restando só o hash.</li>
-      </ul>
+      <div class="privacidade-secao" data-titulo="🗂️ O que guardamos">
+        <p><b>🗂️ O que guardamos</b></p>
+        <p>Só o que é necessário pra você atender melhor:</p>
+        <ul>
+          <li>Dados de cada lead: nome, telefone, e-mail, CEP, data de nascimento, CPF, objetivo, notas e estágio no funil.</li>
+          <li>Histórico de mensagens coladas e respostas geradas por lead, incluindo as conversas do Chat rápido (C&amp;S BOT).</li>
+          <li>Configurações do funil de vendas e campanha ativa.</li>
+          <li>Chaves de API da Anthropic/Google configuradas por cada profissional.</li>
+          <li>Usuário/senha geral (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação (o PIN, no caso do admin) de cada um — nenhuma delas em texto puro (explicamos como, na seção de segurança abaixo). Única exceção: a credencial gerada automaticamente no primeiro uso da instalação fica em texto puro só até você confirmar que a guardou (ou fazer o primeiro login com ela) — depois disso é apagada, restando só o hash.</li>
+        </ul>
+      </div>
 
-      <p><b>📤 O que sai deste computador — e quando</b></p>
-      <p>Sempre por decisão sua, nunca sozinho — o Co-piloto tem 5 recursos que chamam IA, cada um enviando uma quantidade diferente de dado:</p>
-      <ul>
-        <li><b>"Gerar resposta"</b> e <b>"Sugerir abordagem ou Follow-up"</b> enviam o nome do lead (ou o nome da pessoa, ao usar a central de mensagens compartilhada), o objetivo/notas dele, o estágio dele no funil, o texto da mensagem colada e, se preenchida, a informação adicional daquela resposta — ao provedor de IA que você escolheu (Claude, da Anthropic, ou Gemini, do Google), usando a chave de API que o próprio negócio configurou.</li>
-        <li><b>"🔍 Sugerir estágio com IA"</b> envia só o texto da mensagem colada, nada mais (sem nome, objetivo, notas ou estágio) — e sempre para o Gemini (nível gratuito do Google), mesmo que o provedor principal configurado seja o Claude.</li>
-        <li><b>💬 Chat rápido (C&amp;S BOT)</b> envia a mensagem que você digita, o mesmo contexto do lead selecionado que "Gerar resposta" usa (nome, objetivo/notas, estágio) e, a cada nova mensagem, também as perguntas e respostas anteriores daquela mesma conversa de chat (reenviadas como contexto, pra manter a continuidade) — ao provedor de IA escolhido, com a chave configurada. Por trás de cada mensagem enviada, ele também roda a mesma leitura automática do "🔍 Sugerir estágio com IA" (só o texto da mensagem, sempre pro Gemini gratuito — ou pro Claude, se nenhuma chave do Gemini estiver configurada nesta instalação) pra calibrar o tom da resposta.</li>
-        <li><b>"🩺 Health Monitor"</b> é diferente dos demais: não envia nenhum dado de lead. Ao escolher um provedor, ele manda só uma mensagem fixa mínima ("oi") pra cada modelo daquele provedor, usando a chave de API já configurada, só pra medir se o modelo está respondendo e em quanto tempo — nunca é chamado sozinho, só quando você abre o Health Monitor e escolhe um provedor.</li>
-      </ul>
-      <p>Em qualquer um dos cinco, é a IA quem gera a resposta/medição — nada além do listado acima é enviado.</p>
-      <p><b>Telefone, e-mail, CEP, data de nascimento e CPF nunca saem deste computador</b> — não fazem parte do que é mandado pra IA, em nenhuma hipótese.</p>
-      <p>O Co-piloto não lê o conteúdo das conversas do WhatsApp Web. Colar uma mensagem pra gerar resposta é sempre um gesto seu, nunca algo automático.</p>
+      <div class="privacidade-secao" data-titulo="📤 O que sai deste computador — e quando">
+        <p><b>📤 O que sai deste computador — e quando</b></p>
+        <p>Sempre por decisão sua, nunca sozinho — o Co-piloto tem 5 recursos que chamam IA, cada um enviando uma quantidade diferente de dado:</p>
+        <ul>
+          <li><b>"Gerar resposta"</b> e <b>"Sugerir abordagem ou Follow-up"</b> enviam o nome do lead (ou o nome da pessoa, ao usar a central de mensagens compartilhada), o objetivo/notas dele, o estágio dele no funil, o texto da mensagem colada e, se preenchida, a informação adicional daquela resposta — ao provedor de IA que você escolheu (Claude, da Anthropic, ou Gemini, do Google), usando a chave de API que o próprio negócio configurou.</li>
+          <li><b>"🔍 Sugerir estágio com IA"</b> envia só o texto da mensagem colada, nada mais (sem nome, objetivo, notas ou estágio) — e sempre para o Gemini (nível gratuito do Google), mesmo que o provedor principal configurado seja o Claude.</li>
+          <li><b>💬 Chat rápido (C&amp;S BOT)</b> envia a mensagem que você digita, o mesmo contexto do lead selecionado que "Gerar resposta" usa (nome, objetivo/notas, estágio) e, a cada nova mensagem, também as perguntas e respostas anteriores daquela mesma conversa de chat (reenviadas como contexto, pra manter a continuidade) — ao provedor de IA escolhido, com a chave configurada. Por trás de cada mensagem enviada, ele também roda a mesma leitura automática do "🔍 Sugerir estágio com IA" (só o texto da mensagem, sempre pro Gemini gratuito — ou pro Claude, se nenhuma chave do Gemini estiver configurada nesta instalação) pra calibrar o tom da resposta.</li>
+          <li><b>"🩺 Health Monitor"</b> é diferente dos demais: não envia nenhum dado de lead. Ao escolher um provedor, ele manda só uma mensagem fixa mínima ("oi") pra cada modelo daquele provedor, usando a chave de API já configurada, só pra medir se o modelo está respondendo e em quanto tempo — nunca é chamado sozinho, só quando você abre o Health Monitor e escolhe um provedor.</li>
+        </ul>
+        <p>Em qualquer um dos cinco, é a IA quem gera a resposta/medição — nada além do listado acima é enviado.</p>
+        <p><b>Telefone, e-mail, CEP, data de nascimento e CPF nunca saem deste computador</b> — não fazem parte do que é mandado pra IA, em nenhuma hipótese.</p>
+        <p>O Co-piloto não lê o conteúdo das conversas do WhatsApp Web. Colar uma mensagem pra gerar resposta é sempre um gesto seu, nunca algo automático.</p>
+      </div>
 
-      <p><b>🔐 Como protegemos esses dados — e por quê</b></p>
-      <p>Segurança de verdade não é uma frase, é uma pilha de camadas — cada uma cobrindo um risco diferente. É assim que o Co-piloto foi desenhado:</p>
-      <ul>
-        <li><b>Duas camadas de acesso.</b> Primeiro a credencial geral da "Área restrita" (a principal, ou a de equipe — que existe justamente pra manter o cadastro de perfis e as funções de administrador longe de quem só usa o dia a dia, ver Avançado), depois a senha individual de cada perfil. Ninguém chega direto nos dados de um profissional só por estar com o computador em mãos.</li>
-        <li><b>A credencial principal não é fixa — e nunca é a mesma em duas instalações.</b> No primeiro uso, cada instalação gera automaticamente sua própria credencial aleatória, apresentada uma única vez numa janela que bloqueia a tela até você copiar e confirmar que guardou — não existe mais uma senha "de fábrica" igual em todas as cópias do Co-piloto. O administrador pode (e deve) trocar o usuário e a senha por uma escolhida por ele a qualquer momento, em Avançado → Credencial principal; enquanto isso não for feito, um aviso persistente lembra que a instalação ainda usa a credencial gerada automaticamente.</li>
-        <li><b>Nenhuma senha fica salva em texto puro.</b> Toda senha passa por um hash forte (PBKDF2-HMAC-SHA256, 210 mil iterações — a recomendação da OWASP) com um valor aleatório único por senha, antes de ser gravada. Na prática, isso significa que mesmo quem tivesse acesso direto ao arquivo de armazenamento não leria a senha de ninguém, nem conseguiria testar combinações em alta velocidade pra descobri-la.</li>
-        <li><b>Bloqueio automático depois de 3 tentativas erradas.</b> Seja a senha de um perfil ou a credencial geral da Área restrita, três erros seguidos travam o campo por 60 segundos. Existe especificamente pra impedir que alguém sente na frente do computador e fique testando senha atrás de senha sem limite.</li>
-        <li><b>Campos sensíveis cifrados, não só guardados.</b> CPF, e-mail, CEP, data de nascimento, notas e objetivo de cada lead, o conteúdo do histórico de conversas (mensagem do lead, resposta gerada e a próxima pergunta sugerida) e as chaves de API ficam cifrados com AES-256 no armazenamento — de fato ilegíveis sem a chave certa, não apenas escondidos da tela. Eles só voltam a ser texto legível na hora de exibir, com a senha do perfil correspondente. Nome e telefone ficam de fora de propósito, porque precisam ser lidos rapidamente (busca de lead por nome/número, exibição na lista lateral) sem depender de decifrar cada lead — mesmo motivo pelo qual o estágio no funil também fica fora (estatísticas do funil, escolha de modelo de IA).</li>
-        <li><b>Um código de recuperação por perfil — sua chave reserva.</b> Mostrado uma única vez, na criação do perfil ou na última troca de senha. Ele existe porque, numa criptografia de verdade, esquecer a senha tem consequência real: sem esse código, o administrador até consegue liberar o acesso de novo, mas os campos protegidos daquele perfil podem se perder — não porque o sistema decide apagar nada, mas porque, sem a chave certa, nem o próprio Co-piloto consegue decifrá-los de volta.</li>
-        <li><b>Sessão expira sozinha em 30 minutos de inatividade.</b> Pra reduzir o risco de alguém continuar com acesso liberado num computador que ficou sem supervisão.</li>
-        <li><b>Nunca duas abas mexendo nos mesmos dados ao mesmo tempo.</b> Só uma aba do painel (e uma de Configurações) funciona por vez — uma cópia dela, aberta por engano ou de propósito, é travada automaticamente sem carregar nenhum dado, evitando que duas telas gravem informações conflitantes uma por cima da outra.</li>
-        <li><b>Chaves de API só neste computador.</b> Nunca trafegam por nenhum servidor do Co-piloto — vão só do seu navegador direto pro provedor de IA escolhido, na hora de gerar cada resposta.</li>
-        <li><b>O log de auditoria nunca guarda conteúdo protegido.</b> O registro de sessões e ações (Avançado, só o administrador vê) anota também o que acontece com os leads: quem cadastrou, excluiu, restaurou ou alterou, quando, em qual perfil e de qual computador. Ele é a única parte do Co-piloto que fica <b>fora</b> do isolamento por perfil e <b>fora</b> da criptografia — é assim de propósito, porque um registro de auditoria que só o próprio auditado pudesse ler não serviria pra nada. Por isso existe uma regra dura: valor de campo protegido (CPF, e-mail, CEP, nascimento, notas, objetivo) <b>nunca</b> é escrito no log — dele fica só "alterado", "preenchido" ou "apagado". O que entra em texto legível é o mesmo que já fica legível no armazenamento: o nome do lead, o telefone, o estágio e a data.</li>
-        <li><b>Restaurar um backup avisa antes de trocar suas chaves de API.</b> Se o arquivo escolhido contiver uma chave de API diferente da já configurada, um aviso específico aparece antes de confirmar — restaurar um arquivo de origem desconhecida com uma chave de terceiro faria suas conversas de IA passarem pela conta de quem a forneceu. Qualquer campo dentro do arquivo que o Co-piloto não reconheça também é ignorado, nunca gravado.</li>
-      </ul>
+      <div class="privacidade-secao" data-titulo="🔐 Como protegemos esses dados — e por quê">
+        <p><b>🔐 Como protegemos esses dados — e por quê</b></p>
+        <p>Segurança de verdade não é uma frase, é uma pilha de camadas — cada uma cobrindo um risco diferente. É assim que o Co-piloto foi desenhado:</p>
+        <ul>
+          <li><b>Duas camadas de acesso.</b> Primeiro a credencial geral da "Área restrita" (a principal, ou a de equipe — que existe justamente pra manter o cadastro de perfis e as funções de administrador longe de quem só usa o dia a dia, ver Avançado), depois a senha individual de cada perfil. Ninguém chega direto nos dados de um profissional só por estar com o computador em mãos.</li>
+          <li><b>A credencial principal não é fixa — e nunca é a mesma em duas instalações.</b> No primeiro uso, cada instalação gera automaticamente sua própria credencial aleatória, apresentada uma única vez numa janela que bloqueia a tela até você copiar e confirmar que guardou — não existe mais uma senha "de fábrica" igual em todas as cópias do Co-piloto. O administrador pode (e deve) trocar o usuário e a senha por uma escolhida por ele a qualquer momento, em Avançado → Credencial principal; enquanto isso não for feito, um aviso persistente lembra que a instalação ainda usa a credencial gerada automaticamente.</li>
+          <li><b>Nenhuma senha fica salva em texto puro.</b> Toda senha passa por um hash forte (PBKDF2-HMAC-SHA256, 210 mil iterações — a recomendação da OWASP) com um valor aleatório único por senha, antes de ser gravada. Na prática, isso significa que mesmo quem tivesse acesso direto ao arquivo de armazenamento não leria a senha de ninguém, nem conseguiria testar combinações em alta velocidade pra descobri-la.</li>
+          <li><b>Bloqueio automático depois de 3 tentativas erradas.</b> Seja a senha de um perfil ou a credencial geral da Área restrita, três erros seguidos travam o campo por 60 segundos. Existe especificamente pra impedir que alguém sente na frente do computador e fique testando senha atrás de senha sem limite.</li>
+          <li><b>Campos sensíveis cifrados, não só guardados.</b> CPF, e-mail, CEP, data de nascimento, notas e objetivo de cada lead, o conteúdo do histórico de conversas (mensagem do lead, resposta gerada e a próxima pergunta sugerida) e as chaves de API ficam cifrados com AES-256 no armazenamento — de fato ilegíveis sem a chave certa, não apenas escondidos da tela. Eles só voltam a ser texto legível na hora de exibir, com a senha do perfil correspondente. Nome e telefone ficam de fora de propósito, porque precisam ser lidos rapidamente (busca de lead por nome/número, exibição na lista lateral) sem depender de decifrar cada lead — mesmo motivo pelo qual o estágio no funil também fica fora (estatísticas do funil, escolha de modelo de IA).</li>
+          <li><b>Um código de recuperação por perfil — sua chave reserva.</b> Mostrado uma única vez, na criação do perfil ou na última troca de senha. Ele existe porque, numa criptografia de verdade, esquecer a senha tem consequência real: sem esse código, o administrador até consegue liberar o acesso de novo, mas os campos protegidos daquele perfil podem se perder — não porque o sistema decide apagar nada, mas porque, sem a chave certa, nem o próprio Co-piloto consegue decifrá-los de volta.</li>
+          <li><b>Sessão expira sozinha em 30 minutos de inatividade.</b> Pra reduzir o risco de alguém continuar com acesso liberado num computador que ficou sem supervisão.</li>
+          <li><b>Nunca duas abas mexendo nos mesmos dados ao mesmo tempo.</b> Só uma aba do painel (e uma de Configurações) funciona por vez — uma cópia dela, aberta por engano ou de propósito, é travada automaticamente sem carregar nenhum dado, evitando que duas telas gravem informações conflitantes uma por cima da outra.</li>
+          <li><b>Chaves de API só neste computador.</b> Nunca trafegam por nenhum servidor do Co-piloto — vão só do seu navegador direto pro provedor de IA escolhido, na hora de gerar cada resposta.</li>
+          <li><b>O log de auditoria nunca guarda conteúdo protegido.</b> O registro de sessões e ações (Avançado, só o administrador vê) anota também o que acontece com os leads: quem cadastrou, excluiu, restaurou ou alterou, quando, em qual perfil e de qual computador. Ele é a única parte do Co-piloto que fica <b>fora</b> do isolamento por perfil e <b>fora</b> da criptografia — é assim de propósito, porque um registro de auditoria que só o próprio auditado pudesse ler não serviria pra nada. Por isso existe uma regra dura: valor de campo protegido (CPF, e-mail, CEP, nascimento, notas, objetivo) <b>nunca</b> é escrito no log — dele fica só "alterado", "preenchido" ou "apagado". O que entra em texto legível é o mesmo que já fica legível no armazenamento: o nome do lead, o telefone, o estágio e a data.</li>
+          <li><b>Restaurar um backup avisa antes de trocar suas chaves de API.</b> Se o arquivo escolhido contiver uma chave de API diferente da já configurada, um aviso específico aparece antes de confirmar — restaurar um arquivo de origem desconhecida com uma chave de terceiro faria suas conversas de IA passarem pela conta de quem a forneceu. Qualquer campo dentro do arquivo que o Co-piloto não reconheça também é ignorado, nunca gravado.</li>
+        </ul>
+      </div>
 
-      <p><b>🗑️ Retenção e exclusão</b></p>
-      <ul>
-        <li>Leads e respostas excluídos ficam recuperáveis por 30 dias antes de serem apagados de vez, automaticamente — um seguro contra exclusão por engano, não um arquivo permanente.</li>
-        <li>O log de sessões e ações (visível só pro administrador) fica guardado por até 90 dias, pra dar visibilidade de uso sem acumular histórico indefinidamente.</li>
-        <li>Qualquer lead pode ser excluído definitivamente a qualquer momento, sem precisar esperar o prazo acima.</li>
-        <li>O administrador pode resetar a instalação inteira (todos os perfis e todos os dados) quando quiser, em Avançado.</li>
-        <li>Backup e restauração (também em Avançado) permitem exportar ou apagar seus próprios dados quando você quiser — o controle é seu.</li>
-      </ul>
+      <div class="privacidade-secao" data-titulo="🗑️ Retenção e exclusão">
+        <p><b>🗑️ Retenção e exclusão</b></p>
+        <ul>
+          <li>Leads e respostas excluídos ficam recuperáveis por 30 dias antes de serem apagados de vez, automaticamente — um seguro contra exclusão por engano, não um arquivo permanente.</li>
+          <li>O log de sessões e ações (visível só pro administrador) fica guardado por até 90 dias, pra dar visibilidade de uso sem acumular histórico indefinidamente.</li>
+          <li>Qualquer lead pode ser excluído definitivamente a qualquer momento, sem precisar esperar o prazo acima.</li>
+          <li>O administrador pode resetar a instalação inteira (todos os perfis e todos os dados) quando quiser, em Avançado.</li>
+          <li>Backup e restauração (também em Avançado) permitem exportar ou apagar seus próprios dados quando você quiser — o controle é seu.</li>
+        </ul>
+      </div>
 
-      <p><b>🚫 O que o Co-piloto não faz</b></p>
-      <ul>
-        <li>Não vende, aluga nem compartilha dados com ninguém além do provedor de IA que você escolheu — e só o mínimo necessário pra gerar a resposta (ver acima).</li>
-        <li>Não tem publicidade, rastreamento de navegação nem analytics de uso.</li>
-        <li>Não automatiza, intercepta nem envia nada sozinho dentro do WhatsApp Web — quem decide cada envio é sempre você.</li>
-      </ul>
+      <div class="privacidade-secao" data-titulo="🚫 O que o Co-piloto não faz">
+        <p><b>🚫 O que o Co-piloto não faz</b></p>
+        <ul>
+          <li>Não vende, aluga nem compartilha dados com ninguém além do provedor de IA que você escolheu — e só o mínimo necessário pra gerar a resposta (ver acima).</li>
+          <li>Não tem publicidade, rastreamento de navegação nem analytics de uso.</li>
+          <li>Não automatiza, intercepta nem envia nada sozinho dentro do WhatsApp Web — quem decide cada envio é sempre você.</li>
+        </ul>
+      </div>
 
-      <p><b>🏢 De quem é a responsabilidade</b></p>
-      <p>O Co-piloto é uma ferramenta local — quem decide quais dados de cada lead cadastrar, e com qual base legal, é o negócio que usa a extensão, não quem a desenvolveu. Este texto descreve o que o <i>software</i> faz com os dados; obrigações legais do negócio (como avisar os próprios clientes sobre o uso de IA no atendimento) continuam sendo dele.</p>
+      <div class="privacidade-secao" data-titulo="🏢 De quem é a responsabilidade">
+        <p><b>🏢 De quem é a responsabilidade</b></p>
+        <p>O Co-piloto é uma ferramenta local — quem decide quais dados de cada lead cadastrar, e com qual base legal, é o negócio que usa a extensão, não quem a desenvolveu. Este texto descreve o que o <i>software</i> faz com os dados; obrigações legais do negócio (como avisar os próprios clientes sobre o uso de IA no atendimento) continuam sendo dele.</p>
+      </div>
 
-      <p><b>✉️ Fale com a gente</b></p>
-      <p>Dúvidas sobre como seus dados são tratados nesta instalação: <a href="mailto:csvirtual.av@gmail.com" target="_blank" rel="noopener noreferrer">csvirtual.av@gmail.com</a>.</p>
+      <div class="privacidade-secao" data-titulo="✉️ Fale com a gente">
+        <p><b>✉️ Fale com a gente</b></p>
+        <p>Dúvidas sobre como seus dados são tratados nesta instalação: <a href="mailto:csvirtual.av@gmail.com" target="_blank" rel="noopener noreferrer">csvirtual.av@gmail.com</a>.</p>
+      </div>
     </div>
   </div>
 </div>
