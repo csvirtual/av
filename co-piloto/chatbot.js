@@ -294,6 +294,47 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       .filter(w => w.length >= 3 && !STOPWORDS_AJUDA.has(w));
   }
 
+  // Tags que a resposta direta do guia (ver renderMensagem/opts.html) pode
+  // exibir formatadas — negrito, parágrafos, listas, igual já aparece nos
+  // modais de "Como usar"/"Privacidade". Qualquer outra tag encontrada (ex.:
+  // os links internos "<a class=help-goto>" de navegação entre seções, que
+  // não fazem sentido dentro do chat) tem só o envoltório descartado; o
+  // conteúdo de dentro continua.
+  const TAGS_PERMITIDAS_AJUDA = new Set(['P', 'B', 'STRONG', 'I', 'EM', 'UL', 'OL', 'LI', 'BR', 'CODE']);
+
+  // Reconstrói o HTML de um nó só com as tags do allowlist acima, texto
+  // sempre escapado — nunca copia innerHTML bruto nem qualquer atributo.
+  // A origem é sempre o NOSSO próprio HTML estático (#helpBody/
+  // #privacidadeModalOverlay, nunca lead/IA/texto digitado por alguém),
+  // então isto é uma camada extra de segurança, não uma defesa contra
+  // conteúdo hostil de verdade — mas evita que qualquer coisa fora do
+  // esperado (um id, uma classe, um atributo) vaze pro innerHTML da bolha
+  // do chat.
+  function serializarNosHtmlSeguroAjuda(nos){
+    let html = '';
+    nos.forEach(filho => {
+      if(filho.nodeType === Node.TEXT_NODE){
+        const texto = filho.textContent.replace(/\s+/g, ' ');
+        if(!texto.trim()) return; // espaço "decorativo" do HTML de origem entre tags, não é conteúdo
+        html += escapeHtml(texto);
+        return;
+      }
+      if(filho.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = filho.tagName;
+      if(tag === 'BR'){ html += '<br>'; return; }
+      if(TAGS_PERMITIDAS_AJUDA.has(tag)){
+        const tagMin = tag.toLowerCase();
+        html += `<${tagMin}>${serializarNosHtmlSeguroAjuda(Array.from(filho.childNodes))}</${tagMin}>`;
+        return;
+      }
+      html += serializarNosHtmlSeguroAjuda(Array.from(filho.childNodes));
+    });
+    return html;
+  }
+  function serializarHtmlSeguroAjuda(node){
+    return serializarNosHtmlSeguroAjuda(Array.from(node.childNodes));
+  }
+
   // Memoizado: o conteúdo de #helpBody/#privacidadeModalOverlay não muda em
   // tempo de execução (só se a extensão for atualizada, o que já recarrega
   // a página) — não faz sentido varrer o DOM de novo a cada mensagem.
@@ -311,6 +352,11 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
         origem: 'Como usar o co-piloto',
         titulo,
         texto: corpoEl.textContent.replace(/\s+/g, ' ').trim(),
+        // Mesmo conteúdo de `texto` acima, só que preservando negrito/
+        // parágrafos/listas — usado pra exibir a resposta direta formatada
+        // (ver renderMensagem/opts.html); `texto` continua sendo o que vai
+        // pro histórico e pro prompt da IA (não precisa de HTML ali).
+        html: serializarHtmlSeguroAjuda(corpoEl),
         palavrasTitulo: palavrasRelevantes(titulo)
       });
     });
@@ -318,10 +364,19 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     document.querySelectorAll('#privacidadeModalOverlay .privacidade-secao').forEach(item => {
       const titulo = (item.dataset.titulo || '').trim();
       if(!titulo) return;
+      // O primeiro elemento de cada .privacidade-secao já é o próprio
+      // título em negrito, repetido de propósito no HTML de origem (é a
+      // mesma convenção nas 8 seções de Privacidade) — como o chat mostra
+      // o título separado (a partir de data-titulo, acima), pula esse
+      // primeiro elemento pra não repetir a mesma linha duas vezes na
+      // resposta.
+      const primeiroElemento = item.children[0];
+      const nosSemTitulo = Array.from(item.childNodes).filter(n => n !== primeiroElemento);
       secoes.push({
         origem: 'Privacidade e proteção de dados',
         titulo,
-        texto: item.textContent.replace(/\s+/g, ' ').trim(),
+        texto: nosSemTitulo.map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim(),
+        html: serializarNosHtmlSeguroAjuda(nosSemTitulo),
         palavrasTitulo: palavrasRelevantes(titulo)
       });
     });
@@ -460,7 +515,18 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     const box = elMessages();
     const div = document.createElement('div');
     div.className = 'chat-msg ' + (role === 'user' ? 'user' : 'ai') + (opts.erro ? ' error' : '') + (opts.loading ? ' loading' : '');
-    div.textContent = texto;
+    if(opts.html){
+      // Só usado pela resposta direta do guia "Como usar"/"Privacidade" (ver
+      // enviarMensagemChat) — HTML sempre montado por
+      // serializarHtmlSeguroAjuda a partir do NOSSO próprio HTML estático
+      // (nunca de lead, IA ou texto digitado por alguém), restrito a uma
+      // allowlist de tags. Todo o resto do chat (mensagem do usuário,
+      // resposta da IA, erros) continua em texto puro via textContent — a
+      // defesa contra XSS que o chat sempre teve não muda pra esses casos.
+      div.innerHTML = opts.html;
+    }else{
+      div.textContent = texto;
+    }
     if(opts.id) div.id = opts.id;
     box.appendChild(div);
 
@@ -625,8 +691,14 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // não há risco de troca de lead no meio do caminho aqui.
     const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
     if(secaoAjudaDireta){
+      // respostaDireta (texto puro) é o que vai pro histórico salvo e pro
+      // contexto da conversa — respostaDiretaHtml (negrito/parágrafos/listas
+      // preservados, ver serializarHtmlSeguroAjuda) é só pra exibição AGORA
+      // na bolha do chat, mais fácil de ler. Mesmo conteúdo, duas
+      // apresentações — nenhuma palavra muda entre as duas.
       const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
-      renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA` });
+      const respostaDiretaHtml = `<p><b>${escapeHtml(secaoAjudaDireta.titulo)}</b></p>${secaoAjudaDireta.html}`;
+      renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, html: respostaDiretaHtml });
       chatHistorico.push({ role: 'ai', texto: respostaDireta });
       registrarTrocaNoHistoricoBot(texto, respostaDireta, leadIdDoEnvio);
       chatOcupado = false;
