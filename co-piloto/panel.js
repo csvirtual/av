@@ -3608,6 +3608,65 @@ async function preencherEstagioPorNomeConhecido(){
 // depois usar) um estágio pra ESTA mensagem faz sentido igual a qualquer
 // outro lead; só não fica gravado como se fosse um estado permanente do
 // lead compartilhado.
+// Prompt de classificação de estágio/emoção — compartilhado entre este
+// botão e o chat rápido (ver classificarEstagioEmocao, chatbot.js, que
+// delega pra esta mesma função) pra nunca divergir os dois quando um dos
+// dois for ajustado.
+function promptClassificadorEstagioEmocao(){
+  return `Você classifica em qual etapa de um funil de vendas consultivas por WhatsApp uma conversa está, e lê a emoção predominante do cliente nela, com base só no trecho mandado. Responda SOMENTE com um JSON válido (sem markdown, sem texto fora do JSON):
+{
+  "estagio_sugerido": "uma exatamente destas opções: ${ESTAGIO_ORDER.join(' | ')}",
+  "emocao_cliente": "1 a 3 palavras descrevendo a emoção predominante do cliente nesta mensagem (ex: animado, hesitante, frustrado, confiante, ansioso, neutro), ou null se não der pra perceber nenhuma"
+}
+Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem; Sondagem = descobrindo a dor/objetivo; Validação da dor = já entendeu a dor, ainda não apresentou solução; Apresentação da solução = já explicou o que oferece; Condução ao valor = falando de preço/investimento; Objeção = o lead levantou uma objeção (preço, tempo, confiança, "vou pensar"); Fechamento = perto de confirmar/agendar; Follow-up = lead sumiu, retomando contato; Perdido = recusou claramente ou encerrou sem interesse.`;
+}
+
+// Classifica estágio/emoção de um trecho de texto, com fallback Gemini →
+// Claude: tenta o Gemini primeiro (nível econômico, mesmo critério de
+// callGeminiComTier) e só cai pro Claude se não houver NENHUMA chave do
+// Gemini configurada — instalações 100% Claude usam este recurso
+// normalmente, em vez de ficar bloqueadas por só existir um caminho
+// Gemini-only (era o caso antes). Devolve {estagio, emocao} (campos podem
+// vir null se a IA não identificou) ou null se nenhum provedor está
+// configurado ou a chamada falhou.
+async function classificarEstagioEmocaoComIA(texto){
+  if(!texto) return null;
+  const cachedClassificador = promptClassificadorEstagioEmocao();
+
+  const credenciaisGemini = resolverCredenciaisGemini('basico');
+  if(credenciaisGemini.apiKey){
+    try{
+      const resultado = await callGemini(cachedClassificador, '', texto, credenciaisGemini.apiKey, credenciaisGemini.model);
+      return {
+        estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
+        emocao: textoDaIA(resultado.emocao_cliente, 40) || null
+      };
+    }catch(err){
+      console.error(err);
+      return null; // Gemini configurado mas falhou agora — não insiste no Claude, mesma postura silenciosa de sempre
+    }
+  }
+
+  // Sem nenhuma chave do Gemini: cai pro Claude, se a instalação tiver uma
+  // configurada — no modelo econômico quando existir um definido, senão o
+  // principal (mesma regra de custo de callClaudeComTier).
+  if(providerSettings.claudeKey){
+    const modeloClassificacao = providerSettings.claudeModeloBasico || providerSettings.claudeModel || 'claude-sonnet-5';
+    try{
+      const resultado = await callClaude(cachedClassificador, '', texto, modeloClassificacao);
+      return {
+        estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
+        emocao: textoDaIA(resultado.emocao_cliente, 40) || null
+      };
+    }catch(err){
+      console.error(err);
+      return null;
+    }
+  }
+
+  return null; // nenhum provedor configurado
+}
+
 async function sugerirEstagioComIA(){
   if(!currentLeadId) return;
   const lead = leads.find(l=>l.id===currentLeadId);
@@ -3621,9 +3680,11 @@ async function sugerirEstagioComIA(){
   const pasted = document.getElementById('pasteBox').value.trim();
   if(!pasted){ toast('Cole a mensagem do lead primeiro'); return; }
 
-  const credenciais = resolverCredenciaisGemini('basico');
-  if(!credenciais.apiKey){
-    toast('Este recurso usa o nível gratuito do Gemini — configure uma chave em Configurações primeiro');
+  // Só bloqueia se NENHUM dos dois provedores tiver chave — antes exigia
+  // especificamente o Gemini, mesmo que a instalação já tivesse Claude
+  // configurado (ver classificarEstagioEmocaoComIA, que tenta os dois).
+  if(!resolverCredenciaisGemini('basico').apiKey && !providerSettings.claudeKey){
+    toast('Configure uma chave de API em Configurações primeiro (Gemini ou Claude)');
     openOptions();
     return;
   }
@@ -3632,14 +3693,8 @@ async function sugerirEstagioComIA(){
   if(btn) btn.disabled = true;
   const leadId = lead.id;
   try{
-    const cachedClassificador = `Você classifica em qual etapa de um funil de vendas consultivas por WhatsApp uma conversa está, e lê a emoção predominante do cliente nela, com base só no trecho mandado. Responda SOMENTE com um JSON válido (sem markdown, sem texto fora do JSON):
-{
-  "estagio_sugerido": "uma exatamente destas opções: ${ESTAGIO_ORDER.join(' | ')}",
-  "emocao_cliente": "1 a 3 palavras descrevendo a emoção predominante do cliente nesta mensagem (ex: animado, hesitante, frustrado, confiante, ansioso, neutro), ou null se não der pra perceber nenhuma"
-}
-Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem; Sondagem = descobrindo a dor/objetivo; Validação da dor = já entendeu a dor, ainda não apresentou solução; Apresentação da solução = já explicou o que oferece; Condução ao valor = falando de preço/investimento; Objeção = o lead levantou uma objeção (preço, tempo, confiança, "vou pensar"); Fechamento = perto de confirmar/agendar; Follow-up = lead sumiu, retomando contato; Perdido = recusou claramente ou encerrou sem interesse.`;
-    const resultado = await callGemini(cachedClassificador, '', pasted, credenciais.apiKey, credenciais.model);
-    const sugestao = estagioFunilValido(resultado.estagio_sugerido);
+    const resultado = await classificarEstagioEmocaoComIA(pasted);
+    const sugestao = resultado ? resultado.estagio : null;
     if(!sugestao){
       toast('Não consegui sugerir um estágio com confiança — escolha manualmente');
       return;
@@ -3663,7 +3718,7 @@ Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem;
     // feita aqui é a que fica valendo — "Gerar resposta" não sobrescreve
     // (ver analyzeAndSuggest). draftChipsCategoriaOrigemTexto guarda o
     // texto exato a que esta leitura se refere, pra ele conferir isso.
-    const emocao = textoDaIA(resultado.emocao_cliente, 40);
+    const emocao = resultado.emocao;
     leadAtual.draftChipsCategoria = emocao;
     leadAtual.draftChipsCategoriaOrigemTexto = emocao ? pasted : '';
     await persistLeads();

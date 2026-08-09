@@ -13,6 +13,17 @@ function liberarConfig(){
   atualizarMinhaContaForm();
   copilotoMonitorarAtividade();
   copilotoIniciarChecagemInatividade(bloquearConfigPorInatividade);
+
+  // Um link com #âncora (ex.: options.html#cardProvedorIA, usado pelo aviso
+  // "sem chave" do chat rápido — ver mostrarAvisoSemChave em chatbot.js) só
+  // rola até o elemento se ele já estiver visível no momento do parse da
+  // página — mas #configApp começa com display:none até aqui, então o
+  // scroll automático do navegador não tem efeito nenhum. Refazemos manualmente
+  // agora que a tela ficou visível.
+  if(location.hash){
+    const alvo = document.querySelector(location.hash);
+    if(alvo) alvo.scrollIntoView({ block: 'start' });
+  }
 }
 
 // atualizarFaixaAdminImpersonando vive em auth.js (compartilhada com panel.js).

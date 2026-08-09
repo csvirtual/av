@@ -320,10 +320,10 @@
       return `
         <tr data-id="${item.id}" class="${!item.incluir ? 'linha-ignorada' : ''}">
           <td><input type="checkbox" class="importar-chk" data-id="${item.id}" ${item.incluir ? 'checked' : ''}></td>
-          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="nome" value="${escapeAttr(item.nome)}" placeholder="Nome completo"></td>
-          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="telefone" value="${escapeAttr(item.telefone)}" placeholder="(00) 00000-0000"></td>
-          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="cpf" value="${escapeAttr(item.cpf)}" placeholder="000.000.000-00"></td>
-          <td><input type="date" class="importar-campo" data-id="${item.id}" data-campo="dataNascimento" value="${escapeAttr(item.dataNascimento)}"></td>
+          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="nome" value="${escapeHtml(item.nome)}" placeholder="Nome completo"></td>
+          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="telefone" value="${escapeHtml(item.telefone)}" placeholder="(00) 00000-0000"></td>
+          <td><input type="text" class="importar-campo" data-id="${item.id}" data-campo="cpf" value="${escapeHtml(item.cpf)}" placeholder="000.000.000-00"></td>
+          <td><input type="date" class="importar-campo" data-id="${item.id}" data-campo="dataNascimento" value="${escapeHtml(item.dataNascimento)}"></td>
           <td><span class="importar-status-pill ${pillClass}">${item.statusInfo.texto}</span></td>
           <td class="importar-col-del"><button class="importar-del-btn" data-id="${item.id}" title="Remover da lista">🗑️</button></td>
         </tr>
@@ -337,9 +337,8 @@
     document.getElementById('importarSelecionarTodos').checked = todosMarcados;
   }
 
-  function escapeAttr(v){
-    return (v||'').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  }
+  // escapeHtml (global, definida em panel.js — carregado antes deste
+  // arquivo) já cobre isto; não precisa de uma cópia local.
 
   function limparResultado(){
     contatosExtraidos = [];

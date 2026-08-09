@@ -71,6 +71,15 @@
     return leads.find(l => l.id === currentLeadId) || null;
   }
 
+  // Busca um lead por id específico, independente de ser o selecionado
+  // agora — usado por registrarTrocaNoHistoricoBot pra achar o nome do lead
+  // de QUANDO a pergunta foi feita, mesmo que a pessoa já tenha trocado de
+  // lead antes da resposta chegar.
+  function leadPorId(id){
+    if(!id || typeof leads === 'undefined') return null;
+    return leads.find(l => l.id === id) || null;
+  }
+
   function nomeParaExibir(lead){
     if(!lead) return '';
     if(lead.fixo){
@@ -130,52 +139,28 @@
   // configurado (Claude, no modelo econômico se houver um definido) em vez
   // de desistir — uma instalação 100% Claude não perde este recurso só por
   // não ter Gemini cadastrado.
+  // Delega inteiramente pra classificarEstagioEmocaoComIA (panel.js,
+  // carregado antes deste arquivo) — é a MESMA classificação (mesmo
+  // prompt, mesmo fallback Gemini→Claude) que o botão 🔍 "Sugerir estágio
+  // com IA" do painel principal usa, só que aqui aplicada ao texto desta
+  // mensagem do chat em vez do texto colado no painel. Ver
+  // promptClassificadorEstagioEmocao/classificarEstagioEmocaoComIA em
+  // panel.js pra não duplicar essa lógica em dois arquivos.
   async function classificarEstagioEmocao(texto){
     if(!texto) return null;
-    if(typeof ESTAGIO_ORDER === 'undefined' || typeof estagioFunilValido !== 'function') return null;
-
-    const cachedClassificador = `Você classifica em qual etapa de um funil de vendas consultivas por WhatsApp uma conversa está, e lê a emoção predominante do cliente nela, com base só no trecho mandado. Responda SOMENTE com um JSON válido (sem markdown, sem texto fora do JSON):
-{
-  "estagio_sugerido": "uma exatamente destas opções: ${ESTAGIO_ORDER.join(' | ')}",
-  "emocao_cliente": "1 a 3 palavras descrevendo a emoção predominante do cliente nesta mensagem (ex: animado, hesitante, frustrado, confiante, ansioso, neutro), ou null se não der pra perceber nenhuma"
-}
-Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem; Sondagem = descobrindo a dor/objetivo; Validação da dor = já entendeu a dor, ainda não apresentou solução; Apresentação da solução = já explicou o que oferece; Condução ao valor = falando de preço/investimento; Objeção = o lead levantou uma objeção (preço, tempo, confiança, "vou pensar"); Fechamento = perto de confirmar/agendar; Follow-up = lead sumiu, retomando contato; Perdido = recusou claramente ou encerrou sem interesse.`;
-
-    if(typeof resolverCredenciaisGemini === 'function' && typeof callGemini === 'function'){
-      const credenciais = resolverCredenciaisGemini('basico');
-      if(credenciais.apiKey){
-        try{
-          const resultado = await callGemini(cachedClassificador, '', texto, credenciais.apiKey, credenciais.model);
-          return {
-            estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
-            emocao: textoDaIA(resultado.emocao_cliente, 40) || null
-          };
-        }catch(err){
-          console.error(err);
-          return null; // Gemini configurado mas falhou agora — não insiste no Claude, mesma postura silenciosa de sempre
-        }
-      }
-    }
-
-    // Sem nenhuma chave do Gemini: cai pro Claude, se a instalação tiver uma
-    // configurada — no modelo econômico quando existir um definido, senão o
-    // principal (mesma regra de custo de callClaudeComTier).
-    if(typeof providerSettings !== 'undefined' && providerSettings.claudeKey && typeof callClaude === 'function'){
-      const modeloClassificacao = providerSettings.claudeModeloBasico || providerSettings.claudeModel || 'claude-sonnet-5';
-      try{
-        const resultado = await callClaude(cachedClassificador, '', texto, modeloClassificacao);
-        return {
-          estagio: estagioFunilValido(resultado.estagio_sugerido) || null,
-          emocao: textoDaIA(resultado.emocao_cliente, 40) || null
-        };
-      }catch(err){
-        console.error(err);
-        return null;
-      }
-    }
-
-    return null; // nenhum provedor configurado — silencioso, mesmo comportamento de sempre
+    if(typeof classificarEstagioEmocaoComIA !== 'function') return null;
+    return classificarEstagioEmocaoComIA(texto);
   }
+
+  // Classificação disparada pelo paste (ver detectarEstagioEmocaoChat) que
+  // ainda está em voo — permite que garantirLeituraEstagioParaEnvio
+  // reaproveite essa MESMA chamada, em vez de disparar uma segunda, se a
+  // pessoa colar e apertar Enter rápido demais (antes do preview do paste
+  // terminar). Sem isto, as duas rodam em paralelo pro mesmo texto e uma
+  // delas é gasto de token jogado fora (o resultado dela é descartado de
+  // qualquer forma, ver comentário abaixo).
+  let _leituraEstagioEmVooTexto = '';
+  let _leituraEstagioEmVooPromise = null;
 
   // Dispara sozinha assim que um texto é COLADO na caixa deste chat — é só
   // um preview antecipado (roda de novo, com garantia, no momento do envio
@@ -183,7 +168,10 @@ Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem;
   // descartar o resultado se a pessoa já mudou de ideia enquanto classificava.
   async function detectarEstagioEmocaoChat(texto){
     if(!texto || chatEstagioManual) return; // com estágio fixado manualmente, não há o que detectar
-    const resultado = await classificarEstagioEmocao(texto);
+    _leituraEstagioEmVooTexto = texto;
+    _leituraEstagioEmVooPromise = classificarEstagioEmocao(texto);
+    const resultado = await _leituraEstagioEmVooPromise;
+    if(_leituraEstagioEmVooTexto === texto) _leituraEstagioEmVooPromise = null;
     if(!resultado) return;
     // Se a pessoa já apagou/trocou o texto colado enquanto a classificação
     // rodava, a leitura não bate mais com o que está na caixa — descarta.
@@ -205,7 +193,12 @@ Guia rápido do que cada etapa significa: Primeiro contato = ainda sem sondagem;
       return;
     }
     if(chatEstagioDetectadoOrigemTexto === texto) return;
-    const resultado = await classificarEstagioEmocao(texto);
+    // Colar e enviar rápido demais: o preview do paste (detectarEstagioEmocaoChat)
+    // ainda não terminou pra este mesmo texto — reaproveita a chamada já em
+    // voo em vez de começar uma segunda igual.
+    const resultado = (_leituraEstagioEmVooTexto === texto && _leituraEstagioEmVooPromise)
+      ? await _leituraEstagioEmVooPromise
+      : await classificarEstagioEmocao(texto);
     chatEstagioDetectado = resultado ? resultado.estagio : null;
     chatEmocaoDetectada = resultado ? resultado.emocao : null;
     chatEstagioDetectadoOrigemTexto = texto;
@@ -315,7 +308,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       if(!tituloEl || !corpoEl) return;
       const titulo = tituloEl.textContent.trim();
       secoes.push({
-        origem: 'Como usar o copiloto',
+        origem: 'Como usar o co-piloto',
         titulo,
         texto: corpoEl.textContent.replace(/\s+/g, ' ').trim(),
         palavrasTitulo: palavrasRelevantes(titulo)
@@ -387,7 +380,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // conversa pode ter várias idas e voltas. `mensagemUsuario` é usada só
   // pra buscar (ver encontrarSecaoAjudaRelevante acima) uma seção de ajuda
   // relevante pra ESTA mensagem — nunca entra no bloco cacheado, só aqui.
-  function buildChatDynamicContext(lead, mensagemUsuario){
+  function buildChatDynamicContext(lead, mensagemUsuario, secaoAjudaConhecida){
     const base = lead
       ? buildContextoDinamicoBloco(lead, nomeParaExibir(lead), '', '')
       : 'CONTEXTO ATUAL: nenhum lead está selecionado no painel agora — responda de forma genérica, sem inventar dados de um lead específico.';
@@ -406,8 +399,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // Só entra se a busca por palavra-chave achou uma seção de ajuda
     // relevante pra ESTA mensagem (ver encontrarSecaoAjudaRelevante) — na
     // maioria das mensagens (sobre o lead/venda, não sobre o Co-piloto em
-    // si) isto fica vazio e não adiciona nenhum token.
-    const secaoAjuda = encontrarSecaoAjudaRelevante(mensagemUsuario);
+    // si) isto fica vazio e não adiciona nenhum token. secaoAjudaConhecida
+    // deixa reaproveitar um resultado já calculado por quem chamou (ver
+    // enviarMensagemChat, que já roda esta mesma busca antes de decidir se
+    // cai no fluxo de IA) em vez de varrer todas as seções de novo — usa
+    // `undefined` (padrão) pra "ainda não sei, calcule agora".
+    const secaoAjuda = secaoAjudaConhecida !== undefined ? secaoAjudaConhecida : encontrarSecaoAjudaRelevante(mensagemUsuario);
     const blocoAjuda = secaoAjuda
       ? `\n\nCONTEÚDO DE AJUDA (seção "${secaoAjuda.titulo}", de "${secaoAjuda.origem}" — use como fonte se a pergunta for sobre isso, ignore se não for):\n${secaoAjuda.texto}`
       : '';
@@ -420,7 +417,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return `${base}${deteccao}${blocoAjuda}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
   }
 
-  async function pedirRespostaIA(mensagemUsuario){
+  async function pedirRespostaIA(mensagemUsuario, secaoAjudaConhecida){
     const provider = providerSettings.provider;
     const key = provider === 'claude'
       ? providerSettings.claudeKey
@@ -440,7 +437,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     const leadParaTier = lead || { fixo: false, estagio: 'Primeiro contato' };
 
     const cachedSystem = buildChatCachedSystem();
-    const dynamicContext = buildChatDynamicContext(lead, mensagemUsuario);
+    const dynamicContext = buildChatDynamicContext(lead, mensagemUsuario, secaoAjudaConhecida);
 
     const parsed = provider === 'claude'
       ? await callClaudeComTier(cachedSystem, dynamicContext, mensagemUsuario, leadParaTier)
@@ -498,20 +495,24 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return div;
   }
 
-  // Registra uma troca (pergunta + resposta) no Histórico do Bot do lead
-  // atual — usada tanto pela resposta gerada por IA quanto pela resposta
-  // direta do guia (ver enviarMensagemChat), pra não duplicar essa lógica
-  // nos dois caminhos.
-  function registrarTrocaNoHistoricoBot(pergunta, resposta, opts){
+  // Registra uma troca (pergunta + resposta) no Histórico do Bot — usada
+  // tanto pela resposta gerada por IA quanto pela resposta direta do guia
+  // (ver enviarMensagemChat), pra não duplicar essa lógica nos dois
+  // caminhos. leadId é sempre recebido explícito de quem chama (nunca lido
+  // de leadAtualParaChat() aqui dentro): entre o envio da pergunta e a
+  // resposta chegar (chamada de IA, alguns segundos) a pessoa pode ter
+  // trocado de lead — se essa função relesse o lead atual nesse momento,
+  // salvaria a troca no histórico do lead ERRADO (ver leadIdDoEnvio em
+  // enviarMensagemChat).
+  function registrarTrocaNoHistoricoBot(pergunta, resposta, leadIdDaTroca, opts){
     opts = opts || {};
-    const lead = leadAtualParaChat();
-    const leadIdDaTroca = lead ? lead.id : null;
+    const leadDaTroca = leadPorId(leadIdDaTroca);
     const entry = {
       id: 'bothist_' + Date.now(),
       quando: new Date().toISOString(),
       pergunta,
       resposta,
-      leadNome: lead ? nomeParaExibir(lead) : '',
+      leadNome: leadDaTroca ? nomeParaExibir(leadDaTroca) : '',
       estagio: opts.estagio || '',
       emocao: opts.emocao || ''
     };
@@ -548,7 +549,17 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // não quiser contar.
   function mostrarAvisoSemChave(){
     const box = elMessages();
+    // Se a pessoa mandar outra pergunta que também precise de IA enquanto o
+    // aviso anterior ainda está contando (nada impede reenviar — chatOcupado
+    // volta a false depois de um erro), remove o aviso antigo em vez de
+    // empilhar um segundo: só o timer mais novo rodava mesmo (ver
+    // cancelarAvisoSemChave logo abaixo), então o antigo ficava com o texto
+    // da contagem congelado pra sempre.
+    const avisoAntigo = document.getElementById('chatAvisoSemChaveMsg');
+    if(avisoAntigo) avisoAntigo.remove();
+
     const div = document.createElement('div');
+    div.id = 'chatAvisoSemChaveMsg';
     div.className = 'chat-msg ai error';
     const textoEl = document.createElement('div');
     div.appendChild(textoEl);
@@ -589,6 +600,14 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     const texto = input.value.trim();
     if(!texto) return;
 
+    // Lead a que ESTA pergunta pertence, capturado antes de qualquer
+    // espera assíncrona. A resposta (chamada de IA, alguns segundos) pode
+    // demorar mais que o tempo até a pessoa fechar o chat e trocar de
+    // lead — sem isto, tanto a gravação no Histórico do Bot quanto a
+    // renderização da resposta aconteceriam sob o lead ERRADO (ver
+    // aindaNoMesmoLead mais abaixo e registrarTrocaNoHistoricoBot).
+    const leadIdDoEnvio = (leadAtualParaChat() || {}).id || null;
+
     chatOcupado = true;
     elSend().disabled = true;
     input.value = '';
@@ -602,13 +621,14 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // do guia "Como usar"/"Privacidade", sem gastar IA nenhuma — funciona
     // mesmo sem nenhuma chave de API configurada. Só perguntas SEM uma
     // seção clara (a maioria: sobre o lead/venda) seguem pro fluxo de IA
-    // normal, logo abaixo.
+    // normal, logo abaixo. Sem nenhum await entre o clique e este ponto,
+    // não há risco de troca de lead no meio do caminho aqui.
     const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
     if(secaoAjudaDireta){
       const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
       renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA` });
       chatHistorico.push({ role: 'ai', texto: respostaDireta });
-      registrarTrocaNoHistoricoBot(texto, respostaDireta);
+      registrarTrocaNoHistoricoBot(texto, respostaDireta, leadIdDoEnvio);
       chatOcupado = false;
       elSend().disabled = false;
       input.focus();
@@ -624,25 +644,50 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       await garantirLeituraEstagioParaEnvio(texto);
       atualizarBarraDeContexto();
 
-      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto);
+      // secaoAjudaDireta já foi calculada logo acima (e é sempre null aqui —
+      // se tivesse achado uma seção, já teria retornado antes) — repassa em
+      // vez de deixar pedirRespostaIA/buildChatDynamicContext varrerem as
+      // seções de ajuda de novo pra chegar no mesmo resultado.
+      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaDireta);
       loadingEl.remove();
-      renderMensagem('ai', resposta, { meta: metaRoteamento });
-      chatHistorico.push({ role: 'ai', texto: resposta });
+
+      // Depois dos awaits acima é que checamos se ainda estamos no mesmo
+      // lead de quando a pergunta foi enviada — se a pessoa trocou de lead
+      // nesse meio tempo, #chatMessagesBox/chatHistorico já são de OUTRA
+      // conversa agora: gravamos a resposta no histórico do lead certo
+      // (leadIdDoEnvio) mas não a despejamos na tela de quem está sendo
+      // vista agora.
+      const leadIdAgora = (leadAtualParaChat() || {}).id || null;
+      const aindaNoMesmoLead = leadIdAgora === leadIdDoEnvio;
+
+      if(aindaNoMesmoLead){
+        renderMensagem('ai', resposta, { meta: metaRoteamento });
+        chatHistorico.push({ role: 'ai', texto: resposta });
+      }else if(typeof toast === 'function'){
+        toast('Uma resposta pendente de outro lead chegou e foi salva no histórico dele');
+      }
       if(typeof incrementUsage === 'function') await incrementUsage();
 
-      // Registra esta troca no Histórico do Bot deste lead (persistente) —
-      // junto com a leitura automática de estágio/emoção, se houve alguma
-      // pra esta mensagem (ver detectarEstagioEmocaoChat).
-      registrarTrocaNoHistoricoBot(texto, resposta, {
+      // Registra esta troca no Histórico do Bot do lead a que ela pertence
+      // (persistente) — junto com a leitura automática de estágio/emoção,
+      // se houve alguma pra esta mensagem (ver detectarEstagioEmocaoChat).
+      // Sempre usa leadIdDoEnvio, nunca o lead atual (ver comentário acima).
+      registrarTrocaNoHistoricoBot(texto, resposta, leadIdDoEnvio, {
         estagio: chatEstagioDetectado || '',
         emocao: chatEmocaoDetectada || ''
       });
     }catch(err){
       loadingEl.remove();
       if(err.semChave){
+        // Não é uma informação específica deste lead (é config da
+        // extensão inteira) — continua valendo mostrar mesmo que a pessoa
+        // já tenha trocado de lead enquanto isto rodava.
         mostrarAvisoSemChave();
       }else{
-        renderMensagem('ai', 'Erro: ' + err.message, { erro: true });
+        const leadIdAgora = (leadAtualParaChat() || {}).id || null;
+        if(leadIdAgora === leadIdDoEnvio){
+          renderMensagem('ai', 'Erro: ' + err.message, { erro: true });
+        }
         console.error(err);
       }
     }finally{
@@ -800,17 +845,30 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       const lead = leadAtualParaChat();
       leadId = lead ? lead.id : null;
     }
-    botHistoricoLeadId = leadId || null;
+    leadId = leadId || null;
+    botHistoricoLeadId = leadId;
     chatHistorico = [];
     // Estágio fixado manualmente (se houver) era sobre a conversa com o
     // lead anterior — não deve seguir pro próximo (ver resetEstagioManual).
     resetEstagioManual();
+    // Defesa extra: se por algum caminho futuro isto rodar com o chat
+    // ainda aberto e um aviso "sem chave" contando (ver mostrarAvisoSemChave),
+    // não faz sentido redirecionar pra Configurações sobre uma pergunta que
+    // já não está mais na tela.
+    cancelarAvisoSemChave();
     const box = elMessages();
     if(box) box.innerHTML = '';
     try{
-      botHistorico = await loadBotHistory(botHistoricoLeadId);
+      const historico = await loadBotHistory(leadId);
+      // Troca rápida de lead (duas chamadas desta função em sequência):
+      // só aplica o resultado se este ainda for o lead pedido por último —
+      // do contrário uma resposta antiga poderia sobrescrever a lista já
+      // carregada pra um lead mais recente.
+      if(botHistoricoLeadId !== leadId) return;
+      botHistorico = historico;
     }catch(err){
       console.error(err);
+      if(botHistoricoLeadId !== leadId) return;
       botHistorico = [];
     }
     renderBotHistoryList();
