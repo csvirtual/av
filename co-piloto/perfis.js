@@ -324,7 +324,7 @@ async function copilotoAlterarNomePerfil(id, novoNome) {
   const perfilAtivoId = await copilotoPerfilAtivoId();
   const souAdminSessao = await copilotoSessaoEhAdmin();
   if (id !== perfilAtivoId && !souAdminSessao) {
-    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação.' };
+    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
     const lista = await copilotoListarPerfis();
@@ -364,7 +364,7 @@ async function copilotoDefinirTrocaSemSenha(id, permitir) {
   // comum conseguia se marcar (ou marcar outro perfil) pra entrar na troca
   // rápida sem senha nenhuma.
   if (!(await copilotoSessaoEhAdmin())) {
-    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação.' };
+    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
     const lista = await copilotoListarPerfis();
@@ -583,7 +583,19 @@ async function _copilotoRegravarSenhaEDek(perfilId, novaSenha, dekConhecida, amk
     // troca), (re)embrulha o DEK por ela também — é o que dá ao admin
     // acesso aos campos protegidos deste perfil no modo impersonando.
     const amkDaSessao = typeof copilotoObterAmkDaSessao === 'function' ? await copilotoObterAmkDaSessao() : null;
-    if (amkDaSessao) alvo.dekEnvelopeAmk = await copilotoEnvolverChave(dek, amkDaSessao);
+    if (amkDaSessao) {
+      alvo.dekEnvelopeAmk = await copilotoEnvolverChave(dek, amkDaSessao);
+    } else if (dek !== dekConhecida) {
+      // Chegou aqui com um DEK NOVO (o antigo se perdeu, ver
+      // dadosProtegidosPerdidos) e sem AMK nesta sessão pra reembrulhar:
+      // o dekEnvelopeAmk guardado embrulha o DEK VELHO, que não abre mais
+      // nada. Não é vazamento — o GCM rejeita a chave errada e o campo
+      // continua "🔒 protegido" — mas é um envelope que promete um acesso
+      // que deixou de existir. Some com ele, pra que o estado gravado
+      // diga a verdade: o admin precisa reembrulhar este perfil (basta
+      // ele redefinir a senha do perfil estando logado como admin).
+      delete alvo.dekEnvelopeAmk;
+    }
 
     let amkPerdida = false;
     let amkFinal = null;
@@ -649,7 +661,7 @@ async function copilotoAlterarSenhaPerfil(perfilId, { senhaAtual, novaSenha, for
     // aceitar o atalho — sem isso, qualquer perfil comum trocava a senha de
     // QUALQUER outro perfil (inclusive o admin) sem saber senha nenhuma.
     if (!(await copilotoSessaoEhAdmin())) {
-      return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação.' };
+      return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
     }
     // Recupera o DEK sem precisar da senha antiga, pela chave-mestra (AMK)
     // já desembrulhada nesta sessão. Sem ela disponível, os campos
@@ -784,7 +796,7 @@ async function copilotoRecuperarSenhaAdmin(usuarioGeral, senhaGeral, novaSenha, 
 // excluir o próprio perfil admin (a instalação sempre precisa ter um).
 async function copilotoExcluirPerfil(id) {
   if (!(await copilotoSessaoEhAdmin())) {
-    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação.' };
+    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   const resultado = await copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
     const lista = await copilotoListarPerfis();
@@ -972,8 +984,8 @@ async function copilotoRemoverDadosDoPerfil(perfilId) {
 // Extrai, de um snapshot já lido do storage inteiro, só as chaves de UM
 // perfil — com o prefixo removido, ou seja, de volta aos nomes "lógicos" de
 // sempre (leads_all, funil, hist:<id>...). Usada tanto pro backup de um
-// perfil só quanto pro backup de todos de uma vez (ver
-// copilotoMontarDadosDeTodosOsPerfis), sempre a partir do MESMO snapshot lido
+// perfil só quanto pro backup de todos de uma vez, sempre a partir do MESMO
+// snapshot lido
 // uma única vez — evita inconsistência entre perfis por causa de escritas
 // acontecendo no meio da leitura.
 function copilotoExtrairDadosDoPerfil(snapshotStorage, perfilId) {
@@ -985,25 +997,6 @@ function copilotoExtrairDadosDoPerfil(snapshotStorage, perfilId) {
     }
   });
   return dados;
-}
-
-// Reúne, de uma vez, os dados isolados de TODOS os perfis cadastrados —
-// inclusive os que vierem a ser criados depois desta chamada, já que a lista
-// de perfis é sempre lida na hora, nunca fixa. Só faz sentido ser chamada
-// por quem já tem autoridade de admin na sessão (checagem feita por quem
-// chama, na tela — ver copilotoSessaoEhAdmin).
-async function copilotoMontarDadosDeTodosOsPerfis() {
-  const perfis = await copilotoListarPerfis();
-  const snapshotStorage = await chrome.storage.local.get(null);
-  const porPerfil = {};
-  perfis.forEach((p) => {
-    porPerfil[p.id] = {
-      nome: p.nome,
-      admin: !!p.admin,
-      dados: copilotoExtrairDadosDoPerfil(snapshotStorage, p.id)
-    };
-  });
-  return porPerfil;
 }
 
 // ---------- Log de auditoria (sessões e ações sensíveis) — só o admin vê ----------
@@ -1028,8 +1021,13 @@ async function copilotoMontarDadosDeTodosOsPerfis() {
 // 'acesso_dados_protegidos_admin', 'acesso_equipe_alterado',
 // 'backup_realizado', 'backup_todos_perfis_realizado', 'backup_restaurado',
 // 'backup_enviado_email', 'relatorio_leads_exportado', 'ficha_lead_exportada',
-// 'log_auditoria_exportado'. (O reset geral não gera entrada: ele já apaga o
+// 'log_auditoria_exportado', 'lead_criado', 'lead_campo_alterado',
+// 'lead_excluido', 'lead_restaurado', 'leads_importados'. (O reset geral
+// não gera entrada: ele já apaga o
 // storage inteiro, log incluso — é o único evento sem exceção.)
+//
+// Os eventos de lead nunca guardam o CONTEÚDO de campo protegido — ver
+// registrarAlteracaoLeadNoLog em panel.js pro porquê.
 
 const COPILOTO_LOG_KEY = 'copilotoLogAuditoria';
 const COPILOTO_LOG_RETENCAO_DIAS = 90;
@@ -1163,13 +1161,27 @@ async function copilotoRegistrarEventoLog(tipo, perfil, detalhe) {
 // só as entradas daquele perfil, mantendo as dos demais — é o filtro
 // escolhido na tela (ver panel.js).
 async function copilotoExcluirLogAuditoria(perfilId) {
+  // A tela que chama isto (excluirLogAuditoriaClick, panel.js) já confere
+  // copilotoSessaoEhAdmin() antes — mas confere de novo AQUI DENTRO, mesmo
+  // motivo de toda outra função sensível deste arquivo (ver
+  // copilotoExcluirPerfil, copilotoDefinirTrocaSemSenha,
+  // copilotoAlterarSenhaPerfil com forcar:true): uma chamada direta pelo
+  // console do navegador, sem passar pela tela nenhuma, chegaria aqui sem
+  // nenhuma autoridade de verdade. Sem esta checagem, QUALQUER perfil
+  // logado (não só o admin) apagava o log de auditoria inteiro — inclusive
+  // pra cobrir o próprio rastro, o oposto exato do que um log de auditoria
+  // existe pra impedir.
+  if (!(await copilotoSessaoEhAdmin())) {
+    return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
+  }
   return copilotoSerializarPorChave(COPILOTO_LOG_KEY, async () => {
     if (!perfilId) {
       await chrome.storage.local.remove(COPILOTO_LOG_KEY);
-      return;
+      return { ok: true };
     }
     const log = (await copilotoListarLogAuditoriaBruto()).filter(copilotoLogDentroDaRetencao);
     const restante = log.filter((e) => e.perfilId !== perfilId);
     await chrome.storage.local.set({ [COPILOTO_LOG_KEY]: restante });
+    return { ok: true };
   });
 }

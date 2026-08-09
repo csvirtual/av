@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Copiloto de Vendas - C&S Virtual 💜</title>
+<title>Co-piloto de vendas com IA - C&S Virtual 💜</title>
 <link rel="stylesheet" href="styles.css">
 <style>
   /* body{margin:0} já vem de styles.css — removido daqui pra não duplicar a mesma regra em dois lugares. */
@@ -1163,7 +1163,7 @@
 
     <div class="credenciais-padrao-faixa" id="credenciaisPadraoFaixa">
       <span>🚨</span>
-      <span>Esta instalação ainda usa a senha padrão de fábrica da Área restrita — a mesma em toda instalação deste Copiloto. Troque agora.</span>
+      <span>Esta instalação ainda usa a credencial gerada automaticamente no primeiro uso — recomendamos trocar por uma própria.</span>
       <button class="resolver-btn" id="credenciaisPadraoResolverBtn">Trocar agora</button>
     </div>
     <div class="topbar">
@@ -1386,6 +1386,16 @@
         <input type="text" id="historySearchInput" class="hist-search-input" placeholder="🔍 Buscar no histórico deste lead...">
         <div class="history-list" id="historyList"></div>
       </div>
+
+      <div class="card">
+        <div class="hist-header">
+          <h2>🤖 Histórico do Bot <span id="botHistoryCount"></span></h2>
+          <button class="btn danger" id="clearBotHistoryBtn">Limpar histórico</button>
+        </div>
+        <div class="hint">Toda conversa do chat rápido com o C&amp;S - BOT fica registrada aqui: sua pergunta, a resposta da IA e a data/hora — do lead que estiver selecionado agora (troca de lista sozinho ao trocar de lead).</div>
+        <input type="text" id="botHistorySearchInput" class="hist-search-input" placeholder="🔍 Buscar no histórico do bot...">
+        <div class="history-list" id="botHistoryList"></div>
+      </div>
     </div>
   </div>
 
@@ -1568,7 +1578,7 @@ Nascimento: 20/01/1992"></textarea>
 
         <div id="credenciaisPrincipaisSection" class="backup-secao-admin" style="display:none;">
           <div class="backup-section-title">🔐 Credencial principal (Área restrita)</div>
-          <div class="backup-section-sub">O usuário e senha que protegem a Área restrita desta instalação. Troque assim que possível se ainda não tiver feito isso — instalações que nunca trocaram continuam aceitando a credencial padrão de fábrica, idêntica em toda instalação deste Copiloto.</div>
+          <div class="backup-section-sub">O usuário e senha que protegem a Área restrita desta instalação. Se ainda for a credencial aleatória gerada automaticamente no primeiro uso, troque quando puder — cada instalação recebe uma senha diferente, mas trocar por uma escolhida por você facilita lembrar e compartilhar com segurança.</div>
           <div class="backup-status-pill" id="credenciaisPrincipaisStatusPill"><span class="dot ok"></span>Calculando...</div>
           <div class="perfil-campo" style="margin-top:14px; margin-bottom:14px;">
             <label for="credenciaisPrincipaisUsuarioAtualInput">Usuário atual</label>
@@ -1613,7 +1623,7 @@ Nascimento: 20/01/1992"></textarea>
 
         <div id="logAuditoriaSection" class="backup-secao-admin" style="display:none;">
           <div class="backup-section-title">📋 Log de sessões e ações</div>
-          <div class="backup-section-sub">Registro de quem entrou e saiu de cada perfil (e por quê), além de ações administrativas sensíveis — guardado por até 90 dias. Só o administrador geral vê esta seção.</div>
+          <div class="backup-section-sub">Registro de quem entrou e saiu de cada perfil (e por quê), das ações administrativas sensíveis e das alterações feitas nos leads — cadastro, exclusão, restauração e cada campo alterado, com data, hora e computador de origem. Campos protegidos (CPF, e-mail, CEP, nascimento, notas, objetivo) aparecem só como "alterado": o conteúdo nunca entra no log. Guardado por até 90 dias. Só o administrador geral vê esta seção.</div>
           <div class="backup-action">
             <div class="backup-action-icon">📋</div>
             <div class="backup-action-body">
@@ -1723,7 +1733,7 @@ Nascimento: 20/01/1992"></textarea>
       <button class="modal-close" id="bancoDadosCloseBtn" title="Fechar">✕</button>
     </div>
     <div class="modal-body">
-      <p class="hint" style="margin-bottom:18px;">Escolha onde os dados deste Copiloto ficam guardados. Visível só para o administrador geral.</p>
+      <p class="hint" style="margin-bottom:18px;">Escolha onde os dados deste Co-piloto ficam guardados. Visível só para o administrador geral.</p>
 
       <div class="bancodados-opcoes">
         <button class="bancodados-opcao ativa" id="bancoDadosOpcaoLocal" data-modo="local">
@@ -1850,7 +1860,7 @@ Nascimento: 20/01/1992"></textarea>
     <div class="modal-header">
       <div style="display:flex; align-items:center; gap:12px;">
         <h2>📖 Como usar o copiloto</h2>
-        <span class="version-monitor" title="Versão instalada do Copiloto de Vendas">
+        <span class="version-monitor" title="Versão instalada do Co-piloto de vendas">
           <span class="version-dot"></span><span id="helpVersionBadgeText">v—</span>
         </span>
       </div>
@@ -1984,8 +1994,8 @@ Nascimento: 20/01/1992"></textarea>
           <p>A engrenagem no canto superior direito reúne tudo que configura como o Co-piloto trabalha pelo seu negócio.</p>
           <ul>
             <li><b>Minha conta</b> — troca nome e senha, perfil comum ou administrador (que também precisa do PIN alfanumérico pra trocar a senha — <a href="#" class="help-goto" data-secao="12">ver seção 12</a>). Se o admin estiver impersonando outro perfil, esta tela vira "Redefinir senha deste profissional", sem pedir a senha antiga.</li>
-            <li><b>Provedor de IA</b> — Claude ou Gemini. No Claude, uma chave e um modelo só. No Gemini, duas chaves — Chave A (gratuita) e Chave B (paga), <a href="#" class="help-goto" data-secao="11">ver seção 11</a>. Um indicador com bolinha verde ("Roteamento inteligente ativo") ou vermelha ("Roteamento inativo") mostra na hora se as duas estão configuradas.</li>
-            <li><b>Custo por token</b> — preços (US$ por milhão de tokens) usados pra estimar o gasto em "Uso de tokens na API". Se as duas chaves do Gemini usarem o mesmo modelo, editar o preço de uma atualiza a outra sozinha. Ajuste se a Anthropic ou o Google mudarem o preço.</li>
+            <li><b>Provedor de IA</b> — Claude ou Gemini. No Claude, uma chave só e dois modelos: o principal e um econômico opcional, escolhidos por etapa. No Gemini, duas chaves — Chave A (gratuita) e Chave B (paga), <a href="#" class="help-goto" data-secao="11">ver seção 11</a>. No Gemini, um indicador com bolinha verde ("Roteamento inteligente ativo") ou vermelha ("Roteamento inativo") mostra na hora se as duas chaves estão configuradas; no Claude, o próprio cabeçalho do painel mostra os dois modelos quando o roteamento está ligado.</li>
+            <li><b>Custo por token</b> — preços (US$ por milhão de tokens) usados pra estimar o gasto em "Uso de tokens na API". Se as duas chaves do Gemini usarem o mesmo modelo, editar o preço de uma atualiza a outra sozinha. No Claude, o campo se aplica ao modelo principal; o econômico usa a tabela de referência interna. Ajuste se a Anthropic ou o Google mudarem o preço.</li>
             <li><b>Contador de respostas geradas</b> — zera o contador "respostas geradas" (mês/total) sem apagar histórico nem os dados de "Uso de tokens na API".</li>
             <li><b>Funil de vendas</b> — a instrução geral de como a IA deve se comportar, escrevendo respostas, seja qual for a etapa selecionada. É a única fonte de comportamento da IA (tom, postura, o que dizer, o que nunca fazer).</li>
           </ul>
@@ -2004,8 +2014,8 @@ Nascimento: 20/01/1992"></textarea>
           <ul>
             <li><b>Cache automático</b> — as instruções gerais do funil ficam em cache; a primeira chamada da sessão custa mais, as seguintes custam uma fração do preço.</li>
             <li><b>Detecção de duplicata e contexto incremental</b> — <a href="#" class="help-goto" data-secao="3">ver seção 3</a>.</li>
-            <li><b>Roteamento por estágio</b> (só no Gemini) — o modelo de cada chave é sempre o que você escolheu; só a escolha de qual chave entra em ação é automática. Com as duas chaves configuradas: Chave A cobre Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e Central de mensagens; Chave B cobre Apresentação da solução, Condução ao valor, Objeção e Fechamento. Com só uma chave configurada, ela assume todas as etapas. Se a Chave A bater no limite de cota do dia, o copiloto cai pra Chave B automaticamente naquela hora, com o modelo já escolhido pra ela (nunca troca de modelo sozinho).</li>
-            <li><b>Modelo econômico por padrão</b> — Haiku (Claude) e Flash-Lite (Gemini) já vêm como padrão de fábrica, o mais barato. Troque em Configurações quando quiser.</li>
+            <li><b>Roteamento por estágio</b> (nos dois provedores) — a divisão das etapas é a mesma nos dois: <b>Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e Central de mensagens</b> ficam no nível econômico; <b>Apresentação da solução, Condução ao valor, Objeção e Fechamento</b> — onde a venda se decide — ficam no principal.<br><b>No Gemini</b>, o que troca é a <b>chave</b>: o modelo de cada uma é sempre o que você escolheu, e só a escolha de qual chave entra em ação é automática. Com só uma chave configurada, ela assume todas as etapas. Se a Chave A bater no limite de cota do dia, o copiloto cai pra Chave B automaticamente naquela hora, com o modelo já escolhido pra ela (nunca troca de modelo sozinho).<br><b>No Claude</b>, a chave é uma só e o que troca é o <b>modelo</b>. Deixando o campo "modelo econômico" em <i>Desligado</i>, nada é roteado e o principal atende tudo. A economia costuma ficar entre 15% e 20%: cada modelo mantém o próprio cache de prompt, e cada cache precisa ser gravado uma vez — por isso o ganho não é a diferença cheia de preço entre os dois.</li>
+            <li><b>Padrão de fábrica</b> — no Claude, <b>Sonnet 5</b> como principal e <b>Haiku 4.5</b> como econômico, já com o roteamento por etapa ligado. No Gemini, Flash-Lite nas duas chaves. Troque em Configurações quando quiser — se você já tinha um modelo salvo antes desta versão, o seu continua valendo até você abrir Configurações e salvar de novo.</li>
           </ul>
           <p><b>🩺 Health Monitor</b> — a pílula perto do topo mostra, em tempo real, se cada modelo de IA está respondendo e em quanto tempo. Escolha o provedor e o teste roda em todos os modelos daquele provedor de uma vez, usando a chave já configurada — cada modelo é testado 3 vezes com uma mensagem mínima ("oi") e o tempo mostrado é a mediana das 3 medições. Cada linha mostra ok, lento (acima de 4s) ou erro (com a mensagem devolvida pela API). Clicar num modelo aplica ele imediatamente como o modelo em uso no seu perfil, sem precisar abrir Configurações. É um recurso de diagnóstico: só consome cota quando você abre o Health Monitor e escolhe um provedor.</p>
           <p><b>💳 Uso de tokens na API</b> — resumo de quanto você gastou: respostas geradas, tokens usados e custo estimado em dólar, por modelo realmente usado (não por chave). O gasto é sempre uma estimativa, calculada com o preço de Configurações → Custo por token. "Zerar contagem" apaga só esse histórico — é independente do contador "respostas geradas".</p>
@@ -2043,7 +2053,7 @@ Nascimento: 20/01/1992"></textarea>
             <li><b>Enviar por e-mail</b> — "Baixar e abrir e-mail" baixa o backup e já abre um e-mail com destinatário e assunto prontos; só falta anexar e enviar. Nada passa por servidor de terceiro.</li>
             <li><b>Restaurar backup</b> — substitui os dados do perfil atual pelos de um backup salvo, sem afetar os outros perfis. Se o arquivo trouxer uma chave de API diferente da configurada, um aviso específico aparece antes de confirmar; qualquer campo que o arquivo tenha e o Co-piloto não reconheça é ignorado.</li>
             <li><b>Gerenciar perfis</b> (só admin) — excluir perfis e decidir, um por um, quem entra na troca rápida sem senha.</li>
-            <li><b>Log de sessões e ações</b> (só admin) — filtra por perfil ou vê todos, exporta em PDF e exclui entradas. Cada entrada mostra também um código curto do computador de onde veio. Guardado por até 90 dias.</li>
+            <li><b>Log de sessões e ações</b> (só admin) — filtra por perfil ou vê todos, exporta em PDF e exclui entradas. Além de logins e ações administrativas, registra o que acontece com os leads: cadastro, exclusão, restauração, importação em lote e cada campo alterado (de qual valor pra qual). Nos campos protegidos, registra só que mudaram — nunca o conteúdo. Cada entrada mostra também um código curto do computador de onde veio. Guardado por até 90 dias.</li>
           </ul>
           <p>Faça backup regularmente, principalmente antes de reinstalar a extensão ou trocar de computador.</p>
           <p>Numa zona separada, mais abaixo, fica "Resetar todo o sistema" — apaga todos os perfis e todos os dados, devolvendo o Co-piloto ao estado de instalação nova. Só disponível pro administrador, é irreversível: pede usuário e senha geral de novo e uma confirmação explícita antes de liberar o botão final.</p>
@@ -2058,11 +2068,11 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>Este Co-piloto foi idealizado e desenvolvido por <b>Samuel Dos Santos Teixeira</b>, com um propósito simples: dar a quem vende por WhatsApp uma ferramenta que une método, agilidade e inteligência artificial — sem nunca colocar em risco a conta de quem usa.</p>
+          <p>Este Co-piloto foi idealizado e desenvolvido pela <b>C&amp;S Assistência Virtual</b>, com um propósito simples: dar a quem vende por WhatsApp uma ferramenta que une método, agilidade e inteligência artificial — sem nunca colocar em risco a conta de quem usa.</p>
           <p>A ideia por trás de cada funcionalidade é a mesma: todo atendimento se beneficia de um processo replicável. O Co-piloto existe pra que cada conversa siga o funil com fidelidade, sem depender da memória ou do cansaço de quem atende — e pra que, pela primeira vez, dê pra enxergar com clareza onde cada lead está parado.</p>
           <p>Duas decisões guiaram o projeto do início ao fim: nunca automatizar ou interferir dentro do WhatsApp Web, e nunca deixar que algo excluído se perca de verdade sem chance de recuperação.</p>
           <p>O resultado é o Co-piloto que você está usando agora.</p>
-          <div class="credits-signature">— Samuel Dos Santos Teixeira, desenvolvedor</div>
+          <div class="credits-signature">— C&amp;S Assistência Virtual</div>
         </div>
       </div>
 
@@ -2090,7 +2100,7 @@ Nascimento: 20/01/1992"></textarea>
         <li>Histórico de mensagens coladas e respostas geradas por lead.</li>
         <li>Configurações do funil de vendas e campanha ativa.</li>
         <li>Chaves de API da Anthropic/Google configuradas por cada profissional.</li>
-        <li>Usuário/senha geral (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação (o PIN, no caso do admin) de cada um — nenhuma delas em texto puro (explicamos como, na seção de segurança abaixo).</li>
+        <li>Usuário/senha geral (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação (o PIN, no caso do admin) de cada um — nenhuma delas em texto puro (explicamos como, na seção de segurança abaixo). Única exceção: a credencial gerada automaticamente no primeiro uso da instalação fica em texto puro só até você confirmar que a guardou (ou fazer o primeiro login com ela) — depois disso é apagada, restando só o hash.</li>
       </ul>
 
       <p><b>📤 O que sai deste computador — e quando</b></p>
@@ -2108,7 +2118,7 @@ Nascimento: 20/01/1992"></textarea>
       <p>Segurança de verdade não é uma frase, é uma pilha de camadas — cada uma cobrindo um risco diferente. É assim que o Co-piloto foi desenhado:</p>
       <ul>
         <li><b>Duas camadas de acesso.</b> Primeiro a credencial geral da "Área restrita" (a principal, ou a de equipe — que existe justamente pra manter o cadastro de perfis e as funções de administrador longe de quem só usa o dia a dia, ver Avançado), depois a senha individual de cada perfil. Ninguém chega direto nos dados de um profissional só por estar com o computador em mãos.</li>
-        <li><b>A credencial principal não é fixa.</b> O administrador pode (e deve) trocar o usuário e a senha da Área restrita a qualquer momento, em Avançado → Credencial principal. Uma instalação que nunca fez essa troca continua aceitando a senha padrão de fábrica — a mesma em toda instalação deste Co-piloto — e por isso mostra um aviso persistente pro administrador até ser trocada.</li>
+        <li><b>A credencial principal não é fixa — e nunca é a mesma em duas instalações.</b> No primeiro uso, cada instalação gera automaticamente sua própria credencial aleatória, apresentada uma única vez numa janela que bloqueia a tela até você copiar e confirmar que guardou — não existe mais uma senha "de fábrica" igual em todas as cópias do Co-piloto. O administrador pode (e deve) trocar o usuário e a senha por uma escolhida por ele a qualquer momento, em Avançado → Credencial principal; enquanto isso não for feito, um aviso persistente lembra que a instalação ainda usa a credencial gerada automaticamente.</li>
         <li><b>Nenhuma senha fica salva em texto puro.</b> Toda senha passa por um hash forte (PBKDF2-HMAC-SHA256, 210 mil iterações — a recomendação da OWASP) com um valor aleatório único por senha, antes de ser gravada. Na prática, isso significa que mesmo quem tivesse acesso direto ao arquivo de armazenamento não leria a senha de ninguém, nem conseguiria testar combinações em alta velocidade pra descobri-la.</li>
         <li><b>Bloqueio automático depois de 3 tentativas erradas.</b> Seja a senha de um perfil ou a credencial geral da Área restrita, três erros seguidos travam o campo por 60 segundos. Existe especificamente pra impedir que alguém sente na frente do computador e fique testando senha atrás de senha sem limite.</li>
         <li><b>Campos sensíveis cifrados, não só guardados.</b> CPF, e-mail, CEP, data de nascimento, notas e objetivo de cada lead, o conteúdo do histórico de conversas (mensagem do lead, resposta gerada e a próxima pergunta sugerida) e as chaves de API ficam cifrados com AES-256 no armazenamento — de fato ilegíveis sem a chave certa, não apenas escondidos da tela. Eles só voltam a ser texto legível na hora de exibir, com a senha do perfil correspondente. Nome e telefone ficam de fora de propósito, porque precisam ser lidos rapidamente (busca de lead por nome/número, exibição na lista lateral) sem depender de decifrar cada lead — mesmo motivo pelo qual o estágio no funil também fica fora (estatísticas do funil, escolha de modelo de IA).</li>
@@ -2116,6 +2126,7 @@ Nascimento: 20/01/1992"></textarea>
         <li><b>Sessão expira sozinha em 30 minutos de inatividade.</b> Pra reduzir o risco de alguém continuar com acesso liberado num computador que ficou sem supervisão.</li>
         <li><b>Nunca duas abas mexendo nos mesmos dados ao mesmo tempo.</b> Só uma aba do painel (e uma de Configurações) funciona por vez — uma cópia dela, aberta por engano ou de propósito, é travada automaticamente sem carregar nenhum dado, evitando que duas telas gravem informações conflitantes uma por cima da outra.</li>
         <li><b>Chaves de API só neste computador.</b> Nunca trafegam por nenhum servidor do Co-piloto — vão só do seu navegador direto pro provedor de IA escolhido, na hora de gerar cada resposta.</li>
+        <li><b>O log de auditoria nunca guarda conteúdo protegido.</b> O registro de sessões e ações (Avançado, só o administrador vê) anota também o que acontece com os leads: quem cadastrou, excluiu, restaurou ou alterou, quando, em qual perfil e de qual computador. Ele é a única parte do Co-piloto que fica <b>fora</b> do isolamento por perfil e <b>fora</b> da criptografia — é assim de propósito, porque um registro de auditoria que só o próprio auditado pudesse ler não serviria pra nada. Por isso existe uma regra dura: valor de campo protegido (CPF, e-mail, CEP, nascimento, notas, objetivo) <b>nunca</b> é escrito no log — dele fica só "alterado", "preenchido" ou "apagado". O que entra em texto legível é o mesmo que já fica legível no armazenamento: o nome do lead, o telefone, o estágio e a data.</li>
         <li><b>Restaurar um backup avisa antes de trocar suas chaves de API.</b> Se o arquivo escolhido contiver uma chave de API diferente da já configurada, um aviso específico aparece antes de confirmar — restaurar um arquivo de origem desconhecida com uma chave de terceiro faria suas conversas de IA passarem pela conta de quem a forneceu. Qualquer campo dentro do arquivo que o Co-piloto não reconheça também é ignorado, nunca gravado.</li>
       </ul>
 
@@ -2218,11 +2229,46 @@ Nascimento: 20/01/1992"></textarea>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Chat rápido flutuante — pergunta livre pra IA sobre abordagem/follow-up,
+     sem precisar colar mensagem nem preencher campos. Usa automaticamente o
+     mesmo provedor/chave/modelo já configurados em Configurações (ver
+     chatbot.js) e, se houver um lead selecionado no painel, o contexto dele
+     (nome, estágio, notas) — igual ao que "Sugerir abordagem ou Follow-up"
+     já usa. -->
+<button id="chatFloatBtn" class="chat-float-btn" type="button" title="C&amp;S - BOT" aria-label="C&amp;S - BOT">💬</button>
+
+<div class="modal-overlay" id="chatModalOverlay" style="display:none;">
+  <div class="modal-dialog chat-modal-dialog">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <h2>💬 C&amp;S - BOT</h2>
+        <span class="version-monitor" title="Versão instalada do Co-piloto de vendas">
+          <span class="version-dot"></span><span id="chatVersionBadgeText">v—</span>
+        </span>
+      </div>
+      <button class="modal-close" id="chatModalCloseBtn" title="Fechar">✕</button>
+    </div>
+    <div class="chat-context-bar" id="chatContextBar"></div>
+    <div class="chat-estagio-row" id="chatEstagioRow">
+      <label for="chatEstagioOverrideSelect">Estágio nesta conversa:</label>
+      <select id="chatEstagioOverrideSelect"></select>
+    </div>
+    <div class="chat-messages" id="chatMessagesBox"></div>
+    <div class="chat-input-row">
+      <textarea id="chatInputBox" class="chat-input" rows="1" placeholder="Pergunte sobre abordagem, follow-up, objeção..."></textarea>
+      <button class="btn primary" id="chatSendBtn" title="Enviar">➤</button>
+    </div>
+  </div>
+</div>
+
+<script src="aba-unica.js"></script>
 <script src="funil-padrao.js"></script>
 <script src="auth.js"></script>
 <script src="perfis.js"></script>
 <script src="panel.js"></script>
 <script src="panel/importarContatos.js"></script>
 <script src="backtotop.js"></script>
+<script src="chatbot.js"></script>
 </body>
 </html>

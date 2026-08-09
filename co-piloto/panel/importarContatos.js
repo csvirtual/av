@@ -414,6 +414,15 @@
     }
 
     await persistLeads();
+    // Importação em lote entra no log como UMA entrada com o total — uma
+    // por contato encheria o log de auditoria com centenas de linhas
+    // idênticas e enterraria os eventos que importam.
+    if(criados && typeof copilotoRegistrarEventoLog === 'function'){
+      try{
+        await copilotoRegistrarEventoLog('leads_importados', await copilotoObterPerfilAtivo(),
+          `${criados} lead${criados === 1 ? '' : 's'} importado${criados === 1 ? '' : 's'} de arquivo`);
+      }catch(e){}
+    }
     if(typeof renderLeadsList === 'function') renderLeadsList();
     if(typeof toast === 'function'){
       toast(`Importação concluída: ${criados} novo(s), ${atualizados} atualizado(s) ✅`);

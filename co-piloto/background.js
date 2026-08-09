@@ -116,12 +116,64 @@ async function copilotoRegistrarOuChecarAba(chave, tab) {
   });
 }
 
+// ---------- Reivindicação da geração da credencial inicial ----------
+//
+// panel.html e options.html são páginas DIFERENTES — cada uma com sua
+// própria trava de aba duplicada acima (chaves separadas: PANEL_TAB_KEY /
+// OPTIONS_TAB_KEY) — então nada impede as duas de estarem oficialmente
+// abertas ao mesmo tempo (o Chrome restaura as duas ao reabrir, ou alguém
+// abre Configurações numa aba nova bem no instante em que o painel também
+// está carregando pela primeira vez). Se as duas páginas gerassem a
+// credencial inicial cada uma na sua própria aba, nada as impediria de
+// lerem "ainda não existe" ao mesmo tempo e gerarem senhas DIFERENTES — a
+// pessoa guardaria a de uma aba enquanto a outra, escrevendo por último,
+// já teria invalidado aquela senha sem ninguém perceber. Confirmado com um
+// teste automatizado antes desta correção: nas duas abas, cada uma
+// mostrava/copiava uma senha que não era a gravada de fato.
+//
+// chrome.storage não tem uma trava atômica entre abas. O service worker,
+// porém, é o único ponto que as duas páginas realmente compartilham — é
+// um só, nunca dois rodando ao mesmo tempo — e a fila por chave de
+// perfis.js SERIALIZA de verdade dentro dele (não é "quase ao mesmo
+// tempo": é uma de cada vez). Por isso a DECISÃO de quem gera mora aqui;
+// a criptografia em si (PBKDF2, geração da senha) continua na página, em
+// auth.js, que já tinha tudo isso.
+const COPILOTO_CRED_INICIAL_CLAIM_KEY = 'copilotoCredencialInicialClaim';
+// Generoso de propósito: PBKDF2 com 210 mil iterações mais a gravação não
+// deveria chegar nem perto disso. Existe só pra destravar sozinho se uma
+// aba reivindicar e travar no meio (fechada, crashou) antes de terminar —
+// sem isto, uma falha rara naquela aba trancaria a geração da credencial
+// PARA SEMPRE nesta instalação, o que seria pior que a corrida original.
+const COPILOTO_CRED_INICIAL_CLAIM_EXPIRA_MS = 10000;
+
+async function copilotoReivindicarGeracaoCredencialInicial(){
+  return copilotoSerializarPorChave(COPILOTO_CRED_INICIAL_CLAIM_KEY, async () => {
+    const dados = await chrome.storage.local.get([
+      'copilotoCredencialInicialJaGerada', 'copilotoCredenciaisHashV2',
+      'copilotoCredenciaisPersonalizadas', COPILOTO_CRED_INICIAL_CLAIM_KEY
+    ]);
+    if (dados['copilotoCredencialInicialJaGerada'] || dados['copilotoCredenciaisHashV2'] || dados['copilotoCredenciaisPersonalizadas']) {
+      return { vencedor: false }; // já existe credencial — nada a gerar
+    }
+    const reivindicadaEm = dados[COPILOTO_CRED_INICIAL_CLAIM_KEY];
+    if (reivindicadaEm && (Date.now() - reivindicadaEm) < COPILOTO_CRED_INICIAL_CLAIM_EXPIRA_MS) {
+      return { vencedor: false }; // outra aba já reivindicou há pouco — está gerando agora
+    }
+    await chrome.storage.local.set({ [COPILOTO_CRED_INICIAL_CLAIM_KEY]: Date.now() });
+    return { vencedor: true };
+  });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.tipo === 'copilotoRegistrarAbaPainel') {
     const chave = message.pagina === 'options' ? OPTIONS_TAB_KEY : PANEL_TAB_KEY;
     copilotoRegistrarOuChecarAba(chave, sender.tab).then((ehOficial) => {
       sendResponse({ ehAbaOficial: ehOficial });
     });
+    return true; // resposta assíncrona
+  }
+  if (message && message.tipo === 'copilotoReivindicarGeracaoCredencialInicial') {
+    copilotoReivindicarGeracaoCredencialInicial().then(sendResponse);
     return true; // resposta assíncrona
   }
   return undefined;

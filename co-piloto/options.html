@@ -5,7 +5,187 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Configurações - C&S Assistência Virtual 💜</title>
 <link rel="stylesheet" href="styles.css">
-<style>.app{display:grid;grid-template-columns:280px 1fr 220px;min-height:100vh}@media(max-width:1150px){.app{grid-template-columns:280px 1fr}.settings-col-right{display:none}}@media(max-width:880px){.app{grid-template-columns:1fr}.sidebar{order:2;border-right:none;border-top:1px solid var(--line);position:static;height:auto;max-height:none;overflow-y:visible}}.settings-col-right{position:sticky;top:24px;align-self:start;margin:36px 24px 36px 0;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 48px);overflow-y:auto}.settings-nav{display:flex;flex-direction:column;gap:2px;padding:16px 12px;flex-shrink:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl)}.settings-nav-title{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 var(--gap-titulo-subtitulo) 10px}.settings-nav-link{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:600;color:var(--muted);text-decoration:none;line-height:1.3;transition:background .15s ease,color .15s ease}.settings-nav-link span{font-size:14px;flex-shrink:0}.settings-nav-link:hover{background:var(--paper);color:var(--ink)}.settings-nav-link.active{background:var(--purple-soft);color:var(--purple);font-weight:800}.settings-legal-note{padding:14px;flex-shrink:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-xl);font-size:11.5px;color:var(--muted);line-height:1.55}.sidebar{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;background:var(--teal-dark);color:#eaf3f0;padding:24px 18px;display:flex;flex-direction:column;gap:16px}.sidebar .brand{color:#fff;font-size:20px;line-height:1.25}.sidebar .brand span{color:#d9aee8}.privacy-note{font-size:12.5px;color:#c9e4dd;line-height:1.6;margin:0;background:#ffffff0f;border:1px solid #1B5E54;border-radius:10px;padding:12px 13px}.privacy-note b{color:#fff}.back-btn{background:#0d4a42;color:#eaf3f0;border:1px solid #1B5E54;border-radius:var(--radius-md);padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer;text-align:left}.back-btn:hover{background:#123f38}.sidebar-foot{margin-top:auto;font-size:11.5px;color:#7fa69c;line-height:1.5;border-top:1px solid #1B5E54;padding-top:12px}.main{padding:36px 40px;max-width:800px}.topbar{margin-bottom:22px}.topbar h1{font-size:28px;margin:0 0 6px}.topbar .subtitle{color:var(--muted);font-size:14px}.main .card h2{margin:0 0 24px;padding-bottom:14px;border-bottom:1px solid var(--line);text-transform:uppercase;letter-spacing:.04em;font-size:18px;font-weight:700}.routing-status{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid transparent;margin-bottom:var(--gap-cabecalho-conteudo)}.routing-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px;transition:background-color .15s,box-shadow .15s}.routing-status-title{font-size:13px;font-weight:800}.routing-status-sub{font-size:11.5px;color:var(--muted);margin-top:var(--gap-titulo-subtitulo);line-height:1.45}.routing-status.on{background:#e9f7f1;border-color:#b9e4ce}.routing-status.on .routing-status-dot{background:#1fa37a;box-shadow:0 0 0 3px #1fa37a2e}.routing-status.on .routing-status-title{color:#0f5c3f}.routing-status.off{background:#fceeec;border-color:#f3c6c0}.routing-status.off .routing-status-dot{background:#d64545;box-shadow:0 0 0 3px #d645452e}.routing-status.off .routing-status-title{color:#9c2a2a}.price-group{border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;margin-bottom:14px;background:var(--paper)}.price-group:last-of-type{margin-bottom:20px}.price-group-head{display:flex;align-items:center;gap:8px;font-family:Fraunces,serif;font-weight:600;font-size:14px;color:var(--ink);text-transform:uppercase;letter-spacing:.02em;margin-bottom:14px}.price-group-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.price-group-dot.claude{background:#c9862f}.price-group-dot.gemini{background:#4285f4}.price-group .grid2 .field{margin-bottom:0}.price-input-wrap{position:relative}.price-input-wrap .prefix{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:12.5px;color:var(--muted);font-weight:700;pointer-events:none}.price-input-wrap input{padding-left:42px;padding-right:70px}.price-input-wrap .suffix{position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:10.5px;color:var(--muted);pointer-events:none;letter-spacing:.01em}.provider-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}@media(max-width:600px){.provider-row{grid-template-columns:1fr}}.provider-card{border:2px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;text-align:center}.provider-card.selected{border-color:var(--purple);background:var(--purple-soft)}.provider-card b{display:block;font-size:14.5px;margin-bottom:3px}.provider-card small{color:var(--muted);font-size:10.5px;line-height:1.35;text-transform:uppercase;letter-spacing:.03em}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:600px){.grid2{grid-template-columns:1fr}}#claudeFields .hint:last-child,#geminiFields .hint:last-child{margin-bottom:16px}#saveKeysBtn{margin-top:4px}</style>
+<style>
+  /* body{margin:0} já vem de styles.css — removido daqui pra não duplicar a mesma regra em dois lugares. */
+  .app{
+    display:grid;
+    grid-template-columns:280px 1fr 220px;
+    min-height:100vh;
+  }
+  @media (max-width:1150px){
+    .app{grid-template-columns:280px 1fr;}
+    .settings-col-right{display:none;}
+  }
+  @media (max-width:880px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{order:2; border-right:none; border-top:1px solid var(--line); position:static; height:auto; max-height:none; overflow-y:visible;}
+  }
+
+  /* Coluna direita inteira (3ª coluna do grid .app): nav "Nesta página" +
+     o aviso de proteção de dados logo abaixo, um único item de grid pra
+     não bagunçar as 3 colunas declaradas em .app (um 4º filho direto do
+     grid cairia numa linha nova, na coluna 1, não na 3ª). position:sticky
+     no CONTAINER (não em cada filho) de propósito: assim o menu e o aviso
+     andam grudados um no outro ao rolar, em vez de cada um calcular um
+     "top" próprio (o que quebraria toda vez que o menu ganhasse/perdesse
+     um link e mudasse de altura). */
+  .settings-col-right{
+    position:sticky; top:24px; align-self:start;
+    margin:36px 24px 36px 0;
+    display:flex; flex-direction:column; gap:16px;
+    max-height:calc(100vh - 48px); overflow-y:auto;
+  }
+
+  /* Navegação lateral direita — pula direto pra cada seção da página, com
+     destaque automático (.active, via IntersectionObserver em options.js)
+     de qual seção está visível no momento, sem precisar rolar até achar. */
+  .settings-nav{
+    display:flex; flex-direction:column; gap:2px;
+    padding:16px 12px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
+  }
+  .settings-nav-title{
+    font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 var(--gap-titulo-subtitulo) 10px;
+  }
+  .settings-nav-link{
+    display:flex; align-items:center; gap:9px;
+    padding:9px 10px; border-radius:var(--radius-sm);
+    font-size:12.5px; font-weight:600; color:var(--muted); text-decoration:none; line-height:1.3;
+    transition:background .15s ease, color .15s ease;
+  }
+  .settings-nav-link span{ font-size:14px; flex-shrink:0; }
+  .settings-nav-link:hover{ background:var(--paper); color:var(--ink); }
+  .settings-nav-link.active{ background:var(--purple-soft); color:var(--purple); font-weight:800; }
+
+  /* Mesmo cartão visual do "Nesta página" acima (fundo, borda, raio), só
+     que sem sticky próprio — quem gruda no scroll é o .settings-col-right
+     (container-pai dos dois), não cada filho individualmente. */
+  .settings-legal-note{
+    padding:14px 14px; flex-shrink:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-xl);
+    font-size:11.5px; color:var(--muted); line-height:1.55;
+  }
+
+  /* Sticky também na barra esquerda inteira (marca + voltar + aviso de
+     privacidade + rodapé) — mesmo motivo da coluna direita: o conteúdo de
+     .main é bem mais alto que a barra, então sem isso o botão "Voltar ao
+     Co-piloto" e o aviso somem de vista assim que a página rola. Só faz
+     sentido com o grid de verdade (sidebar ao lado do conteúdo); no layout
+     empilhado de telas estreitas (media query abaixo) isso é desligado,
+     senão a barra ficaria "grudada" numa página de rolagem única, sem uma
+     coluna ao lado pra justificar. */
+  .sidebar{
+    position:sticky; top:0; align-self:start;
+    height:100vh; overflow-y:auto;
+    background:var(--teal-dark);
+    color:#EAF3F0;
+    padding:24px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .sidebar .brand{ color:#fff; font-size:20px; line-height:1.25; }
+  .sidebar .brand span{ color:#D9AEE8; }
+  .privacy-note{
+    font-size:12.5px; color:#C9E4DD; line-height:1.6; margin:0;
+    background:rgba(255,255,255,.06);
+    border:1px solid #1B5E54;
+    border-radius:10px;
+    padding:12px 13px;
+  }
+  .privacy-note b{ color:#fff; }
+  .back-btn{
+    background:#0D4A42; color:#EAF3F0; border:1px solid #1B5E54;
+    border-radius:var(--radius-md); padding:10px 14px; font-weight:700; font-size:13px;
+    cursor:pointer; text-align:left;
+  }
+  .back-btn:hover{ background:#123F38; }
+  .sidebar-foot{
+    margin-top:auto; font-size:11.5px; color:#7FA69C; line-height:1.5;
+    border-top:1px solid #1B5E54; padding-top:12px;
+  }
+
+  .main{ padding:36px 40px; max-width:800px; }
+  .topbar{ margin-bottom:22px; }
+  .topbar h1{ font-size:28px; margin:0 0 6px 0; }
+  .topbar .subtitle{ color:var(--muted); font-size:14px; }
+
+  /* Mais respiro entre o título de cada card e o conteúdo logo abaixo */
+  .main .card h2{
+    margin:0 0 24px 0;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--line);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-size:18px;
+    font-weight:700;
+  }
+
+  .routing-status{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:12px 14px; border-radius:12px; border:1px solid transparent;
+    margin-bottom:var(--gap-cabecalho-conteudo);
+  }
+  .routing-status-dot{
+    width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:3px;
+    transition:background-color .15s, box-shadow .15s;
+  }
+  .routing-status-title{ font-size:13px; font-weight:800; }
+  .routing-status-sub{ font-size:11.5px; color:var(--muted); margin-top:var(--gap-titulo-subtitulo); line-height:1.45; }
+  .routing-status.on{ background:#E9F7F1; border-color:#B9E4CE; }
+  .routing-status.on .routing-status-dot{ background:#1FA37A; box-shadow:0 0 0 3px rgba(31,163,122,.18); }
+  .routing-status.on .routing-status-title{ color:#0F5C3F; }
+  .routing-status.off{ background:#FCEEEC; border-color:#F3C6C0; }
+  .routing-status.off .routing-status-dot{ background:#D64545; box-shadow:0 0 0 3px rgba(214,69,69,.18); }
+  .routing-status.off .routing-status-title{ color:#9C2A2A; }
+
+  .price-group{
+    border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px 16px; margin-bottom:14px; background:var(--paper);
+  }
+  .price-group:last-of-type{ margin-bottom:20px; }
+  .price-group-head{
+    display:flex; align-items:center; gap:8px;
+    font-family:'Fraunces',serif; font-weight:600; font-size:14px; color:var(--ink);
+    text-transform:uppercase; letter-spacing:.02em;
+    margin-bottom:14px;
+  }
+  .price-group-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .price-group-dot.claude{ background:#C9862F; }
+  .price-group-dot.gemini{ background:#4285F4; }
+  /* Zera o espaçamento só dos campos DENTRO de uma grade (.grid2 já tem seu
+     próprio gap, então o margin-bottom do .field duplicaria o respiro) — os
+     campos empilhados sem grade (Chave de API + Modelo, logo abaixo) usam o
+     margin-bottom padrão do .field normalmente, senão ficam quase colados. */
+  .price-group .grid2 .field{ margin-bottom:0; }
+  .price-input-wrap{ position:relative; }
+  .price-input-wrap .prefix{
+    position:absolute; left:13px; top:50%; transform:translateY(-50%);
+    font-size:12.5px; color:var(--muted); font-weight:700; pointer-events:none;
+  }
+  .price-input-wrap input{ padding-left:42px; padding-right:70px; }
+  .price-input-wrap .suffix{
+    position:absolute; right:13px; top:50%; transform:translateY(-50%);
+    font-size:10.5px; color:var(--muted); pointer-events:none; letter-spacing:.01em;
+  }
+
+  .provider-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  @media (max-width:600px){ .provider-row{ grid-template-columns:1fr; } }
+  .provider-card{
+    border:2px solid var(--line); border-radius:12px; padding:16px; cursor:pointer; text-align:center;
+  }
+  .provider-card.selected{ border-color:var(--purple); background:var(--purple-soft); }
+  .provider-card b{ display:block; font-size:14.5px; margin-bottom:3px; }
+  .provider-card small{ color:var(--muted); font-size:10.5px; line-height:1.35; text-transform:uppercase; letter-spacing:.03em; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:600px){ .grid2{ grid-template-columns:1fr; } }
+
+  #claudeFields .hint:last-child,
+  #geminiFields .hint:last-child{ margin-bottom:16px; }
+  #saveKeysBtn{ margin-top:4px; }
+</style>
 </head>
 <body>
 
@@ -29,7 +209,7 @@
 
   <div class="sidebar">
     <div class="brand">C&amp;S<span> Assistência Virtual</span></div>
-    <button class="back-btn" id="backBtn">← Voltar ao Copiloto</button>
+    <button class="back-btn" id="backBtn">← Voltar ao Co-piloto</button>
     <p class="privacy-note">Essas informações ficam guardadas só no seu computador, no armazenamento local do Chrome. Não vão para nenhum servidor da <b>C&amp;S Virtual</b> — só para a IA escolhida, na hora de gerar cada resposta.</p>
     <div class="sidebar-foot">
       Nenhuma automação toca no WhatsApp Web. Tudo aqui é configuração local do seu copiloto.
@@ -100,12 +280,24 @@
         <div class="field">
           <label>Modelo</label>
           <select id="claudeModel">
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5 — modelo mais econômico, focado em seguir um roteiro já definido com rapidez</option>
+            <option value="claude-sonnet-5" selected>Sonnet 5 — modelo equilibrado, focado em mais nuance quando a conversa fica complexa</option>
+            <option value="claude-opus-4-8">Opus 4.8 — modelo robusto, focado em raciocínio mais profundo (maior custo)</option>
+            <option value="claude-fable-5">Fable 5 — modelo mais avançado da Anthropic, focado em máxima qualidade (custo mais alto de todos)</option>
+          </select>
+          <div class="hint">A Anthropic ainda não oferece um apelido "sempre a versão mais nova" — por isso a lista é fixa; se ela lançar um modelo novo, adicione o nome exato aqui.</div>
+        </div>
+        <div class="field">
+          <label>Modelo econômico para as etapas de menor risco — opcional</label>
+          <select id="claudeModeloBasico">
+            <option value="">Desligado — usar o modelo principal em todas as etapas</option>
             <option value="claude-haiku-4-5-20251001" selected>Haiku 4.5 — modelo mais econômico, focado em seguir um roteiro já definido com rapidez</option>
             <option value="claude-sonnet-5">Sonnet 5 — modelo equilibrado, focado em mais nuance quando a conversa fica complexa</option>
             <option value="claude-opus-4-8">Opus 4.8 — modelo robusto, focado em raciocínio mais profundo (maior custo)</option>
             <option value="claude-fable-5">Fable 5 — modelo mais avançado da Anthropic, focado em máxima qualidade (custo mais alto de todos)</option>
           </select>
-          <div class="hint">A Anthropic ainda não oferece um apelido "sempre a versão mais nova" — por isso a lista é fixa; se ela lançar um modelo novo, adicione o nome exato aqui.</div>
+          <div class="hint">Escolhendo um modelo aqui, o copiloto passa a usar <b>ele</b> nas etapas de menor risco (Primeiro contato, Sondagem, Validação da dor, Follow-up, Perdido e a Central de mensagens) e o <b>modelo principal</b> só onde a venda se decide (Apresentação da solução, Condução ao valor, Objeção e Fechamento). A chave é a mesma nos dois — muda só o modelo. Em "Desligado", nada é roteado e o modelo principal atende tudo, como sempre.</div>
+          <div class="hint">Duas observações de custo: a economia costuma ficar entre 15% e 20%, porque cada modelo mantém o próprio cache de prompt e cada cache precisa ser gravado uma vez. E o custo estimado do modelo econômico usa a tabela de referência interna — o campo de "Custo por token" abaixo se aplica ao modelo principal.</div>
         </div>
         <div class="hint">Pegue sua chave em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer"><b>console.anthropic.com</b></a> → API Keys.</div>
       </div>
@@ -307,6 +499,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<script src="aba-unica.js"></script>
 <script src="funil-padrao.js"></script>
 <script src="auth.js"></script>
 <script src="perfis.js"></script>

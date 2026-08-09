@@ -1,34 +1,7 @@
 
-// --- Trava de aba duplicada (mesmo mecanismo de panel.js — ver o
-// comentário lá e copilotoRegistrarOuChecarAba em background.js).
-// Options.html é alcançado por navegação NA MESMA aba a partir de
-// panel.html (window.location.href), então o id da aba não muda — a
-// mesma checagem serve pra cobrir o caso de alguém duplicar a aba
-// enquanto Configurações está aberta. ----------------------------------
-let copilotoAbaDuplicada = false;
-const copilotoChecagemAbaDuplicada = (async () => {
-  try {
-    const resposta = await chrome.runtime.sendMessage({ tipo: 'copilotoRegistrarAbaPainel', pagina: 'options' });
-    copilotoAbaDuplicada = !!(resposta && resposta.ehAbaOficial === false);
-  } catch (e) {
-    copilotoAbaDuplicada = false;
-  }
-  if (copilotoAbaDuplicada) {
-    document.body.innerHTML = `
-      <div style="position:fixed; inset:0; z-index:99999; background:var(--ink,#132420); color:#fff;
-                  display:flex; align-items:center; justify-content:center; padding:24px; text-align:center;
-                  font-family:'Manrope', sans-serif;">
-        <div style="max-width:420px;">
-          <div style="font-size:38px; margin-bottom:14px;">🔒</div>
-          <h2 style="margin:0 0 10px; font-size:20px;">Esta aba é uma cópia</h2>
-          <p style="margin:0; opacity:.85; line-height:1.55; font-size:14.5px;">
-            O Copiloto já está aberto em outra aba. Feche esta aba e continue na aba original —
-            assim seus dados ficam sempre em um só lugar, sem risco de conflito.
-          </p>
-        </div>
-      </div>`;
-  }
-})();
+// A trava de aba duplicada (copilotoAbaDuplicada /
+// copilotoChecagemAbaDuplicada, usadas mais abaixo) vive em aba-unica.js,
+// carregado antes deste arquivo nas duas páginas.
 
 // ---------- Área restrita: login (usuário/senha) para acessar Configurações (usa auth.js compartilhado) ----------
 
@@ -173,17 +146,12 @@ async function salvarSenhaMinhaConta(){
     if(resultado.amkPerdida){
       partes.push('sem a chave-mestra disponível, o acesso aos dados protegidos dos outros perfis (modo administrador) ficou temporariamente inacessível — volta conforme cada um trocar a própria senha de novo');
     }
-    alert((forcar ? 'Senha redefinida' : 'Senha alterada') + ', mas ' + partes.join('; e ') + '.');
+    await copilotoAvisar((forcar ? 'Senha redefinida' : 'Senha alterada') + ', mas ' + partes.join('; e ') + '.',
+      { titulo: 'Leia antes de continuar' });
   }
 
-  if(resultado.codigoRecuperacaoNovo){
-    if(perfilAtivo.admin){
-      await copilotoRegistrarEventoLog('pin_admin_gerado', perfilAtivo, 'Gerado na troca de senha');
-      await mostrarPinAdminModal(resultado.codigoRecuperacaoNovo);
-    }else{
-      await mostrarCodigoRecuperacaoModal(resultado.codigoRecuperacaoNovo);
-    }
-  }
+  await copilotoMostrarCodigoRecuperacaoNovo(
+    perfilAtivo, resultado.codigoRecuperacaoNovo, 'Gerado na troca de senha');
 }
 
 document.getElementById('minhaContaSalvarBtn').addEventListener('click', salvarSenhaMinhaConta);
@@ -317,8 +285,11 @@ async function saveKeys(){
   await copilotoStorage.local.set({
     provider,
     claudeKey: await valorChaveApiParaSalvar('claudeKey', atual.claudeKey, dek, avisoRef),
-    claudeModel: document.getElementById('claudeModel').value.trim() || 'claude-haiku-4-5-20251001',
-    // Gemini agora tem dois níveis (ver comentário em panel.js, escolherTierGemini):
+    claudeModel: document.getElementById('claudeModel').value.trim() || 'claude-sonnet-5',
+    // Vazio de propósito quando a pessoa deixa em "Desligado": é assim que
+    // panel.js sabe que não deve rotear nada (ver callClaudeComTier).
+    claudeModeloBasico: document.getElementById('claudeModeloBasico').value.trim(),
+    // Gemini agora tem dois níveis (ver comentário em panel.js, escolherTierPorEstagio):
     // básico pra maioria das etapas do funil, avançado só nas de maior risco pra
     // venda. A chave avançada é opcional — se ficar em branco, a básica assume
     // essas etapas também, sempre com o modelo que o humano escolheu pra ela (o
@@ -365,7 +336,13 @@ async function savePrecos(){
   const go = parseFloat(document.getElementById('precoGeminiOutput').value);
   const giAvancado = parseFloat(document.getElementById('precoGeminiAvancadoInput').value);
   const goAvancado = parseFloat(document.getElementById('precoGeminiAvancadoOutput').value);
-  const claudeModel = document.getElementById('claudeModel').value.trim() || 'claude-haiku-4-5-20251001';
+  // Mesmo fallback de saveKeys() logo acima — as duas leem o MESMO campo
+  // <select id="claudeModel"> (que já vem com "Sonnet 5" marcado como
+  // selected no HTML). Aqui usava 'claude-haiku-4-5-20251001', sobra de
+  // antes do padrão de fábrica ter virado Sonnet 5 como principal: gravar
+  // um preço com fallback errado salvaria a estimativa de custo sob o
+  // modelo errado, se este campo alguma vez viesse vazio.
+  const claudeModel = document.getElementById('claudeModel').value.trim() || 'claude-sonnet-5';
   const geminiModeloBasico = document.getElementById('geminiModeloBasico').value.trim() || 'gemini-flash-lite-latest';
   const geminiModeloAvancado = document.getElementById('geminiModeloAvancado').value.trim() || 'gemini-flash-lite-latest';
 
@@ -396,7 +373,10 @@ async function savePrecos(){
 // re-renderiza sozinho assim que "usageStats" muda, então não precisa fazer
 // nada além de gravar aqui.
 async function resetUsageStats(){
-  if(!confirm('Isso vai zerar o contador de "respostas geradas" (mês e total) mostrado na tela principal. Essa ação não pode ser desfeita. Continuar?')) return;
+  const confirmado = await copilotoConfirmar(
+    'Isso vai zerar o contador de "respostas geradas" (mês e total) mostrado na tela principal. Essa ação não pode ser desfeita.',
+    { titulo: 'Zerar contador de respostas?', textoConfirmar: 'Zerar contador' });
+  if(!confirmado) return;
   await copilotoStorage.local.set({ usageStats: {} });
   toast('Contador de respostas geradas zerado');
 }
@@ -513,7 +493,7 @@ async function preencherCampoChaveApi(inputId, valorSalvo, dek){
 
 async function init(){
   const data = await copilotoStorage.local.get([
-    'provider','claudeKey','claudeModel',
+    'provider','claudeKey','claudeModel','claudeModeloBasico',
     'geminiKey','geminiModel', // legado (chave única, de antes deste recurso existir)
     'geminiKeyBasico','geminiModeloBasico','geminiKeyAvancado','geminiModeloAvancado',
     'config','funil','precosToken'
@@ -522,6 +502,10 @@ async function init(){
   const dekAtivo = await obterDekAtivo();
   await preencherCampoChaveApi('claudeKey', data.claudeKey, dekAtivo);
   if(data.claudeModel) selecionarPreservandoValor(document.getElementById('claudeModel'), data.claudeModel);
+  // Mesma distinção do panel.js: undefined é "nunca configurado" (entra o
+  // padrão de fábrica), string vazia é "Desligado" escolhido a dedo.
+  selecionarPreservandoValor(document.getElementById('claudeModeloBasico'),
+    data.claudeModeloBasico === undefined ? 'claude-haiku-4-5-20251001' : data.claudeModeloBasico);
 
   // Migração: quem configurou o Gemini antes deste recurso existir tinha só
   // uma chave/modelo — isso vira o ponto de partida da Chave A, sem precisar
@@ -537,7 +521,7 @@ async function init(){
   atualizarRoteamentoStatus();
 
   const precosToken = data.precosToken || {};
-  const claudeModel = data.claudeModel || 'claude-haiku-4-5-20251001';
+  const claudeModel = data.claudeModel || 'claude-sonnet-5';
   const precoClaude = precosToken[claudeModel];
   if(precoClaude){
     document.getElementById('precoClaudeInput').value = precoClaude.input ?? '';
@@ -584,4 +568,12 @@ function initSettingsNav(){
   });
 }
 initSettingsNav();
+
+// A credencial inicial de cada instalação nasce na primeira tela de login
+// que for aberta — e a página de Configurações é alcançável direto pelo
+// menu da extensão, sem passar pelo painel. Sem este bloco, quem abrisse as
+// Configurações primeiro numa instalação nova via a trava recusar qualquer
+// usuário/senha (nenhuma credencial tinha sido gerada ainda), sem nada na
+// tela explicando o porquê. Mesma lógica de panel.js, espelhada aqui.
+copilotoExibirCredencialInicialSePendente('configUserInput');
 
