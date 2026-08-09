@@ -782,17 +782,6 @@ document.getElementById('palavraChaveCopiarBtn').addEventListener('click', async
   }
 });
 
-// Tenta autenticar com o usuário/senha dos campos indicados. Em caso de
-// sucesso, marca a sessão e roda `aoAutenticar`. Em caso de falha, escreve a
-// mensagem de erro padrão, dispara a animação de "shake" no elemento
-// indicado, limpa e refoca o campo de senha.
-//
-// Antes esta sequência (verificar -> shake -> limpar -> refocar) estava
-// copiada quase igual em 3 lugares (login de tela cheia do painel, modal
-// avançado do painel, e login das configurações) — cada cópia com seu
-// próprio seletor de DOM, o que é fácil de deixar dessincronizado se o HTML
-// de um deles mudar e o dos outros não. Agora é uma função só.
-
 // ---------- Modal da credencial inicial (bloqueante) ----------
 //
 // Esta senha existe UMA vez. Depois de confirmada ela é apagada, e não há
@@ -950,10 +939,6 @@ function copilotoSelecionarTextoDoElemento(el){
   }catch(e){}
 }
 
-// Ponto de entrada das duas telas de login: gera a credencial se esta
-// instalação ainda não tiver uma, e mostra o modal se houver uma pendente
-// de confirmação. Sai calada quando não há nada pendente — que é o caso de
-// toda instalação já em uso.
 // ---------- Confirmar/Avisar — substitui confirm()/alert() nativos ----------
 //
 // Os diálogos nativos do navegador (confirm/alert) mostram o nome da
@@ -1099,6 +1084,10 @@ async function copilotoAvisar(mensagem, opcoes){
   await copilotoAbrirModalDecisao(mensagem, Object.assign({ somenteOk: true }, opcoes || {}));
 }
 
+// Ponto de entrada das duas telas de login: gera a credencial se esta
+// instalação ainda não tiver uma, e mostra o modal se houver uma pendente
+// de confirmação. Sai calada quando não há nada pendente — que é o caso de
+// toda instalação já em uso.
 async function copilotoExibirCredencialInicialSePendente(usuarioInputId){
   const gerada = await copilotoGarantirCredencialInicial();
   const pendente = gerada || await copilotoLerCredencialInicialPendente();
@@ -1268,6 +1257,16 @@ async function copilotoChecarBloqueioAreaRestrita(passInputId, submitBtnId, erro
   return status.bloqueado;
 }
 
+// Tenta autenticar com o usuário/senha dos campos indicados. Em caso de
+// sucesso, marca a sessão e roda `aoAutenticar`. Em caso de falha, escreve a
+// mensagem de erro padrão, dispara a animação de "shake" no elemento
+// indicado, limpa e refoca o campo de senha.
+//
+// Antes esta sequência (verificar -> shake -> limpar -> refocar) estava
+// copiada quase igual em 3 lugares (login de tela cheia do painel, modal
+// avançado do painel, e login das configurações) — cada cópia com seu
+// próprio seletor de DOM, o que é fácil de deixar dessincronizado se o HTML
+// de um deles mudar e o dos outros não. Agora é uma função só.
 async function copilotoTentarLogin({ userInputId, passInputId, errorId, submitBtnId, shakeEl, aoAutenticar }){
   // Confere ANTES de verificar a senha — evita gastar um PBKDF2 (e, mais
   // importante, contar mais uma tentativa) enquanto já está bloqueado.

@@ -657,10 +657,14 @@ function initHealthMonitor(){
   async function testarGeminiUmaVez(model, apiKey){
     const inicio = performance.now();
     try{
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      // Chave vai no header x-goog-api-key (suportado pela própria API), não
+      // na URL — evita que ela apareça em qualquer lugar que logue a URL
+      // completa da requisição (proxy corporativo, aba de rede do DevTools
+      // durante um suporte remoto etc.).
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
       const resp = await pingComTimeout(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: 'oi' }] }],
           generationConfig: { maxOutputTokens: 5, temperature: 0 }
@@ -1898,15 +1902,13 @@ async function resetBillingStats(){
 
 const BACKUP_APP_ID = 'copiloto-vendas-csvirtual';
 
-// Allow-list de chaves reconhecidas num arquivo de backup — compartilhada
-// por restaurarBackup() (um perfil) e restaurarBackupTodosOsPerfis() (todos
-// de uma vez), pra nunca as duas listas divergirem uma da outra. Um backup
-// de verdade só tem chaves que o próprio Copiloto grava (ver todos os
-// copilotoStorage.local.set em panel.js/options.js) mais o padrão dinâmico
-// "hist:<leadId>". Qualquer chave fora disso é ignorada (nunca gravada) —
-// não é o app confiando cegamente em qualquer nome de campo que um arquivo
-// adulterado decida incluir, mesmo que o arquivo passe nas checagens de
-// formato.
+// Allow-list de chaves reconhecidas num arquivo de backup — usada por
+// restaurarBackup() logo abaixo. Um backup de verdade só tem chaves que o
+// próprio Copiloto grava (ver todos os copilotoStorage.local.set em
+// panel.js/options.js) mais o padrão dinâmico "hist:<leadId>". Qualquer
+// chave fora disso é ignorada (nunca gravada) — não é o app confiando
+// cegamente em qualquer nome de campo que um arquivo adulterado decida
+// incluir, mesmo que o arquivo passe nas checagens de formato.
 const CHAVES_BACKUP_RECONHECIDAS = new Set([
   'config','funil','leads_all','provider',
   'claudeKey','claudeModel','claudeModeloBasico',
@@ -2094,8 +2096,7 @@ async function restaurarBackup(){
     return;
   }
 
-  // Ver CHAVES_BACKUP_RECONHECIDAS acima (compartilhada com
-  // restaurarBackupTodosOsPerfis).
+  // Ver CHAVES_BACKUP_RECONHECIDAS acima.
   const dadosFiltrados = {};
   const chavesIgnoradas = [];
   Object.entries(parsed.data).forEach(([chave, valor]) => {
@@ -3323,14 +3324,18 @@ async function callClaude(cachedSystem, dynamicContext, userMessage, modeloEscol
 // chamar esta função. Isso mantém esta função sem saber nada sobre
 // "níveis"/funil — só faz a chamada com o que recebeu.
 async function callGemini(cachedSystem, dynamicContext, userMessage, apiKey, model){
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   // Mesma delimitação de callClaude — ver o comentário lá.
   const userText = dynamicContext
     ? `${dynamicContext}\n\n<mensagem_do_lead>\n${userMessage}\n</mensagem_do_lead>`
     : `<mensagem_do_lead>\n${userMessage}\n</mensagem_do_lead>`;
   const response = await fetchComRetry(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    // Chave no header x-goog-api-key (suportado pela própria API), não na
+    // URL — evita que ela apareça em qualquer lugar que logue a URL
+    // completa da requisição (proxy corporativo, aba de rede do DevTools
+    // durante um suporte remoto etc.).
+    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       system_instruction: { parts: [{ text: cachedSystem }] },
       contents: [{ role: "user", parts: [{ text: userText }] }],
@@ -4993,9 +4998,7 @@ const LOG_TIPO_INFO = {
   acesso_dados_protegidos_admin: { icone: '🔓', label: 'Admin acessou dados protegidos (modo administrador)' },
   acesso_equipe_alterado:        { icone: '🔑', label: 'Credencial de acesso da equipe alterada' },
   backup_realizado:              { icone: '📦', label: 'Backup do próprio perfil realizado' },
-  backup_todos_perfis_realizado: { icone: '🛡️', label: 'Backup de todos os perfis realizado' },
   backup_restaurado:             { icone: '📂', label: 'Backup restaurado' },
-  backup_todos_perfis_restaurado: { icone: '🛡️', label: 'Backup de todos os perfis restaurado' },
   backup_enviado_email:          { icone: '📧', label: 'Backup baixado para envio por e-mail' },
   relatorio_leads_exportado:     { icone: '📥', label: 'Relatório de leads exportado/impresso' },
   ficha_lead_exportada:          { icone: '🗂️', label: 'Ficha de lead exportada/impressa' },

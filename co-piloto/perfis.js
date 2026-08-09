@@ -1019,7 +1019,7 @@ function copilotoExtrairDadosDoPerfil(snapshotStorage, perfilId) {
 // 'senha_redefinida_por_admin', 'senha_admin_recuperada', 'nome_alterado',
 // 'troca_rapida_alterada', 'log_excluido', 'pin_admin_gerado',
 // 'acesso_dados_protegidos_admin', 'acesso_equipe_alterado',
-// 'backup_realizado', 'backup_todos_perfis_realizado', 'backup_restaurado',
+// 'backup_realizado', 'backup_restaurado',
 // 'backup_enviado_email', 'relatorio_leads_exportado', 'ficha_lead_exportada',
 // 'log_auditoria_exportado', 'lead_criado', 'lead_campo_alterado',
 // 'lead_excluido', 'lead_restaurado', 'leads_importados'. (O reset geral
