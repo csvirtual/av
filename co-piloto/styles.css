@@ -182,12 +182,15 @@ textarea{resize:vertical; min-height:90px; line-height:1.45;}
 .back-to-top{
   position:fixed; right:20px; bottom:20px; z-index:500;
   width:46px; height:46px; border-radius:50%;
-  /* Mesmo contorno do botão do chat (.chat-float-btn) — sem borda nenhuma,
-     de propósito, pros dois botões lado a lado ficarem visualmente
-     idênticos. */
+  /* Sem borda no CÍRCULO (igual ao botão do chat, .chat-float-btn) — o
+     contorno fica na SETA em si, não no botão. O emoji 💬 do botão do chat
+     já vem com sombreado/contorno nativo dando profundidade; o caractere
+     "↑" sozinho não tem nada disso, então o contorno preto é desenhado nele
+     via -webkit-text-stroke (mesma grossura visual do contorno do emoji). */
   border:none;
   background:linear-gradient(135deg, var(--purple), #5F2C82);
   color:#fff; font-size:20px; font-weight:700; line-height:1; cursor:pointer;
+  -webkit-text-stroke:1.5px rgba(20,8,40,.9);
   text-shadow:0 1px 2px rgba(0,0,0,.3);
   display:flex; align-items:center; justify-content:center;
   box-shadow:0 4px 14px rgba(124,58,168,.35);
