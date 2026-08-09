@@ -238,11 +238,21 @@ body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointe
 .chat-msg.ai.error{ background:#fdecea; color:#8a1f11; }
 .chat-msg.loading{ align-self:flex-start; color:var(--muted); font-style:italic; }
 .chat-input-row{
-  display:flex; gap:8px; padding:12px 16px; border-top:1px solid #eee; align-items:flex-end;
+  /* center, não flex-end: o botão de enviar fica sempre no centro vertical
+     da caixa de digitar, cresça ela o quanto crescer (ver .chat-input
+     abaixo e o auto-grow em chatbot.js). */
+  display:flex; gap:8px; padding:12px 16px; border-top:1px solid #eee; align-items:center;
 }
 .chat-input{
   flex:1; resize:none; max-height:110px; border:1px solid #ddd; border-radius:10px;
   padding:9px 12px; font-family:'Manrope', sans-serif; font-size:13.5px; line-height:1.4;
+  /* Sobrescreve o min-height:90px do seletor genérico "textarea" (styles.css,
+     bem mais acima) — aqui é pra começar compacta, de uma linha só, e
+     crescer sozinha ao digitar (ver o listener de 'input' em chatbot.js);
+     sem isto, a caixa nascia bem mais alta que o botão de enviar ao lado,
+     e os dois ficavam com centros bem diferentes, mesmo com align-items
+     certo. */
+  min-height:0;
 }
 .chat-input:focus{ outline:none; border-color:var(--purple); }
 .chat-input-row .btn{ flex-shrink:0; }
