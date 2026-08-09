@@ -661,10 +661,19 @@
     color:var(--muted); background:#FBF9F5; border-top:1px solid var(--line);
   }
   .accordion-item.open .accordion-panel{ display:block; }
-  .accordion-panel p{ margin:8px 0; }
-  .accordion-panel ul, .accordion-panel ol{ margin:6px 0; padding-left:18px; }
-  .accordion-panel li{ margin-bottom:5px; }
-  .accordion-panel b{ color:var(--ink); }
+  /* Mesma tipografia usada em .privacidade-secao logo abaixo (e replicada,
+     com os mesmos valores, na resposta direta do C&S BOT — ver
+     serializarHtmlSeguroAjuda em chatbot.js) — um padrão só de negrito/
+     parágrafo/lista/código pras três telas onde este mesmo conteúdo
+     aparece. */
+  .accordion-panel p, .privacidade-secao p{ margin:8px 0; }
+  .accordion-panel ul, .accordion-panel ol,
+  .privacidade-secao ul, .privacidade-secao ol{ margin:6px 0; padding-left:18px; }
+  .accordion-panel li, .privacidade-secao li{ margin-bottom:5px; }
+  .accordion-panel b, .privacidade-secao b{ color:var(--ink); }
+  .accordion-panel code, .privacidade-secao code{
+    background:rgba(0,0,0,.07); padding:1px 4px; border-radius:4px; font-size:12px;
+  }
 
   .accordion-item-credits{ border-color:var(--purple); }
   .accordion-item-credits.open{ box-shadow:0 3px 14px rgba(124,58,168,.12); }
