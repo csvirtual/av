@@ -468,28 +468,59 @@ document.getElementById('precoGeminiAvancadoOutput').addEventListener('input', (
 });
 
 // Mostra uma chave de API já decifrada num campo — ou, se não puder ser
-// decifrada agora (DEK indisponível nesta sessão, ver auth.js), deixa o
-// campo vazio e BLOQUEADO (mesma lógica de aplicarCampoProtegido em
-// panel.js), pra nunca expor texto cifrado bruto nem correr o risco de
-// saveKeys() gravar por cima com um valor errado.
+// decifrada agora (DEK indisponível nesta sessão, ver auth.js — típico caso:
+// backup restaurado de OUTRO perfil/instalação, cifrado com um DEK que este
+// aqui não tem), deixa o campo vazio e BLOQUEADO (mesma lógica de
+// aplicarCampoProtegido em panel.js), pra nunca expor texto cifrado bruto
+// nem correr o risco de saveKeys() gravar por cima com um valor errado.
+// Guarda o placeholder original em dataset ANTES de sobrescrever — é o que
+// liberarCampoChaveApi() usa pra devolvê-lo quando o campo é destravado.
 async function preencherCampoChaveApi(inputId, valorSalvo, dek){
   const input = document.getElementById(inputId);
+  const aviso = document.getElementById(inputId + 'BloqueadaAviso');
+  if(input.dataset.placeholderOriginal === undefined) input.dataset.placeholderOriginal = input.placeholder || '';
   if(!pareceCifrado(valorSalvo)){
     input.value = valorSalvo || '';
     input.disabled = false;
+    if(aviso) aviso.style.display = 'none';
     return;
   }
   if(dek){
     try{
       input.value = await copilotoDecifrarAesGcm(dek, valorSalvo);
       input.disabled = false;
+      if(aviso) aviso.style.display = 'none';
       return;
     }catch(e){ /* cai pro bloqueio abaixo */ }
   }
   input.value = '';
   input.disabled = true;
   input.placeholder = '🔒 Protegido — sem acesso agora';
+  if(aviso) aviso.style.display = 'flex';
 }
+
+// Libera um campo BLOQUEADO por preencherCampoChaveApi (chamada pelo botão
+// "Digitar uma chave nova" do aviso que aparece nesse caso) — não recupera a
+// chave antiga (não dá: foi cifrada com o DEK de OUTRO perfil/instalação,
+// que esta sessão não tem, e nunca vai ter), só destrava o campo pra uma
+// chave NOVA ser digitada. Ao salvar (saveKeys -> valorChaveApiParaSalvar),
+// essa chave nova substitui a antiga de vez — a antiga, de qualquer forma,
+// já era inacessível e inutilizável aqui. Deixar em branco e salvar assim
+// mesmo também é uma opção válida: equivale a "esquecer" a chave protegida
+// e ficar sem nenhuma configurada, até digitar uma de verdade depois.
+function liberarCampoChaveApi(inputId){
+  const input = document.getElementById(inputId);
+  const aviso = document.getElementById(inputId + 'BloqueadaAviso');
+  input.disabled = false;
+  input.value = '';
+  input.placeholder = input.dataset.placeholderOriginal !== undefined ? input.dataset.placeholderOriginal : input.placeholder;
+  if(aviso) aviso.style.display = 'none';
+  input.focus();
+}
+['claudeKey', 'geminiKeyBasico', 'geminiKeyAvancado'].forEach((inputId) => {
+  const btn = document.getElementById(inputId + 'LiberarBtn');
+  if(btn) btn.addEventListener('click', () => liberarCampoChaveApi(inputId));
+});
 
 async function init(){
   const data = await copilotoStorage.local.get([

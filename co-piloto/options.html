@@ -276,6 +276,13 @@
         <div class="field">
           <label>Chave de API da Anthropic</label>
           <input type="password" id="claudeKey" placeholder="sk-ant-..." autocomplete="off">
+          <!-- Só aparece quando o valor salvo veio cifrado por um DEK que esta
+               sessão não tem (ex.: backup restaurado de outro perfil/instalação)
+               — ver preencherCampoChaveApi/liberarCampoChaveApi em options.js. -->
+          <div class="chave-api-bloqueada-aviso" id="claudeKeyBloqueadaAviso" style="display:none;">
+            🔒 Esta chave veio de um backup de outro perfil/instalação e não pode ser lida aqui.
+            <button type="button" class="chave-api-liberar-btn" id="claudeKeyLiberarBtn">Digitar uma chave nova</button>
+          </div>
         </div>
         <div class="field">
           <label>Modelo</label>
@@ -320,6 +327,10 @@
           <div class="field">
             <label>Chave de API - (gratuita)</label>
             <input type="password" id="geminiKeyBasico" placeholder="AIza..." autocomplete="off">
+            <div class="chave-api-bloqueada-aviso" id="geminiKeyBasicoBloqueadaAviso" style="display:none;">
+              🔒 Esta chave veio de um backup de outro perfil/instalação e não pode ser lida aqui.
+              <button type="button" class="chave-api-liberar-btn" id="geminiKeyBasicoLiberarBtn">Digitar uma chave nova</button>
+            </div>
           </div>
           <div class="field">
             <label>Modelo — Chave A</label>
@@ -342,6 +353,10 @@
           <div class="field">
             <label>Chave de API - (paga, opcional)</label>
             <input type="password" id="geminiKeyAvancado" placeholder="Deixe em branco pra usar a Chave A também aqui" autocomplete="off">
+            <div class="chave-api-bloqueada-aviso" id="geminiKeyAvancadoBloqueadaAviso" style="display:none;">
+              🔒 Esta chave veio de um backup de outro perfil/instalação e não pode ser lida aqui.
+              <button type="button" class="chave-api-liberar-btn" id="geminiKeyAvancadoLiberarBtn">Digitar uma chave nova</button>
+            </div>
           </div>
           <div class="field">
             <label>Modelo — Chave B</label>
