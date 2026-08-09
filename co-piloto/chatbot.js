@@ -479,23 +479,108 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       });
       box.appendChild(copiarBtn);
 
-      // Legenda pequena com qual chave/modelo respondeu (ver
+      // Legenda pequena embaixo da resposta — ou um texto fixo (opts.legenda,
+      // ex.: "📖 Direto do guia — sem usar IA", ver enviarMensagemChat) ou,
+      // na ausência dele, qual chave/modelo respondeu de verdade (ver
       // labelRoteamentoIA/anexarMetaRoteamento, panel.js) — mesma
       // visibilidade que "Gerar resposta"/"Sugerir follow-up" ganharam no
       // painel principal.
-      if(opts.meta && typeof labelRoteamentoIA === 'function'){
-        const label = labelRoteamentoIA(opts.meta);
-        if(label){
-          const legenda = document.createElement('div');
-          legenda.className = 'chat-roteamento-info';
-          legenda.textContent = label;
-          box.appendChild(legenda);
-        }
+      const textoLegenda = opts.legenda || (opts.meta && typeof labelRoteamentoIA === 'function' ? labelRoteamentoIA(opts.meta) : '');
+      if(textoLegenda){
+        const legenda = document.createElement('div');
+        legenda.className = 'chat-roteamento-info';
+        legenda.textContent = textoLegenda;
+        box.appendChild(legenda);
       }
     }
 
     box.scrollTop = box.scrollHeight;
     return div;
+  }
+
+  // Registra uma troca (pergunta + resposta) no Histórico do Bot do lead
+  // atual — usada tanto pela resposta gerada por IA quanto pela resposta
+  // direta do guia (ver enviarMensagemChat), pra não duplicar essa lógica
+  // nos dois caminhos.
+  function registrarTrocaNoHistoricoBot(pergunta, resposta, opts){
+    opts = opts || {};
+    const lead = leadAtualParaChat();
+    const leadIdDaTroca = lead ? lead.id : null;
+    const entry = {
+      id: 'bothist_' + Date.now(),
+      quando: new Date().toISOString(),
+      pergunta,
+      resposta,
+      leadNome: lead ? nomeParaExibir(lead) : '',
+      estagio: opts.estagio || '',
+      emocao: opts.emocao || ''
+    };
+    botHistorico.push(entry);
+    renderBotHistoryList();
+    salvarEntradaHistoricoBot(leadIdDaTroca, entry).catch(err => console.error(err));
+  }
+
+  // Timer da contagem regressiva do aviso "sem chave configurada" (ver
+  // mostrarAvisoSemChave) — module-level pra fecharChatModal() poder
+  // cancelar se a pessoa fechar o chat antes dos 5s acabarem (sem isso, ela
+  // seria redirecionada pra Configurações "do nada" alguns segundos depois
+  // de já ter saído do chat).
+  let _avisoSemChaveIntervalId = null;
+
+  function cancelarAvisoSemChave(){
+    if(_avisoSemChaveIntervalId){
+      clearInterval(_avisoSemChaveIntervalId);
+      _avisoSemChaveIntervalId = null;
+    }
+  }
+
+  // Vai direto pra seção "Provedor de IA" de Configurações (âncora no
+  // próprio card — ver #cardProvedorIA em options.html) em vez de só abrir
+  // a tela no topo, já que o problema específico é exatamente essa seção.
+  function abrirConfiguracoesNaSecaoProvedor(){
+    window.location.href = 'options.html#cardProvedorIA';
+  }
+
+  // Mostra o aviso de "nenhuma chave configurada" com contagem regressiva
+  // de 5s antes de redirecionar sozinho pra Configurações → Provedor de IA
+  // — em vez do redirecionamento imediato de antes (que não dava nem tempo
+  // da pessoa ler a mensagem de erro). "Ir agora" pula a espera pra quem
+  // não quiser contar.
+  function mostrarAvisoSemChave(){
+    const box = elMessages();
+    const div = document.createElement('div');
+    div.className = 'chat-msg ai error';
+    const textoEl = document.createElement('div');
+    div.appendChild(textoEl);
+    const irAgoraBtn = document.createElement('button');
+    irAgoraBtn.type = 'button';
+    irAgoraBtn.className = 'chat-copy-btn';
+    irAgoraBtn.textContent = 'Ir agora';
+    div.appendChild(irAgoraBtn);
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+
+    let restante = 5;
+    const atualizarTexto = () => {
+      textoEl.textContent = `🔑 Nenhuma chave de API configurada ainda — te levando para Configurações → Provedor de IA em ${restante}s...`;
+    };
+    atualizarTexto();
+
+    const ir = () => {
+      cancelarAvisoSemChave();
+      abrirConfiguracoesNaSecaoProvedor();
+    };
+    irAgoraBtn.addEventListener('click', ir);
+
+    cancelarAvisoSemChave(); // nunca dois contadores rodando ao mesmo tempo
+    _avisoSemChaveIntervalId = setInterval(() => {
+      restante -= 1;
+      if(restante <= 0){
+        ir();
+        return;
+      }
+      atualizarTexto();
+    }, 1000);
   }
 
   async function enviarMensagemChat(){
@@ -511,6 +596,24 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
     renderMensagem('user', texto);
     chatHistorico.push({ role: 'user', texto });
+
+    // Pergunta claramente sobre o próprio Co-piloto (achou uma seção de
+    // ajuda bem casada — ver encontrarSecaoAjudaRelevante) responde direto
+    // do guia "Como usar"/"Privacidade", sem gastar IA nenhuma — funciona
+    // mesmo sem nenhuma chave de API configurada. Só perguntas SEM uma
+    // seção clara (a maioria: sobre o lead/venda) seguem pro fluxo de IA
+    // normal, logo abaixo.
+    const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
+    if(secaoAjudaDireta){
+      const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
+      renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA` });
+      chatHistorico.push({ role: 'ai', texto: respostaDireta });
+      registrarTrocaNoHistoricoBot(texto, respostaDireta);
+      chatOcupado = false;
+      elSend().disabled = false;
+      input.focus();
+      return;
+    }
 
     const loadingEl = renderMensagem('ai', 'digitando...', { loading: true, id: 'chatLoadingMsg' });
 
@@ -530,26 +633,17 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       // Registra esta troca no Histórico do Bot deste lead (persistente) —
       // junto com a leitura automática de estágio/emoção, se houve alguma
       // pra esta mensagem (ver detectarEstagioEmocaoChat).
-      const lead = leadAtualParaChat();
-      const leadIdDaTroca = lead ? lead.id : null;
-      const entry = {
-        id: 'bothist_' + Date.now(),
-        quando: new Date().toISOString(),
-        pergunta: texto,
-        resposta: resposta,
-        leadNome: lead ? nomeParaExibir(lead) : '',
+      registrarTrocaNoHistoricoBot(texto, resposta, {
         estagio: chatEstagioDetectado || '',
         emocao: chatEmocaoDetectada || ''
-      };
-      botHistorico.push(entry);
-      renderBotHistoryList();
-      salvarEntradaHistoricoBot(leadIdDaTroca, entry).catch(err => console.error(err));
+      });
     }catch(err){
       loadingEl.remove();
-      renderMensagem('ai', 'Erro: ' + err.message, { erro: true });
-      console.error(err);
-      if(err.semChave && typeof openOptions === 'function'){
-        openOptions();
+      if(err.semChave){
+        mostrarAvisoSemChave();
+      }else{
+        renderMensagem('ai', 'Erro: ' + err.message, { erro: true });
+        console.error(err);
       }
     }finally{
       // Automático: a leitura vale só pra pergunta que acabou de ser
@@ -583,6 +677,11 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   function fecharChatModal(){
     elOverlay().style.display = 'none';
     document.body.classList.remove('modal-open');
+    // Sem isto, fechar o chat antes dos 5s do aviso "sem chave" acabar
+    // (ver mostrarAvisoSemChave) ainda redirecionava pra Configurações
+    // alguns segundos depois — "do nada", já que a pessoa nem estava mais
+    // olhando pro chat.
+    cancelarAvisoSemChave();
   }
 
   function init(){
