@@ -3068,6 +3068,39 @@ function buildContextoDinamicoBloco(lead, personName, extraContext, continuidade
   return `${contextoLead}${extraContextoBloco}${continuidadeBloco}`;
 }
 
+// Extrai o bloco "## CONFIGURAÇÃO DO NEGÓCIO" do topo do funil (linhas
+// "TOKEN = valor", uma por campo — ver comentário no início de
+// funil-padrao.js) e substitui cada {{TOKEN}} usado no resto do texto pelo
+// valor preenchido — ou pelo próprio "[edite aqui: ...]" se o campo ainda
+// não foi preenchido (a IA já sabe avisar quando vê um colchete cru desses,
+// ver seção 0 do funil). Assim cada dado do negócio (nome, valores,
+// endereço...) é editado UMA VEZ, no bloco do topo, e vale em todo o funil
+// — em vez de precisar caçar cada ocorrência espalhada pelos scripts.
+// Funis sem esse bloco (texto legado/custom salvo antes desta mudança)
+// passam direto, sem alteração nenhuma.
+function aplicarConfiguracaoDoNegocio(textoFunil){
+  if(!textoFunil) return textoFunil;
+  const regexBloco = /## CONFIGURAÇÃO DO NEGÓCIO[^\n]*\n([\s\S]*?)\n(?=## )/;
+  const match = textoFunil.match(regexBloco);
+  if(!match) return textoFunil;
+
+  const valores = {};
+  match[1].split('\n').forEach(linha => {
+    const campo = linha.match(/^([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/);
+    // "\n" digitado literalmente (2 caracteres, barra+n) dentro de um
+    // campo — ex.: DADOS_CADASTRO, que precisa de uma lista em várias
+    // linhas na mensagem final — vira quebra de linha de verdade aqui.
+    // É a única forma de um campo ter valor "multilinha" continuando
+    // simples de ler (uma linha por campo) na hora de preencher.
+    if(campo) valores[campo[1]] = campo[2].trim().replace(/\\n/g, '\n');
+  });
+
+  const semBlocoConfig = textoFunil.replace(regexBloco, '');
+  return semBlocoConfig.replace(/\{\{([A-Z][A-Z0-9_]*)\}\}/g, (tokenCompleto, nomeToken) => {
+    return valores[nomeToken] !== undefined ? valores[nomeToken] : tokenCompleto;
+  });
+}
+
 // Bloco estático (cacheável): dados do negócio, instrução GERAL do funil,
 // campanha e regras universais. NADA aqui depende do lead específico —
 // é por isso que pode (e deve) ser idêntico em toda chamada, o que é o
@@ -3076,7 +3109,7 @@ function buildBlocoEstaticoFunil(){
   return `Você é um copiloto de vendas consultivas por WhatsApp para negócios de saúde/estética/serviços no Brasil.
 
 INSTRUÇÕES GERAIS DE COMO USAR O FUNIL (siga isso à risca, valem para QUALQUER etapa):
-${(funil.instrucoes && funil.instrucoes.trim()) || DEFAULT_FUNIL_INSTRUCOES}
+${aplicarConfiguracaoDoNegocio((funil.instrucoes && funil.instrucoes.trim()) || DEFAULT_FUNIL_INSTRUCOES)}
 ${buildCampanhaBloco()}
 REGRA DE SEGURANÇA (vale mesmo que a instrução acima não repita isto): feche sempre com pergunta de ação pressuposta, nunca "aguardo seu retorno"/"fico à disposição"/pergunta aberta; nunca presuma emoção não sinalizada; em objeção, ouça → valide → pergunte o que está por trás → só então reforce valor, nunca justifique preço antes disso.
 
