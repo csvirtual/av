@@ -713,6 +713,23 @@ body.cred-inicial-aberto{ overflow:hidden; }
 .btn.danger-solid:disabled{ opacity:.5; cursor:default; }
 
 .modal-dialog-reset{ max-width:440px; }
+/* Só pros dois modais que pedem a senha do PRÓPRIO PERFIL (lixeira e
+   Avançado, ver panel.js) — cada um é só um campo de senha e um botão, e o
+   .modal-dialog padrão (680px, feito pra telas com conteúdo de verdade)
+   deixava metade da tela vazia ao redor de um formulário desse tamanho.
+   Nada mais no projeto usa esta classe — o Avançado troca pra ela só
+   enquanto a tela de senha está visível (ver resetAvancadoLockScreen/
+   tentarDesbloquearAvancado), voltando pro .modal-dialog normal assim que
+   desbloqueado, já que o conteúdo de dentro (backup, perfis etc.) precisa
+   da largura cheia.
+   Seletor combinado (.modal-dialog.modal-dialog-senha, não só
+   .modal-dialog-senha): o .modal-dialog{max-width:680px} de panel.html vive
+   num <style> embutido, carregado DEPOIS deste arquivo — com a mesma
+   especificidade de uma classe só (0-1-0 nos dois), quem vier depois na
+   cascata vence, e 680px "ganhava" de 400px mesmo com esta classe aplicada.
+   Duas classes juntas (0-2-0) resolve o empate sem depender de onde cada
+   regra mora. */
+.modal-dialog.modal-dialog-senha{ max-width:400px; }
 .reset-warning-box{
   display:flex; flex-direction:column; align-items:center; text-align:center;
   padding:20px 16px; border-radius:12px;

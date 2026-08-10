@@ -1828,6 +1828,11 @@ let _avancadoFocoAposDesbloquear = null;
 async function resetAvancadoLockScreen(){
   document.getElementById('avancadoLockScreen').style.display = 'flex';
   document.getElementById('avancadoContent').style.display = 'none';
+  // Modal mais estreito (ver modal-dialog-senha, styles.css) só enquanto a
+  // tela de senha está visível — o conteúdo de dentro do Avançado (backup,
+  // gerenciar perfis etc.) precisa da largura cheia, então volta pro
+  // .modal-dialog padrão assim que desbloqueado (ver tentarDesbloquearAvancado).
+  document.getElementById('avancadoModalDialog').classList.add('modal-dialog-senha');
   document.getElementById('avancadoPasswordInput').value = '';
   copilotoLimparErroDoCampo(document.getElementById('avancadoLockError'));
   copilotoCancelarBloqueioAreaRestrita('avancadoLockError');
@@ -1877,6 +1882,7 @@ async function tentarDesbloquearAvancado(){
   copilotoLimparErroDoCampo(errorEl);
   document.getElementById('avancadoLockScreen').style.display = 'none';
   document.getElementById('avancadoContent').style.display = 'block';
+  document.getElementById('avancadoModalDialog').classList.remove('modal-dialog-senha'); // ver resetAvancadoLockScreen
   // Mesma lógica de 'lixeira_aberta': entrar em "Avançado" já dá acesso
   // a backup/restauração, reset total, credenciais e o próprio log de
   // sessões — vale deixar rastro de quando esse acesso aconteceu, não
