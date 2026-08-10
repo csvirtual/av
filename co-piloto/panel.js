@@ -2410,15 +2410,20 @@ async function renderTrashModal(){
         item.id);
     }
     // item.entryData.pergunta vem cifrado da lixeira (ver
-    // deleteHistoryEntry/clearHistory) — nunca decifrado só pra uma prévia
-    // aqui; se estiver protegido, mostra um aviso em vez do texto cifrado
-    // bruto (mesmo princípio de aplicarCampoProtegido/VALOR_PROTEGIDO).
+    // deleteHistoryEntry/clearHistory/deleteBotHistoryEntry/clearBotHistory)
+    // — nunca decifrado só pra uma prévia aqui; se estiver protegido, mostra
+    // um aviso em vez do texto cifrado bruto (mesmo princípio de
+    // aplicarCampoProtegido/VALOR_PROTEGIDO).
     const perguntaFull = (item.entryData && item.entryData.pergunta) || '';
     const perguntaProtegida = pareceCifrado(perguntaFull);
     const preview = perguntaProtegida ? '' : perguntaFull.slice(0,70);
     const previewHtml = perguntaProtegida
       ? ' · 🔒 conteúdo protegido'
       : (preview ? ' · "' + escapeHtml(preview) + (perguntaFull.length>70?'…':'') + '"' : '');
+    if(item.type === 'botHistoryEntry'){
+      return linhaLixeiraHtml('🤖', `Conversa do C&S - BOT com ${escapeHtml(item.leadNome||'lead removido')}`,
+        `Excluída em ${formatDataHora(item.deletedAt)}${previewHtml}`, item.id);
+    }
     return linhaLixeiraHtml('💬', `Resposta de ${escapeHtml(item.leadNome||'lead removido')}`,
       `Excluída em ${formatDataHora(item.deletedAt)}${previewHtml}`, item.id);
   }).join('');
@@ -2464,6 +2469,25 @@ async function restoreTrashItem(itemId){
       renderHistoryList();
     }
     toast('Resposta restaurada no histórico ✓');
+  } else if(item.type === 'botHistoryEntry'){
+    // item.leadId pode ser null (conversa tida sem nenhum lead selecionado
+    // — balde "_sem_lead", ver botHistoryKey em chatbot.js): nesse caso não
+    // há lead pra checar, sempre restaura.
+    if(item.leadId){
+      const leadExists = leads.find(l=>l.id===item.leadId);
+      if(!leadExists){
+        toast('O lead dessa conversa não existe mais — restaure o lead primeiro');
+        return;
+      }
+    }
+    // item.entryData vem da lixeira ainda cifrado (ver deleteBotHistoryEntry/
+    // clearBotHistory, chatbot.js) — decifra antes de repassar, mesma
+    // convenção do ramo 'historyEntry' acima.
+    const [entradaDecifrada] = await decifrarHistoricoEmMemoria([{ ...item.entryData }], await obterDekAtivo());
+    if(typeof window.restaurarEntradaHistoricoBot === 'function'){
+      await window.restaurarEntradaHistoricoBot(item.leadId, entradaDecifrada);
+    }
+    toast('Conversa restaurada no Histórico do Bot ✓');
   }
 
   await updateTrashCountBadge();
@@ -5276,7 +5300,8 @@ const LOG_TIPO_INFO = {
   lead_campo_alterado:           { icone: '✏️', label: 'Dado de lead alterado' },
   lead_excluido:                 { icone: '🗑️', label: 'Lead movido para excluídos' },
   lead_restaurado:               { icone: '♻️', label: 'Lead restaurado' },
-  leads_importados:              { icone: '📇', label: 'Leads importados em lote' }
+  leads_importados:              { icone: '📇', label: 'Leads importados em lote' },
+  bot_conversa_excluida:         { icone: '🗑️', label: 'Conversa do C&S - BOT movida para excluídos' }
 };
 
 function formatarDataHoraLog(iso){

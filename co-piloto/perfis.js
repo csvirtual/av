@@ -1131,8 +1131,8 @@ function copilotoExtrairDadosDoPerfil(snapshotStorage, perfilId) {
 // 'backup_realizado', 'backup_restaurado',
 // 'backup_enviado_email', 'relatorio_leads_exportado', 'ficha_lead_exportada',
 // 'log_auditoria_exportado', 'lead_criado', 'lead_campo_alterado',
-// 'lead_excluido', 'lead_restaurado', 'leads_importados'. (O reset geral
-// não gera entrada: ele já apaga o
+// 'lead_excluido', 'lead_restaurado', 'leads_importados',
+// 'bot_conversa_excluida'. (O reset geral não gera entrada: ele já apaga o
 // storage inteiro, log incluso — é o único evento sem exceção.)
 //
 // Os eventos de lead nunca guardam o CONTEÚDO de campo protegido — ver

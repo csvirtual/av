@@ -1009,36 +1009,113 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     });
   }
 
-  // Diferente do histórico por lead, esta exclusão é direta (não passa
-  // pelos "leads excluídos"/lixeira) — é um histórico de apoio da conversa
-  // com a IA. Mexe só na chave do lead atualmente carregado
-  // (botHistoricoLeadId), nunca nas de outros leads.
+  // Mesmo destino do histórico de respostas (deleteHistoryEntry, panel.js):
+  // vai pra lixeira (item.type === 'botHistoryEntry'), cifrada, recuperável
+  // por 30 dias, e a exclusão fica registrada no log de auditoria — antes
+  // esta exclusão era direta e definitiva, sem nenhuma rede de segurança
+  // nem rastro, inconsistente com o resto do produto. Mexe só na chave do
+  // lead atualmente carregado (botHistoricoLeadId), nunca nas de outros leads.
   async function deleteBotHistoryEntry(entryId){
-    const confirmado = await copilotoConfirmar('Excluir esta conversa do Histórico do Bot?',
-      { titulo: 'Excluir conversa?', textoConfirmar: 'Excluir' });
+    const leadId = botHistoricoLeadId;
+    const historicoOriginal = botHistorico;
+    const entry = historicoOriginal.find(h => h.id === entryId);
+    if(!entry) return;
+    const confirmado = await copilotoConfirmar('Mover esta conversa do Histórico do Bot para os excluídos?',
+      { titulo: 'Mover para excluídos?', textoConfirmar: 'Mover para excluídos' });
     if(!confirmado) return;
-    botHistorico = botHistorico.filter(h => h.id !== entryId);
+
+    const lead = (typeof leads !== 'undefined' && Array.isArray(leads)) ? leads.find(l => l.id === leadId) : null;
+    const dek = await obterDekAtivo();
+    // Cifra antes de guardar na lixeira — mesmo motivo de deleteHistoryEntry
+    // (panel.js): sem isso, a pergunta feita e a resposta do bot ficariam em
+    // texto puro por até 30 dias na lixeira, mesmo já protegidas na origem.
+    const [entryCifrada] = await cifrarHistoricoParaSalvar([entry], dek);
+    const nomeParaLog = entry.leadNome || (lead ? lead.nome : '') || '(sem lead)';
+    if(typeof addToTrash === 'function'){
+      await addToTrash({
+        id: 'trash_' + Date.now(),
+        type: 'botHistoryEntry',
+        deletedAt: new Date().toISOString(),
+        leadId: leadId,
+        leadNome: nomeParaLog,
+        entryData: entryCifrada
+      });
+    }
+
+    botHistorico = historicoOriginal.filter(h => h.id !== entryId);
     try{
-      const dek = await obterDekAtivo();
       const paraSalvar = await cifrarHistoricoParaSalvar(botHistorico, dek);
-      await copilotoStorage.local.set({ [botHistoryKey(botHistoricoLeadId)]: paraSalvar });
+      await copilotoStorage.local.set({ [botHistoryKey(leadId)]: paraSalvar });
     }catch(err){ console.error(err); }
     renderBotHistoryList();
-    toast('Conversa excluída do Histórico do Bot 🗑️');
+    if(typeof updateTrashCountBadge === 'function') await updateTrashCountBadge();
+    if(typeof copilotoRegistrarEventoLog === 'function' && typeof copilotoObterPerfilAtivo === 'function'){
+      try{
+        await copilotoRegistrarEventoLog('bot_conversa_excluida', await copilotoObterPerfilAtivo(),
+          `Conversa do C&S - BOT com ${nomeParaLog} movida para os excluídos`);
+      }catch(e){}
+    }
+    toast('Conversa movida para os excluídos 🗑️');
   }
 
   async function clearBotHistory(){
     if(!botHistorico.length){ toast('Não há histórico do bot para limpar'); return; }
-    const confirmado = await copilotoConfirmar('Limpar todo o Histórico do Bot deste lead (chat rápido com o C&S - BOT)?',
-      { titulo: 'Limpar tudo?', textoConfirmar: 'Limpar tudo' });
+    const confirmado = await copilotoConfirmar('Mover todo o Histórico do Bot deste lead (chat rápido com o C&S - BOT) para os excluídos?',
+      { titulo: 'Mover tudo para excluídos?', textoConfirmar: 'Mover tudo' });
     if(!confirmado) return;
+
+    const leadId = botHistoricoLeadId;
+    const historicoOriginal = botHistorico;
+    const lead = (typeof leads !== 'undefined' && Array.isArray(leads)) ? leads.find(l => l.id === leadId) : null;
+    const nomeParaLog = (historicoOriginal[0] && historicoOriginal[0].leadNome) || (lead ? lead.nome : '') || '(sem lead)';
+    const dek = await obterDekAtivo();
+    const now = new Date().toISOString();
+    if(typeof mutarTrash === 'function'){
+      await mutarTrash(async (trash) => {
+        for(let i = 0; i < historicoOriginal.length; i++){
+          const entry = historicoOriginal[i];
+          const [entryCifrada] = await cifrarHistoricoParaSalvar([entry], dek);
+          trash.push({
+            id: 'trash_' + Date.now() + '_' + i,
+            type: 'botHistoryEntry',
+            deletedAt: now,
+            leadId: leadId,
+            leadNome: entry.leadNome || nomeParaLog,
+            entryData: entryCifrada
+          });
+        }
+        await copilotoStorage.local.set({ trash });
+      });
+    }
+
     botHistorico = [];
     try{
-      await copilotoStorage.local.set({ [botHistoryKey(botHistoricoLeadId)]: [] });
+      await copilotoStorage.local.set({ [botHistoryKey(leadId)]: [] });
     }catch(err){ console.error(err); }
     renderBotHistoryList();
-    toast('Histórico do Bot limpo 🧹');
+    if(typeof updateTrashCountBadge === 'function') await updateTrashCountBadge();
+    if(typeof copilotoRegistrarEventoLog === 'function' && typeof copilotoObterPerfilAtivo === 'function'){
+      try{
+        await copilotoRegistrarEventoLog('bot_conversa_excluida', await copilotoObterPerfilAtivo(),
+          `${historicoOriginal.length} conversa${historicoOriginal.length===1?'':'s'} do C&S - BOT com ${nomeParaLog} movida${historicoOriginal.length===1?'':'s'} para os excluídos`);
+      }catch(e){}
+    }
+    toast('Histórico do Bot movido para os excluídos 🗑️');
   }
+
+  // Usada por restoreTrashItem (panel.js) pra devolver uma conversa da
+  // lixeira pro Histórico do Bot — mesma ideia de saveHistoryEntry
+  // (panel.js) pro histórico de respostas: reaproveita
+  // salvarEntradaHistoricoBot (já serializada por chave) pra gravar a
+  // entrada JÁ decifrada (recebida em texto puro), e só atualiza a tela se
+  // o chat rápido deste MESMO lead estiver carregado agora.
+  window.restaurarEntradaHistoricoBot = async function(leadId, entradaDecifrada){
+    const arr = await salvarEntradaHistoricoBot(leadId, entradaDecifrada);
+    if(botHistoricoLeadId === leadId){
+      botHistorico = arr;
+      renderBotHistoryList();
+    }
+  };
 
   // Exposta pra panel.js chamar depois do painel desbloqueado (mesmo
   // momento em que os leads e o resto dos dados do perfil ativo são
