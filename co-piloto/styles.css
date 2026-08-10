@@ -320,6 +320,20 @@ body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointe
   align-self:flex-start; margin-top:2px; font-size:10.5px; color:var(--muted);
 }
 
+/* Cada resultado de "/find" (ver montarResultadoFindHtml, chatbot.js) — um
+   cartão por trecho encontrado, reaproveitando .hist-block/.hist-tag/
+   .hist-text (definidas em panel.html, já usadas na lista do "Histórico do
+   Bot" na tela principal) por dentro, só com uma borda própria pra separar
+   visualmente um resultado do outro dentro da mesma bolha do chat. */
+.chat-find-item{
+  border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  margin:8px 0; background:#fff;
+}
+.chat-find-item:last-child{ margin-bottom:0; }
+.chat-find-item .hist-date{ margin-bottom:4px; }
+.chat-find-item .chat-copy-btn{ display:block; margin-top:8px; }
+.chat-find-item .chat-copy-btn:disabled{ opacity:.55; cursor:default; text-decoration:none; }
+
 /* ÁREA RESTRITA - tela de usuário/senha (usada no modal Avançado e na página de Configurações) */
 .avancado-lock{
   display:flex; flex-direction:column; align-items:center; text-align:center;

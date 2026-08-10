@@ -54,6 +54,22 @@
   let botHistorico = [];
   let botHistorySearchQuery = '';
 
+  // ---------- "Memória" — trechos do Histórico do Bot marcados pra entrar
+  // no contexto da PRÓXIMA mensagem de IA (ver "/find" e "usar-memoria" mais
+  // abaixo) ----------
+  //
+  // Nunca automático: só existe aqui o que a atendente encontrou com "/find"
+  // e clicou em "📌 Usar no contexto" — sem isso, um trecho de uma conversa
+  // de semanas atrás nunca entra sozinho numa resposta nova. Consumido uma
+  // única vez (a próxima mensagem enviada) e esvaziado depois — ver
+  // enviarMensagemChat — pra não crescer sem limite feito o
+  // chatHistorico faria se persistisse entre sessões. Limitado a
+  // MEMORIA_LIMITE_TRECHOS de propósito: cada trecho vai inteiro (pergunta +
+  // resposta) pro contexto DINÂMICO (nunca cacheado, sempre preço cheio de
+  // entrada), então mais que uns poucos por vez pesaria no custo à toa.
+  let _memoriaAtivada = [];
+  const MEMORIA_LIMITE_TRECHOS = 3;
+
   function elBtn(){ return document.getElementById('chatFloatBtn'); }
   function elOverlay(){ return document.getElementById('chatModalOverlay'); }
   function elMessages(){ return document.getElementById('chatMessagesBox'); }
@@ -111,6 +127,9 @@
       if(chatEstagioDetectado) bits.push(`estágio: ${chatEstagioDetectado}`);
       if(chatEmocaoDetectada) bits.push(`emoção do cliente: ${chatEmocaoDetectada}`);
       partes.push(`🔍 Leitura automática da mensagem — ${bits.join(' · ')}`);
+    }
+    if(_memoriaAtivada.length){
+      partes.push(`🧠 ${_memoriaAtivada.length} trecho${_memoriaAtivada.length===1?'':'s'} do histórico anexado${_memoriaAtivada.length===1?'':'s'} (/find) — vai${_memoriaAtivada.length===1?'':'ão'} junto na próxima mensagem`);
     }
     if(!partes.length){
       bar.classList.remove('show');
@@ -232,12 +251,16 @@
   // Volta o seletor pro estado inicial ("Automático") — chamado ao trocar
   // de lead (ver carregarHistoricoBotChat), já que um estágio fixado
   // manualmente é sobre a CONVERSA com aquele lead específico, não deve
-  // seguir pro próximo.
+  // seguir pro próximo. Trechos marcados com "/find" (ver _memoriaAtivada)
+  // também são sobre o lead que estava aberto — trocar de lead sem enviá-los
+  // ainda os esvazia, pelo mesmo motivo: não fazem sentido "vazando" pro
+  // contexto de um lead diferente daquele de onde vieram.
   function resetEstagioManual(){
     chatEstagioManual = '';
     chatEstagioDetectado = null;
     chatEmocaoDetectada = null;
     chatEstagioDetectadoOrigemTexto = '';
+    _memoriaAtivada = [];
     const select = elEstagioSelect();
     if(select) select.value = '';
   }
@@ -478,6 +501,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     porOrigem.forEach((itens, origem) => {
       html += `<p><b>${escapeHtml(origem)}</b></p><ul>${itens.join('')}</ul>`;
     });
+    html += '<p>💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use <code>/find &lt;palavra&gt;</code>.</p>';
     return html;
   }
 
@@ -486,6 +510,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     coletarSecoesAjuda().forEach((secao, i) => {
       texto += `${i + 1}. [${secao.origem}] ${secao.titulo}\n`;
     });
+    texto += '\n💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use "/find <palavra>".';
     return texto.trim();
   }
 
@@ -499,6 +524,117 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     if(!isNaN(numero) && numero >= 1 && numero <= secoes.length) return secoes[numero - 1];
     const resultado = melhorSecaoAjudaPara(argumento);
     return resultado ? resultado.secao : null;
+  }
+
+  // ---------- Comando "/find" (busca no Histórico do Bot deste lead, sem IA) ----------
+  //
+  // Um "Ctrl+F" pro Histórico do Bot: acha, por palavra-chave (mesmo
+  // casamento de melhorSecaoAjudaPara acima — zero custo, zero IA), trechos
+  // JÁ CONVERSADOS com o lead atual em sessões anteriores deste mesmo chat.
+  // Existe porque a alternativa (a IA "lembrar" sozinha, injetando o
+  // histórico inteiro ou um resumo dele em toda mensagem nova) ou cresce sem
+  // limite de custo, ou decide relevância por conta própria — nos dois
+  // casos, silenciosamente. Aqui é o oposto: um pedido explícito, que devolve
+  // exatamente os trechos batidos (nunca inventa nem resume), e cada um
+  // ganha um botão "📌 Usar no contexto" — só se a atendente clicar nele é
+  // que aquele trecho específico entra na PRÓXIMA chamada de IA (ver
+  // _memoriaAtivada/adicionarTrechoNaMemoria, mais abaixo). Nunca escreve no
+  // Histórico do Bot (diferente do "/help") — uma busca não é uma conversa
+  // nova, não faz sentido virar mais uma entrada pesquisável nela mesma.
+  const COMANDOS_FIND = ['/find', '/buscar'];
+
+  // Mesma forma de argumentoComandoHelp — '' pro comando sozinho, o termo
+  // buscado se vier algo junto, ou null se não é um comando de busca.
+  function argumentoComandoFind(mensagem){
+    const normalizado = normalizarTextoAjuda((mensagem || '').trim());
+    for(const cmd of COMANDOS_FIND){
+      if(normalizado === cmd) return '';
+      if(normalizado.startsWith(cmd + ' ')) return mensagem.trim().slice(cmd.length).trim();
+    }
+    return null;
+  }
+
+  const FIND_LIMITE_RESULTADOS = 8;
+
+  // Pontua cada entrada do Histórico do Bot do lead atual pelas palavras do
+  // termo buscado (título/corpo não existem aqui — é tudo "corpo": pergunta
+  // + resposta pesam igual, ao contrário de melhorSecaoAjudaPara, que
+  // favorece o título de uma seção fixa). Sem limiar mínimo — mesmo
+  // raciocínio de acharSecaoPorComando: é um pedido explícito, uma palavra
+  // batendo já é motivo suficiente pra aparecer na lista, a atendente que
+  // julga se serve. `personNameFiltro` restringe à mesma pessoa (ver
+  // enviarMensagemChat): na central de mensagens (@csvirtual) o Histórico do
+  // Bot mistura conversas de gente diferente, sem isso a busca vazaria
+  // trecho de uma pessoa pra outra. Entradas ainda cifradas (sem DEK
+  // disponível agora) são puladas — não têm texto legível pra bater com
+  // nada.
+  function buscarNoHistoricoBot(termo, personNameFiltro){
+    const palavrasQuery = palavrasRelevantes(termo);
+    if(!palavrasQuery.length) return [];
+    return botHistorico
+      .filter(h => !pareceCifrado(h.pergunta) && !pareceCifrado(h.resposta))
+      .filter(h => !personNameFiltro || h.pessoa === personNameFiltro)
+      .map(h => {
+        const corpo = normalizarTextoAjuda(`${h.pergunta || ''} ${h.resposta || ''}`);
+        let pontuacao = 0;
+        palavrasQuery.forEach(p => { if(corpo.includes(p)) pontuacao += 1; });
+        return { entry: h, pontuacao };
+      })
+      .filter(r => r.pontuacao > 0)
+      .sort((a, b) => b.pontuacao - a.pontuacao || new Date(b.entry.quando) - new Date(a.entry.quando))
+      .slice(0, FIND_LIMITE_RESULTADOS)
+      .map(r => r.entry);
+  }
+
+  // Texto puro dos resultados — só pro botão "Copiar" da bolha (ver
+  // renderMensagem); a exibição de verdade é montarResultadoFindHtml, logo
+  // abaixo, com os botões "Usar no contexto".
+  function montarResultadoFindTexto(termo, resultados){
+    if(!resultados.length) return `Não encontrei nada no Histórico do Bot deste lead sobre "${termo}".`;
+    let texto = `${resultados.length} resultado${resultados.length === 1 ? '' : 's'} no Histórico do Bot deste lead sobre "${termo}":\n`;
+    resultados.forEach((h, i) => {
+      texto += `\n${i + 1}. [${formatDataHora(h.quando)}]\nVocê perguntou: ${h.pergunta}\nC&S - BOT respondeu: ${h.resposta}\n`;
+    });
+    return texto.trim();
+  }
+
+  // corpoHistoricoBotHtml vive mais abaixo (seção "Histórico do Bot") —
+  // function declaration, então já está disponível aqui mesmo definida
+  // depois no arquivo (hoisting), sem duplicar o mesmo HTML de exibição.
+  function montarResultadoFindHtml(termo, resultados){
+    if(!resultados.length){
+      return `<p>Não encontrei nada no Histórico do Bot deste lead sobre "<b>${escapeHtml(termo)}</b>".</p>`;
+    }
+    let html = `<p><b>🔎 ${resultados.length} resultado${resultados.length === 1 ? '' : 's'}</b> no Histórico do Bot deste lead sobre "${escapeHtml(termo)}":</p>`;
+    resultados.forEach(h => {
+      html += `<div class="chat-find-item">
+        <div class="hist-date">🕒 ${formatDataHora(h.quando)}</div>
+        ${corpoHistoricoBotHtml(h)}
+        <button type="button" class="chat-copy-btn" data-acao="usar-memoria" data-find-id="${escapeHtml(h.id)}">📌 Usar no contexto</button>
+      </div>`;
+    });
+    return html;
+  }
+
+  // Marca um trecho encontrado por "/find" pra entrar na PRÓXIMA chamada de
+  // IA (ver blocoMemoria em buildChatDynamicContext) — chamado pelo clique
+  // delegado em [data-acao="usar-memoria"] (ver init(), mais abaixo).
+  // Consumido (esvaziado) uma única vez, logo depois do próximo envio bem
+  // sucedido — ver enviarMensagemChat — pra nunca ficar "grudado" em
+  // mensagens futuras sem a atendente pedir de novo.
+  function adicionarTrechoNaMemoria(entry, btn){
+    if(_memoriaAtivada.some(t => t.id === entry.id)){
+      toast('Esse trecho já está marcado pra entrar na próxima mensagem');
+      return;
+    }
+    if(_memoriaAtivada.length >= MEMORIA_LIMITE_TRECHOS){
+      toast(`Só dá pra marcar até ${MEMORIA_LIMITE_TRECHOS} trechos por vez — envie a mensagem (ou abra o chat de novo) antes de marcar outro`);
+      return;
+    }
+    _memoriaAtivada.push(entry);
+    if(btn){ btn.disabled = true; btn.textContent = '✓ Marcado'; }
+    atualizarBarraDeContexto();
+    toast('Trecho anexado — vai junto na próxima mensagem que você enviar 🧠');
   }
 
   // Lê a versão direto do manifest.json (nunca hardcoded aqui), pra nunca
@@ -548,12 +684,21 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       ? `\n\nCONTEÚDO DE AJUDA (seção "${secaoAjuda.titulo}", de "${secaoAjuda.origem}" — use como fonte se a pergunta for sobre isso, ignore se não for):\n${secaoAjuda.texto}`
       : '';
 
-    if(!chatHistorico.length) return base + deteccao + blocoAjuda;
+    // Trechos de conversas ANTERIORES (de sessões passadas do chat, não
+    // desta) que a atendente achou com "/find" e marcou explicitamente com
+    // "📌 Usar no contexto" — ver _memoriaAtivada, mais acima, e
+    // finalizarBuscaComMemoria/enviarMensagemChat, mais abaixo. Nunca entra
+    // sozinho: só existe aqui o que foi marcado à mão pra ESTA mensagem.
+    const blocoMemoria = _memoriaAtivada.length
+      ? `\n\nTRECHOS DE CONVERSAS ANTERIORES QUE A ATENDENTE MARCOU COMO RELEVANTES PRA ESTA PERGUNTA (achados com /find no Histórico do Bot deste lead — são conversas de verdade já tidas com ele antes, use como memória real, não invente continuidade além do que está escrito):\n${_memoriaAtivada.map((h, i) => `${i + 1}. [${formatDataHora(h.quando)}] Pergunta: ${h.pergunta}\nResposta: ${h.resposta}`).join('\n\n')}`
+      : '';
+
+    if(!chatHistorico.length) return base + deteccao + blocoAjuda + blocoMemoria;
 
     const historicoTexto = chatHistorico
       .map(m => `${m.role === 'user' ? 'Atendente' : 'Você'}: ${m.texto}`)
       .join('\n');
-    return `${base}${deteccao}${blocoAjuda}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
+    return `${base}${deteccao}${blocoAjuda}${blocoMemoria}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
   }
 
   async function pedirRespostaIA(mensagemUsuario, secaoAjudaConhecida){
@@ -817,13 +962,33 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // linguagem natural sobre o Co-piloto, diferente de "/help", passa pela
   // IA normalmente (ver enviarMensagemChat/pedirRespostaIA) e por isso
   // entra em chatHistorico como qualquer outra troca da conversa.
-  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
-    renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
-    registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
+  // Sequência final comum a QUALQUER turno do chat que não segue pro fluxo
+  // de IA (cancela um aviso de "sem chave" pendente, libera a caixa de novo)
+  // — compartilhada por finalizarRespostaSemIA ("/help") e
+  // finalizarBuscaSemIA ("/find"), logo abaixo.
+  function encerrarTurnoChat(input){
     cancelarAvisoSemChave();
     chatOcupado = false;
     elSend().disabled = false;
     input.focus();
+  }
+
+  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
+    renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
+    registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
+    encerrarTurnoChat(input);
+  }
+
+  // Fecha o turno de um resultado de "/find" (ver COMANDOS_FIND acima) —
+  // igual a finalizarRespostaSemIA, MAS de propósito NUNCA chama
+  // registrarTrocaNoHistoricoBot: uma busca não é uma conversa nova, e
+  // salvá-la faria futuras buscas acharem a si mesmas (o texto "resultado
+  // sobre X" bate com a próxima busca por "X"), poluindo os resultados com
+  // o tempo. "/find" nunca deixa rastro no Histórico do Bot — é consulta,
+  // não conteúdo.
+  function finalizarBuscaSemIA(respostaTexto, respostaHtml, legenda, input){
+    renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
+    encerrarTurnoChat(input);
   }
 
   async function enviarMensagemChat(){
@@ -875,6 +1040,37 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       return;
     }
 
+    // "/find <termo>" ou "/buscar <termo>" — busca no Histórico do Bot
+    // (persistente, entre sessões) do lead atual, sem gastar IA — ver
+    // COMANDOS_FIND/buscarNoHistoricoBot acima. Mesmo raciocínio do "/help"
+    // acima: checado antes de qualquer await, de propósito NÃO entra em
+    // chatHistorico (ver finalizarBuscaSemIA), e nunca é salvo no próprio
+    // Histórico do Bot.
+    const argumentoFind = argumentoComandoFind(texto);
+    if(argumentoFind !== null){
+      if(!argumentoFind){
+        finalizarBuscaSemIA('Use "/find <palavra ou trecho>" pra procurar no Histórico do Bot deste lead. Ex.: /find preço',
+          null, '🔎 Sem usar IA', input);
+      }else{
+        const leadAtual = leadAtualParaChat();
+        // Na central de mensagens (@csvirtual), o Histórico do Bot mistura
+        // conversas de várias pessoas diferentes — sem o nome preenchido, a
+        // busca vazaria trecho de uma pessoa pra outra (mesma guarda que
+        // sugerirEstagioComIA/analyzeAndSuggest já fazem, panel.js).
+        const personName = leadAtual && leadAtual.fixo
+          ? document.getElementById('personNameInput').value.trim() : '';
+        if(leadAtual && leadAtual.fixo && !personName){
+          finalizarBuscaSemIA('Preencha "Nome da pessoa desta mensagem" antes de buscar — é a central de mensagens compartilhada, e a busca precisa saber de quem é a conversa.',
+            null, '🔎 Sem usar IA', input);
+        }else{
+          const resultados = buscarNoHistoricoBot(argumentoFind, leadAtual && leadAtual.fixo ? personName : null);
+          finalizarBuscaSemIA(montarResultadoFindTexto(argumentoFind, resultados), montarResultadoFindHtml(argumentoFind, resultados),
+            '🔎 Busca no Histórico do Bot — sem usar IA', input);
+        }
+      }
+      return;
+    }
+
     chatHistorico.push({ role: 'user', texto });
 
     // Pergunta em linguagem natural (não um comando "/help") SEMPRE passa
@@ -914,6 +1110,14 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       // de uma pergunta anterior ainda contando, não faz mais sentido
       // nenhum ele navegar pra Configurações sozinho daqui a pouco.
       cancelarAvisoSemChave();
+
+      // Os trechos marcados com "/find" (se houver) já foram usados nesta
+      // chamada (ver blocoMemoria em buildChatDynamicContext) — esvazia
+      // agora, só em caso de SUCESSO: se a chamada tivesse falhado (ex.:
+      // sem chave configurada), os trechos continuam marcados pra não se
+      // perder quando a atendente corrigir o problema e reenviar. A barra
+      // de contexto atualiza sozinha no finally, mais abaixo.
+      _memoriaAtivada = [];
 
       // Depois dos awaits acima é que checamos se ainda estamos no mesmo
       // lead de quando a pergunta foi enviada — se a pessoa trocou de lead
@@ -1034,6 +1238,18 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     popularSeletorEstagio();
     const estagioSelect = elEstagioSelect();
     if(estagioSelect) estagioSelect.addEventListener('change', onEstagioManualChange);
+
+    // Botão "📌 Usar no contexto" de cada resultado do "/find" (ver
+    // montarResultadoFindHtml) — delegado no container inteiro das
+    // mensagens, já que os resultados são inseridos como HTML depois deste
+    // init() rodar (nunca existem no DOM na hora de registrar o listener).
+    elMessages().addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-acao="usar-memoria"]');
+      if(!btn) return;
+      const entry = botHistorico.find(h => h.id === btn.dataset.findId);
+      if(!entry) return;
+      adicionarTrechoNaMemoria(entry, btn);
+    });
 
     const clearBotHistBtn = document.getElementById('clearBotHistoryBtn');
     if(clearBotHistBtn) clearBotHistBtn.addEventListener('click', clearBotHistory);
