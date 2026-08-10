@@ -331,12 +331,34 @@ async function saveKeys(){
   }
 }
 
+// Confere se o bloco "## CONFIGURAÇÃO DO NEGÓCIO" (ver aplicarConfiguracaoDoNegocio,
+// panel.js) está bem formado — sem isso, os dois erros mais prováveis de
+// acontecer editando a mão (apagar sem querer a linha "## FIM DA
+// CONFIGURAÇÃO DO NEGÓCIO", ou colar o bloco duas vezes) ficavam
+// completamente silenciosos: os campos preenchidos parariam de valer em
+// todo o funil, sem nenhum aviso. Devolve o texto do aviso (ou null se
+// estiver tudo certo) — quem chama decide o que fazer com isso.
+function avisoConfiguracaoDoNegocioMalformada(texto){
+  const inicio = (texto.match(/## CONFIGURAÇÃO DO NEGÓCIO/g) || []).length;
+  if(!inicio) return null; // funil sem esse bloco (legado/custom) — nada a checar
+  const fim = (texto.match(/## FIM DA CONFIGURAÇÃO DO NEGÓCIO/g) || []).length;
+  if(inicio > 1){
+    return '⚠️ Funil salvo, mas achei mais de um bloco "CONFIGURAÇÃO DO NEGÓCIO" — só o primeiro vale, apague a duplicata.';
+  }
+  if(fim === 0){
+    return '⚠️ Funil salvo, mas não achei a linha "## FIM DA CONFIGURAÇÃO DO NEGÓCIO" — os campos preenchidos podem não funcionar. Confira se ela não foi apagada.';
+  }
+  return null;
+}
+
 async function saveFunil(){
-  const funil = {
-    instrucoes: document.getElementById('funilInstrucoes').value.trim()
-  };
+  const instrucoes = document.getElementById('funilInstrucoes').value.trim();
+  const funil = { instrucoes };
   await copilotoStorage.local.set({ funil });
-  toast('Seu funil foi salvo');
+  // Um só toast por vez (ver toast(), auth.js) — o aviso de malformação,
+  // quando existe, já diz "funil salvo" nele mesmo, então substitui a
+  // confirmação normal em vez de piscar e sumir por cima dela.
+  toast(avisoConfiguracaoDoNegocioMalformada(instrucoes) || 'Seu funil foi salvo');
 }
 
 async function savePrecos(){
