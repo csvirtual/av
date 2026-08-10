@@ -954,7 +954,10 @@ async function copilotoDefinirPerfilAtivoId(id) {
   const souAdminSessao = await copilotoSessaoEhAdmin();
   const semSenhaCadastrada = !perfil.senhaHash;
   const trocaSemSenhaLiberada = !!perfil.permitirTrocaSemSenha;
-  if (!jaTemDek && !souAdminSessao && !semSenhaCadastrada && !trocaSemSenhaLiberada) return false;
+  if (!jaTemDek && !souAdminSessao && !semSenhaCadastrada && !trocaSemSenhaLiberada) {
+    await copilotoLogTentativaSemPrivilegio('copilotoDefinirPerfilAtivoId');
+    return false;
+  }
   try {
     await chrome.storage.session.set({ [COPILOTO_PERFIL_ATIVO_KEY]: id });
   } catch (e) {}
@@ -1025,9 +1028,15 @@ async function copilotoObterPerfilAtivo() {
 // primeiro perfil) — então não é um passo extra pra pessoa.
 async function copilotoDefinirSessaoAdmin(id, senha) {
   const perfil = await copilotoObterPerfilPorId(id);
-  if (!perfil || !perfil.admin) return false;
+  if (!perfil || !perfil.admin) {
+    await copilotoLogTentativaSemPrivilegio('copilotoDefinirSessaoAdmin(perfil inválido/não-admin)');
+    return false;
+  }
   const senhaOk = await copilotoVerificarSenhaPerfil(id, senha);
-  if (!senhaOk) return false;
+  if (!senhaOk) {
+    await copilotoLogTentativaSemPrivilegio('copilotoDefinirSessaoAdmin(senha incorreta)');
+    return false;
+  }
   try {
     await chrome.storage.session.set({ [COPILOTO_SESSAO_ADMIN_KEY]: id });
   } catch (e) {}
