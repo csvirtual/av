@@ -1485,7 +1485,7 @@
     <div class="modal-body">
 
       <div class="importar-passo-titulo">1. Cole o texto ou envie um arquivo</div>
-      <div class="importar-sub">Cole aqui a lista de contatos do seu CRM antigo (nome, telefone, CPF e data de nascimento, em qualquer formato — um por linha, em colunas separadas por vírgula/ponto e vírgula/tab, ou em blocos com rótulos tipo "Nome: ..."). Também dá para enviar um arquivo .txt ou .csv.</div>
+      <div class="importar-sub">Cole aqui a lista de contatos do seu CRM antigo (nome, telefone, CPF e data de nascimento, em qualquer formato — um por linha, em colunas separadas por vírgula/ponto e vírgula/tab, ou em blocos com rótulos tipo "Nome: ..."). Também dá para enviar um arquivo .txt ou .csv (até 5MB).</div>
       <textarea class="importar-textarea" id="importarTextarea" placeholder="Ex.: 
 Maria da Silva Souza, (71) 99999-8888, 123.456.789-00, 12/05/1990
 João Pedro Alves; 71 98888-7777; 987.654.321-00; 03/11/1985
@@ -1548,15 +1548,14 @@ Nascimento: 20/01/1992"></textarea>
 
       <div class="avancado-lock" id="avancadoLockScreen">
         <div class="avancado-lock-icon">🔒</div>
-        <div class="avancado-lock-title">Área restrita</div>
-        <div class="avancado-lock-sub">Informe usuário e senha para acessar backup e restauração dos dados do Co-piloto.</div>
-        <input type="text" id="avancadoUserInput" class="avancado-lock-input" placeholder="Usuário" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="margin-bottom:10px;">
+        <div class="avancado-lock-title">Confirme sua senha</div>
+        <div class="avancado-lock-sub">Por segurança, toda vez que for abrir o Avançado é preciso confirmar sua própria senha (a mesma do seu perfil — não a da Área restrita).</div>
         <div style="position:relative; width:100%; max-width:280px;">
           <input type="password" id="avancadoPasswordInput" class="avancado-lock-input" placeholder="Senha" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%; padding-right:40px;">
           <button type="button" id="avancadoTogglePassBtn" title="Mostrar/ocultar senha" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:15px; padding:4px;">👁</button>
         </div>
-        <button class="btn purple avancado-lock-btn" id="avancadoUnlockBtn">Entrar</button>
-        <div class="avancado-lock-error" id="avancadoLockError" style="display:none;">Acesso negado. Você não tem permissão para acessar esta área.</div>
+        <button class="btn purple avancado-lock-btn" id="avancadoUnlockBtn">Abrir Avançado</button>
+        <div class="avancado-lock-error" id="avancadoLockError" style="display:none;"></div>
       </div>
 
       <div id="avancadoContent" style="display:none;">
@@ -2008,8 +2007,8 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p><b>Histórico:</b> toda resposta gerada fica no histórico do lead, com a mensagem original e a data/hora. Use a busca do histórico pra achar uma resposta antiga por palavra-chave. O ícone 🗑 em cada resposta manda só aquele item pros excluídos. "Limpar histórico" manda tudo do lead pros excluídos de uma vez (recuperável depois).</p>
-          <p><b>Leads excluídos:</b> leads e respostas apagados ficam aqui por 30 dias antes de sumirem de vez. "Restaurar" devolve o item pro lugar de origem; "Excluir de vez" remove só aquele item, sem volta; "Excluir tudo definitivamente" esvazia tudo de uma vez.</p>
+          <p><b>Histórico:</b> toda resposta gerada fica no histórico do lead, com a mensagem original e a data/hora. Use a busca do histórico pra achar uma resposta antiga por palavra-chave. O ícone 🗑 em cada resposta manda só aquele item pros excluídos. "Limpar histórico" manda tudo do lead pros excluídos de uma vez (recuperável depois). O mesmo vale pro <b>Histórico do Bot</b> (conversas do C&amp;S BOT, <a href="#" class="help-goto" data-secao="3">ver seção 3</a>): excluir uma conversa (ou tudo de uma vez) também manda pra lixeira, nunca apaga direto.</p>
+          <p><b>Leads excluídos (a "lixeira"):</b> leads, respostas e conversas do bot apagados ficam aqui por 30 dias antes de sumirem de vez. "Restaurar" devolve o item pro lugar de origem; "Excluir de vez" remove só aquele item, sem volta; "Excluir tudo definitivamente" esvazia tudo de uma vez. Por guardar o conteúdo real do que foi excluído, <b>abrir a lixeira pede a senha do seu próprio perfil toda vez</b> (nunca a da Área restrita) — mesmo dentro de uma sessão já autenticada; as ações de dentro dela (restaurar, excluir de vez, esvaziar) não pedem senha de novo.</p>
         </div>
       </div>
 
@@ -2022,7 +2021,7 @@ Nascimento: 20/01/1992"></textarea>
         <div class="accordion-panel">
           <p>Traga de uma vez uma lista de contatos de um CRM antigo — cole o texto ou envie um arquivo .txt/.csv, sem precisar cadastrar lead por lead.</p>
           <p>Aceita nome, telefone, CPF e data de nascimento em qualquer formato: linhas separadas por vírgula/ponto e vírgula/tab, ou blocos com rótulo ("Nome: ...", "Telefone: ..."). Clique em "🔎 Extrair contatos" pra ver a prévia antes de importar de verdade — nada é gravado nesse passo.</p>
-          <p>Cada linha extraída mostra a situação: "Novo" vira um lead novo; "Já existe no CRM" (mesmo telefone, últimos 8 dígitos) só completa os campos que aquele lead já tinha em branco, sem sobrescrever nada preenchido manualmente; "Sem nome nem telefone" fica fora por padrão. Revise e corrija os campos direto na tabela antes de confirmar. Desmarque quem não quiser trazer e clique em "Importar contatos selecionados". Tudo acontece neste computador — nada é enviado a servidor nenhum nesse processo.</p>
+          <p>Cada linha extraída mostra a situação: "Novo" vira um lead novo; "Já existe no CRM" (mesmo telefone, últimos 8 dígitos) só completa os campos que aquele lead já tinha em branco, sem sobrescrever nada preenchido manualmente; "Sem nome nem telefone" fica fora por padrão. Revise e corrija os campos direto na tabela antes de confirmar. Desmarque quem não quiser trazer e clique em "Importar contatos selecionados". Tudo acontece neste computador — nada é enviado a servidor nenhum nesse processo. Limite de 5MB por arquivo enviado (só proteção contra escolher um arquivo errado por engano — uma lista de contatos real, mesmo grande, fica bem abaixo disso); colar o texto direto na caixa não tem esse limite.</p>
         </div>
       </div>
 
@@ -2077,7 +2076,7 @@ Nascimento: 20/01/1992"></textarea>
           <p><b>Um perfil comum não pode:</b> ver ou editar dados de outro perfil, resetar o sistema, excluir perfis, ver o log de sessões, decidir quem entra na troca rápida, ou entrar em outro perfil sem senha (a não ser que esteja liberado pra "troca rápida").</p>
           <p><b>Só o administrador geral</b> (sempre o primeiro perfil cadastrado) pode: entrar em qualquer outro perfil sem senha (com faixa dourada "Modo administrador" avisando, e registro em log na primeira vez que acessa campo protegido de outra pessoa na sessão), resetar todo o sistema, gerenciar perfis, trocar a credencial principal, configurar o acesso da equipe, ver o log de sessões e ações, e redefinir a senha de outro profissional que esqueceu a dele.</p>
           <p><b>Troca de perfil sem sair da sessão:</b> o ícone "🔁" no topo do painel (ou clicar no seu nome/avatar) volta pra tela de seleção de perfis sem pedir a credencial geral de novo. Perfis marcados pelo administrador pra "troca rápida" pulam direto pra dentro, sem senha individual.</p>
-          <p><b>Segurança de acesso:</b> bloqueio de 60 segundos após 3 senhas erradas seguidas; PIN alfanumérico do administrador (gerado ao criar/trocar a senha do admin, necessário pra trocar de novo); código de recuperação por perfil comum (mostrado na criação e a cada troca de senha); "Esqueci minha senha" na tela de senha do perfil (código de recuperação) ou na do admin (usuário/senha geral + PIN, se disponível). A sessão expira em 30 minutos de inatividade, ao fechar o navegador, ou ao clicar em sair. Uma aba por vez: clicar de novo no ícone da extensão sempre foca a aba já aberta, nunca abre uma segunda.</p>
+          <p><b>Segurança de acesso:</b> bloqueio de 60 segundos após 3 senhas erradas seguidas; PIN alfanumérico do administrador (gerado ao criar/trocar a senha do admin, necessário pra trocar de novo); código de recuperação por perfil comum (mostrado na criação e a cada troca de senha); "Esqueci minha senha" na tela de senha do perfil (código de recuperação) ou na do admin (usuário/senha geral + PIN, se disponível). A sessão expira em 30 minutos de inatividade, ao fechar o navegador, ou ao clicar em sair. Uma aba por vez: clicar de novo no ícone da extensão sempre foca a aba já aberta, nunca abre uma segunda. Duas áreas pedem a senha do seu PRÓPRIO perfil de novo toda vez que são abertas, mesmo dentro de uma sessão já autenticada — "Ver leads excluídos" e "Avançado" — justamente as que dão acesso a conteúdo excluído/backup/reset; as ações de dentro delas não repetem esse pedido.</p>
         </div>
       </div>
 
@@ -2089,7 +2088,7 @@ Nascimento: 20/01/1992"></textarea>
         </button>
         <div class="accordion-panel">
           <p><b>Banco de dados</b> (só admin) — mostra onde os dados ficam guardados. "Local" é o modo usado hoje: cada perfil isolado, gravado só neste computador (armazenamento ilimitado), sem depender de internet nem de servidor de terceiro — a tela mostra quanto espaço já está em uso. "Nuvem" ainda não é implementado; a aba traz um guia de como implantar sincronização de verdade (Firebase ou Supabase), caso um dia isso seja necessário.</p>
-          <p>O botão "Avançado" no menu lateral (também protegido por login) reúne backup, restauração e as ferramentas mais sensíveis:</p>
+          <p>O botão "Avançado" no menu lateral (que também pede a senha do seu próprio perfil toda vez que é aberto, igual a "Ver leads excluídos" — <a href="#" class="help-goto" data-secao="7">ver seção 7</a>) reúne backup, restauração e as ferramentas mais sensíveis:</p>
           <ul>
             <li><b>Fazer backup agora</b> — salva um arquivo com os dados do seu próprio perfil na pasta escolhida ("Trocar pasta" muda o destino). Disponível pra qualquer perfil.</li>
             <li><b>Enviar por e-mail</b> — "Baixar e abrir e-mail" baixa o backup e já abre um e-mail com destinatário e assunto prontos; só falta anexar e enviar. Nada passa por servidor de terceiro.</li>
@@ -2183,13 +2182,14 @@ Nascimento: 20/01/1992"></textarea>
           <li><b>Chaves de API só neste computador.</b> Nunca trafegam por nenhum servidor do Co-piloto — vão só do seu navegador direto pro provedor de IA escolhido, na hora de gerar cada resposta.</li>
           <li><b>O log de auditoria nunca guarda conteúdo protegido.</b> O registro de sessões e ações (Avançado, só o administrador vê) anota também o que acontece com os leads: quem cadastrou, excluiu, restaurou ou alterou, quando, em qual perfil e de qual computador. Ele é a única parte do Co-piloto que fica <b>fora</b> do isolamento por perfil e <b>fora</b> da criptografia — é assim de propósito, porque um registro de auditoria que só o próprio auditado pudesse ler não serviria pra nada. Por isso existe uma regra dura: valor de campo protegido (CPF, e-mail, CEP, nascimento, notas, objetivo) <b>nunca</b> é escrito no log — dele fica só "alterado", "preenchido" ou "apagado". O que entra em texto legível é o mesmo que já fica legível no armazenamento: o nome do lead, o telefone, o estágio e a data.</li>
           <li><b>Restaurar um backup avisa antes de trocar suas chaves de API.</b> Se o arquivo escolhido contiver uma chave de API diferente da já configurada, um aviso específico aparece antes de confirmar — restaurar um arquivo de origem desconhecida com uma chave de terceiro faria suas conversas de IA passarem pela conta de quem a forneceu. Qualquer campo dentro do arquivo que o Co-piloto não reconheça também é ignorado, nunca gravado.</li>
+          <li><b>"Ver leads excluídos" e "Avançado" pedem sua senha de novo, toda vez.</b> Mesmo dentro de uma sessão já autenticada — porque guardam conteúdo excluído (recuperável) ou dão acesso a backup/restauração/reset. É sempre a senha do seu PRÓPRIO perfil (nunca a da Área restrita), e só pra ABRIR: restaurar, excluir de vez, fazer backup etc. não pedem de novo depois de já estar dentro.</li>
         </ul>
       </div>
 
       <div class="privacidade-secao" data-titulo="🗑️ Retenção e exclusão">
         <p><b>🗑️ Retenção e exclusão</b></p>
         <ul>
-          <li>Leads e respostas excluídos ficam recuperáveis por 30 dias antes de serem apagados de vez, automaticamente — um seguro contra exclusão por engano, não um arquivo permanente.</li>
+          <li>Leads, respostas e conversas do Chat rápido (C&amp;S BOT) excluídos ficam recuperáveis por 30 dias antes de serem apagados de vez, automaticamente — um seguro contra exclusão por engano, não um arquivo permanente.</li>
           <li>O log de sessões e ações (visível só pro administrador) fica guardado por até 90 dias, pra dar visibilidade de uso sem acumular histórico indefinidamente.</li>
           <li>Qualquer lead pode ser excluído definitivamente a qualquer momento, sem precisar esperar o prazo acima.</li>
           <li>O administrador pode resetar a instalação inteira (todos os perfis e todos os dados) quando quiser, em Avançado.</li>

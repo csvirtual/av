@@ -1722,8 +1722,11 @@ function closeTrashModal(){
 // PRÓPRIO ADMIN, não a do perfil impersonado. Pedir a senha do perfil
 // impersonado seria uma armadilha: o admin entrou ali exatamente SEM saber
 // a senha dele (esse é o ponto da impersonação) — exigi-la aqui deixaria a
-// lixeira inacessível justamente pra quem tem autoridade de admin.
-async function copilotoPerfilParaSenhaLixeira(){
+// tela inacessível justamente pra quem tem autoridade de admin. Compartilhada
+// pelas duas telas que pedem a senha do PRÓPRIO perfil toda vez que abrem
+// (lixeira e Avançado, ver confirmarSenhaLixeiraClick/tentarDesbloquearAvancado) —
+// mesma regra, mesma exceção pro admin impersonando, nos dois lugares.
+async function copilotoPerfilParaSenhaPropria(){
   if(await copilotoSessaoEhAdmin()){
     const adminId = await copilotoSessaoAdminIdAtual();
     if(adminId) return copilotoObterPerfilPorId(adminId);
@@ -1732,7 +1735,7 @@ async function copilotoPerfilParaSenhaLixeira(){
 }
 
 async function abrirModalSenhaLixeira(){
-  const perfil = await copilotoPerfilParaSenhaLixeira();
+  const perfil = await copilotoPerfilParaSenhaPropria();
   if(!perfil){ toast('Nenhum perfil ativo — não foi possível abrir os itens excluídos.'); return; }
   document.getElementById('trashSenhaInput').value = '';
   copilotoLimparErroDoCampo(document.getElementById('trashSenhaError'));
@@ -1760,7 +1763,7 @@ function mostrarBloqueioSenhaLixeira(restanteMs){
 }
 
 async function confirmarSenhaLixeiraClick(){
-  const perfil = await copilotoPerfilParaSenhaLixeira();
+  const perfil = await copilotoPerfilParaSenhaPropria();
   if(!perfil){ fecharModalSenhaLixeira(); return; }
 
   const statusAtual = await copilotoStatusBloqueioSenha(perfil.id);
@@ -1795,40 +1798,96 @@ async function confirmarSenhaLixeiraClick(){
   await copilotoRegistrarEventoLog('lixeira_aberta', await copilotoObterPerfilAtivo(), 'Itens excluídos visualizados');
 }
 
-// ---------- Modal "Avançado" (backup e restauração, protegido por usuário/senha) ----------
+// ---------- Modal "Avançado" (backup e restauração, backup, reset — protegido pela senha do próprio perfil) ----------
+//
+// Até aqui, "Avançado" reaproveitava a mesma sessão geral da Área restrita
+// que já libera o painel inteiro — na prática, isso nunca chegava a pedir
+// nada: copilotoEstaAutenticado() usa o MESMO relógio de 30min de
+// inatividade que já derruba o painel inteiro primeiro (ver
+// bloquearPainelPorInatividade), então a tela de senha aqui dentro nunca
+// era alcançada de verdade — quem já está vendo o botão "Avançado" sempre
+// já tinha passado pela Área restrita minutos atrás. Backup/restauração,
+// reset total, credenciais e o log de sessões são sensíveis demais pra essa
+// trava efetivamente nunca disparar — agora pede a senha do PRÓPRIO PERFIL
+// (nunca a da Área restrita) toda vez que o Avançado é aberto, mesmo dentro
+// de uma sessão já autenticada — exatamente o mesmo padrão e os mesmos
+// helpers da lixeira (ver copilotoPerfilParaSenhaPropria/
+// confirmarSenhaLixeiraClick, mais acima): se for o admin impersonando
+// outro perfil, pede a senha do PRÓPRIO ADMIN (pelo mesmo motivo de lá —
+// exigir a senha do perfil impersonado travaria justamente quem tem
+// autoridade de admin, que entrou ali sem saber essa senha).
+
+// Id de um campo pra focar assim que o Avançado for desbloqueado — usado só
+// pelo atalho "Trocar agora" da faixa de credencial padrão (ver bindEvents),
+// que antes desta trava pedir senha sempre chegava direto no conteúdo e
+// focava o campo na hora. Sem isto, esse atalho tentaria focar um campo
+// ainda escondido atrás da tela de senha (sem efeito visível, e perdido
+// depois que o conteúdo aparece).
+let _avancadoFocoAposDesbloquear = null;
 
 async function resetAvancadoLockScreen(){
   document.getElementById('avancadoLockScreen').style.display = 'flex';
   document.getElementById('avancadoContent').style.display = 'none';
-  document.getElementById('avancadoLockError').style.display = 'none';
   document.getElementById('avancadoPasswordInput').value = '';
-  const usuario = await copilotoPreencherUsuarioSalvo('avancadoUserInput');
-  const focoId = usuario ? 'avancadoPasswordInput' : 'avancadoUserInput';
-  const jaBloqueado = await copilotoChecarBloqueioAreaRestrita('avancadoPasswordInput', 'avancadoUnlockBtn', 'avancadoLockError');
-  if(!jaBloqueado) setTimeout(()=>document.getElementById(focoId).focus(), 50);
+  copilotoLimparErroDoCampo(document.getElementById('avancadoLockError'));
+  copilotoCancelarBloqueioAreaRestrita('avancadoLockError');
+  const perfil = await copilotoPerfilParaSenhaPropria();
+  if(!perfil){ toast('Nenhum perfil ativo — não foi possível abrir o Avançado.'); closeAvancadoModal(); return; }
+  const status = await copilotoStatusBloqueioSenha(perfil.id);
+  if(status.bloqueado){
+    mostrarBloqueioSenhaAvancado(status.restanteMs);
+  }else{
+    document.getElementById('avancadoPasswordInput').disabled = false;
+    document.getElementById('avancadoUnlockBtn').disabled = false;
+    setTimeout(()=>document.getElementById('avancadoPasswordInput').focus(), 50);
+  }
 }
 
-// Usa a função compartilhada de auth.js (verificar -> shake -> limpar -> refocar
-// em caso de erro; marcar sessão -> rodar callback em caso de sucesso) em vez
-// de repetir essa sequência aqui.
+function mostrarBloqueioSenhaAvancado(restanteMs){
+  copilotoMostrarBloqueioAreaRestrita('avancadoPasswordInput', 'avancadoUnlockBtn', 'avancadoLockError', restanteMs);
+}
+
 async function tentarDesbloquearAvancado(){
-  return await copilotoTentarLogin({
-    userInputId: 'avancadoUserInput',
-    passInputId: 'avancadoPasswordInput',
-    errorId: 'avancadoLockError',
-    submitBtnId: 'avancadoUnlockBtn',
-    shakeEl: document.getElementById('avancadoLockScreen'),
-    origemLog: 'Login geral (Avançado)',
-    aoAutenticar: async ()=>{
-      document.getElementById('avancadoLockScreen').style.display = 'none';
-      document.getElementById('avancadoContent').style.display = 'block';
-      // Mesma lógica de 'lixeira_aberta': entrar em "Avançado" já dá acesso
-      // a backup/restauração, reset total, credenciais e o próprio log de
-      // sessões — vale deixar rastro de quando esse acesso aconteceu, não
-      // só das ações tomadas lá dentro (essas já eram logadas uma a uma).
-      await copilotoRegistrarEventoLog('acesso_avancado', await copilotoObterPerfilAtivo());
+  const perfil = await copilotoPerfilParaSenhaPropria();
+  if(!perfil){ closeAvancadoModal(); return; }
+
+  const statusAtual = await copilotoStatusBloqueioSenha(perfil.id);
+  if(statusAtual.bloqueado){
+    mostrarBloqueioSenhaAvancado(statusAtual.restanteMs);
+    return;
+  }
+
+  const senha = document.getElementById('avancadoPasswordInput').value;
+  const errorEl = document.getElementById('avancadoLockError');
+  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha);
+  if(!ok){
+    const estado = await copilotoRegistrarTentativaFalha(perfil.id, 'Senha para abrir o Avançado');
+    document.getElementById('avancadoPasswordInput').value = '';
+    if(estado.bloqueadoAte > Date.now()){
+      mostrarBloqueioSenhaAvancado(estado.bloqueadoAte - Date.now());
+    }else{
+      const restantes = COPILOTO_TENTATIVAS_MAX - estado.tentativas;
+      copilotoMostrarErroNoCampo(errorEl, `Senha incorreta. Mais ${restantes} tentativa${restantes===1?'':'s'} e o campo será bloqueado por 60s.`);
+      document.getElementById('avancadoPasswordInput').focus();
     }
-  });
+    return;
+  }
+
+  await copilotoLimparTentativas(perfil.id);
+  copilotoLimparErroDoCampo(errorEl);
+  document.getElementById('avancadoLockScreen').style.display = 'none';
+  document.getElementById('avancadoContent').style.display = 'block';
+  // Mesma lógica de 'lixeira_aberta': entrar em "Avançado" já dá acesso
+  // a backup/restauração, reset total, credenciais e o próprio log de
+  // sessões — vale deixar rastro de quando esse acesso aconteceu, não
+  // só das ações tomadas lá dentro (essas já eram logadas uma a uma).
+  await copilotoRegistrarEventoLog('acesso_avancado', await copilotoObterPerfilAtivo());
+
+  if(_avancadoFocoAposDesbloquear){
+    const campo = document.getElementById(_avancadoFocoAposDesbloquear);
+    if(campo) campo.focus();
+    _avancadoFocoAposDesbloquear = null;
+  }
 }
 
 async function openAvancadoModal(){
@@ -1845,12 +1904,7 @@ async function openAvancadoModal(){
     await atualizarStatusCredenciaisPrincipais();
     await atualizarStatusAcessoEquipe();
   }
-  if(await copilotoEstaAutenticado()){
-    document.getElementById('avancadoLockScreen').style.display = 'none';
-    document.getElementById('avancadoContent').style.display = 'block';
-  }else{
-    resetAvancadoLockScreen();
-  }
+  await resetAvancadoLockScreen();
 }
 
 function closeAvancadoModal(){
@@ -4457,7 +4511,6 @@ function bindEvents(){
   document.getElementById('avancadoModalCloseBtn').addEventListener('click', closeAvancadoModal);
   bindOverlayClose('avancadoModalOverlay', closeAvancadoModal);
   document.getElementById('avancadoUnlockBtn').addEventListener('click', tentarDesbloquearAvancado);
-  bindEnterKey('avancadoUserInput', tentarDesbloquearAvancado);
   bindEnterKey('avancadoPasswordInput', tentarDesbloquearAvancado);
   document.getElementById('avancadoTogglePassBtn').addEventListener('click', ()=>{
     const input = document.getElementById('avancadoPasswordInput');
@@ -4500,8 +4553,10 @@ function bindEvents(){
 
   document.getElementById('credenciaisPrincipaisSalvarBtn').addEventListener('click', salvarCredenciaisPrincipaisClick);
   document.getElementById('credenciaisPadraoResolverBtn').addEventListener('click', ()=>{
+    // O campo só existe atrás da senha do Avançado agora — o foco real
+    // acontece depois de desbloquear (ver _avancadoFocoAposDesbloquear).
+    _avancadoFocoAposDesbloquear = 'credenciaisPrincipaisUsuarioAtualInput';
     openAvancadoModal();
-    document.getElementById('credenciaisPrincipaisUsuarioAtualInput').focus();
   });
 
   document.getElementById('acessoEquipeSalvarBtn').addEventListener('click', salvarAcessoEquipeClick);
