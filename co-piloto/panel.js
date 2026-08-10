@@ -1773,7 +1773,7 @@ async function confirmarSenhaLixeiraClick(){
   const errorEl = document.getElementById('trashSenhaError');
   const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha);
   if(!ok){
-    const estado = await copilotoRegistrarTentativaFalha(perfil.id);
+    const estado = await copilotoRegistrarTentativaFalha(perfil.id, 'Senha para abrir a lixeira');
     document.getElementById('trashSenhaInput').value = '';
     if(estado.bloqueadoAte > Date.now()){
       mostrarBloqueioSenhaLixeira(estado.bloqueadoAte - Date.now());
@@ -1818,9 +1818,15 @@ async function tentarDesbloquearAvancado(){
     errorId: 'avancadoLockError',
     submitBtnId: 'avancadoUnlockBtn',
     shakeEl: document.getElementById('avancadoLockScreen'),
-    aoAutenticar: ()=>{
+    origemLog: 'Login geral (Avançado)',
+    aoAutenticar: async ()=>{
       document.getElementById('avancadoLockScreen').style.display = 'none';
       document.getElementById('avancadoContent').style.display = 'block';
+      // Mesma lógica de 'lixeira_aberta': entrar em "Avançado" já dá acesso
+      // a backup/restauração, reset total, credenciais e o próprio log de
+      // sessões — vale deixar rastro de quando esse acesso aconteceu, não
+      // só das ações tomadas lá dentro (essas já eram logadas uma a uma).
+      await copilotoRegistrarEventoLog('acesso_avancado', await copilotoObterPerfilAtivo());
     }
   });
 }
@@ -2006,6 +2012,9 @@ async function resetBillingStats(){
   if(!confirmado) return;
   await copilotoStorage.local.set({ tokenUsageStats: { byModel: {} } });
   await renderBillingModal();
+  // Mesmo motivo de 'estatisticas_zeradas' em resetUsageStats (options.js) —
+  // zerar histórico de custo sem deixar rastro permitiria esconder uso.
+  await copilotoRegistrarEventoLog('estatisticas_zeradas', await copilotoObterPerfilAtivo(), 'Histórico de uso e custo de tokens');
   toast('Contagem de uso zerada');
 }
 
@@ -2278,6 +2287,7 @@ async function handleResetSystemBtnClick(){
     abrirModalResetConfirm();
   }else{
     avisoEl.style.display = 'block';
+    await copilotoLogTentativaSemPrivilegio('handleResetSystemBtnClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
   }
 }
@@ -2322,6 +2332,7 @@ async function tentarConfirmarReset(){
   // confirmar), o reset é bloqueado aqui também.
   if(!(await copilotoSessaoEhAdmin())){
     fecharModalResetConfirm();
+    await copilotoLogTentativaSemPrivilegio('tentarConfirmarReset');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return false;
   }
@@ -2331,6 +2342,7 @@ async function tentarConfirmarReset(){
     errorId: 'resetConfirmError',
     submitBtnId: 'resetConfirmSubmitBtn',
     shakeEl: document.querySelector('#resetConfirmModalOverlay .modal-dialog-reset'),
+    origemLog: 'Login geral (confirmação de reset total)',
     aoAutenticar: executarResetTotal
   });
 }
@@ -2344,6 +2356,7 @@ async function executarResetTotal(){
   // novo) pra apagar tudo sem passar por checagem nenhuma. Mesma defesa em
   // profundidade das outras ações de admin deste arquivo.
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('executarResetTotal');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -4455,6 +4468,10 @@ function bindEvents(){
   document.getElementById('changeBackupFolderBtn').addEventListener('click', async ()=>{
     try{
       await pickNewDirHandle();
+      // Muda pra onde os backups locais (com dados de leads) passam a ser
+      // escritos — vale deixar rastro de quando e por quem essa pasta foi
+      // trocada.
+      await copilotoRegistrarEventoLog('pasta_backup_alterada', await copilotoObterPerfilAtivo());
       toast('Pasta de backup atualizada');
     }catch(err){
       if(err && err.name === 'AbortError') return; // cancelou o seletor — nem é erro, não avisa nada
@@ -5053,7 +5070,7 @@ async function confirmarSenhaPerfilClick(){
   // senha estiver errada, resultado.ok vem false, igual antes.
   const resultado = await copilotoDesbloquearPerfilComSenha(perfilAlvo.id, senha);
   if(!resultado.ok){
-    const estado = await copilotoRegistrarTentativaFalha(perfilAlvo.id);
+    const estado = await copilotoRegistrarTentativaFalha(perfilAlvo.id, 'Login de perfil');
     const card = document.querySelector('#perfilPassoSenha .perfil-senha-card');
     card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
     document.getElementById('perfilSenhaInput').value = '';
@@ -5216,6 +5233,7 @@ async function excluirPerfilClick(id, nome){
   // true), mas isso sozinho não protege contra chamar a função direto (ex.:
   // console do navegador) — mesmo cuidado já aplicado no log de sessões.
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('excluirPerfilClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5265,6 +5283,7 @@ async function renderGerenciarPerfisLista(){
       // Mesma defesa em profundidade de excluirPerfilClick logo acima —
       // esse toggle vive na mesma tela admin-only.
       if(!(await copilotoSessaoEhAdmin())){
+        await copilotoLogTentativaSemPrivilegio('toggleTrocaSemSenha');
         toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
         e.target.checked = !e.target.checked;
         return;
@@ -5304,6 +5323,7 @@ async function salvarCredenciaisPrincipaisClick(){
   // credencial ATUAL certa por conta própria de qualquer forma — mesmo
   // cuidado das outras ações administrativas desta tela.
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('salvarCredenciaisPrincipaisClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5355,6 +5375,7 @@ async function salvarAcessoEquipeClick(){
   // nada por conta própria — mesmo cuidado já aplicado no log de sessões e
   // na exclusão de perfis.
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('salvarAcessoEquipeClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5374,6 +5395,7 @@ async function salvarAcessoEquipeClick(){
 
 async function removerAcessoEquipeClick(){
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('removerAcessoEquipeClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5422,7 +5444,15 @@ const LOG_TIPO_INFO = {
   historico_resposta_restaurada: { icone: '♻️', label: 'Resposta do histórico restaurada' },
   lixeira_aberta:                { icone: '🔓', label: 'Itens excluídos visualizados' },
   lixeira_item_excluido_definitivamente: { icone: '💥', label: 'Item da lixeira excluído definitivamente' },
-  lixeira_esvaziada:             { icone: '💥', label: 'Lixeira esvaziada' }
+  lixeira_esvaziada:             { icone: '💥', label: 'Lixeira esvaziada' },
+  bloqueio_por_tentativas:       { icone: '🚫', label: 'Bloqueado por tentativas erradas de senha' },
+  tentativa_sem_privilegio:      { icone: '⛔', label: 'Tentativa de ação sem privilégio suficiente' },
+  funil_alterado:                { icone: '📝', label: 'Instruções do funil alteradas' },
+  chave_api_alterada:            { icone: '🔑', label: 'Chave de API alterada' },
+  provedor_ia_alterado:          { icone: '🤖', label: 'Provedor de IA alterado' },
+  estatisticas_zeradas:          { icone: '🧹', label: 'Estatísticas de uso zeradas' },
+  pasta_backup_alterada:         { icone: '📁', label: 'Pasta de backup alterada' },
+  acesso_avancado:               { icone: '🔓', label: 'Acesso à área Avançado' }
 };
 
 function formatarDataHoraLog(iso){
@@ -5441,6 +5471,7 @@ async function abrirLogAuditoriaModal(){
   // quem chamar a função direto (ex.: console do navegador) — mesmo cuidado
   // que outras ações administrativas já tinham, faltava aqui.
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('abrirLogAuditoriaModal');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5543,6 +5574,7 @@ async function logAuditoriaFiltroChange(){
 
 async function excluirLogAuditoriaClick(){
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('excluirLogAuditoriaClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5593,6 +5625,7 @@ function renderLogAuditoriaReportHtml(eventos, filtroLabel, instalacaoAtual, fus
 
 async function exportarLogAuditoriaClick(){
   if(!(await copilotoSessaoEhAdmin())){
+    await copilotoLogTentativaSemPrivilegio('exportarLogAuditoriaClick');
     toast('Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.');
     return;
   }
@@ -5767,6 +5800,7 @@ async function tentarDesbloquearPainel(){
     errorId: 'painelLockError',
     submitBtnId: 'painelUnlockBtn',
     shakeEl: document.querySelector('#painelLockScreen .avancado-lock'),
+    origemLog: 'Login geral (painel)',
     aoAutenticar: aposLoginMaster
   });
 }

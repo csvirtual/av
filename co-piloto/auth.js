@@ -1309,7 +1309,7 @@ async function copilotoChecarBloqueioAreaRestrita(passInputId, submitBtnId, erro
 // avançado do painel, e login das configurações) — cada cópia com seu
 // próprio seletor de DOM, o que é fácil de deixar dessincronizado se o HTML
 // de um deles mudar e o dos outros não. Agora é uma função só.
-async function copilotoTentarLogin({ userInputId, passInputId, errorId, submitBtnId, shakeEl, aoAutenticar }){
+async function copilotoTentarLogin({ userInputId, passInputId, errorId, submitBtnId, shakeEl, aoAutenticar, origemLog }){
   // Confere ANTES de verificar a senha — evita gastar um PBKDF2 (e, mais
   // importante, contar mais uma tentativa) enquanto já está bloqueado.
   const statusAtual = await copilotoStatusBloqueioSenha(COPILOTO_LOCKOUT_AREA_RESTRITA);
@@ -1336,7 +1336,7 @@ async function copilotoTentarLogin({ userInputId, passInputId, errorId, submitBt
     await copilotoSalvarUltimoUsuario(usuario);
     if(aoAutenticar) await aoAutenticar();
   }else{
-    const estado = await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA);
+    const estado = await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, origemLog || 'Login geral');
     document.getElementById(passInputId).value = '';
 
     if(estado.bloqueadoAte > Date.now()){

@@ -217,6 +217,7 @@ async function tentarDesbloquearConfig(){
     errorId: 'configLockError',
     submitBtnId: 'configUnlockBtn',
     shakeEl: document.querySelector('#configLockScreen .avancado-lock'),
+    origemLog: 'Login geral (Configurações)',
     aoAutenticar: async ()=>{
       // Mesma limpeza que panel.js faz em aposLoginMaster — sem isto, um
       // login bem-sucedido feito só por aqui (Configurações aberta antes do
@@ -278,9 +279,19 @@ function renderProviderCards(provider){
 }
 
 // Clique num dos cartões: atualiza a tela E já persiste a escolha.
-function selectProvider(provider){
+async function selectProvider(provider){
   renderProviderCards(provider);
-  copilotoStorage.local.set({ provider });
+  // Lido ANTES de sobrescrever, só pra saber se realmente mudou — clicar no
+  // cartão já selecionado não deveria gerar entrada de log nenhuma.
+  const anterior = await copilotoStorage.local.get('provider');
+  await copilotoStorage.local.set({ provider });
+  if(anterior.provider && anterior.provider !== provider){
+    const rotulo = { claude: 'Claude (Anthropic)', gemini: 'Gemini (Google)' };
+    // Decide pra qual empresa o conteúdo do lead passa a ser enviado — dado
+    // de privacidade real, antes essa troca era completamente silenciosa.
+    await copilotoRegistrarEventoLog('provedor_ia_alterado', await copilotoObterPerfilAtivo(),
+      `${rotulo[anterior.provider] || anterior.provider} → ${rotulo[provider] || provider}`);
+  }
 }
 
 // As chaves de API são um campo protegido (ver auth.js) — cifradas com o
@@ -294,6 +305,13 @@ function selectProvider(provider){
 async function valorChaveApiParaSalvar(inputId, valorAtualSalvo, dek, avisoRef){
   const input = document.getElementById(inputId);
   if(input.disabled) return valorAtualSalvo || '';
+  // Chegar até aqui (campo não desabilitado) só acontece depois de
+  // liberarCampoChaveApi — ou seja, é sempre uma edição intencional deste
+  // campo, esteja ele sendo preenchido com uma chave nova ou deixado em
+  // branco de propósito (remoção). Marcado em avisoRef.alteradas só pro log
+  // de auditoria (chave_api_alterada, ver saveKeys) — nunca afeta o que é
+  // salvo.
+  avisoRef.alteradas.push(inputId);
   const digitado = input.value.trim();
   if(!digitado) return '';
   // Marca especificamente QUAL campo ficou bloqueado (não só um booleano
@@ -310,7 +328,7 @@ async function saveKeys(){
   const provider = document.getElementById('cardClaude').classList.contains('selected') ? 'claude' : 'gemini';
   const dek = await obterDekAtivo();
   const atual = await copilotoStorage.local.get(['claudeKey','geminiKeyBasico','geminiKeyAvancado']);
-  const avisoRef = { bloqueou: false, bloqueadas: [] };
+  const avisoRef = { bloqueou: false, bloqueadas: [], alteradas: [] };
   await copilotoStorage.local.set({
     provider,
     claudeKey: await valorChaveApiParaSalvar('claudeKey', atual.claudeKey, dek, avisoRef),
@@ -346,6 +364,17 @@ async function saveKeys(){
   if(!avisoRef.bloqueadas.includes('geminiKeyBasico')){
     await copilotoStorage.local.remove(['geminiKey', 'geminiModel']);
   }
+  // Log da mudança de chave — nunca do VALOR dela, só de QUAL campo foi
+  // mexido (mesmo espírito de credencial_principal_alterada/
+  // acesso_equipe_alterado: o segredo em si nunca aparece no log). Quem
+  // decide para onde os dados do lead são enviados (Anthropic vs Google) é
+  // sensível o bastante pra deixar rastro — antes trocar/remover uma chave
+  // era completamente silencioso.
+  if(avisoRef.alteradas.length){
+    const rotulos = { claudeKey: 'Claude', geminiKeyBasico: 'Gemini (Chave A)', geminiKeyAvancado: 'Gemini (Chave B)' };
+    const lista = avisoRef.alteradas.map(id => rotulos[id] || id).join(', ');
+    await copilotoRegistrarEventoLog('chave_api_alterada', await copilotoObterPerfilAtivo(), `Chave(s): ${lista}`);
+  }
   if(avisoRef.bloqueou){
     toast('Modelos salvos, mas a(s) chave(s) nova(s) digitada(s) NÃO foram salvas — sem acesso protegido agora');
   }else{
@@ -380,8 +409,21 @@ function avisoConfiguracaoDoNegocioMalformada(texto){
 
 async function saveFunil(){
   const instrucoes = document.getElementById('funilInstrucoes').value.trim();
+  // Lido ANTES de sobrescrever — só pra comparar e decidir se realmente
+  // mudou algo (ver o log logo abaixo). Clicar "Salvar" sem ter editado
+  // nada não deveria gerar entrada de log nenhuma, senão vira ruído.
+  const anterior = await copilotoStorage.local.get('funil');
+  const instrucoesAnteriores = (anterior.funil && anterior.funil.instrucoes) || '';
   const funil = { instrucoes };
   await copilotoStorage.local.set({ funil });
+  // Log de "mudou", nunca do CONTEÚDO do funil (é o script inteiro de
+  // vendas, longo demais e não é isso que um log de auditoria guarda) — é
+  // literalmente o que a IA fala pra todo cliente (preço, política, tom);
+  // antes uma alteração aqui não deixava rastro nenhum.
+  if(instrucoes !== instrucoesAnteriores){
+    await copilotoRegistrarEventoLog('funil_alterado', await copilotoObterPerfilAtivo(),
+      instrucoes ? `Instruções do funil alteradas (${instrucoes.length} caracteres)` : 'Instruções do funil apagadas — voltou ao padrão de fábrica');
+  }
   // Um só toast por vez (ver toast(), auth.js) — o aviso de malformação,
   // quando existe, já diz "funil salvo" nele mesmo, então substitui a
   // confirmação normal em vez de piscar e sumir por cima dela. Funil salvo
@@ -443,6 +485,10 @@ async function resetUsageStats(){
     { titulo: 'Zerar contador de respostas?', textoConfirmar: 'Zerar contador' });
   if(!confirmado) return;
   await copilotoStorage.local.set({ usageStats: {} });
+  // Zerar um contador de uso é exatamente o tipo de ação que um log de
+  // auditoria existe pra não deixar passar despercebida — sem isto, dava
+  // pra "esconder" quanto a IA foi usada sem deixar rastro nenhum.
+  await copilotoRegistrarEventoLog('estatisticas_zeradas', await copilotoObterPerfilAtivo(), 'Contador de respostas geradas');
   toast('Contador de respostas geradas zerado');
 }
 

@@ -353,6 +353,7 @@ async function copilotoAlterarNomePerfil(id, novoNome) {
   const perfilAtivoId = await copilotoPerfilAtivoId();
   const souAdminSessao = await copilotoSessaoEhAdmin();
   if (id !== perfilAtivoId && !souAdminSessao) {
+    await copilotoLogTentativaSemPrivilegio('copilotoAlterarNomePerfil');
     return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
@@ -393,6 +394,7 @@ async function copilotoDefinirTrocaSemSenha(id, permitir) {
   // comum conseguia se marcar (ou marcar outro perfil) pra entrar na troca
   // rápida sem senha nenhuma.
   if (!(await copilotoSessaoEhAdmin())) {
+    await copilotoLogTentativaSemPrivilegio('copilotoDefinirTrocaSemSenha');
     return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
@@ -539,24 +541,52 @@ async function copilotoStatusBloqueioSenha(perfilId) {
 // a ter as tentativas cheias de novo). Retorna o novo estado, pra quem
 // chamou decidir se mostra "faltam N tentativas" ou já o cronômetro de
 // bloqueio.
-async function copilotoRegistrarTentativaFalha(perfilId) {
+// `contexto` (opcional) é só texto livre pro log — qual tela pediu a senha
+// (login de perfil, credencial geral, código de recuperação, senha da
+// lixeira...). Não afeta a lógica de bloqueio nenhuma, todos compartilham o
+// mesmo balde de tentativas por perfilId (ver comentário de
+// copilotoRegistrarTentativaFalha no cabeçalho do arquivo).
+async function copilotoRegistrarTentativaFalha(perfilId, contexto) {
   // Ver copilotoSerializarPorChave acima: sem isto, duas submissões quase
   // simultâneas da mesma senha errada (ex.: Enter segurado disparando duas
   // vezes) podiam ler o mesmo contador antigo e uma pisar na outra, deixando
   // o bloqueio de 3 tentativas exigir mais tentativas do que devia.
-  return copilotoSerializarPorChave(COPILOTO_TENTATIVAS_KEY, async () => {
+  const estado = await copilotoSerializarPorChave(COPILOTO_TENTATIVAS_KEY, async () => {
     const data = await chrome.storage.local.get(COPILOTO_TENTATIVAS_KEY);
     const todas = data[COPILOTO_TENTATIVAS_KEY] || {};
-    const estado = todas[perfilId] || { tentativas: 0, bloqueadoAte: 0 };
-    estado.tentativas += 1;
-    if (estado.tentativas >= COPILOTO_TENTATIVAS_MAX) {
-      estado.bloqueadoAte = Date.now() + COPILOTO_BLOQUEIO_MS;
-      estado.tentativas = 0;
+    const atual = todas[perfilId] || { tentativas: 0, bloqueadoAte: 0 };
+    atual.tentativas += 1;
+    let acabouDeBloquear = false;
+    if (atual.tentativas >= COPILOTO_TENTATIVAS_MAX) {
+      atual.bloqueadoAte = Date.now() + COPILOTO_BLOQUEIO_MS;
+      atual.tentativas = 0;
+      acabouDeBloquear = true;
     }
-    todas[perfilId] = estado;
+    todas[perfilId] = atual;
     await chrome.storage.local.set({ [COPILOTO_TENTATIVAS_KEY]: todas });
-    return estado;
+    return { ...atual, acabouDeBloquear };
   });
+
+  // Loga só quando o bloqueio DISPARA — não a cada tentativa errada (1 ou 2
+  // erros isolados são normais demais pra virar entrada de log; "3 erros
+  // seguidos" é o sinal que interessa pra quem audita). Um único ponto
+  // (aqui, dentro da função que TODOS os fluxos de senha já chamam) cobre
+  // login de perfil, credencial geral da Área restrita, código de
+  // recuperação e a senha da lixeira de uma vez — antes nenhum deles
+  // deixava rastro nenhum de tentativa/bloqueio, só o sucesso aparecia no
+  // log.
+  if (estado.acabouDeBloquear) {
+    const idAreaRestrita = typeof COPILOTO_LOCKOUT_AREA_RESTRITA !== 'undefined' ? COPILOTO_LOCKOUT_AREA_RESTRITA : null;
+    const perfilParaLog = (idAreaRestrita && perfilId === idAreaRestrita)
+      ? { id: null, nome: 'Credencial geral (Área restrita)' }
+      : await copilotoObterPerfilPorId(perfilId);
+    try {
+      await copilotoRegistrarEventoLog('bloqueio_por_tentativas', perfilParaLog,
+        `Bloqueado por 60s após ${COPILOTO_TENTATIVAS_MAX} tentativas erradas seguidas${contexto ? ' — ' + contexto : ''}`);
+    } catch (e) {}
+  }
+
+  return estado;
 }
 
 // Chamada depois de uma senha CERTA — zera qualquer contador de tentativas
@@ -707,6 +737,7 @@ async function copilotoAlterarSenhaPerfil(perfilId, { senhaAtual, novaSenha, for
     // aceitar o atalho — sem isso, qualquer perfil comum trocava a senha de
     // QUALQUER outro perfil (inclusive o admin) sem saber senha nenhuma.
     if (!(await copilotoSessaoEhAdmin())) {
+      await copilotoLogTentativaSemPrivilegio('copilotoAlterarSenhaPerfil(forcar)');
       return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
     }
     // Recupera o DEK sem precisar da senha antiga, pela chave-mestra (AMK)
@@ -753,7 +784,7 @@ async function copilotoRecuperarSenhaComCodigo(perfilId, codigoRecuperacao, nova
   const codigoNormalizado = (codigoRecuperacao || '').toUpperCase().trim();
   const dek = await copilotoAbrirEnvelopePorTexto(perfil.dekEnvelopeRecuperacao, codigoNormalizado, 'dek-por-recuperacao').catch(() => null);
   if (!dek) {
-    await copilotoRegistrarTentativaFalha(perfilId);
+    await copilotoRegistrarTentativaFalha(perfilId, 'Código de recuperação');
     return { ok: false, erro: 'Código de recuperação incorreto.' };
   }
 
@@ -805,7 +836,7 @@ async function copilotoRecuperarSenhaAdmin(usuarioGeral, senhaGeral, novaSenha, 
   const credenciaisOk = await copilotoVerificarCredenciais(usuarioGeral, senhaGeral);
   if (!credenciaisOk) {
     if (typeof COPILOTO_LOCKOUT_AREA_RESTRITA !== 'undefined') {
-      await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA);
+      await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, 'Recuperação de senha do admin (login geral)');
     }
     return { ok: false, erro: 'Usuário ou senha geral do sistema incorretos.' };
   }
@@ -854,6 +885,7 @@ return { copilotoAlterarSenhaPerfil, copilotoRecuperarSenhaComCodigo, copilotoRe
 // excluir o próprio perfil admin (a instalação sempre precisa ter um).
 async function copilotoExcluirPerfil(id) {
   if (!(await copilotoSessaoEhAdmin())) {
+    await copilotoLogTentativaSemPrivilegio('copilotoExcluirPerfil');
     return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   const resultado = await copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
@@ -1135,8 +1167,11 @@ function copilotoExtrairDadosDoPerfil(snapshotStorage, perfilId) {
 // 'bot_conversa_excluida', 'bot_conversa_restaurada',
 // 'historico_resposta_excluida', 'historico_resposta_restaurada',
 // 'lixeira_aberta', 'lixeira_item_excluido_definitivamente',
-// 'lixeira_esvaziada'. (O reset geral não gera entrada: ele já apaga o
-// storage inteiro, log incluso — é o único evento sem exceção.)
+// 'lixeira_esvaziada', 'bloqueio_por_tentativas', 'tentativa_sem_privilegio',
+// 'funil_alterado', 'chave_api_alterada', 'provedor_ia_alterado',
+// 'estatisticas_zeradas', 'pasta_backup_alterada', 'acesso_avancado'.
+// (O reset geral não gera entrada: ele já apaga o storage inteiro, log
+// incluso — é o único evento sem exceção.)
 //
 // Os eventos de lead nunca guardam o CONTEÚDO de campo protegido — ver
 // registrarAlteracaoLeadNoLog em panel.js pro porquê.
@@ -1269,6 +1304,23 @@ async function copilotoRegistrarEventoLog(tipo, perfil, detalhe) {
   } catch (e) {}
 }
 
+// Chamada quando uma ação que exige autoridade de admin é REJEITADA pela
+// própria checagem "confere de novo aqui dentro" de cada função/tela
+// sensível (copilotoExcluirPerfil, copilotoDefinirSessaoAdmin,
+// excluirPerfilClick em panel.js, etc.) — nunca pela checagem da UI, que só
+// evita MOSTRAR o botão, não é barreira de verdade. Sem isto, uma tentativa
+// de chamar uma dessas funções direto (ex.: console do navegador) sem
+// autoridade simplesmente falhava em silêncio: a defesa funcionava, mas não
+// deixava vestígio nenhum de que alguém tentou. `origem` identifica qual
+// função/tela rejeitou; o perfil registrado é sempre o ativo agora (quem
+// estava logado quando a tentativa aconteceu), não o alvo da ação.
+async function copilotoLogTentativaSemPrivilegio(origem) {
+  try {
+    const perfilAtivo = await copilotoObterPerfilAtivo();
+    await copilotoRegistrarEventoLog('tentativa_sem_privilegio', perfilAtivo, origem || '(origem desconhecida)');
+  } catch (e) {}
+}
+
 // Sem perfilId: apaga o log inteiro (todos os perfis). Com perfilId: apaga
 // só as entradas daquele perfil, mantendo as dos demais — é o filtro
 // escolhido na tela (ver panel.js).
@@ -1284,6 +1336,11 @@ async function copilotoExcluirLogAuditoria(perfilId) {
   // pra cobrir o próprio rastro, o oposto exato do que um log de auditoria
   // existe pra impedir.
   if (!(await copilotoSessaoEhAdmin())) {
+    // Registrar ESTA rejeição em particular é quase irônico — e por isso
+    // mesmo importante: é justo a função que apagaria o log, chamada por
+    // quem não tem autoridade pra isso. Uma tentativa de cobrir o próprio
+    // rastro vira, ela mesma, uma entrada no rastro.
+    await copilotoLogTentativaSemPrivilegio('copilotoExcluirLogAuditoria');
     return { ok: false, erro: 'Você não tem privilégios suficientes para esta ação. Ligue como administrador geral.' };
   }
   return copilotoSerializarPorChave(COPILOTO_LOG_KEY, async () => {
