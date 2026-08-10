@@ -754,6 +754,13 @@ body.cred-inicial-aberto{ overflow:hidden; }
 }
 .reset-confirm-error{ color:#B3261E; font-size:12px; font-weight:700; margin-top:6px; }
 .reset-confirm-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+/* No modal de senha da lixeira (mais estreito, 400px — ver
+   .modal-dialog.modal-dialog-senha) só há dois botões e nenhum outro
+   elemento disputando a mesma linha, então alinhar à direita (padrão do
+   .reset-confirm-actions acima, pensado pro modal de 680px/440px com mais
+   contexto ao redor) sobra bastante vazio à esquerda e parece descentralizado.
+   Centralizado fica mais equilibrado especificamente aqui. */
+.modal-dialog-senha .reset-confirm-actions{ justify-content:center; }
 
 /* MINHA CONTA — resumo de uso/custo de tokens */
 .billing-summary-row{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
