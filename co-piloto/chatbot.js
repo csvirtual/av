@@ -764,13 +764,16 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     const div = document.createElement('div');
     div.className = 'chat-msg ' + (role === 'user' ? 'user' : 'ai') + (opts.erro ? ' error' : '') + (opts.loading ? ' loading' : '');
     if(opts.html){
-      // Só usado pela resposta direta do guia "Como usar"/"Privacidade" (ver
-      // enviarMensagemChat) — HTML sempre montado por
-      // serializarHtmlSeguroAjuda a partir do NOSSO próprio HTML estático
-      // (nunca de lead, IA ou texto digitado por alguém), restrito a uma
-      // allowlist de tags. Todo o resto do chat (mensagem do usuário,
-      // resposta da IA, erros) continua em texto puro via textContent — a
-      // defesa contra XSS que o chat sempre teve não muda pra esses casos.
+      // Só usado por "/help" e "/find" (nunca pela resposta da IA nem pela
+      // mensagem digitada, que continuam texto puro via textContent, abaixo)
+      // — dois HTMLs possíveis, os dois sempre escapados antes de chegar
+      // aqui, nunca innerHTML bruto: o do guia "Como usar"/"Privacidade" via
+      // serializarHtmlSeguroAjuda (allowlist de tags, a partir do NOSSO
+      // próprio HTML estático — ver montarMenuAjudaHtml/acharSecaoPorComando)
+      // e o de "/find" via escapeHtml direto em cima de h.pergunta/h.resposta
+      // (ver corpoHistoricoBotHtml/montarResultadoFindHtml) — ali sim vindo
+      // de texto digitado pela atendente e gerado pela IA, por isso escapado
+      // explicitamente em vez de restrito por allowlist.
       div.innerHTML = opts.html;
     }else{
       div.textContent = texto;
@@ -952,25 +955,6 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }, 1000);
   }
 
-  // Fecha o turno de uma resposta de "/help" (nunca chama IA — ver
-  // argumentoComandoHelp/acharSecaoPorComando acima) — mostra a bolha,
-  // guarda no Histórico do Bot persistente (pra aparecer depois na tela
-  // principal do lead), cancela um aviso de "sem chave" de uma pergunta
-  // ANTERIOR que porventura ainda estivesse contando (ver
-  // mostrarAvisoSemChave — sem isto ele dispararia sozinho daqui a pouco e
-  // navegaria pra Configurações mesmo a pessoa acabando de receber uma
-  // resposta útil), e libera a caixa de novo.
-  //
-  // De propósito NUNCA entra em `chatHistorico` (o que é reenviado pra IA
-  // como contexto a cada NOVA mensagem desta mesma conversa — ver
-  // buildChatDynamicContext): "/help" e sua resposta são navegação de tela,
-  // não conversa — se entrasse, o menu inteiro (ou o texto de uma seção
-  // inteira) ficaria "andando junto", sendo reenviado (e cobrado) em TODA
-  // chamada de IA seguinte desta mesma conversa, mesmo sem nenhuma relação
-  // com o que estiver sendo perguntado dali pra frente. Uma pergunta em
-  // linguagem natural sobre o Co-piloto, diferente de "/help", passa pela
-  // IA normalmente (ver enviarMensagemChat/pedirRespostaIA) e por isso
-  // entra em chatHistorico como qualquer outra troca da conversa.
   // Sequência final comum a QUALQUER turno do chat que não segue pro fluxo
   // de IA (cancela um aviso de "sem chave" pendente, libera a caixa de novo)
   // — compartilhada por finalizarRespostaSemIA ("/help") e
@@ -982,6 +966,21 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     input.focus();
   }
 
+  // Fecha o turno de uma resposta de "/help" (nunca chama IA — ver
+  // argumentoComandoHelp/acharSecaoPorComando acima) — mostra a bolha,
+  // guarda no Histórico do Bot persistente (pra aparecer depois na tela
+  // principal do lead), e encerra o turno (ver encerrarTurnoChat acima).
+  //
+  // De propósito NUNCA entra em `chatHistorico` (o que é reenviado pra IA
+  // como contexto a cada NOVA mensagem desta mesma conversa — ver
+  // buildChatDynamicContext): "/help" e sua resposta são navegação de tela,
+  // não conversa — se entrasse, o menu inteiro (ou o texto de uma seção
+  // inteira) ficaria "andando junto", sendo reenviado (e cobrado) em TODA
+  // chamada de IA seguinte desta mesma conversa, mesmo sem nenhuma relação
+  // com o que estiver sendo perguntado dali pra frente. Uma pergunta em
+  // linguagem natural sobre o Co-piloto, diferente de "/help", passa pela
+  // IA normalmente (ver enviarMensagemChat/pedirRespostaIA) e por isso
+  // entra em chatHistorico como qualquer outra troca da conversa.
   function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
     renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
     registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
@@ -1455,6 +1454,15 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }
 
     botHistorico = historicoOriginal.filter(h => h.id !== entryId);
+    // Se este trecho estava marcado com "/find" pra entrar na próxima
+    // mensagem de IA (ver _memoriaAtivada) — possível mesmo com o chat
+    // fechado, já que marcar não exige o modal aberto e não se esvazia ao
+    // fechá-lo — remove a marca também: não faz sentido enviar pra IA um
+    // trecho que a pessoa acabou de mandar pros excluídos.
+    if(_memoriaAtivada.some(t => t.id === entryId)){
+      _memoriaAtivada = _memoriaAtivada.filter(t => t.id !== entryId);
+      atualizarBarraDeContexto();
+    }
     try{
       const paraSalvar = await cifrarHistoricoParaSalvar(botHistorico, dek);
       await copilotoStorage.local.set({ [botHistoryKey(leadId)]: paraSalvar });
@@ -1501,6 +1509,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }
 
     botHistorico = [];
+    // Idem deleteBotHistoryEntry: qualquer trecho deste lead marcado com
+    // "/find" pra entrar na próxima mensagem também deixou de existir aqui.
+    if(_memoriaAtivada.length){
+      _memoriaAtivada = [];
+      atualizarBarraDeContexto();
+    }
     try{
       await copilotoStorage.local.set({ [botHistoryKey(leadId)]: [] });
     }catch(err){ console.error(err); }
