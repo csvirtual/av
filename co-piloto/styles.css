@@ -712,7 +712,18 @@ body.cred-inicial-aberto{ overflow:hidden; }
 .btn.danger-solid:hover{ background:#8C1D17; }
 .btn.danger-solid:disabled{ opacity:.5; cursor:default; }
 
-.modal-dialog-reset{ max-width:440px; }
+/* .modal-dialog-reset (modal "Confirmar reset total") e .modal-dialog-senha
+   (lixeira/Avançado, ver panel.js) — as duas em seletor combinado
+   (.modal-dialog.modal-dialog-X, não só .modal-dialog-X sozinha): o
+   .modal-dialog{max-width:680px} de panel.html vive num <style> embutido,
+   carregado DEPOIS deste arquivo — com a mesma especificidade de uma classe
+   só (0-1-0 nos dois), quem vier depois na cascata vence, então 680px
+   sempre "ganhava" mesmo com a classe mais estreita aplicada (achado ao
+   medir a largura renderizada de verdade, não só lendo o CSS — as duas
+   classes existiam há tempo sem nunca terem tido efeito nenhum). Duas
+   classes juntas (0-2-0) resolve o empate sem depender de onde cada regra
+   mora. */
+.modal-dialog.modal-dialog-reset{ max-width:440px; }
 /* Só pros dois modais que pedem a senha do PRÓPRIO PERFIL (lixeira e
    Avançado, ver panel.js) — cada um é só um campo de senha e um botão, e o
    .modal-dialog padrão (680px, feito pra telas com conteúdo de verdade)
@@ -721,14 +732,7 @@ body.cred-inicial-aberto{ overflow:hidden; }
    enquanto a tela de senha está visível (ver resetAvancadoLockScreen/
    tentarDesbloquearAvancado), voltando pro .modal-dialog normal assim que
    desbloqueado, já que o conteúdo de dentro (backup, perfis etc.) precisa
-   da largura cheia.
-   Seletor combinado (.modal-dialog.modal-dialog-senha, não só
-   .modal-dialog-senha): o .modal-dialog{max-width:680px} de panel.html vive
-   num <style> embutido, carregado DEPOIS deste arquivo — com a mesma
-   especificidade de uma classe só (0-1-0 nos dois), quem vier depois na
-   cascata vence, e 680px "ganhava" de 400px mesmo com esta classe aplicada.
-   Duas classes juntas (0-2-0) resolve o empate sem depender de onde cada
-   regra mora. */
+   da largura cheia. */
 .modal-dialog.modal-dialog-senha{ max-width:400px; }
 .reset-warning-box{
   display:flex; flex-direction:column; align-items:center; text-align:center;
