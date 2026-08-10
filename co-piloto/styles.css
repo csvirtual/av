@@ -1,13 +1,39 @@
-/* Antes havia aqui um @import de fonts.googleapis.com (Fraunces + Manrope)
- * — uma chamada de rede real pra um domínio de terceiro, feita toda vez que
- * qualquer página da extensão abre, sem estar declarada em host_permissions
- * (manifest.json) nem mencionada no aviso de privacidade das telas
- * ("fica só no seu computador... não vai pra nenhum servidor", ver
- * options.html). Removido: as regras 'Fraunces'/'Manrope' abaixo já têm
- * fallback pra serif/sans-serif do sistema em cada declaração — sem o
- * @import, o navegador cai direto nesse fallback, sem quebrar layout
- * nenhum, e a extensão para de fazer qualquer chamada de rede fora de
- * api.anthropic.com/generativelanguage.googleapis.com. */
+/* Fraunces (títulos) e Manrope (corpo) — as mesmas fontes de sempre, mas
+ * agora EMBUTIDAS no pacote da extensão em vez de um @import pra
+ * fonts.googleapis.com. O @import antigo fazia uma chamada de rede real
+ * pra um domínio de terceiro toda vez que qualquer página da extensão
+ * abria, sem estar declarada em host_permissions (manifest.json) nem
+ * mencionada no aviso de privacidade das telas ("fica só no seu
+ * computador... não vai pra nenhum servidor", ver options.html) — foi
+ * removida numa auditoria anterior, mas isso trocou a tipografia real por
+ * serif/sans-serif do sistema, o que não devia ter sido o resultado final.
+ * A correção certa é esta: os dois arquivos .woff2 abaixo (só o subconjunto
+ * "latin" — cobre acentuação do português inteira, ex. ã/ç/é/õ — sem os
+ * subconjuntos cirílico/grego/vietnamita que o Google manda por padrão)
+ * ficam em fonts/, dentro do próprio pacote da extensão. Cada um é uma
+ * fonte VARIÁVEL (Fraunces cobre peso 400-700 + eixo de tamanho óptico
+ * inteiro; Manrope cobre peso 400-800) num arquivo só — mesma faixa de
+ * pesos que o @import antigo pedia, ~90KB no total. Caminho local (não
+ * chrome-extension://...): CSS de uma página da extensão carregando um
+ * recurso da própria extensão por caminho relativo não precisa de
+ * web_accessible_resources no manifest — isso só é exigido quando uma
+ * PÁGINA WEB comum (fora da extensão) tenta carregar o recurso. */
+@font-face{
+  font-family:'Fraunces';
+  font-style:normal;
+  font-weight:400 700;
+  font-display:swap;
+  src:url('fonts/fraunces-variable-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:'Manrope';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url('fonts/manrope-variable-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 :root{
   --ink:#132420;
