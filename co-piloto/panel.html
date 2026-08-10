@@ -760,12 +760,13 @@
      em panel.js. Cartões lado a lado numa linha só (overflow-x:auto rola em
      vez de quebrar linha, pra nunca virar uma grade — o pedido era "um ao
      lado do outro em linha reta"); centralizados quando cabem todos, com
-     scroll horizontal só se a tela for estreita demais pros 7. */
-  .recent-leads-section{ margin-top:32px; text-align:left; }
-  /* Variante quando é o primeiro elemento do card (logo abaixo da linha de
-     badges) — sem o espaço de 32px que só faz sentido vindo depois de outro
-     bloco de conteúdo; usa o padding-top do próprio card como respiro. */
-  .recent-leads-section-top{ margin-top:0; margin-bottom:8px; }
+     scroll horizontal só se a tela for estreita demais pros 7.
+     .recent-leads-card é um .card comum (mesmo branco/borda/sombra/respiro
+     de qualquer outro card da tela, ex: #centralAvisoBanner, Dados do lead)
+     — não herda o fundo do card "Pronto para atender" logo abaixo; os dois
+     ficam empilhados com o espaçamento padrão entre cards (margin-bottom do
+     .card), do mesmo jeito que o resto do app já organiza vários blocos de
+     conteúdo na mesma tela. */
   .recent-leads-title{
     font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;
     letter-spacing:.05em; text-align:center; margin-bottom:14px;
@@ -1252,16 +1253,23 @@
       <div id="campanhaBadge"></div>
     </div>
 
-    <div id="noLeadState" class="card empty-state">
+    <!-- Envelope só pra sincronizar a visibilidade dos dois cards abaixo com
+         o resto da "tela inicial" (sem lead selecionado) — goToHome/
+         selectLead/deleteLead mostram/escondem #homeEmptyState inteiro de
+         uma vez, em vez de mexer em cada card por dentro separadamente. -->
+    <div id="homeEmptyState">
       <!-- Tira horizontal com os leads mais recentes (ver renderRecentLeadsStrip,
-           panel.js) — substituiu a lista que antes ficava na lateral. Primeira
-           coisa da tela inicial, logo abaixo da linha de badges (provedor de
-           IA / respostas geradas / Health Monitor) que fica acima deste card. -->
-      <div class="recent-leads-section recent-leads-section-top">
+           panel.js) — substituiu a lista que antes ficava na lateral. Card
+           PRÓPRIO (não colado no card branco do "Pronto para atender" logo
+           abaixo) — mesmo padrão de cards empilhados usado no resto do app
+           (Dados do lead, Central de mensagens etc.), pra ficar coerente com
+           a aparência geral da tela em vez de inventar um visual novo. -->
+      <div class="card recent-leads-card">
         <div class="recent-leads-title">7 últimos leads cadastrados</div>
         <div class="recent-leads-strip" id="recentLeadsStrip"></div>
       </div>
 
+      <div id="noLeadState" class="card empty-state">
       <div class="empty-icon">💬</div>
       <div class="big">Pronto para atender o próximo lead</div>
       <div class="empty-sub">Crie um lead na barra lateral para começar a registrar o atendimento — é rapidinho:</div>
@@ -1290,6 +1298,7 @@
             copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
           </div>
         </div>
+      </div>
       </div>
     </div>
 

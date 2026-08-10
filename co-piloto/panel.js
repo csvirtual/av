@@ -375,7 +375,7 @@ function hideFollowupResultCard(){
 function goToHome(){
   currentLeadId = null;
   document.getElementById('leadWorkspace').style.display = 'none';
-  document.getElementById('noLeadState').style.display = 'block';
+  document.getElementById('homeEmptyState').style.display = 'block';
   document.getElementById('resultCard').style.display = 'none';
   hideFollowupResultCard();
   renderLeadsList();
@@ -909,13 +909,14 @@ function renderLeadsList(){
 
 // ---------- Tira horizontal "N últimos leads cadastrados" (tela inicial) ----------
 // Antes vivia na lateral (lista vertical, com busca) — agora fica na tela
-// inicial (#noLeadState, mesmo card do "Pronto para atender o próximo
-// lead"), como uma tira de cartões lado a lado. A lateral hoje só tem os
-// dois atalhos fixos (@csvirtual e @C&S_BOT, ver acima); achar um lead
-// específico por nome/telefone continua em "Ver / exportar leads" (modal
-// dedicado, com busca de verdade — não perdeu a função, só de endereço).
-// Some junto com o resto da tela inicial quando um lead é aberto
-// (goToHome/selectLead escondem #noLeadState inteiro).
+// inicial, num card PRÓPRIO (não colado no card branco do "Pronto para
+// atender o próximo lead" — ver #homeEmptyState em panel.html), como uma
+// tira de cartões lado a lado. A lateral hoje só tem os dois atalhos fixos
+// (@csvirtual e @C&S_BOT, ver acima); achar um lead específico por nome/
+// telefone continua em "Ver / exportar leads" (modal dedicado, com busca de
+// verdade — não perdeu a função, só de endereço). Some junto com o resto da
+// tela inicial quando um lead é aberto (goToHome/selectLead escondem
+// #homeEmptyState inteiro, ver os dois cards nele).
 const LEADS_RECENTES_QTD = 7;
 function renderRecentLeadsStrip(){
   const box = document.getElementById('recentLeadsStrip');
@@ -1366,7 +1367,7 @@ async function deleteLead(){
     currentHistory = [];
     currentLeadId = null;
     document.getElementById('leadWorkspace').style.display='none';
-    document.getElementById('noLeadState').style.display='block';
+    document.getElementById('homeEmptyState').style.display='block';
     if(typeof window.carregarHistoricoBotChat === 'function'){
       window.carregarHistoricoBotChat(null);
     }
@@ -1381,7 +1382,7 @@ async function selectLead(id){
   currentLeadId = id;
   const lead = leads.find(l=>l.id===id);
   if(!lead) return;
-  document.getElementById('noLeadState').style.display='none';
+  document.getElementById('homeEmptyState').style.display='none';
   document.getElementById('leadWorkspace').style.display='block';
   const dekDisponivel = !!(await obterDekAtivo());
   aplicarCampoProtegido('leadObjetivo', lead.objetivo, dekDisponivel);
