@@ -701,6 +701,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, html: respostaDiretaHtml });
       chatHistorico.push({ role: 'ai', texto: respostaDireta });
       registrarTrocaNoHistoricoBot(texto, respostaDireta, leadIdDoEnvio);
+      // Esta resposta não precisou de chave nenhuma — mas se um aviso de
+      // "sem chave" de uma pergunta ANTERIOR ainda estiver contando (ver
+      // mostrarAvisoSemChave), sem cancelar aqui ele dispararia sozinho
+      // daqui a pouco e navegaria pra Configurações mesmo a pessoa
+      // acabando de receber uma resposta útil, sem ter pedido isso.
+      cancelarAvisoSemChave();
       chatOcupado = false;
       elSend().disabled = false;
       input.focus();
@@ -722,6 +728,10 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       // seções de ajuda de novo pra chegar no mesmo resultado.
       const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaDireta);
       loadingEl.remove();
+      // Resposta da IA veio com sucesso — se havia um aviso de "sem chave"
+      // de uma pergunta anterior ainda contando, não faz mais sentido
+      // nenhum ele navegar pra Configurações sozinho daqui a pouco.
+      cancelarAvisoSemChave();
 
       // Depois dos awaits acima é que checamos se ainda estamos no mesmo
       // lead de quando a pergunta foi enviada — se a pessoa trocou de lead

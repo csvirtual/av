@@ -51,12 +51,21 @@ async function openOrFocusPanel() {
 
 chrome.action.onClicked.addListener(openOrFocusPanel);
 
-chrome.tabs.onRemoved.addListener(async (id) => {
-  const stored = await chrome.storage.session.get([PANEL_TAB_KEY, OPTIONS_TAB_KEY]);
-  const chavesParaLimpar = [];
-  if (stored[PANEL_TAB_KEY] && stored[PANEL_TAB_KEY].id === id) chavesParaLimpar.push(PANEL_TAB_KEY);
-  if (stored[OPTIONS_TAB_KEY] && stored[OPTIONS_TAB_KEY].id === id) chavesParaLimpar.push(OPTIONS_TAB_KEY);
-  if (chavesParaLimpar.length) await chrome.storage.session.remove(chavesParaLimpar);
+// Serializado por chave (mesma fila usada por openOrFocusPanel e
+// copilotoRegistrarOuChecarAba abaixo) — sem isto, fechar a aba oficial de
+// uma página exatamente no instante em que outra chamada está gravando um
+// id novo pra essa mesma chave (ex.: reabrindo pelo ícone) podia ler o
+// registro ANTIGO aqui, e o remove() concluir DEPOIS da escrita nova —
+// apagando o registro da aba nova e legítima, não da que de fato fechou.
+chrome.tabs.onRemoved.addListener((id) => {
+  [PANEL_TAB_KEY, OPTIONS_TAB_KEY].forEach((chave) => {
+    copilotoSerializarPorChave(chave, async () => {
+      const stored = await chrome.storage.session.get(chave);
+      if (stored[chave] && stored[chave].id === id) {
+        await chrome.storage.session.remove(chave);
+      }
+    });
+  });
 });
 
 // Trava de aba duplicada: panel.js e options.js chamam isto (via mensagem,
@@ -69,34 +78,17 @@ chrome.tabs.onRemoved.addListener(async (id) => {
 // tanto o clique no ícone quanto qualquer outra forma de abrir uma cópia da
 // página (duplicar aba, colar a URL, restaurar aba fechada): a resposta é
 // sempre baseada em qual aba chegou primeiro.
-// Uma aba conta como "já conhecida" se já é a oficial de QUALQUER UMA das
-// duas páginas do Copiloto (painel ou configurações) — usado abaixo pra
-// nunca travar por engano quem está navegando dentro do próprio app (ex.:
-// já está no painel, clica em "Configurações", navega NA MESMA aba pra
-// options.html). Sem isto: se um dia alguém abrisse Configurações direto
-// (fora do fluxo normal — link "Opções da extensão" do Chrome, por
-// exemplo) e deixasse aquela aba esquecida por aí, essa aba esquecida
-// ficaria registrada como "a" oficial de Configurações pra sempre — e a
-// aba de verdade que a pessoa está usando (painel, ao clicar em
-// Configurações) seria travada como se fosse a cópia, quando é o oposto.
-async function copilotoAbaJaConhecida(tabId) {
-  const stored = await chrome.storage.session.get([PANEL_TAB_KEY, OPTIONS_TAB_KEY]);
-  return (stored[PANEL_TAB_KEY] && stored[PANEL_TAB_KEY].id === tabId)
-    || (stored[OPTIONS_TAB_KEY] && stored[OPTIONS_TAB_KEY].id === tabId);
-}
-
 async function copilotoRegistrarOuChecarAba(chave, tab) {
   if (!tab || typeof tab.id !== 'number') return true; // sem info da aba pra checar — não trava (mais seguro que travar sem certeza)
   return copilotoSerializarPorChave(chave, async () => {
     const stored = await chrome.storage.session.get(chave);
     const registrada = stored[chave];
 
+    // Sem registro ainda, ou já é esta mesma aba (ex.: recarregou, ou está
+    // navegando dentro do próprio app — já está no painel, clica em
+    // "Configurações", navega NA MESMA aba pra options.html) — sempre
+    // registra/confirma, nunca trava.
     if (!registrada || registrada.id === tab.id) {
-      await chrome.storage.session.set({ [chave]: { id: tab.id, windowId: tab.windowId } });
-      return true;
-    }
-
-    if (await copilotoAbaJaConhecida(tab.id)) {
       await chrome.storage.session.set({ [chave]: { id: tab.id, windowId: tab.windowId } });
       return true;
     }
@@ -104,6 +96,18 @@ async function copilotoRegistrarOuChecarAba(chave, tab) {
     // Existe outra aba registrada como oficial — confirma que ela ainda
     // existe de verdade antes de travar esta (evita travar por engano se a
     // aba antiga fechou e o onRemoved acima ainda não rodou).
+    //
+    // De propósito NÃO existe mais aqui um atalho de "esta aba já é oficial
+    // da OUTRA página do Copiloto, então pode assumir esta também" — havia
+    // um antes (copilotoAbaJaConhecida), removido porque cedia a chave pra
+    // esta aba mesmo quando a aba registrada continuava genuinamente aberta
+    // em outra janela (ex.: painel na aba B, Configurações na aba A; volta
+    // ao painel pela aba A) — órfãzinha a aba B, que era a legítima, como
+    // se fosse cópia da aba que a substituiu. Sem esse atalho, esse cenário
+    // agora resolve do jeito mais seguro: a aba B continua sendo a oficial
+    // do painel, e a aba A (que só estava de passagem) vê a tela de "esta
+    // aba é uma cópia" ao tentar assumir uma chave que já tem dona viva —
+    // pior caso é uma tela a mais pra fechar, nunca uma aba legítima perdida.
     const aindaExiste = await new Promise((resolve) => {
       chrome.tabs.get(registrada.id, () => resolve(!chrome.runtime.lastError));
     });
@@ -112,7 +116,7 @@ async function copilotoRegistrarOuChecarAba(chave, tab) {
       return true;
     }
 
-    return false; // é mesmo uma cópia — já existe outra aba oficial aberta
+    return false; // é mesmo uma cópia — já existe outra aba oficial aberta e viva
   });
 }
 
@@ -149,10 +153,10 @@ const COPILOTO_CRED_INICIAL_CLAIM_EXPIRA_MS = 10000;
 async function copilotoReivindicarGeracaoCredencialInicial(){
   return copilotoSerializarPorChave(COPILOTO_CRED_INICIAL_CLAIM_KEY, async () => {
     const dados = await chrome.storage.local.get([
-      'copilotoCredencialInicialJaGerada', 'copilotoCredenciaisHashV2',
-      'copilotoCredenciaisPersonalizadas', COPILOTO_CRED_INICIAL_CLAIM_KEY
+      COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY, COPILOTO_CREDENCIAIS_HASH_V2_KEY,
+      COPILOTO_CREDENCIAIS_PERSONALIZADAS_KEY, COPILOTO_CRED_INICIAL_CLAIM_KEY
     ]);
-    if (dados['copilotoCredencialInicialJaGerada'] || dados['copilotoCredenciaisHashV2'] || dados['copilotoCredenciaisPersonalizadas']) {
+    if (dados[COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY] || dados[COPILOTO_CREDENCIAIS_HASH_V2_KEY] || dados[COPILOTO_CREDENCIAIS_PERSONALIZADAS_KEY]) {
       return { vencedor: false }; // já existe credencial — nada a gerar
     }
     const reivindicadaEm = dados[COPILOTO_CRED_INICIAL_CLAIM_KEY];

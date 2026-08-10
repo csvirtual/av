@@ -50,6 +50,17 @@
 // simplesmente não chegam a ser chamadas) — por isso usa só funções simples
 // no escopo global, sem import/export.
 
+// Estas 3 vivem aqui (não em auth.js, onde são usadas em conjunto com o
+// resto da autenticação) porque background.js — o service worker, que
+// decide quem "ganha" a corrida de gerar a credencial inicial, ver
+// copilotoReivindicarGeracaoCredencialInicial lá — só pode importar este
+// arquivo via importScripts (auth.js usa document.getElementById no escopo
+// do módulo, que não existe em service worker). Mantê-las só aqui evita
+// duas fontes da verdade pro mesmo nome de chave entre os dois arquivos.
+const COPILOTO_CREDENCIAIS_HASH_V2_KEY = 'copilotoCredenciaisHashV2';
+const COPILOTO_CREDENCIAIS_PERSONALIZADAS_KEY = 'copilotoCredenciaisPersonalizadas';
+const COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY = 'copilotoCredencialInicialJaGerada';
+
 const COPILOTO_PERFIS_KEY = 'copilotoPerfis'; // chrome.storage.local — lista global de perfis
 const COPILOTO_AMK_ENVELOPE_KEY = 'copilotoAmkEnvelope'; // chrome.storage.local — chave-mestra do admin, embrulhada (ver mais abaixo)
 const COPILOTO_PERFIL_ATIVO_KEY = 'copilotoPerfilAtivoId'; // chrome.storage.session — perfil sendo visualizado/editado agora
@@ -99,6 +110,16 @@ async function copilotoListarPerfis() {
   }
 }
 
+// Setter de baixo nível, sem validação — todo chamador público já faz a
+// própria checagem de autoridade antes (copilotoAlterarNomePerfil,
+// copilotoDefinirTrocaSemSenha, copilotoExcluirPerfil, e as funções de
+// senha dentro do closure acima), então na prática grava só o que já foi
+// vetado. Uma chamada direta pelo console (bypassando tudo isso) ainda
+// seria possível — mas nesse ponto chrome.storage.local.set(...) direto já
+// alcança o mesmo resultado sem passar por nenhuma função deste arquivo,
+// então encapsular só esta função não fecharia essa porta de verdade (só a
+// deixaria menos óbvia de achar). O mesmo vale pra copilotoSalvarEnvelopeAmk
+// logo abaixo.
 async function copilotoSalvarListaPerfis(lista) {
   await chrome.storage.local.set({ [COPILOTO_PERFIS_KEY]: lista });
 }
@@ -300,6 +321,14 @@ async function copilotoCriarPerfil(nome, senha) {
 // chamada assim que a sequência (Privacidade, depois Como usar) é disparada
 // pela primeira e única vez pra este perfil, em liberarPainel (panel.js).
 async function copilotoLimparBoasVindasPendentes(id) {
+  // Só o próprio perfil (o ativo agora) ou o admin — mesmo padrão do resto
+  // do arquivo (ver copilotoAlterarNomePerfil). Impacto de não checar seria
+  // baixo (só controla se a sequência de boas-vindas dispara de novo), mas
+  // mantém a mesma garantia de autoridade que toda outra escrita na lista
+  // de perfis já exige.
+  const perfilAtivoId = await copilotoPerfilAtivoId();
+  const souAdminSessao = await copilotoSessaoEhAdmin();
+  if (id !== perfilAtivoId && !souAdminSessao) return;
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
     const lista = await copilotoListarPerfis();
     const alvo = lista.find((p) => p.id === id);
@@ -562,7 +591,24 @@ async function copilotoLimparTentativas(perfilId) {
 // com um código velho, de uma senha que já não vale mais, ainda válido por
 // aí. Se for o perfil admin, cuida também da chave-mestra (AMK): usa a
 // `amkConhecida` se veio alguma, ou gera uma nova (idem, com aviso).
-// Não faz NENHUMA checagem de autoridade — quem chama já garantiu isso.
+// Não faz NENHUMA checagem de autoridade — quem chama já garantiu isso (ver
+// o comentário do closure logo acima desta função pra como isto fica
+// protegido mesmo assim, mesmo sem checagem própria).
+//
+// ---------- Por que esta função e as 3 que a chamam ficam num closure ----------
+// Ao contrário do resto do arquivo, o prefixo "_" sozinho não bastava aqui:
+// é só convenção, e uma função de nível superior continua acessível pelo
+// console do navegador com esse mesmo nome, senha nenhuma exigida. Por isso
+// _copilotoRegravarSenhaEDek e as 3 funções públicas que legitimamente a
+// chamam (copilotoAlterarSenhaPerfil, copilotoRecuperarSenhaComCodigo,
+// copilotoRecuperarSenhaAdmin — todas já conferem senha atual/PIN, código de
+// recuperação, ou usuário/senha geral antes de chegar aqui) vivem dentro da
+// IIFE logo abaixo, que só devolve as 3 funções públicas. Depois disso,
+// _copilotoRegravarSenhaEDek nunca chega a existir como variável global —
+// não tem mais como digitar o nome dela no DevTools pra trocar a senha (e
+// recuperar o DEK cru) de qualquer perfil, inclusive o admin, sem senha.
+const { copilotoAlterarSenhaPerfil, copilotoRecuperarSenhaComCodigo, copilotoRecuperarSenhaAdmin } = (function(){
+
 async function _copilotoRegravarSenhaEDek(perfilId, novaSenha, dekConhecida, amkConhecidaSeAdmin) {
   return copilotoSerializarPorChave(COPILOTO_PERFIS_KEY, async () => {
     const lista = await copilotoListarPerfis();
@@ -714,6 +760,15 @@ async function copilotoRecuperarSenhaComCodigo(perfilId, codigoRecuperacao, nova
   const erroSenha = copilotoValidarSenhaPerfil(novaSenha);
   if (erroSenha) return { ok: false, erro: erroSenha };
 
+  // Prova de identidade bem-sucedida (o código conseguiu abrir o DEK) — zera
+  // qualquer contador de tentativas erradas anterior deste perfil, do mesmo
+  // jeito que uma senha normal certa já faz em
+  // copilotoDesbloquearPerfilComSenha. Sem isto, erros anteriores (de senha
+  // normal ou de código) continuavam contando no mesmo balde e podiam
+  // bloquear o primeiro login com a senha nova, logo depois de a pessoa ter
+  // acabado de provar quem é.
+  await copilotoLimparTentativas(perfilId);
+
   const amk = perfil.admin ? await copilotoObterAmkComCodigoRecuperacao(codigoNormalizado) : null;
   return _copilotoRegravarSenhaEDek(perfilId, novaSenha, dek, amk);
 }
@@ -787,6 +842,9 @@ async function copilotoRecuperarSenhaAdmin(usuarioGeral, senhaGeral, novaSenha, 
   };
 }
 
+return { copilotoAlterarSenhaPerfil, copilotoRecuperarSenhaComCodigo, copilotoRecuperarSenhaAdmin };
+})();
+
 // Remove um perfil (e todos os dados isolados dele). Só quem já é
 // administrador geral pode chamar isto — confere de novo aqui dentro (mesmo
 // motivo do "forcar:true" em copilotoAlterarSenhaPerfil e de
@@ -814,7 +872,18 @@ async function copilotoExcluirPerfil(id) {
   await copilotoLimparTentativas(id); // não deixa órfão o contador de bloqueio de um perfil que não existe mais
 
   const ativo = await copilotoPerfilAtivoId();
-  if (ativo === id) await copilotoLimparPerfilAtivo();
+  if (ativo === id) {
+    await copilotoLimparPerfilAtivo();
+  } else if (typeof copilotoLimparDekDaSessao === 'function') {
+    // O perfil excluído pode ter sido impersonado (admin "entrou" nele) mais
+    // cedo nesta sessão sem ser o perfil ativo agora — copilotoLimparPerfilAtivo
+    // só limpa a DEK de sessão do perfil que está saindo NESTE momento, então
+    // sem isto a DEK deste perfil já excluído ficava órfã em
+    // chrome.storage.session pelo resto da sessão (inofensivo na prática,
+    // já que os dados do perfil já foram apagados acima, mas não deveria
+    // sobrar).
+    await copilotoLimparDekDaSessao(id);
+  }
   const sessaoAdminId = await copilotoSessaoAdminIdAtual();
   if (sessaoAdminId === id) await copilotoLimparSessaoAdmin();
 
@@ -832,10 +901,32 @@ async function copilotoPerfilAtivoId() {
   }
 }
 
+// Reconfere aqui dentro a mesma autorização que entrarNoPerfil (panel.js)
+// já checa antes de chamar isto — mesmo motivo de _copilotoRegravarSenhaEDek
+// e copilotoDefinirSessaoAdmin acima: esta função é o setter de baixo nível
+// que decide QUAL perfil fica ativo na sessão, e portanto quais dados
+// chrome.storage.local passam a ser expostos/editáveis daqui pra frente
+// (ver copilotoStorage). Sem revalidar aqui dentro, chamar isto direto
+// (ex.: console do navegador) com o id de qualquer outro perfil trocava o
+// perfil ativo sem senha nenhuma — os campos protegidos (CPF, e-mail, CEP,
+// nascimento, notas, chaves de API) continuam ilegíveis sem a DEK, mas nome,
+// telefone, estágio no funil e configurações ficam expostos/editáveis.
+// Autorizado nos mesmos 4 casos que entrarNoPerfil já reconhece: DEK deste
+// perfil já está na sessão, autoridade de admin de sessão, perfil sem senha
+// cadastrada (compatibilidade retroativa), ou troca rápida sem senha
+// liberada pelo admin para este perfil específico.
 async function copilotoDefinirPerfilAtivoId(id) {
+  const perfil = await copilotoObterPerfilPorId(id);
+  if (!perfil) return false;
+  const jaTemDek = !!(typeof copilotoObterDekDaSessao === 'function' && await copilotoObterDekDaSessao(id));
+  const souAdminSessao = await copilotoSessaoEhAdmin();
+  const semSenhaCadastrada = !perfil.senhaHash;
+  const trocaSemSenhaLiberada = !!perfil.permitirTrocaSemSenha;
+  if (!jaTemDek && !souAdminSessao && !semSenhaCadastrada && !trocaSemSenhaLiberada) return false;
   try {
     await chrome.storage.session.set({ [COPILOTO_PERFIL_ATIVO_KEY]: id });
   } catch (e) {}
+  return true;
 }
 
 // Limpa qual perfil está ativo E a DEK desse perfil que está saindo (nunca a
@@ -887,10 +978,28 @@ async function copilotoObterPerfilAtivo() {
 // vez, entrar em qualquer perfil sem saber a senha dele, redefinir a senha
 // de outro profissional e excluir perfis.
 
-async function copilotoDefinirSessaoAdmin(id) {
+// Recebe a senha (recém conferida, ou recém definida numa recuperação/
+// criação de perfil) e a reconfere aqui dentro antes de conceder a
+// autoridade — mesmo padrão do resto do arquivo (ver copilotoExcluirPerfil,
+// copilotoDefinirTrocaSemSenha, _copilotoRegravarSenhaEDek): esta é a
+// função que CONCEDE a autoridade de admin da sessão, então não dá pra
+// confiar só em quem chamou já ter verificado a senha na tela. Sem esta
+// checagem, chamar isto direto (ex.: console do navegador) com o id do
+// perfil admin virava admin sem senha nenhuma — e daí em diante toda outra
+// checagem "copilotoSessaoEhAdmin()" do resto do arquivo passava a
+// autorizar. Os 3 chamadores (panel.js) já têm a senha em mãos no momento
+// da chamada — a que acabou de ser conferida (login normal) ou a que
+// acabou de ser definida (recuperação de senha do admin/criação do
+// primeiro perfil) — então não é um passo extra pra pessoa.
+async function copilotoDefinirSessaoAdmin(id, senha) {
+  const perfil = await copilotoObterPerfilPorId(id);
+  if (!perfil || !perfil.admin) return false;
+  const senhaOk = await copilotoVerificarSenhaPerfil(id, senha);
+  if (!senhaOk) return false;
   try {
     await chrome.storage.session.set({ [COPILOTO_SESSAO_ADMIN_KEY]: id });
   } catch (e) {}
+  return true;
 }
 
 async function copilotoSessaoAdminIdAtual() {

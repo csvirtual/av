@@ -280,10 +280,17 @@ const _copilotoSalvesDebounced = [];
 function debounce(fn, delay){
   let timer = null;
   let ultimosArgs = null;
+  let emAndamento = null; // Promise do disparo atualmente em voo, se houver
   const disparar = async (args) => {
     timer = null;
     ultimosArgs = null;
-    await fn.apply(null, args);
+    const p = fn.apply(null, args);
+    emAndamento = p;
+    try{
+      await p;
+    }finally{
+      if(emAndamento === p) emAndamento = null;
+    }
   };
   const wrapped = function(...args){
     ultimosArgs = args;
@@ -291,12 +298,24 @@ function debounce(fn, delay){
     timer = setTimeout(()=>disparar(args), delay);
   };
   wrapped.flush = async function(){
-    if(timer === null) return;
-    clearTimeout(timer);
-    const args = ultimosArgs;
-    timer = null;
-    ultimosArgs = null;
-    if(args) await disparar(args);
+    if(timer !== null){
+      clearTimeout(timer);
+      const args = ultimosArgs;
+      timer = null;
+      ultimosArgs = null;
+      if(args) await disparar(args);
+      return;
+    }
+    // Nenhum timer pendente — mas pode haver um disparo já EM VOO: o
+    // setTimeout nativo já rodou e zerou `timer` (primeira linha de
+    // `disparar`), mas o `await fn.apply(...)` de dentro ainda não
+    // terminou. Sem esperar por ele aqui, `timer === null` sozinho não
+    // prova "nada pendente" — quem chamou flush() (ex.:
+    // copilotoFlusharSalvamentosPendentes, sempre antes de trocar de perfil
+    // ou encerrar a sessão) seguia em frente acreditando que tudo estava
+    // sincronizado, enquanto o save antigo ainda gravava em segundo plano,
+    // com o perfil ativo podendo já ter trocado até ele terminar.
+    if(emAndamento) await emAndamento;
   };
   _copilotoSalvesDebounced.push(wrapped);
   return wrapped;
@@ -2544,7 +2563,14 @@ async function registrarAlteracaoLeadNoLog(lead, campo, antes, depois){
       detalhe = `Lead "${alvo}" · ${rotulo}: ${descreverValorParaLog(a)} → ${descreverValorParaLog(d)}`;
     }
     await copilotoRegistrarEventoLog('lead_campo_alterado', await copilotoObterPerfilAtivo(), detalhe);
-  }catch(e){}
+  }catch(e){
+    // O log de auditoria é parte do argumento de conformidade do produto
+    // ("registra quem alterou o quê, quando") — uma falha silenciosa nele é
+    // mais sensível que um catch vazio comum. Não interrompe o fluxo (o
+    // campo já foi salvo, é só o registro que falhou), mas deixa rastro
+    // pra depuração/suporte em vez de sumir sem deixar pista nenhuma.
+    console.error('Falha ao registrar alteração de lead no log de auditoria:', e);
+  }
 }
 
 // Criação, exclusão e restauração — o ciclo de vida do registro.
@@ -2553,7 +2579,9 @@ async function registrarEventoLeadNoLog(tipo, lead, complemento){
     const alvo = (lead && lead.nome) ? lead.nome : '(sem nome)';
     const detalhe = `Lead "${alvo}"` + (complemento ? ' · ' + complemento : '');
     await copilotoRegistrarEventoLog(tipo, await copilotoObterPerfilAtivo(), detalhe);
-  }catch(e){}
+  }catch(e){
+    console.error('Falha ao registrar evento de lead no log de auditoria:', e);
+  }
 }
 
 async function saveNotasNow(){
@@ -3089,7 +3117,16 @@ function buildContextoDinamicoBloco(lead, personName, extraContext, continuidade
 // prompt), só a PRIMEIRA define os valores usados.
 function aplicarConfiguracaoDoNegocio(textoFunil){
   if(!textoFunil) return textoFunil;
-  const regexBloco = /## CONFIGURAÇÃO DO NEGÓCIO[^\n]*\n([\s\S]*?)\n## FIM DA CONFIGURAÇÃO DO NEGÓCIO[^\n]*\n?/g;
+  // Flag "i" (case-insensitive) de propósito: se o cabeçalho for digitado/
+  // colado com capitalização diferente (autocorretor, colar de outro
+  // editor — ex.: "## Configuração do Negócio"), o bloco continua sendo
+  // reconhecido e os {{TOKEN}} continuam sendo substituídos. Sem isto, uma
+  // simples troca de maiúscula/minúscula fazia o bloco inteiro parar de ser
+  // reconhecido — e as mensagens saíam pro cliente final com
+  // "{{NOME_PROFISSIONAL}}", "{{CHAVE_PIX}}" etc. literalmente, sem nenhum
+  // aviso (ver avisoConfiguracaoDoNegocioMalformada, em options.js, que
+  // usa a mesma flag pelo mesmo motivo).
+  const regexBloco = /## CONFIGURAÇÃO DO NEGÓCIO[^\n]*\n([\s\S]*?)\n## FIM DA CONFIGURAÇÃO DO NEGÓCIO[^\n]*\n?/gi;
   const blocos = Array.from(textoFunil.matchAll(regexBloco));
   if(!blocos.length) return textoFunil;
 
@@ -3284,6 +3321,25 @@ async function fetchComRetry(url, opcoes){
   }
 }
 
+// Lê o corpo de uma resposta como JSON com uma mensagem de erro legível
+// quando o corpo NÃO é JSON — ex.: página de erro HTML de um proxy
+// corporativo, resposta vazia de um 502 de gateway. Sem isto, `response.json()`
+// cru lançava uma exceção de parsing crua ("Unexpected token < in JSON..."),
+// que acabava aparecendo pra quem está atendendo como 'Erro: Unexpected
+// token...' — tecnicamente correto, mas incompreensível pra quem não é
+// programador. Com status HTTP disponível, a mensagem já dá uma pista
+// acionável (ex.: instabilidade da rede/proxy) em vez de jargão de parsing.
+async function jsonComErroAmigavel(response){
+  try{
+    return await response.json();
+  }catch(e){
+    const erro = new Error(`O servidor respondeu de um jeito inesperado (HTTP ${response.status}) — normalmente é instabilidade momentânea de rede ou do provedor. Tente de novo em alguns instantes.`);
+    erro.status = response.status || null;
+    erro.respostaNaoEraJson = true;
+    throw erro;
+  }
+}
+
 // `cachedSystem` é o bloco estático (idêntico em toda chamada, ver nota
 // acima de buildBlocoEstaticoFunil) — vai como um bloco de "system" próprio
 // com cache_control, pra Anthropic guardar em cache. `dynamicContext` é o
@@ -3340,12 +3396,12 @@ async function callClaude(cachedSystem, dynamicContext, userMessage, modeloEscol
 
   let cacheDeUmaHora = true;
   let response = await fetchComRetry("https://api.anthropic.com/v1/messages", montarRequisicao(true));
-  let data = await response.json();
+  let data = await jsonComErroAmigavel(response);
 
   if(data.error && /cache|ttl|beta/i.test(data.error.message || '')){
     cacheDeUmaHora = false;
     response = await fetchComRetry("https://api.anthropic.com/v1/messages", montarRequisicao(false));
-    data = await response.json();
+    data = await jsonComErroAmigavel(response);
   }
 
   if(data.error){
@@ -3410,7 +3466,7 @@ async function callGemini(cachedSystem, dynamicContext, userMessage, apiKey, mod
       generationConfig: { maxOutputTokens: 1024, temperature: 0.7 }
     })
   });
-  const data = await response.json();
+  const data = await jsonComErroAmigavel(response);
   if(data.error){
     const erro = new Error(data.error.message || 'Erro na API do Gemini');
     // status HTTP + o campo `status` estruturado que o Gemini já manda (ex.:
@@ -4262,8 +4318,14 @@ function bindEvents(){
       await pickNewDirHandle();
       toast('Pasta de backup atualizada');
     }catch(err){
-      if(err && err.name === 'AbortError') return;
+      if(err && err.name === 'AbortError') return; // cancelou o seletor — nem é erro, não avisa nada
       console.error(err);
+      // Sem isto, uma falha que NÃO é o usuário cancelar (permissão negada
+      // pelo SO, API indisponível, erro de I/O) só ia pro console — a tela
+      // não mudava, nenhuma mensagem aparecia, e a pessoa não tinha como
+      // saber que a troca de pasta falhou até o próximo backup não cair
+      // onde esperava.
+      toast('Não consegui trocar a pasta de backup — tente de novo');
     }
   });
   initBackupFolderHint();
@@ -4736,7 +4798,10 @@ async function recuperarSenhaAdminClick(){
   // Conferir usuário/senha geral + definir uma nova senha do admin já prova
   // identidade suficiente pra conceder a autoridade de admin nesta sessão —
   // mesmo nível de confiança de um login normal no perfil admin.
-  await copilotoDefinirSessaoAdmin(resultado.perfil.id);
+  // novaSenha é a senha que acabou de ser gravada como a senha atual do
+  // admin (ver copilotoRecuperarSenhaAdmin) — copilotoDefinirSessaoAdmin
+  // reconfere ela mesma antes de conceder a autoridade.
+  await copilotoDefinirSessaoAdmin(resultado.perfil.id, novaSenha);
   await copilotoLimparTentativas(resultado.perfil.id);
   if(resultado.dek) await copilotoGuardarDekNaSessao(resultado.perfil.id, resultado.dek);
   if(resultado.amk) await copilotoGuardarAmkNaSessao(resultado.amk);
@@ -4867,7 +4932,10 @@ async function confirmarSenhaPerfilClick(){
 
   await copilotoLimparTentativas(perfilAlvo.id);
   if(perfilAlvo.admin){
-    await copilotoDefinirSessaoAdmin(perfilAlvo.id);
+    // senha acabou de ser conferida certa por copilotoDesbloquearPerfilComSenha
+    // acima — copilotoDefinirSessaoAdmin reconfere ela mesma de novo, aqui
+    // dentro, antes de conceder a autoridade.
+    await copilotoDefinirSessaoAdmin(perfilAlvo.id, senha);
   }
   if(resultado.dek) await copilotoGuardarDekNaSessao(perfilAlvo.id, resultado.dek);
   if(resultado.amk) await copilotoGuardarAmkNaSessao(resultado.amk);
@@ -4979,8 +5047,9 @@ async function criarNovoPerfilClick(){
   if(resultado.perfil.admin){
     // O primeiro perfil cadastrado na instalação já entra como administrador
     // geral autenticado — acabou de provar que conhece a própria senha ao
-    // criá-la agora mesmo.
-    await copilotoDefinirSessaoAdmin(resultado.perfil.id);
+    // criá-la agora mesmo. copilotoDefinirSessaoAdmin reconfere essa mesma
+    // senha de novo, aqui dentro, antes de conceder a autoridade.
+    await copilotoDefinirSessaoAdmin(resultado.perfil.id, senha);
   }
   // Guarda o DEK (e a AMK, se for o admin) que copilotoCriarPerfil já
   // gerou — evita ter que "desbloquear" de novo logo em seguida só pra

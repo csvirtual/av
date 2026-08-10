@@ -53,12 +53,29 @@ async function copilotoGerarHashSenhaForte(texto){
   return `pbkdf2:${COPILOTO_PBKDF2_ITERACOES}:${salt}:${hash}`;
 }
 
+// Compara duas strings hex de tamanho fixo sempre no mesmo tempo,
+// independente de onde a primeira diferença aparecer — não existe
+// timingSafeEqual no SubtleCrypto do navegador (só no Node.js), então é
+// byte a byte manual, com XOR acumulado em vez de `return` antecipado no
+// primeiro byte diferente. Comparação comum (`===`) pode, em teoria,
+// devolver mais rápido quanto mais cedo a string diverge — um canal
+// lateral por tempo. O vetor de ataque exigiria já ter execução de código
+// na própria página (e nesse ponto já dá pra ler o hash direto do
+// chrome.storage), então o risco prático é baixo, mas não custa nada
+// fechar por rigor.
+function copilotoCompararHex(a, b){
+  if(a.length !== b.length) return false;
+  let diferenca = 0;
+  for(let i = 0; i < a.length; i++) diferenca |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diferenca === 0;
+}
+
 async function copilotoVerificarHashSenhaForte(texto, hashSalvo){
   const partes = (hashSalvo || '').split(':');
   if (partes.length !== 4 || partes[0] !== 'pbkdf2') return false;
   const [, iteracoesStr, salt, hashEsperado] = partes;
   const hash = await copilotoPbkdf2Hex(texto, salt, parseInt(iteracoesStr, 10));
-  return hash === hashEsperado;
+  return copilotoCompararHex(hash, hashEsperado);
 }
 
 // Versão forte (PBKDF2) do usuário/senha da Área restrita — cada instalação
@@ -67,7 +84,17 @@ async function copilotoVerificarHashSenhaForte(texto, hashSalvo){
 // (copilotoAlterarCredenciaisPrincipais). Não existe mais nenhum hash fixo
 // de fábrica no código-fonte: sem este valor gravado, não há credencial
 // válida nenhuma pra esta instalação.
-const COPILOTO_CREDENCIAIS_HASH_V2_KEY = 'copilotoCredenciaisHashV2';
+// Definida em perfis.js (não aqui) de propósito: background.js precisa do
+// MESMO valor literal pra checar se já existe credencial gravada antes de
+// decidir quem "ganha" a corrida de gerar a credencial inicial (ver
+// copilotoReivindicarGeracaoCredencialInicial lá) — mas background.js
+// (service worker) não pode carregar auth.js (usa document.getElementById
+// no escopo do módulo, que não existe em service worker), só perfis.js via
+// importScripts. Manter as 3 chaves (esta, COPILOTO_CREDENCIAIS_PERSONALIZADAS_KEY,
+// COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY) só em perfis.js evita duas fontes
+// da verdade pro mesmo nome de chave — antes background.js repetia esses 3
+// literais escritos à mão, sem nada amarrando os dois lados se um dia
+// alguém renomeasse só aqui.
 
 // Marca se ESTA instalação já trocou a credencial principal por uma
 // própria (ver copilotoAlterarCredenciaisPrincipais, mais abaixo) — usada
@@ -75,8 +102,9 @@ const COPILOTO_CREDENCIAIS_HASH_V2_KEY = 'copilotoCredenciaisHashV2';
 // de fábrica" (copilotoCredenciaisSaoPadrao). A troca em si já é garantida
 // pela lógica de copilotoVerificarCredenciais logo abaixo (hashV2, uma vez
 // sobrescrito com uma credencial nova, nunca mais confere com a antiga) —
-// esta chave não participa da autenticação, só do aviso.
-const COPILOTO_CREDENCIAIS_PERSONALIZADAS_KEY = 'copilotoCredenciaisPersonalizadas';
+// esta chave não participa da autenticação, só do aviso. Definida em
+// perfis.js — ver o comentário de COPILOTO_CREDENCIAIS_HASH_V2_KEY acima
+// pro porquê.
 
 async function copilotoVerificarCredenciais(usuario, senha){
   const textoCompleto = `${(usuario||'').trim().toLowerCase()}|${senha||''}`;
@@ -139,7 +167,10 @@ async function copilotoAlterarCredenciaisPrincipais(usuarioAtual, senhaAtual, no
 // login, e apagada do storage assim que confirmada ou usada no primeiro
 // login (nunca persiste em disco depois disso).
 const COPILOTO_CREDENCIAL_INICIAL_KEY = 'copilotoCredencialInicialPendente'; // chrome.storage.local — texto puro, só até ser vista/confirmada
-const COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY = 'copilotoCredencialInicialJaGerada'; // marca que esta instalação já passou por aqui — nunca gera (nem troca) duas vezes
+// COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY ('copilotoCredencialInicialJaGerada'
+// — marca que esta instalação já passou por aqui, nunca gera/troca duas
+// vezes) é definida em perfis.js — ver o comentário de
+// COPILOTO_CREDENCIAIS_HASH_V2_KEY acima pro porquê.
 
 function copilotoGerarSenhaAleatoria(tamanho){
   // Alfabeto sem caracteres ambíguos (0/O, 1/l/I) — esta senha é lida e
@@ -772,15 +803,26 @@ function mostrarPinAdminModal(codigo){
   });
 }
 
-document.getElementById('palavraChaveCopiarBtn').addEventListener('click', async ()=>{
-  const codigo = document.getElementById('palavraChaveCodigo').textContent;
-  try{
-    await navigator.clipboard.writeText(codigo);
-    toast('Copiado');
-  }catch(e){
-    toast('Não consegui copiar automaticamente — selecione e copie manualmente');
+// Guarda com `if(...)`, não um getElementById cru: este arquivo é
+// compartilhado por panel.html e options.html, e sem a guarda um id
+// removido/renomeado num futuro ajuste de qualquer um dos dois HTMLs
+// lançaria TypeError bem aqui, no meio do carregamento do script — travando
+// tudo que vem DEPOIS desta linha no arquivo (copilotoTentarLogin incluída),
+// não só este botão.
+{
+  const btnCopiarPalavraChave = document.getElementById('palavraChaveCopiarBtn');
+  if(btnCopiarPalavraChave){
+    btnCopiarPalavraChave.addEventListener('click', async ()=>{
+      const codigo = document.getElementById('palavraChaveCodigo').textContent;
+      try{
+        await navigator.clipboard.writeText(codigo);
+        toast('Copiado');
+      }catch(e){
+        toast('Não consegui copiar automaticamente — selecione e copie manualmente');
+      }
+    });
   }
-});
+}
 
 // ---------- Modal da credencial inicial (bloqueante) ----------
 //

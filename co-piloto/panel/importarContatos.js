@@ -34,10 +34,14 @@
 
   function pareceCpfFormatado(v){ return RX_CPF_FORMATADO.test(v||''); }
 
+  // A guarda de comprimento acima já limita d.length a 10-13 — então
+  // "d.length === 10 || ... === 13" no final é sempre verdadeiro e o teste
+  // de pontuação (/[()+.\- ]/) nunca influencia o resultado de verdade,
+  // apesar do nome sugerir o contrário. Simplificado pra dizer só o que a
+  // função realmente decide: comprimento plausível de telefone BR.
   function pareceTelefoneFormatado(v){
     const d = apenasDig(v);
-    if(d.length < 10 || d.length > 13) return false;
-    return /[()+.\- ]/.test(v||'') || d.length === 10 || d.length === 11 || d.length === 12 || d.length === 13;
+    return d.length >= 10 && d.length <= 13;
   }
 
   // Converte qualquer formato de data reconhecido pra yyyy-mm-dd (formato
@@ -51,7 +55,12 @@
     if(br){
       let [, dia, mes, ano] = br;
       dia = dia.padStart(2,'0'); mes = mes.padStart(2,'0');
-      if(ano.length === 2) ano = (Number(ano) > 30 ? '19' : '20') + ano;
+      // ">=" (não ">"): com ">", o ano de 2 dígitos "30" caía num buraco —
+      // a heurística escolhia "20"+"30"=2030 (30 > 30 é falso), mas o teto
+      // de anoNum > 2029 logo abaixo rejeitava 2030 sempre, e a hipótese
+      // 1930 nunca chegava a ser tentada. Com ">=", "30" vira 1930 (dentro
+      // do teto), igual qualquer outro valor de 30-99.
+      if(ano.length === 2) ano = (Number(ano) >= 30 ? '19' : '20') + ano;
       const diaNum = Number(dia), mesNum = Number(mes), anoNum = Number(ano);
       if(mesNum < 1 || mesNum > 12 || diaNum < 1 || diaNum > 31 || anoNum < 1900 || anoNum > 2029) return '';
       return `${ano}-${mes}-${dia}`;
@@ -385,9 +394,20 @@
     const nowIso = new Date().toISOString();
 
     for(const item of selecionados){
-      const existente = item.statusInfo && item.statusInfo.leadExistenteId
-        ? leads.find(l => l.id === item.statusInfo.leadExistenteId)
-        : null;
+      // Recalcula contra o array `leads` ATUAL (não o id congelado em
+      // item.statusInfo, calculado uma vez antes deste laço começar) — sem
+      // isto, dois contatos duplicados dentro do mesmo texto/arquivo colado
+      // (mesmo telefone aparecendo duas vezes) criavam DOIS leads pra
+      // mesma pessoa: o primeiro é empurrado em `leads` durante a própria
+      // iteração deste laço, mas o segundo, calculado com o statusInfo de
+      // ANTES da importação começar, ainda "achava" que não existia.
+      // Recalcular a cada iteração pega tanto duplicata contra o CRM quanto
+      // duplicata dentro da mesma leva.
+      const existente = item.telefone
+        ? leads.find(l => telefoneBate(l.telefone, item.telefone))
+        : (item.statusInfo && item.statusInfo.leadExistenteId
+          ? leads.find(l => l.id === item.statusInfo.leadExistenteId)
+          : null);
 
       if(existente){
         // Só completa o que estava vazio — nunca sobrescreve dado que já
@@ -415,11 +435,15 @@
     await persistLeads();
     // Importação em lote entra no log como UMA entrada com o total — uma
     // por contato encheria o log de auditoria com centenas de linhas
-    // idênticas e enterraria os eventos que importam.
-    if(criados && typeof copilotoRegistrarEventoLog === 'function'){
+    // idênticas e enterraria os eventos que importam. Condição cobre
+    // `atualizados` também (antes só checava `criados`): uma importação que
+    // só COMPLETA campos vazios de leads já existentes (CPF, data de
+    // nascimento — dados sensíveis, ver acima) também precisa deixar
+    // rastro, mesmo sem criar nenhum lead novo.
+    if((criados || atualizados) && typeof copilotoRegistrarEventoLog === 'function'){
       try{
         await copilotoRegistrarEventoLog('leads_importados', await copilotoObterPerfilAtivo(),
-          `${criados} lead${criados === 1 ? '' : 's'} importado${criados === 1 ? '' : 's'} de arquivo`);
+          `${criados} lead${criados === 1 ? '' : 's'} criado${criados === 1 ? '' : 's'} e ${atualizados} atualizado${atualizados === 1 ? '' : 's'} de arquivo`);
       }catch(e){}
     }
     if(typeof renderLeadsList === 'function') renderLeadsList();
@@ -439,7 +463,13 @@
     document.getElementById('importarModalOverlay').style.display = 'none';
   }
 
+  const IMPORTAR_ARQUIVO_TAMANHO_MAX = 5 * 1024 * 1024; // 5MB — texto puro, nenhuma lista de contatos real chega perto disso
+
   function lerArquivo(file){
+    if(file.size > IMPORTAR_ARQUIVO_TAMANHO_MAX){
+      if(typeof toast === 'function') toast('Esse arquivo é grande demais (máx. 5MB) — confira se é mesmo uma lista de contatos em texto.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       document.getElementById('importarTextarea').value = reader.result || '';

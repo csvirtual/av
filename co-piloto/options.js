@@ -218,6 +218,14 @@ async function tentarDesbloquearConfig(){
     submitBtnId: 'configUnlockBtn',
     shakeEl: document.querySelector('#configLockScreen .avancado-lock'),
     aoAutenticar: async ()=>{
+      // Mesma limpeza que panel.js faz em aposLoginMaster — sem isto, um
+      // login bem-sucedido feito só por aqui (Configurações aberta antes do
+      // painel) não apagava a credencial inicial pendente em texto puro do
+      // storage; ela só saía se a pessoa clicasse "Já guardei" no modal
+      // (que já força isso) ou passasse pelo painel depois. Idempotente
+      // (chrome.storage.local.remove de uma chave que já não existe não
+      // faz nada), então chamar de novo aqui não tem custo.
+      await copilotoConfirmarCredencialInicialVista();
       if(!(await exigirPerfilAtivoOuVoltar())) return;
       liberarConfig();
     }
@@ -259,8 +267,12 @@ const DEFAULT_FUNIL = {
 // init() (carregamento da página), que não deve escrever no storage só por
 // estar mostrando o valor já salvo.
 function renderProviderCards(provider){
-  document.getElementById('cardClaude').classList.toggle('selected', provider==='claude');
-  document.getElementById('cardGemini').classList.toggle('selected', provider==='gemini');
+  const cardClaude = document.getElementById('cardClaude');
+  const cardGemini = document.getElementById('cardGemini');
+  cardClaude.classList.toggle('selected', provider==='claude');
+  cardGemini.classList.toggle('selected', provider==='gemini');
+  cardClaude.setAttribute('aria-pressed', String(provider==='claude'));
+  cardGemini.setAttribute('aria-pressed', String(provider==='gemini'));
   document.getElementById('claudeFields').style.display = provider==='claude' ? 'block':'none';
   document.getElementById('geminiFields').style.display = provider==='gemini' ? 'block':'none';
 }
@@ -284,7 +296,13 @@ async function valorChaveApiParaSalvar(inputId, valorAtualSalvo, dek, avisoRef){
   if(input.disabled) return valorAtualSalvo || '';
   const digitado = input.value.trim();
   if(!digitado) return '';
-  if(!dek){ avisoRef.bloqueou = true; return valorAtualSalvo || ''; }
+  // Marca especificamente QUAL campo ficou bloqueado (não só um booleano
+  // genérico) — necessário pra saveKeys() decidir a remoção da chave legada
+  // do Gemini olhando só pro campo que de fato importa pra ela
+  // (geminiKeyBasico), sem um bloqueio em outro campo qualquer (ex.:
+  // claudeKey, sem relação nenhuma com a chave legada) impedir essa
+  // remoção por engano.
+  if(!dek){ avisoRef.bloqueou = true; avisoRef.bloqueadas.push(inputId); return valorAtualSalvo || ''; }
   return copilotoCifrarAesGcm(dek, digitado);
 }
 
@@ -292,7 +310,7 @@ async function saveKeys(){
   const provider = document.getElementById('cardClaude').classList.contains('selected') ? 'claude' : 'gemini';
   const dek = await obterDekAtivo();
   const atual = await copilotoStorage.local.get(['claudeKey','geminiKeyBasico','geminiKeyAvancado']);
-  const avisoRef = { bloqueou: false };
+  const avisoRef = { bloqueou: false, bloqueadas: [] };
   await copilotoStorage.local.set({
     provider,
     claudeKey: await valorChaveApiParaSalvar('claudeKey', atual.claudeKey, dek, avisoRef),
@@ -317,11 +335,15 @@ async function saveKeys(){
   // fallback `data.geminiKeyBasico || data.geminiKey` (ver init() abaixo e
   // panel.js) fazia a chave antiga "ressuscitar" sozinha assim que
   // geminiKeyBasico ficasse vazio, mesmo depois de a pessoa apagá-la e
-  // salvar de propósito. Só remove se NADA ficou bloqueado por falta de
-  // chave (avisoRef.bloqueou): se algum campo não pôde ser salvo agora
-  // (sem DEK disponível), apagar a legada aqui e agora poderia destruir os
-  // dois valores de uma vez, sem nenhum pra recuperar depois.
-  if(!avisoRef.bloqueou){
+  // salvar de propósito. Só remove se o campo "geminiKeyBasico" ESPECIFICAMENTE
+  // não ficou bloqueado por falta de DEK — checar avisoRef.bloqueou (um
+  // booleano genérico, somado de qualquer um dos 3 campos) fazia um bloqueio
+  // em claudeKey ou geminiKeyAvancado (sem relação nenhuma com a chave
+  // legada) impedir essa remoção por engano, deixando "geminiKeyBasico"
+  // salvo em branco de propósito mas a chave legada ainda viva pra
+  // "ressuscitar" no próximo init() — exatamente o bug que este comentário
+  // descreve ter corrigido, reaberto por um campo não relacionado.
+  if(!avisoRef.bloqueadas.includes('geminiKeyBasico')){
     await copilotoStorage.local.remove(['geminiKey', 'geminiModel']);
   }
   if(avisoRef.bloqueou){
@@ -339,9 +361,14 @@ async function saveKeys(){
 // todo o funil, sem nenhum aviso. Devolve o texto do aviso (ou null se
 // estiver tudo certo) — quem chama decide o que fazer com isso.
 function avisoConfiguracaoDoNegocioMalformada(texto){
-  const inicio = (texto.match(/## CONFIGURAÇÃO DO NEGÓCIO/g) || []).length;
+  // Flag "i" (case-insensitive) — mesmo motivo do regexBloco em
+  // aplicarConfiguracaoDoNegocio (panel.js): os dois precisam concordar
+  // sobre o que conta como "achei o bloco", senão este checker podia dizer
+  // "tudo certo" (ou "bloco ausente, nada a avisar") enquanto o parser real
+  // via outra coisa, ou vice-versa.
+  const inicio = (texto.match(/## CONFIGURAÇÃO DO NEGÓCIO/gi) || []).length;
   if(!inicio) return null; // funil sem esse bloco (legado/custom) — nada a checar
-  const fim = (texto.match(/## FIM DA CONFIGURAÇÃO DO NEGÓCIO/g) || []).length;
+  const fim = (texto.match(/## FIM DA CONFIGURAÇÃO DO NEGÓCIO/gi) || []).length;
   if(inicio > 1){
     return '⚠️ Funil salvo, mas achei mais de um bloco "CONFIGURAÇÃO DO NEGÓCIO" — só o primeiro vale, apague a duplicata.';
   }
@@ -357,8 +384,13 @@ async function saveFunil(){
   await copilotoStorage.local.set({ funil });
   // Um só toast por vez (ver toast(), auth.js) — o aviso de malformação,
   // quando existe, já diz "funil salvo" nele mesmo, então substitui a
-  // confirmação normal em vez de piscar e sumir por cima dela.
-  toast(avisoConfiguracaoDoNegocioMalformada(instrucoes) || 'Seu funil foi salvo');
+  // confirmação normal em vez de piscar e sumir por cima dela. Funil salvo
+  // vazio de propósito volta a usar o funil padrão de fábrica (ver
+  // buildBlocoEstaticoFunil, panel.js) — sem avisar isso aqui, a tela ficava
+  // com o campo genuinamente vazio sem indicar que o padrão está ativo por
+  // baixo.
+  toast(avisoConfiguracaoDoNegocioMalformada(instrucoes)
+    || (instrucoes ? 'Seu funil foi salvo' : 'Funil salvo vazio — a IA volta a usar o funil padrão de fábrica'));
 }
 
 async function savePrecos(){
@@ -597,8 +629,22 @@ async function init(){
   document.getElementById('funilInstrucoes').value = funil.instrucoes || '';
 }
 
-document.getElementById('cardClaude').addEventListener('click', ()=>selectProvider('claude'));
-document.getElementById('cardGemini').addEventListener('click', ()=>selectProvider('gemini'));
+// role="button"/tabindex="0" (options.html) tornam os cartões alcançáveis
+// por Tab, mas só o listener de click reagia — Enter/Espaço (o jeito padrão
+// de "clicar" em algo focado via teclado) não faziam nada. Sem isto,
+// ninguém navegando só por teclado conseguia trocar de provedor de IA.
+function bindProviderCard(elId, provider){
+  const el = document.getElementById(elId);
+  el.addEventListener('click', ()=>selectProvider(provider));
+  el.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      selectProvider(provider);
+    }
+  });
+}
+bindProviderCard('cardClaude', 'claude');
+bindProviderCard('cardGemini', 'gemini');
 document.getElementById('saveKeysBtn').addEventListener('click', saveKeys);
 document.getElementById('savePrecosBtn').addEventListener('click', savePrecos);
 document.getElementById('resetUsageStatsBtn').addEventListener('click', resetUsageStats);
