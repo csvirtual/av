@@ -307,6 +307,13 @@ body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointe
   align-self:flex-start; margin-top:4px; font-size:11px; background:none; border:none;
   color:var(--purple); cursor:pointer; padding:0; text-decoration:underline;
 }
+/* Duas .chat-copy-btn lado a lado (ver mostrarAvisoSemChave, chatbot.js:
+   "Ir agora"/"Permanecer nesta página") — sem isto, dois <button> seguidos
+   sem nenhum espaço em branco entre eles no DOM colam um no outro. O
+   margin-top que separa da mensagem acima migra pro wrapper (senão ficaria
+   dobrado, um de cada botão, empurrando a linha pra baixo à toa). */
+.chat-msg-botoes{ display:flex; gap:14px; margin-top:4px; align-self:flex-start; }
+.chat-msg-botoes .chat-copy-btn{ margin-top:0; }
 /* Legenda de qual chave/modelo respondeu (ver labelRoteamentoIA, panel.js). */
 .chat-roteamento-info{
   align-self:flex-start; margin-top:2px; font-size:10.5px; color:var(--muted);

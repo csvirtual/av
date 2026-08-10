@@ -664,7 +664,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
   // Timer da contagem regressiva do aviso "sem chave configurada" (ver
   // mostrarAvisoSemChave) — module-level pra fecharChatModal() poder
-  // cancelar se a pessoa fechar o chat antes dos 5s acabarem (sem isso, ela
+  // cancelar se a pessoa fechar o chat antes dos 15s acabarem (sem isso, ela
   // seria redirecionada pra Configurações "do nada" alguns segundos depois
   // de já ter saído do chat).
   let _avisoSemChaveIntervalId = null;
@@ -683,11 +683,31 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     window.location.href = 'options.html#cardProvedorIA';
   }
 
+  // Interrompe a contagem regressiva do aviso "sem chave" (se estiver
+  // rodando) e deixa uma mensagem estática no lugar, sem os botões — usada
+  // tanto pelo botão "Permanecer nesta página" quanto por qualquer
+  // caractere digitado/apagado na caixa (ver init(), mais abaixo): a pessoa
+  // claramente decidiu continuar aqui, então redirecionar sozinho não faz
+  // mais sentido. Sai calada se não houver nenhum contador rodando agora
+  // (ex.: digitar a próxima pergunta depois que uma resposta anterior já
+  // chegou normalmente, sem nenhum aviso na tela).
+  function pararRedirecionamentoSemChave(){
+    if(!_avisoSemChaveIntervalId) return;
+    cancelarAvisoSemChave();
+    const div = document.getElementById('chatAvisoSemChaveMsg');
+    if(!div) return;
+    const textoEl = div.querySelector('div');
+    if(textoEl) textoEl.textContent = '🔑 Nenhuma chave de API configurada ainda. Configure quando quiser em Configurações → Provedor de IA.';
+    div.querySelectorAll('button').forEach(btn => btn.remove());
+  }
+
   // Mostra o aviso de "nenhuma chave configurada" com contagem regressiva
-  // de 5s antes de redirecionar sozinho pra Configurações → Provedor de IA
+  // de 15s antes de redirecionar sozinho pra Configurações → Provedor de IA
   // — em vez do redirecionamento imediato de antes (que não dava nem tempo
   // da pessoa ler a mensagem de erro). "Ir agora" pula a espera pra quem
-  // não quiser contar.
+  // não quiser contar; "Permanecer nesta página" (ou simplesmente digitar
+  // algo na caixa, ver init()) cancela o redirecionamento de vez, sem sair
+  // do chat.
   function mostrarAvisoSemChave(){
     const box = elMessages();
     // Se a pessoa mandar outra pergunta que também precise de IA enquanto o
@@ -704,15 +724,31 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     div.className = 'chat-msg ai error';
     const textoEl = document.createElement('div');
     div.appendChild(textoEl);
+    // Os dois botões (ver chat-msg-botoes, styles.css) ficam lado a lado
+    // com espaço entre eles — sem esse wrapper, dois <button> seguidos
+    // (nenhum texto/espaço em branco entre eles no DOM, só appendChild)
+    // colam um no outro, tipo "Ir agoraPermanecer nesta página".
+    const botoesRow = document.createElement('div');
+    botoesRow.className = 'chat-msg-botoes';
+    div.appendChild(botoesRow);
     const irAgoraBtn = document.createElement('button');
     irAgoraBtn.type = 'button';
     irAgoraBtn.className = 'chat-copy-btn';
     irAgoraBtn.textContent = 'Ir agora';
-    div.appendChild(irAgoraBtn);
+    botoesRow.appendChild(irAgoraBtn);
+    // "Permanecer nesta página": cancela o redirecionamento automático sem
+    // sair do chat — pra quem só quer terminar de ler a resposta, copiar
+    // algo, ou configurar a chave depois, sem ser empurrado pra
+    // Configurações no meio do que estava fazendo.
+    const ficarBtn = document.createElement('button');
+    ficarBtn.type = 'button';
+    ficarBtn.className = 'chat-copy-btn';
+    ficarBtn.textContent = 'Permanecer nesta página';
+    botoesRow.appendChild(ficarBtn);
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 
-    let restante = 5;
+    let restante = 15;
     const atualizarTexto = () => {
       textoEl.textContent = `🔑 Nenhuma chave de API configurada ainda — te levando para Configurações → Provedor de IA em ${restante}s...`;
     };
@@ -723,6 +759,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       abrirConfiguracoesNaSecaoProvedor();
     };
     irAgoraBtn.addEventListener('click', ir);
+    ficarBtn.addEventListener('click', pararRedirecionamentoSemChave);
 
     cancelarAvisoSemChave(); // nunca dois contadores rodando ao mesmo tempo
     _avisoSemChaveIntervalId = setInterval(() => {
@@ -933,7 +970,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   function fecharChatModal(){
     elOverlay().style.display = 'none';
     document.body.classList.remove('modal-open');
-    // Sem isto, fechar o chat antes dos 5s do aviso "sem chave" acabar
+    // Sem isto, fechar o chat antes dos 15s do aviso "sem chave" acabar
     // (ver mostrarAvisoSemChave) ainda redirecionava pra Configurações
     // alguns segundos depois — "do nada", já que a pessoa nem estava mais
     // olhando pro chat.
@@ -954,7 +991,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     });
     // Cresce junto com o texto digitado, até o limite definido em CSS
     // (.chat-input{max-height}) — depois disso passa a rolar por dentro.
+    // Também interrompe o redirecionamento automático do aviso "sem chave"
+    // (ver pararRedirecionamentoSemChave) — qualquer caractere digitado ou
+    // apagado aqui já mostra que a pessoa está fazendo algo nesta página,
+    // não faz sentido navegar sozinho pra Configurações no meio disso.
     elInput().addEventListener('input', () => {
+      pararRedirecionamentoSemChave();
       const el = elInput();
       el.style.height = 'auto';
       el.style.height = el.scrollHeight + 'px';
