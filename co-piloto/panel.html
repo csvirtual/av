@@ -724,26 +724,26 @@
     display:flex; justify-content:center; gap:22px; margin-top:28px; flex-wrap:wrap;
     max-width:560px; margin-left:auto; margin-right:auto;
   }
+  /* Mesmo padrão visual do #centralAvisoBanner (fundo --purple-soft + borda
+     --purple) — reaproveitado de propósito em vez de inventar um segundo
+     estilo de "aviso importante": antes este card era branco sobre o card
+     branco ao redor (só a sombra e a faixa lateral separavam os dois),
+     ficando "flutuando" sem contraste de verdade. Com fundo tintado, o
+     cartão se distingue por si só, sem precisar de sombra nem faixa. */
   .no-auto-notice{
     display:flex; gap:14px; align-items:flex-start; text-align:left;
-    max-width:540px; margin:75px auto 0;
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:16px; padding:17px 20px 17px 18px;
-    box-shadow:0 3px 10px rgba(19,36,32,.06);
-    position:relative; overflow:hidden;
-  }
-  .no-auto-notice::before{
-    content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
-    background:linear-gradient(180deg, var(--purple), #B27FD1);
+    max-width:540px; margin:28px auto 0;
+    background:var(--purple-soft); border:1px solid var(--purple);
+    border-radius:16px; padding:16px 20px;
   }
   .no-auto-notice-icon{
     flex:0 0 auto; width:32px; height:32px; border-radius:50%;
-    background:var(--purple-soft); display:flex; align-items:center; justify-content:center;
+    background:var(--panel); display:flex; align-items:center; justify-content:center;
     font-size:14px; margin-top:1px;
   }
   .no-auto-notice-body{ min-width:0; }
   .no-auto-notice-title{
-    font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink);
+    font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--purple);
     margin-bottom:var(--gap-titulo-subtitulo); letter-spacing:.01em;
   }
   .no-auto-notice-text{ font-size:12.5px; line-height:1.65; color:var(--muted); }
@@ -1225,7 +1225,7 @@
         </div>
       </div>
       <div class="no-auto-notice">
-        <div class="no-auto-notice-icon">🔒</div>
+        <div class="no-auto-notice-icon">✅</div>
         <div class="no-auto-notice-body">
           <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
           <div class="no-auto-notice-text">
