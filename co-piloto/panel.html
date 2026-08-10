@@ -724,16 +724,16 @@
     display:flex; justify-content:center; gap:22px; margin-top:28px; flex-wrap:wrap;
     max-width:560px; margin-left:auto; margin-right:auto;
   }
-  /* Volta ao visual branco original (sombra sutil + faixa roxa lateral) —
-     só a LARGURA que continua da rodada "faixa larga" (100%, sem a
-     max-width:540px/margin:auto que deixava uma caixinha pequena
-     centralizada, com folga em branco dos dois lados). Espaçamento acima
-     também continua reduzido (28px, não os 75px originais) — isso não fazia
-     parte do "estilo anterior" pedido, era só um espaço em branco solto
-     demais quebrando o ritmo da tela. */
+  /* Visual branco original (sombra sutil + faixa roxa lateral), largura
+     cheia (100%, sem a max-width:540px/margin:auto que deixava uma
+     caixinha pequena centralizada). Agora é card próprio — sem margin-top:
+     o respiro entre ele e o card "Pronto para atender" acima vem do
+     margin-bottom:16px que já é padrão de QUALQUER .card (ver #noLeadState
+     logo acima dele), o mesmo espaçamento usado entre todo par de cards
+     empilhados no resto do app. */
   .no-auto-notice{
     display:flex; gap:14px; align-items:flex-start; text-align:left;
-    width:100%; margin:28px 0 0;
+    width:100%; margin:0;
     background:var(--panel); border:1px solid var(--line);
     border-radius:16px; padding:17px 20px 17px 18px;
     box-shadow:0 3px 10px rgba(19,36,32,.06);
@@ -1288,6 +1288,13 @@
           <span class="step-txt">Copie a resposta pronta e envie</span>
         </div>
       </div>
+      </div>
+
+      <!-- Card próprio, separado do "Pronto para atender" acima — mesma
+           ideia do .recent-leads-card lá em cima: fica de pé sozinho, com o
+           espaçamento padrão entre cards (margin-bottom do próprio
+           #noLeadState.card já abre o respiro), em vez de depender do fundo
+           branco do card anterior. -->
       <div class="no-auto-notice">
         <div class="no-auto-notice-icon">🔒</div>
         <div class="no-auto-notice-body">
@@ -1298,7 +1305,6 @@
             copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
           </div>
         </div>
-      </div>
       </div>
     </div>
 
