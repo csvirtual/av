@@ -425,6 +425,14 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return { secao: melhor, pontuacao: melhorPontuacao };
   }
 
+  // Usada em toda mensagem de chat que não for um comando "/help" (ver
+  // enviarMensagemChat) — decide, sem gastar IA nenhuma, SE a pergunta
+  // parece ser sobre o próprio Co-piloto o bastante pra valer a pena
+  // injetar aquela seção no contexto da chamada de IA que vem a seguir (ver
+  // pedirRespostaIA/buildChatDynamicContext). Não responde nada sozinha:
+  // quem lê o conteúdo encontrado e formula a resposta de verdade é sempre
+  // a IA — este casamento de palavras-chave só evita mandar o guia inteiro
+  // (ou nada) em toda mensagem.
   function encontrarSecaoAjudaRelevante(mensagem){
     const resultado = melhorSecaoAjudaPara(mensagem);
     if(!resultado) return null;
@@ -433,16 +441,17 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
   // ---------- Comando "/help" (menu completo dos assuntos, sem IA) ----------
   //
-  // A leitura automática acima (encontrarSecaoAjudaRelevante) só acerta
-  // quando a pergunta bate o bastante com o título/corpo de UMA seção — boa
-  // pra uma pergunta certeira ("como funciona a lixeira?"), mas não ajuda
-  // quem não sabe nem por onde começar, ou escreveu de um jeito que não
-  // bateu o limiar. "/help" (ou "/ajuda") resolve isso: lista TODOS os
-  // assuntos do "Como usar"/Privacidade, numerados — e "/help <número ou
-  // palavra>" abre um deles direto, sem precisar do mesmo limiar da leitura
-  // automática (é um pedido explícito, não uma adivinhação). Sempre sem
-  // gastar IA nenhuma, funciona mesmo sem nenhuma chave de API configurada
-  // — mesma garantia da resposta automática por palavra-chave.
+  // A leitura automática acima (encontrarSecaoAjudaRelevante) só decide se
+  // vale a pena injetar UMA seção no contexto de uma pergunta em linguagem
+  // natural — boa pra uma pergunta certeira ("como funciona a lixeira?"),
+  // mas não ajuda quem não sabe nem por onde começar, e continua exigindo
+  // IA (e uma chave configurada) pra responder de fato. "/help" (ou
+  // "/ajuda") resolve os dois problemas: lista TODOS os assuntos do "Como
+  // usar"/Privacidade, numerados — e "/help <número ou palavra>" abre um
+  // deles direto, sem precisar do mesmo limiar da leitura automática (é um
+  // pedido explícito, não uma adivinhação) — e é o único caminho de ajuda
+  // que continua funcionando sem IA nenhuma, mesmo sem nenhuma chave de API
+  // configurada.
   const COMANDOS_HELP = ['/help', '/ajuda'];
 
   // Devolve '' se a mensagem for só o comando ("/help"), o texto depois dele
@@ -560,11 +569,21 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
     const lead = leadAtualParaChat();
     // callClaudeComTier/callGeminiComTier esperam um lead com .fixo/.estagio
-    // pra decidir o tier (ver escolherTierPorEstagio em panel.js) — sem
-    // lead selecionado, usa um objeto mínimo equivalente a "Primeiro
-    // contato", que sempre resolve pro nível econômico (o mais barato,
-    // adequado pra um papo livre sem lead nenhum aberto).
-    const leadParaTier = lead || { fixo: false, estagio: 'Primeiro contato' };
+    // pra decidir o tier (ver escolherTierPorEstagio em panel.js) — um
+    // objeto mínimo equivalente a "Primeiro contato" sempre resolve pro
+    // nível econômico (o mais barato, e o que resolverCredenciaisGemini/
+    // callClaudeComTier já sabem sozinhos resolver pro que estiver
+    // disponível — só a Chave B configurada, só o modelo principal, etc.).
+    // Dois casos usam esse objeto mínimo em vez do lead de verdade: sem
+    // nenhum lead selecionado (papo livre, sem venda em jogo — comportamento
+    // de sempre), e sempre que a pergunta é sobre o próprio Co-piloto
+    // (secaoAjudaConhecida veio preenchida, ver encontrarSecaoAjudaRelevante
+    // em enviarMensagemChat) — consultar o próprio guia não é uma resposta
+    // que decide venda nenhuma, não faz sentido pagar o nível mais caro só
+    // porque o lead selecionado agora por acaso está numa etapa de risco.
+    const leadParaTier = secaoAjudaConhecida
+      ? { fixo: false, estagio: 'Primeiro contato' }
+      : (lead || { fixo: false, estagio: 'Primeiro contato' });
 
     const cachedSystem = buildChatCachedSystem();
     const dynamicContext = buildChatDynamicContext(lead, mensagemUsuario, secaoAjudaConhecida);
@@ -779,30 +798,27 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }, 1000);
   }
 
-  // Fecha o turno de uma resposta que não precisou de IA (achado automático
-  // por palavra-chave, OU o comando /help, mais abaixo) — sempre a mesma
-  // sequência: mostra a bolha, guarda no Histórico do Bot persistente
-  // (pra aparecer depois na tela principal do lead), cancela um aviso de
-  // "sem chave" de uma pergunta ANTERIOR que porventura ainda estivesse
-  // contando (ver mostrarAvisoSemChave — sem isto ele dispararia sozinho
-  // daqui a pouco e navegaria pra Configurações mesmo a pessoa acabando de
-  // receber uma resposta útil), e libera a caixa de novo. Compartilhada
-  // pelas duas origens de resposta sem IA pra não duplicar essa sequência.
+  // Fecha o turno de uma resposta de "/help" (nunca chama IA — ver
+  // argumentoComandoHelp/acharSecaoPorComando acima) — mostra a bolha,
+  // guarda no Histórico do Bot persistente (pra aparecer depois na tela
+  // principal do lead), cancela um aviso de "sem chave" de uma pergunta
+  // ANTERIOR que porventura ainda estivesse contando (ver
+  // mostrarAvisoSemChave — sem isto ele dispararia sozinho daqui a pouco e
+  // navegaria pra Configurações mesmo a pessoa acabando de receber uma
+  // resposta útil), e libera a caixa de novo.
   //
-  // `entraNoContextoDaIA` decide se esta troca também entra em
-  // `chatHistorico` — o que é reenviado pra IA como contexto a cada NOVA
-  // mensagem desta mesma conversa (ver buildChatDynamicContext). Pra uma
-  // pergunta em linguagem natural que só por acaso bateu com uma seção do
-  // guia (a leitura automática, ver encontrarSecaoAjudaRelevante), faz
-  // sentido continuar valendo como conversa de verdade. Já "/help" e sua
-  // resposta são navegação de tela, não conversa — sem excluir do
-  // contexto, o menu inteiro (ou o texto de uma seção inteira) ficaria
-  // "andando junto", sendo reenviado (e cobrado) em TODA chamada de IA
-  // seguinte desta mesma conversa, mesmo sem nenhuma relação com o que
-  // estiver sendo perguntado dali pra frente.
-  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input, entraNoContextoDaIA){
+  // De propósito NUNCA entra em `chatHistorico` (o que é reenviado pra IA
+  // como contexto a cada NOVA mensagem desta mesma conversa — ver
+  // buildChatDynamicContext): "/help" e sua resposta são navegação de tela,
+  // não conversa — se entrasse, o menu inteiro (ou o texto de uma seção
+  // inteira) ficaria "andando junto", sendo reenviado (e cobrado) em TODA
+  // chamada de IA seguinte desta mesma conversa, mesmo sem nenhuma relação
+  // com o que estiver sendo perguntado dali pra frente. Uma pergunta em
+  // linguagem natural sobre o Co-piloto, diferente de "/help", passa pela
+  // IA normalmente (ver enviarMensagemChat/pedirRespostaIA) e por isso
+  // entra em chatHistorico como qualquer outra troca da conversa.
+  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
     renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
-    if(entraNoContextoDaIA) chatHistorico.push({ role: 'ai', texto: respostaTexto });
     registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
     cancelarAvisoSemChave();
     chatOcupado = false;
@@ -833,29 +849,27 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
     // "/help" (lista completa dos assuntos) ou "/help <número ou palavra>"
     // (abre um deles direto) — ver argumentoComandoHelp/acharSecaoPorComando
-    // acima. Checado ANTES da leitura automática por palavra-chave, logo
-    // abaixo: um comando explícito nunca deveria "perder" pra IA só porque a
-    // pergunta não bateu o limiar de relevância — é justamente o caminho
-    // pra quando aquela leitura automática não ajuda. Sem nenhum await até
-    // aqui, não há risco de troca de lead no meio do caminho. De propósito
-    // NÃO entra em chatHistorico (nem o comando, nem a resposta) — ver o
-    // comentário de entraNoContextoDaIA em finalizarRespostaSemIA.
+    // acima. Único caminho de ajuda que continua respondendo sem IA (rápido,
+    // literal, funciona mesmo sem nenhuma chave configurada) — de propósito
+    // NÃO entra em chatHistorico (nem o comando, nem a resposta), ver o
+    // comentário de finalizarRespostaSemIA. Sem nenhum await até aqui, não
+    // há risco de troca de lead no meio do caminho.
     const argumentoHelp = argumentoComandoHelp(texto);
     if(argumentoHelp !== null){
       if(!argumentoHelp){
         finalizarRespostaSemIA(texto, montarMenuAjudaTexto(), montarMenuAjudaHtml(),
-          '📖 Menu de ajuda — sem usar IA', leadIdDoEnvio, input, false);
+          '📖 Menu de ajuda — sem usar IA', leadIdDoEnvio, input);
       }else{
         const secao = acharSecaoPorComando(argumentoHelp);
         if(secao){
           const respostaTexto = `${secao.titulo}\n\n${secao.texto}`;
           const respostaHtml = `<p><b>${escapeHtml(secao.titulo)}</b></p>${secao.html}`;
           finalizarRespostaSemIA(texto, respostaTexto, respostaHtml,
-            `📖 Direto de "${secao.origem}" — sem usar IA`, leadIdDoEnvio, input, false);
+            `📖 Direto de "${secao.origem}" — sem usar IA`, leadIdDoEnvio, input);
         }else{
           finalizarRespostaSemIA(texto,
             `Não encontrei nada sobre "${argumentoHelp}". Digite só "/help" pra ver a lista completa de assuntos.`,
-            null, '📖 Sem usar IA', leadIdDoEnvio, input, false);
+            null, '📖 Sem usar IA', leadIdDoEnvio, input);
         }
       }
       return;
@@ -863,28 +877,24 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
     chatHistorico.push({ role: 'user', texto });
 
-    // Pergunta claramente sobre o próprio Co-piloto (achou uma seção de
-    // ajuda bem casada — ver encontrarSecaoAjudaRelevante) responde direto
-    // do guia "Como usar"/"Privacidade", sem gastar IA nenhuma — funciona
-    // mesmo sem nenhuma chave de API configurada. Só perguntas SEM uma
-    // seção clara (a maioria: sobre o lead/venda) seguem pro fluxo de IA
-    // normal, logo abaixo. Esta, diferente do /help acima, ENTRA em
-    // chatHistorico: nasceu de uma pergunta em linguagem natural (não um
-    // comando de navegação), então pode ser o início de um assunto que
-    // continua nas próximas mensagens desta conversa.
-    const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
-    if(secaoAjudaDireta){
-      // respostaDireta (texto puro) é o que vai pro histórico salvo e pro
-      // contexto da conversa — respostaDiretaHtml (negrito/parágrafos/listas
-      // preservados, ver serializarHtmlSeguroAjuda) é só pra exibição AGORA
-      // na bolha do chat, mais fácil de ler. Mesmo conteúdo, duas
-      // apresentações — nenhuma palavra muda entre as duas.
-      const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
-      const respostaDiretaHtml = `<p><b>${escapeHtml(secaoAjudaDireta.titulo)}</b></p>${secaoAjudaDireta.html}`;
-      finalizarRespostaSemIA(texto, respostaDireta, respostaDiretaHtml,
-        `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, leadIdDoEnvio, input, true);
-      return;
-    }
+    // Pergunta em linguagem natural (não um comando "/help") SEMPRE passa
+    // pela IA — inclusive quando é sobre o próprio Co-piloto. A resposta
+    // "direta do guia, sem gastar IA" que existia aqui foi removida: fora do
+    // "/help" (que resolve bem o caso de quem já sabe o assunto exato), esse
+    // atalho só acertava quando a pergunta batia MUITO com o título/corpo de
+    // uma única seção — qualquer coisa parafraseada, mais vaga ou mais
+    // conversacional caía fora do limiar e ia pra IA do mesmo jeito, só que
+    // SEM o conteúdo de ajuda no contexto (só a leitura automática decidia
+    // se algo entrava ou não). Agora encontrarSecaoAjudaRelevante() continua
+    // rodando (mesmo casamento de palavras-chave, zero custo, mesmo limiar
+    // de confiança) mas só pra decidir SE injeta a seção encontrada no
+    // contexto desta chamada de IA (ver buildChatDynamicContext/
+    // pedirRespostaIA) — quem responde de verdade é sempre a IA, lendo esse
+    // conteúdo como fonte quando ele existe. pedirRespostaIA força o nível
+    // básico/econômico (ou o que estiver disponível) sempre que uma seção é
+    // encontrada, já que consultar o próprio guia não é uma resposta que
+    // decide venda nenhuma.
+    const secaoAjudaConhecida = encontrarSecaoAjudaRelevante(texto);
 
     const loadingEl = renderMensagem('ai', 'digitando...', { loading: true, id: 'chatLoadingMsg' });
 
@@ -895,11 +905,10 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       await garantirLeituraEstagioParaEnvio(texto);
       atualizarBarraDeContexto();
 
-      // secaoAjudaDireta já foi calculada logo acima (e é sempre null aqui —
-      // se tivesse achado uma seção, já teria retornado antes) — repassa em
-      // vez de deixar pedirRespostaIA/buildChatDynamicContext varrerem as
-      // seções de ajuda de novo pra chegar no mesmo resultado.
-      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaDireta);
+      // secaoAjudaConhecida já foi calculada logo acima — repassa em vez de
+      // deixar pedirRespostaIA/buildChatDynamicContext varrerem as seções de
+      // ajuda de novo pra chegar no mesmo resultado.
+      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaConhecida);
       loadingEl.remove();
       // Resposta da IA veio com sucesso — se havia um aviso de "sem chave"
       // de uma pergunta anterior ainda contando, não faz mais sentido
