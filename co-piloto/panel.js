@@ -414,7 +414,7 @@ function renderAvisoInicial(){
   const icone = document.getElementById('noAutoNoticeIcon');
   const titulo = document.getElementById('noAutoNoticeTitle');
   const texto = document.getElementById('noAutoNoticeText');
-  if(!icone || !titulo || !texto) return; // card não existe nesta página (ex: options.html)
+  if(!icone || !titulo || !texto) return; // defesa: elementos estáticos do panel.html, sempre presentes a essa altura (chamada só depois de liberarPainel já ter montado a tela) — checagem por segurança, não porque haja um cenário real em que faltem
   icone.textContent = slide.icone;
   titulo.textContent = slide.titulo;
   // innerHTML aqui é seguro: slide.texto é sempre um dos 2 textos FIXOS

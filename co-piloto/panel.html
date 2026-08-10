@@ -43,11 +43,6 @@
     padding:0 13px; font-weight:700; cursor:pointer; font-size:16px;
   }
   .leads-list{ display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height:52vh; padding-right:2px; }
-  .leads-list-title{
-    font-size:11px; font-weight:800; color:#9FC1B8; text-transform:uppercase;
-    letter-spacing:.05em; margin-bottom:var(--gap-cabecalho-conteudo);
-    text-align:center;
-  }
   .lead-item{
     padding:10px 11px; border-radius:12px; cursor:pointer;
     display:flex; align-items:flex-start; gap:10px;
@@ -748,11 +743,11 @@
     content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
     background:linear-gradient(180deg, var(--purple), #B27FD1);
   }
-  /* Ícone e título lado a lado, centralizados juntos como um par — o
-     cadeado "acompanha" o título em vez de ficar ancorado sozinho no canto
-     esquerdo do card enquanto o título centraliza por conta própria. */
+  /* Ícone e título lado a lado, alinhados à esquerda como um par — o
+     cadeado "acompanha" o título (mesma linha, mesmo bloco) em vez de ficar
+     ancorado sozinho num canto enquanto o título se movia por conta própria. */
   .no-auto-notice-header{
-    display:flex; align-items:center; justify-content:flex-start; gap:10px;
+    display:flex; align-items:center; gap:10px;
     margin-bottom:14px;
   }
   .no-auto-notice-icon{
@@ -760,7 +755,6 @@
     background:var(--purple-soft); display:flex; align-items:center; justify-content:center;
     font-size:14px;
   }
-  .no-auto-notice-body{ min-width:0; }
   .no-auto-notice-title{
     font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink);
     letter-spacing:.01em;
@@ -832,10 +826,6 @@
   .stat-num{ font-family:'Fraunces',serif; font-size:20px; color:#fff; line-height:1.1; }
   .stat-lbl{ font-size:9.5px; color:#9FC1B8; text-transform:uppercase; letter-spacing:.02em; margin-top:2px; }
 
-  .lead-search{
-    background:#0D4A42; border:1px solid #1B5E54; color:#fff;
-  }
-  .lead-search::placeholder{ color:#8FB4AB; }
   .leads-empty{ color:#9FC1B8; font-size:12.5px; padding:8px 4px; }
   .btn-sidebar{
     width:100%; display:flex; align-items:center; justify-content:center; gap:9px;
@@ -1282,45 +1272,40 @@
       </div>
 
       <div id="noLeadState" class="card empty-state">
-      <div class="empty-icon">💬</div>
-      <div class="big">Pronto para atender o próximo lead</div>
-      <div class="empty-sub">Crie um lead na barra lateral para começar a registrar o atendimento — é rapidinho:</div>
+        <div class="empty-icon">💬</div>
+        <div class="big">Pronto para atender o próximo lead</div>
+        <div class="empty-sub">Crie um lead na barra lateral para começar a registrar o atendimento — é rapidinho:</div>
 
-      <div class="onboarding-steps">
-        <div class="onboarding-step">
-          <span class="step-num">1</span>
-          <span class="step-txt">Crie ou selecione um lead ao lado</span>
-        </div>
-        <div class="onboarding-step">
-          <span class="step-num">2</span>
-          <span class="step-txt">Cole a última mensagem dele no WhatsApp</span>
-        </div>
-        <div class="onboarding-step">
-          <span class="step-num">3</span>
-          <span class="step-txt">Copie a resposta pronta e envie</span>
+        <div class="onboarding-steps">
+          <div class="onboarding-step">
+            <span class="step-num">1</span>
+            <span class="step-txt">Crie ou selecione um lead ao lado</span>
+          </div>
+          <div class="onboarding-step">
+            <span class="step-num">2</span>
+            <span class="step-txt">Cole a última mensagem dele no WhatsApp</span>
+          </div>
+          <div class="onboarding-step">
+            <span class="step-num">3</span>
+            <span class="step-txt">Copie a resposta pronta e envie</span>
+          </div>
         </div>
       </div>
-      </div>
 
-      <!-- Card próprio, separado do "Pronto para atender" acima — mesma
-           ideia do .recent-leads-card lá em cima: fica de pé sozinho, com o
-           espaçamento padrão entre cards (margin-bottom do próprio
-           #noLeadState.card já abre o respiro), em vez de depender do fundo
-           branco do card anterior. -->
-      <!-- Alterna entre 2 avisos a cada 5s (ver iniciarRotacaoAvisoInicial,
-           panel.js) — o texto/ícone daqui são só o estado inicial (1º
-           slide), antes do primeiro giro; o JS assume o controle depois. -->
+      <!-- Card próprio, separado do "Pronto para atender" acima (mesma ideia
+           do .recent-leads-card lá em cima — margin-bottom do #noLeadState.card
+           já abre o respiro entre os dois). Alterna entre 2 avisos a cada 5s
+           (ver iniciarRotacaoAvisoInicial, panel.js); o texto/ícone abaixo são
+           só o estado inicial (1º slide), antes do primeiro giro. -->
       <div class="no-auto-notice">
         <div class="no-auto-notice-header">
           <div class="no-auto-notice-icon" id="noAutoNoticeIcon">🔒</div>
           <div class="no-auto-notice-title" id="noAutoNoticeTitle">Sem automação dentro do WhatsApp</div>
         </div>
-        <div class="no-auto-notice-body">
-          <div class="no-auto-notice-text" id="noAutoNoticeText">
-            O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
-            isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
-            copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
-          </div>
+        <div class="no-auto-notice-text" id="noAutoNoticeText">
+          O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
+          isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
+          copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
         </div>
       </div>
     </div>
