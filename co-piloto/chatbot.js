@@ -129,7 +129,11 @@
       partes.push(`🔍 Leitura automática da mensagem — ${bits.join(' · ')}`);
     }
     if(_memoriaAtivada.length){
-      partes.push(`🧠 ${_memoriaAtivada.length} trecho${_memoriaAtivada.length===1?'':'s'} do histórico anexado${_memoriaAtivada.length===1?'':'s'} (/find) — vai${_memoriaAtivada.length===1?'':'ão'} junto na próxima mensagem`);
+      // "vai"/"vão" é verbo irregular — não dá pra formar o plural
+      // concatenando um sufixo (era "vai"+"ão" = "vaião", errado); a
+      // palavra toda precisa trocar.
+      const verboIr = _memoriaAtivada.length === 1 ? 'vai' : 'vão';
+      partes.push(`🧠 ${_memoriaAtivada.length} trecho${_memoriaAtivada.length===1?'':'s'} do histórico anexado${_memoriaAtivada.length===1?'':'s'} (/find) — ${verboIr} junto na próxima mensagem`);
     }
     if(!partes.length){
       bar.classList.remove('show');
@@ -628,7 +632,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       return;
     }
     if(_memoriaAtivada.length >= MEMORIA_LIMITE_TRECHOS){
-      toast(`Só dá pra marcar até ${MEMORIA_LIMITE_TRECHOS} trechos por vez — envie a mensagem (ou abra o chat de novo) antes de marcar outro`);
+      // "Fechar e reabrir o chat" NÃO libera espaço aqui de propósito — os
+      // trechos marcados sobrevivem a fechar o modal (mesmo padrão de
+      // chatEstagioManual), só esvaziam depois de um envio bem-sucedido ou
+      // ao trocar de lead (ver enviarMensagemChat/resetEstagioManual). Por
+      // isso o aviso só menciona esses dois caminhos reais.
+      toast(`Só dá pra marcar até ${MEMORIA_LIMITE_TRECHOS} trechos por vez — envie a mensagem (ou troque de lead) antes de marcar outro`);
       return;
     }
     _memoriaAtivada.push(entry);
@@ -686,9 +695,9 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
     // Trechos de conversas ANTERIORES (de sessões passadas do chat, não
     // desta) que a atendente achou com "/find" e marcou explicitamente com
-    // "📌 Usar no contexto" — ver _memoriaAtivada, mais acima, e
-    // finalizarBuscaComMemoria/enviarMensagemChat, mais abaixo. Nunca entra
-    // sozinho: só existe aqui o que foi marcado à mão pra ESTA mensagem.
+    // "📌 Usar no contexto" — ver _memoriaAtivada/adicionarTrechoNaMemoria,
+    // mais acima, e enviarMensagemChat, mais abaixo. Nunca entra sozinho:
+    // só existe aqui o que foi marcado à mão pra ESTA mensagem.
     const blocoMemoria = _memoriaAtivada.length
       ? `\n\nTRECHOS DE CONVERSAS ANTERIORES QUE A ATENDENTE MARCOU COMO RELEVANTES PRA ESTA PERGUNTA (achados com /find no Histórico do Bot deste lead — são conversas de verdade já tidas com ele antes, use como memória real, não invente continuidade além do que está escrito):\n${_memoriaAtivada.map((h, i) => `${i + 1}. [${formatDataHora(h.quando)}] Pergunta: ${h.pergunta}\nResposta: ${h.resposta}`).join('\n\n')}`
       : '';
