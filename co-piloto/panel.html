@@ -30,14 +30,7 @@
     flex-direction:column;
     gap:16px;
   }
-  /* align-self:center (não text-align) porque .sidebar é flex-direction:column
-     sem align-items declarado (o padrão, stretch, só afeta largura — não
-     centraliza) — e width:fit-content faz o bloco (uma linha só) ficar mais
-     estreito que a sidebar, então sem isto ele sempre "gruda" na borda
-     esquerda (mesmo alinhamento de todo o resto da sidebar, que é
-     intencionalmente full-width) em vez de ficar centralizado como uma marca
-     costuma ficar. */
-  .sidebar .brand{ color:#fff; font-size:18px; line-height:1.25; cursor:pointer; transition:opacity .15s; width:fit-content; align-self:center; }
+  .sidebar .brand{ color:#fff; font-size:18px; line-height:1.25; cursor:pointer; transition:opacity .15s; width:fit-content; }
   .sidebar .brand:hover{ opacity:.8; }
   .sidebar .brand span{ color:#D9AEE8; }
   .lead-add{ display:flex; gap:6px; }
