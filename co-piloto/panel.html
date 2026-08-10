@@ -732,7 +732,7 @@
      logo acima dele), o mesmo espaçamento usado entre todo par de cards
      empilhados no resto do app. */
   .no-auto-notice{
-    display:flex; gap:14px; align-items:flex-start; text-align:left;
+    text-align:left;
     width:100%; margin:0;
     background:var(--panel); border:1px solid var(--line);
     border-radius:16px; padding:17px 20px 17px 18px;
@@ -743,15 +743,22 @@
     content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
     background:linear-gradient(180deg, var(--purple), #B27FD1);
   }
+  /* Ícone e título lado a lado, centralizados juntos como um par — o
+     cadeado "acompanha" o título em vez de ficar ancorado sozinho no canto
+     esquerdo do card enquanto o título centraliza por conta própria. */
+  .no-auto-notice-header{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    margin-bottom:var(--gap-titulo-subtitulo);
+  }
   .no-auto-notice-icon{
     flex:0 0 auto; width:32px; height:32px; border-radius:50%;
     background:var(--purple-soft); display:flex; align-items:center; justify-content:center;
-    font-size:14px; margin-top:1px;
+    font-size:14px;
   }
   .no-auto-notice-body{ min-width:0; }
   .no-auto-notice-title{
     font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink);
-    margin-bottom:var(--gap-titulo-subtitulo); letter-spacing:.01em; text-align:center;
+    letter-spacing:.01em;
   }
   .no-auto-notice-text{ font-size:12.5px; line-height:1.65; color:var(--muted); }
   .no-auto-notice-text b{ color:var(--purple); font-weight:700; }
@@ -1296,9 +1303,11 @@
            #noLeadState.card já abre o respiro), em vez de depender do fundo
            branco do card anterior. -->
       <div class="no-auto-notice">
-        <div class="no-auto-notice-icon">🔒</div>
-        <div class="no-auto-notice-body">
+        <div class="no-auto-notice-header">
+          <div class="no-auto-notice-icon">🔒</div>
           <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
+        </div>
+        <div class="no-auto-notice-body">
           <div class="no-auto-notice-text">
             O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
             isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
