@@ -762,6 +762,10 @@
      lado do outro em linha reta"); centralizados quando cabem todos, com
      scroll horizontal só se a tela for estreita demais pros 7. */
   .recent-leads-section{ margin-top:32px; text-align:left; }
+  /* Variante quando é o primeiro elemento do card (logo abaixo da linha de
+     badges) — sem o espaço de 32px que só faz sentido vindo depois de outro
+     bloco de conteúdo; usa o padding-top do próprio card como respiro. */
+  .recent-leads-section-top{ margin-top:0; margin-bottom:8px; }
   .recent-leads-title{
     font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;
     letter-spacing:.05em; text-align:center; margin-bottom:14px;
@@ -1249,16 +1253,18 @@
     </div>
 
     <div id="noLeadState" class="card empty-state">
-      <div class="empty-icon">💬</div>
-      <div class="big">Pronto para atender o próximo lead</div>
-      <div class="empty-sub">Crie um lead na barra lateral para começar a registrar o atendimento — é rapidinho:</div>
-
       <!-- Tira horizontal com os leads mais recentes (ver renderRecentLeadsStrip,
-           panel.js) — substituiu a lista que antes ficava na lateral. -->
-      <div class="recent-leads-section">
+           panel.js) — substituiu a lista que antes ficava na lateral. Primeira
+           coisa da tela inicial, logo abaixo da linha de badges (provedor de
+           IA / respostas geradas / Health Monitor) que fica acima deste card. -->
+      <div class="recent-leads-section recent-leads-section-top">
         <div class="recent-leads-title">7 últimos leads cadastrados</div>
         <div class="recent-leads-strip" id="recentLeadsStrip"></div>
       </div>
+
+      <div class="empty-icon">💬</div>
+      <div class="big">Pronto para atender o próximo lead</div>
+      <div class="empty-sub">Crie um lead na barra lateral para começar a registrar o atendimento — é rapidinho:</div>
 
       <div class="onboarding-steps">
         <div class="onboarding-step">
