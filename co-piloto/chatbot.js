@@ -684,13 +684,16 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   }
 
   // Interrompe a contagem regressiva do aviso "sem chave" (se estiver
-  // rodando) e deixa uma mensagem estática no lugar, sem os botões — usada
-  // tanto pelo botão "Permanecer nesta página" quanto por qualquer
-  // caractere digitado/apagado na caixa (ver init(), mais abaixo): a pessoa
+  // rodando) e deixa uma mensagem estática no lugar — usada tanto pelo
+  // botão "Permanecer nesta página" quanto por qualquer caractere
+  // digitado/apagado na caixa (ver init(), mais abaixo): a pessoa
   // claramente decidiu continuar aqui, então redirecionar sozinho não faz
-  // mais sentido. Sai calada se não houver nenhum contador rodando agora
-  // (ex.: digitar a próxima pergunta depois que uma resposta anterior já
-  // chegou normalmente, sem nenhum aviso na tela).
+  // mais sentido. "Ir agora" continua ali (só some "Permanecer nesta
+  // página", que já cumpriu o papel dela) — a pessoa pode ter cancelado o
+  // redirecionamento automático sem querer abrir mão de ir configurar a
+  // chave manualmente quando quiser. Sai calada se não houver nenhum
+  // contador rodando agora (ex.: digitar a próxima pergunta depois que uma
+  // resposta anterior já chegou normalmente, sem nenhum aviso na tela).
   function pararRedirecionamentoSemChave(){
     if(!_avisoSemChaveIntervalId) return;
     cancelarAvisoSemChave();
@@ -698,7 +701,8 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     if(!div) return;
     const textoEl = div.querySelector('div');
     if(textoEl) textoEl.textContent = '🔑 Nenhuma chave de API configurada ainda. Configure quando quiser em Configurações → Provedor de IA.';
-    div.querySelectorAll('button').forEach(btn => btn.remove());
+    const ficarBtn = div.querySelector('[data-acao="ficar"]');
+    if(ficarBtn) ficarBtn.remove();
   }
 
   // Mostra o aviso de "nenhuma chave configurada" com contagem regressiva
@@ -744,6 +748,9 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     ficarBtn.type = 'button';
     ficarBtn.className = 'chat-copy-btn';
     ficarBtn.textContent = 'Permanecer nesta página';
+    // Marcado pra pararRedirecionamentoSemChave() saber qual dos dois
+    // botões remover (só este) e qual manter ("Ir agora").
+    ficarBtn.dataset.acao = 'ficar';
     botoesRow.appendChild(ficarBtn);
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
