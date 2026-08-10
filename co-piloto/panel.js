@@ -18,15 +18,24 @@ function apenasDigitos(valor){
   return (valor || '').replace(/\D/g, '');
 }
 
+// Minúsculo + sem acento — pra buscar "joao"/"José" batendo com "João"/"jose"
+// dos dois lados, não só maiúscula/minúscula (que já era ignorada antes).
+// normalize('NFD') separa cada letra acentuada em base + marca de acento; o
+// replace descarta só a marca (intervalo Unicode das marcas diacríticas
+// combinantes), sobrando a letra base pura.
+function normalizarParaBusca(texto){
+  return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 // Filtra leads por nome ou telefone (com ou sem pontuação) — usado tanto na
 // lista lateral quanto no modal "Ver todos".
 function filtrarLeadsPorBusca(list, query){
-  const q = (query || '').trim().toLowerCase();
+  const q = normalizarParaBusca(query).trim();
   if(!q) return list;
-  const qDigits = apenasDigitos(q);
+  const qDigits = apenasDigitos(query);
   return list.filter(l=>
-    (l.nome||'').toLowerCase().includes(q) ||
-    (l.telefone||'').toLowerCase().includes(q) ||
+    normalizarParaBusca(l.nome).includes(q) ||
+    normalizarParaBusca(l.telefone).includes(q) ||
     (qDigits && apenasDigitos(l.telefone).includes(qDigits))
   );
 }
