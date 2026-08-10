@@ -724,31 +724,71 @@
     display:flex; justify-content:center; gap:22px; margin-top:28px; flex-wrap:wrap;
     max-width:560px; margin-left:auto; margin-right:auto;
   }
-  /* Mesma ideia estrutural das faixas já usadas alhures no app (o aviso
-     vermelho de credencial padrão, o dourado de admin impersonando — ver
-     .credenciais-padrao-faixa/.admin-impersonando-faixa em styles.css):
-     uma barra que ocupa a largura inteira do espaço disponível, em vez de
-     uma caixa pequena boiando centralizada com folga dos dois lados. Cor
-     em tom claro/roxo (não vermelho/dourado daquelas) de propósito — este
-     aviso tranquiliza, não alerta de um risco pendente. */
+  /* Volta ao visual branco original (sombra sutil + faixa roxa lateral) —
+     só a LARGURA que continua da rodada "faixa larga" (100%, sem a
+     max-width:540px/margin:auto que deixava uma caixinha pequena
+     centralizada, com folga em branco dos dois lados). Espaçamento acima
+     também continua reduzido (28px, não os 75px originais) — isso não fazia
+     parte do "estilo anterior" pedido, era só um espaço em branco solto
+     demais quebrando o ritmo da tela. */
   .no-auto-notice{
     display:flex; gap:14px; align-items:flex-start; text-align:left;
     width:100%; margin:28px 0 0;
-    background:var(--purple-soft); border:1px solid var(--purple);
-    border-radius:12px; padding:14px 20px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:17px 20px 17px 18px;
+    box-shadow:0 3px 10px rgba(19,36,32,.06);
+    position:relative; overflow:hidden;
+  }
+  .no-auto-notice::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+    background:linear-gradient(180deg, var(--purple), #B27FD1);
   }
   .no-auto-notice-icon{
     flex:0 0 auto; width:32px; height:32px; border-radius:50%;
-    background:var(--panel); display:flex; align-items:center; justify-content:center;
+    background:var(--purple-soft); display:flex; align-items:center; justify-content:center;
     font-size:14px; margin-top:1px;
   }
   .no-auto-notice-body{ min-width:0; }
   .no-auto-notice-title{
-    font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--purple);
+    font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--ink);
     margin-bottom:var(--gap-titulo-subtitulo); letter-spacing:.01em;
   }
   .no-auto-notice-text{ font-size:12.5px; line-height:1.65; color:var(--muted); }
   .no-auto-notice-text b{ color:var(--purple); font-weight:700; }
+
+  /* Tira horizontal "N últimos leads cadastrados" — ver renderRecentLeadsStrip
+     em panel.js. Cartões lado a lado numa linha só (overflow-x:auto rola em
+     vez de quebrar linha, pra nunca virar uma grade — o pedido era "um ao
+     lado do outro em linha reta"); centralizados quando cabem todos, com
+     scroll horizontal só se a tela for estreita demais pros 7. */
+  .recent-leads-section{ margin-top:32px; text-align:left; }
+  .recent-leads-title{
+    font-size:11px; font-weight:800; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.05em; text-align:center; margin-bottom:14px;
+  }
+  .recent-leads-strip{
+    display:flex; gap:12px; justify-content:center; flex-wrap:nowrap;
+    overflow-x:auto; padding:4px 2px 10px;
+  }
+  .recent-lead-tile{
+    flex:0 0 auto; width:92px; display:flex; flex-direction:column; align-items:center;
+    gap:8px; padding:12px 8px; border-radius:14px; cursor:pointer;
+    border:1px solid transparent; transition:background .15s ease, border-color .15s ease, transform .12s ease;
+  }
+  .recent-lead-tile:hover{ background:var(--purple-soft); transform:translateY(-2px); }
+  .recent-lead-tile.active{ background:var(--purple-soft); border-color:var(--purple); }
+  .recent-lead-tile .avatar{
+    width:52px; height:52px; border-radius:50%; flex-shrink:0;
+    background:linear-gradient(135deg, var(--purple), #5F2C82);
+    color:#fff; font-weight:700; font-size:19px; text-transform:uppercase;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .recent-lead-tile .nm{
+    font-size:12px; font-weight:700; color:var(--ink); text-align:center;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; line-height:1.3; word-break:break-word;
+  }
+  .recent-leads-strip .leads-empty{ text-align:center; width:100%; color:var(--muted); }
   .onboarding-step{
     display:flex; flex-direction:column; align-items:center; gap:10px; width:150px;
   }
@@ -1111,11 +1151,12 @@
 
     <div class="stats-bar" id="statsBar"></div>
 
-    <input type="text" id="leadSearchInput" class="lead-search" placeholder="🔍 Buscar lead por nome ou número">
-
     <div class="sidebar-divider"></div>
 
-    <div class="leads-list-title" id="leadsListTitle">3 últimos leads cadastrados</div>
+    <!-- Só os dois atalhos fixos (@csvirtual e @C&S_BOT) — ver
+         renderLeadsList em panel.js. Os leads recentes de verdade agora
+         aparecem na tela inicial (#recentLeadsStrip); achar um lead
+         específico continua em "Ver / exportar leads" abaixo. -->
     <div class="leads-list" id="leadsList"></div>
 
     <div class="sidebar-divider"></div>
@@ -1226,7 +1267,7 @@
         </div>
       </div>
       <div class="no-auto-notice">
-        <div class="no-auto-notice-icon">✅</div>
+        <div class="no-auto-notice-icon">🔒</div>
         <div class="no-auto-notice-body">
           <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
           <div class="no-auto-notice-text">
@@ -1235,6 +1276,13 @@
             copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
           </div>
         </div>
+      </div>
+
+      <!-- Tira horizontal com os leads mais recentes (ver renderRecentLeadsStrip,
+           panel.js) — substituiu a lista que antes ficava na lateral. -->
+      <div class="recent-leads-section">
+        <div class="recent-leads-title">7 últimos leads cadastrados</div>
+        <div class="recent-leads-strip" id="recentLeadsStrip"></div>
       </div>
     </div>
 

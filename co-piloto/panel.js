@@ -31,7 +31,6 @@ function filtrarLeadsPorBusca(list, query){
   );
 }
 
-let searchQuery = '';
 let usageStats = {};
 let historySearchQuery = '';
 let campanhaAtiva = false;
@@ -903,41 +902,48 @@ function renderLeadsList(){
     </div>`;
   box.appendChild(botShortcut);
 
-  let list = filtrarLeadsPorBusca(leads.filter(l=>l.id!==FIXED_LEAD_ID), searchQuery);
-  // Ordena por ordem de entrada no sistema (data de cadastro), não pela
-  // data efetiva do lead — essa última pode ser editada manualmente pelo
-  // usuário no campo "Data do lead" e bagunçaria a ordem de cadastro real.
-  list.sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
-  const isSearching = !!searchQuery.trim();
-  const shown = isSearching ? list : list.slice(0,3);
-
-  if(!shown.length){
-    if(!fixedLead) box.innerHTML = '<div class="leads-empty">Nenhum lead encontrado.</div>';
-  } else {
-    shown.forEach(l=>{
-      const div = document.createElement('div');
-      div.className = 'lead-item' + (l.id===currentLeadId ? ' active':'');
-      div.addEventListener('click', ()=>selectLead(l.id));
-      const inicial = (l.nome||'?').trim().charAt(0) || '?';
-      div.innerHTML = `<div class="avatar">${escapeHtml(inicial)}</div>
-        <div class="info">
-          <div class="info-top">
-            <span class="nm">${escapeHtml(l.nome||'(sem nome)')}</span>
-          </div>
-          <span class="obj">${pareceCifrado(l.objetivo) ? '🔒 protegido' : escapeHtml(l.objetivo||'sem objetivo')}</span>
-          ${l.telefone ? `<span class="meta">${escapeHtml(l.telefone)}</span>` : ''}
-        </div>`;
-      box.appendChild(div);
-    });
-  }
-
-  const titleBox = document.getElementById('leadsListTitle');
-  if(titleBox){
-    titleBox.textContent = isSearching ? 'Resultados da busca' : '3 últimos leads cadastrados';
-  }
-
+  renderRecentLeadsStrip();
   renderStatsBar();
   renderFunilOverview();
+}
+
+// ---------- Tira horizontal "N últimos leads cadastrados" (tela inicial) ----------
+// Antes vivia na lateral (lista vertical, com busca) — agora fica na tela
+// inicial (#noLeadState, mesmo card do "Pronto para atender o próximo
+// lead"), como uma tira de cartões lado a lado. A lateral hoje só tem os
+// dois atalhos fixos (@csvirtual e @C&S_BOT, ver acima); achar um lead
+// específico por nome/telefone continua em "Ver / exportar leads" (modal
+// dedicado, com busca de verdade — não perdeu a função, só de endereço).
+// Some junto com o resto da tela inicial quando um lead é aberto
+// (goToHome/selectLead escondem #noLeadState inteiro).
+const LEADS_RECENTES_QTD = 7;
+function renderRecentLeadsStrip(){
+  const box = document.getElementById('recentLeadsStrip');
+  if(!box) return;
+  box.innerHTML = '';
+
+  // Mesmo critério de ordenação de sempre: data de CADASTRO (criadoEm), não
+  // a data efetiva do lead (editável manualmente, bagunçaria a ordem real
+  // de entrada no sistema).
+  const list = leads.filter(l=>l.id!==FIXED_LEAD_ID)
+    .slice()
+    .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm))
+    .slice(0, LEADS_RECENTES_QTD);
+
+  if(!list.length){
+    box.innerHTML = '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
+    return;
+  }
+  list.forEach(l=>{
+    const tile = document.createElement('div');
+    tile.className = 'recent-lead-tile' + (l.id===currentLeadId ? ' active':'');
+    tile.title = l.nome || '(sem nome)';
+    tile.addEventListener('click', ()=>selectLead(l.id));
+    const inicial = (l.nome||'?').trim().charAt(0) || '?';
+    tile.innerHTML = `<div class="avatar">${escapeHtml(inicial)}</div>
+      <span class="nm">${escapeHtml(l.nome||'(sem nome)')}</span>`;
+    box.appendChild(tile);
+  });
 }
 
 // ---------- Data efetiva do lead (para ordenação, contadores e filtros) ----------
@@ -4495,10 +4501,6 @@ function bindEvents(){
     });
   }
 
-  document.getElementById('leadSearchInput').addEventListener('input', (e)=>{
-    searchQuery = e.target.value;
-    renderLeadsList();
-  });
   document.getElementById('exportAllBtn').addEventListener('click', ()=>{
     openLeadsModal('');
   });
