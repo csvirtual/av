@@ -1441,6 +1441,27 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="trashSenhaModalOverlay" style="display:none;">
+  <div class="modal-dialog modal-dialog-reset">
+    <div class="modal-header">
+      <h2>🔒 Confirme sua senha</h2>
+      <button class="modal-close" id="trashSenhaCloseBtn" title="Fechar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" style="margin-bottom:14px;">Por segurança, toda vez que for abrir os itens excluídos é preciso confirmar sua própria senha (a mesma do seu perfil — não a da Área restrita).</div>
+      <div class="field">
+        <label>Sua senha</label>
+        <input type="password" id="trashSenhaInput" placeholder="Senha" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="reset-confirm-error" id="trashSenhaError" style="display:none;"></div>
+      <div class="reset-confirm-actions">
+        <button class="btn secondary" id="trashSenhaCancelBtn">Cancelar</button>
+        <button class="btn purple" id="trashSenhaSubmitBtn">Abrir itens excluídos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="trashModalOverlay" style="display:none;">
   <div class="modal-dialog">
     <div class="modal-header">

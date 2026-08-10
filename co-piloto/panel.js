@@ -1578,6 +1578,7 @@ async function deleteHistoryEntry(entryId){
     renderHistoryList();
   }
   await updateTrashCountBadge();
+  await registrarEventoLeadNoLog('historico_resposta_excluida', lead, 'resposta movida para os excluídos (recuperável na lixeira)');
   toast('Resposta movida para os leads excluídos 🗑️');
 }
 
@@ -1617,6 +1618,8 @@ async function clearHistory(){
     renderHistoryList();
   }
   await updateTrashCountBadge();
+  await registrarEventoLeadNoLog('historico_resposta_excluida', lead,
+    `${historicoOriginal.length} resposta${historicoOriginal.length===1?'':'s'} movida${historicoOriginal.length===1?'':'s'} para os excluídos (recuperável na lixeira)`);
   toast('Histórico movido para os leads excluídos 🗑️');
 }
 
@@ -1694,15 +1697,102 @@ async function updateTrashCountBadge(){
   }
 }
 
+// A lixeira guarda o conteúdo real de leads/respostas/conversas excluídas
+// (cifrado, mas decifrável por quem tem a DEK da sessão) — pedir a senha de
+// novo pra abri-la, mesmo dentro de uma sessão já autenticada, reduz a
+// janela de quem consegue folhear esse conteúdo (ex.: alguém que pega o
+// computador destravado um instante). De propósito NÃO é a credencial da
+// Área restrita (usuário/senha geral, auth.js) — é a mesma senha de perfil
+// já usada pra entrar (copilotoVerificarSenhaPerfil), pedida de novo. As
+// AÇÕES dentro da lixeira (restaurar, excluir definitivamente, esvaziar)
+// não pedem senha de novo — só ABRIR pede, e pede toda vez, sem "lembrar"
+// entre uma abertura e outra na mesma sessão.
 async function openTrashModal(){
-  document.getElementById('trashModalOverlay').style.display = 'flex';
-  document.body.classList.add('modal-open');
-  await renderTrashModal();
+  await abrirModalSenhaLixeira();
 }
 
 function closeTrashModal(){
   document.getElementById('trashModalOverlay').style.display = 'none';
   document.body.classList.remove('modal-open');
+}
+
+// Qual perfil deve ter a senha conferida: normalmente o perfil ativo (quem
+// está de fato usando a sessão) — mas se for o admin em modo administrador
+// (impersonando outro perfil, ver copilotoSessaoEhAdmin), pede a senha do
+// PRÓPRIO ADMIN, não a do perfil impersonado. Pedir a senha do perfil
+// impersonado seria uma armadilha: o admin entrou ali exatamente SEM saber
+// a senha dele (esse é o ponto da impersonação) — exigi-la aqui deixaria a
+// lixeira inacessível justamente pra quem tem autoridade de admin.
+async function copilotoPerfilParaSenhaLixeira(){
+  if(await copilotoSessaoEhAdmin()){
+    const adminId = await copilotoSessaoAdminIdAtual();
+    if(adminId) return copilotoObterPerfilPorId(adminId);
+  }
+  return copilotoObterPerfilAtivo();
+}
+
+async function abrirModalSenhaLixeira(){
+  const perfil = await copilotoPerfilParaSenhaLixeira();
+  if(!perfil){ toast('Nenhum perfil ativo — não foi possível abrir os itens excluídos.'); return; }
+  document.getElementById('trashSenhaInput').value = '';
+  copilotoLimparErroDoCampo(document.getElementById('trashSenhaError'));
+  copilotoCancelarBloqueioAreaRestrita('trashSenhaError');
+  document.getElementById('trashSenhaModalOverlay').style.display = 'flex';
+  document.body.classList.add('modal-open');
+  const status = await copilotoStatusBloqueioSenha(perfil.id);
+  if(status.bloqueado){
+    mostrarBloqueioSenhaLixeira(status.restanteMs);
+  }else{
+    document.getElementById('trashSenhaInput').disabled = false;
+    document.getElementById('trashSenhaSubmitBtn').disabled = false;
+    setTimeout(()=>document.getElementById('trashSenhaInput').focus(), 50);
+  }
+}
+
+function fecharModalSenhaLixeira(){
+  copilotoCancelarBloqueioAreaRestrita('trashSenhaError');
+  document.getElementById('trashSenhaModalOverlay').style.display = 'none';
+  document.body.classList.remove('modal-open');
+}
+
+function mostrarBloqueioSenhaLixeira(restanteMs){
+  copilotoMostrarBloqueioAreaRestrita('trashSenhaInput', 'trashSenhaSubmitBtn', 'trashSenhaError', restanteMs);
+}
+
+async function confirmarSenhaLixeiraClick(){
+  const perfil = await copilotoPerfilParaSenhaLixeira();
+  if(!perfil){ fecharModalSenhaLixeira(); return; }
+
+  const statusAtual = await copilotoStatusBloqueioSenha(perfil.id);
+  if(statusAtual.bloqueado){
+    mostrarBloqueioSenhaLixeira(statusAtual.restanteMs);
+    return;
+  }
+
+  const senha = document.getElementById('trashSenhaInput').value;
+  const errorEl = document.getElementById('trashSenhaError');
+  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha);
+  if(!ok){
+    const estado = await copilotoRegistrarTentativaFalha(perfil.id);
+    document.getElementById('trashSenhaInput').value = '';
+    if(estado.bloqueadoAte > Date.now()){
+      mostrarBloqueioSenhaLixeira(estado.bloqueadoAte - Date.now());
+    }else{
+      const restantes = COPILOTO_TENTATIVAS_MAX - estado.tentativas;
+      copilotoMostrarErroNoCampo(errorEl, `Senha incorreta. Mais ${restantes} tentativa${restantes===1?'':'s'} e o campo será bloqueado por 60s.`);
+      document.getElementById('trashSenhaInput').focus();
+    }
+    return;
+  }
+
+  await copilotoLimparTentativas(perfil.id);
+  copilotoLimparErroDoCampo(errorEl);
+  fecharModalSenhaLixeira();
+
+  document.getElementById('trashModalOverlay').style.display = 'flex';
+  document.body.classList.add('modal-open');
+  await renderTrashModal();
+  await copilotoRegistrarEventoLog('lixeira_aberta', await copilotoObterPerfilAtivo(), 'Itens excluídos visualizados');
 }
 
 // ---------- Modal "Avançado" (backup e restauração, protegido por usuário/senha) ----------
@@ -2468,6 +2558,7 @@ async function restoreTrashItem(itemId){
       currentHistory = hist;
       renderHistoryList();
     }
+    await registrarEventoLeadNoLog('historico_resposta_restaurada', leadExists, 'resposta restaurada dos excluídos');
     toast('Resposta restaurada no histórico ✓');
   } else if(item.type === 'botHistoryEntry'){
     // item.leadId pode ser null (conversa tida sem nenhum lead selecionado
@@ -2487,6 +2578,8 @@ async function restoreTrashItem(itemId){
     if(typeof window.restaurarEntradaHistoricoBot === 'function'){
       await window.restaurarEntradaHistoricoBot(item.leadId, entradaDecifrada);
     }
+    await copilotoRegistrarEventoLog('bot_conversa_restaurada', await copilotoObterPerfilAtivo(),
+      `Conversa do C&S - BOT com ${item.leadNome || '(lead removido)'} restaurada dos excluídos`);
     toast('Conversa restaurada no Histórico do Bot ✓');
   }
 
@@ -2494,16 +2587,30 @@ async function restoreTrashItem(itemId){
   renderTrashModal();
 }
 
+// Descrição curta de um item da lixeira pro log de auditoria — usada só na
+// exclusão DEFINITIVA (forgetTrashItem/emptyTrash), já que aí o item some
+// de vez e o log é o único registro que sobra de que ele existiu.
+function descreverItemLixeiraParaLog(item){
+  if(!item) return '(item não encontrado)';
+  if(item.type === 'lead') return `lead "${(item.leadData && item.leadData.nome) || '(sem nome)'}"`;
+  if(item.type === 'botHistoryEntry') return `conversa do C&S - BOT com ${item.leadNome || '(lead removido)'}`;
+  return `resposta do histórico de ${item.leadNome || '(lead removido)'}`; // historyEntry
+}
+
 async function forgetTrashItem(itemId){
   const confirmado = await copilotoConfirmar('Essa ação não pode ser desfeita.',
     { titulo: 'Excluir este item definitivamente?', textoConfirmar: 'Excluir definitivamente', perigo: true });
   if(!confirmado) return;
-  await mutarTrash(async (trash) => {
+  const item = await mutarTrash(async (trash) => {
+    const achado = trash.find(t=>t.id===itemId) || null;
     const newTrash = trash.filter(t=>t.id!==itemId);
     await copilotoStorage.local.set({ trash: newTrash });
+    return achado;
   });
   await updateTrashCountBadge();
   renderTrashModal();
+  await copilotoRegistrarEventoLog('lixeira_item_excluido_definitivamente', await copilotoObterPerfilAtivo(),
+    `Excluído para sempre: ${descreverItemLixeiraParaLog(item)}`);
   toast('Excluído definitivamente');
 }
 
@@ -2514,11 +2621,14 @@ async function emptyTrash(){
     `${trash.length} ite${trash.length===1?'m':'ns'} ${trash.length===1?'será':'serão'} apagado${trash.length===1?'':'s'} para sempre e não poderá${trash.length===1?'':'ão'} mais ser restaurado${trash.length===1?'':'s'}.`,
     { titulo: 'Excluir tudo definitivamente?', textoConfirmar: 'Excluir tudo', perigo: true });
   if(!confirmado) return;
+  const quantidade = trash.length;
   await mutarTrash(async () => {
     await copilotoStorage.local.set({ trash: [] });
   });
   await updateTrashCountBadge();
   renderTrashModal();
+  await copilotoRegistrarEventoLog('lixeira_esvaziada', await copilotoObterPerfilAtivo(),
+    `${quantidade} ite${quantidade===1?'m':'ns'} excluído${quantidade===1?'':'s'} para sempre`);
   toast('Tudo excluído definitivamente');
 }
 
@@ -4304,6 +4414,11 @@ function bindEvents(){
   bindOverlayClose('relatorioModalOverlay', closeLeadsReportModal);
 
   document.getElementById('trashBtn').addEventListener('click', openTrashModal);
+  document.getElementById('trashSenhaCloseBtn').addEventListener('click', fecharModalSenhaLixeira);
+  document.getElementById('trashSenhaCancelBtn').addEventListener('click', fecharModalSenhaLixeira);
+  bindOverlayClose('trashSenhaModalOverlay', fecharModalSenhaLixeira);
+  document.getElementById('trashSenhaSubmitBtn').addEventListener('click', confirmarSenhaLixeiraClick);
+  bindEnterKey('trashSenhaInput', confirmarSenhaLixeiraClick);
   document.getElementById('avancadoBtn').addEventListener('click', openAvancadoModal);
   document.getElementById('bancoDadosBtn').addEventListener('click', abrirBancoDadosModal);
   document.getElementById('bancoDadosCloseBtn').addEventListener('click', fecharBancoDadosModal);
@@ -5301,7 +5416,13 @@ const LOG_TIPO_INFO = {
   lead_excluido:                 { icone: '🗑️', label: 'Lead movido para excluídos' },
   lead_restaurado:               { icone: '♻️', label: 'Lead restaurado' },
   leads_importados:              { icone: '📇', label: 'Leads importados em lote' },
-  bot_conversa_excluida:         { icone: '🗑️', label: 'Conversa do C&S - BOT movida para excluídos' }
+  bot_conversa_excluida:         { icone: '🗑️', label: 'Conversa do C&S - BOT movida para excluídos' },
+  bot_conversa_restaurada:       { icone: '♻️', label: 'Conversa do C&S - BOT restaurada' },
+  historico_resposta_excluida:   { icone: '🗑️', label: 'Resposta do histórico movida para excluídos' },
+  historico_resposta_restaurada: { icone: '♻️', label: 'Resposta do histórico restaurada' },
+  lixeira_aberta:                { icone: '🔓', label: 'Itens excluídos visualizados' },
+  lixeira_item_excluido_definitivamente: { icone: '💥', label: 'Item da lixeira excluído definitivamente' },
+  lixeira_esvaziada:             { icone: '💥', label: 'Lixeira esvaziada' }
 };
 
 function formatarDataHoraLog(iso){
