@@ -1954,6 +1954,7 @@ Nascimento: 20/01/1992"></textarea>
           <p>Nada se perde ao trocar de lead ou fechar o painel — mensagem, contexto e a última resposta ficam salvos por lead. Proteção contra gasto à toa: colar a mesma mensagem que já gerou resposta antes avisa antes de gerar de novo; recolar a conversa com só mensagens novas no final manda pra IA só a parte nova, não a conversa toda. O botão "Ver mensagem do lead", que aparece perto da resposta, pula direto pro item correspondente no histórico.</p>
           <p><b>💬 Chat rápido (C&amp;S BOT)</b> — um chat livre com a IA, pra tirar dúvida rápida sobre como agir ("como eu abordo esse lead agora?", "como respondo essa objeção de preço?", "me dá uma ideia de follow-up") sem precisar colar mensagem nem preencher os campos acima. Abre pelo botão roxo 💬, flutuante no canto inferior direito, ao lado do "voltar ao topo". Reaproveita a mesma infraestrutura: o provedor/chave configurados em Configurações, o mesmo roteamento por estágio (<a href="#" class="help-goto" data-secao="10">ver seção 10</a>) e os mesmos contadores de uso/custo. Se houver um lead selecionado no painel, o contexto dele (nome, objetivo/notas, estágio) entra automaticamente na conversa; sem lead selecionado, responde de forma genérica. Cada nova pergunta reenvia as anteriores desta mesma conversa como contexto — por isso a conversa em andamento (não o histórico salvo) é limpa sempre que você troca de lead.</p>
           <p>A cada mensagem enviada, o chat lê sozinho o estágio e a emoção do cliente a partir do próprio texto (mostrado na barra "🔍 Leitura automática" acima da caixa de digitar) — mesma ideia do "🔍 Sugerir estágio com IA" logo acima, só que automática a cada envio. Se a leitura não bater, dá pra fixar um estágio manualmente no seletor da barra de contexto, valendo pras próximas mensagens desta conversa até você trocar de novo ou trocar de lead. Cada resposta tem um botão "Copiar" e mostra uma legenda discreta de qual chave/modelo respondeu (ex.: "🔀 Gemini · Chave B · nível avançado"). O <b>Histórico do Bot</b>, na tela principal do lead (abaixo do "Histórico de respostas"), guarda toda troca desse chat com aquele lead, com busca e exclusão por item ou tudo de uma vez (<a href="#" class="help-goto" data-secao="7">ver seção 7</a>).</p>
+          <p><b>Perguntas sobre o próprio Co-piloto</b> (ex.: "como funciona a lixeira?", "o que o admin pode fazer?") o C&amp;S BOT tenta responder direto deste guia e da tela de Privacidade — sem gastar IA, sem precisar de nenhuma chave configurada (a legenda "📖 Direto de [...] — sem usar IA" aparece nesses casos). Isso depende de a pergunta bater com algum assunto conhecido, então nem sempre acerta de primeira. Digite <code>/help</code> pra ver a lista completa de assuntos disponíveis (sempre sem gastar IA também), ou <code>/help</code> seguido do número ou de uma palavra do assunto (ex.: <code>/help lixeira</code>) pra abrir um deles direto.</p>
         </div>
       </div>
 
@@ -2003,7 +2004,7 @@ Nascimento: 20/01/1992"></textarea>
       <div class="accordion-item" id="helpSecao7">
         <button class="accordion-header">
           <span class="accordion-icon">🕒</span>
-          <span class="accordion-title">7. Histórico de respostas e Leads excluídos</span>
+          <span class="accordion-title">7. Histórico de respostas e Leads excluídos (a "lixeira")</span>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
@@ -2331,7 +2332,7 @@ Nascimento: 20/01/1992"></textarea>
     </div>
     <div class="chat-messages" id="chatMessagesBox"></div>
     <div class="chat-input-row">
-      <textarea id="chatInputBox" class="chat-input" rows="1" placeholder="Pergunte sobre abordagem, follow-up, objeção..."></textarea>
+      <textarea id="chatInputBox" class="chat-input" rows="1" placeholder="Pergunte sobre abordagem, follow-up, objeção... (ou digite /help pra ver tudo, sem gastar IA)"></textarea>
       <button class="btn primary" id="chatSendBtn" title="Enviar">➤</button>
     </div>
   </div>

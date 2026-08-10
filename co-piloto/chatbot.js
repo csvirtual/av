@@ -395,7 +395,15 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   const PESO_CORPO = 1;
   const LIMIAR_RELEVANCIA = 3;
 
-  function encontrarSecaoAjudaRelevante(mensagem){
+  // Pontua todas as seções pra uma mensagem e devolve a de maior pontuação
+  // (ou null, se nenhuma palavra relevante foi digitada) — sem aplicar
+  // nenhum limiar aqui; quem chama decide o quão exigente ser (ver
+  // encontrarSecaoAjudaRelevante, que aplica LIMIAR_RELEVANCIA pra leitura
+  // automática, e acharSecaoPorComando, mais abaixo, que não aplica nenhum —
+  // um pedido explícito via /help não precisa da mesma exigência de uma
+  // leitura automática tentando adivinhar se a pergunta era mesmo sobre o
+  // Co-piloto).
+  function melhorSecaoAjudaPara(mensagem){
     const palavrasQuery = palavrasRelevantes(mensagem);
     if(!palavrasQuery.length) return null;
 
@@ -414,7 +422,74 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       }
     });
 
-    return melhorPontuacao >= LIMIAR_RELEVANCIA ? melhor : null;
+    return { secao: melhor, pontuacao: melhorPontuacao };
+  }
+
+  function encontrarSecaoAjudaRelevante(mensagem){
+    const resultado = melhorSecaoAjudaPara(mensagem);
+    if(!resultado) return null;
+    return resultado.pontuacao >= LIMIAR_RELEVANCIA ? resultado.secao : null;
+  }
+
+  // ---------- Comando "/help" (menu completo dos assuntos, sem IA) ----------
+  //
+  // A leitura automática acima (encontrarSecaoAjudaRelevante) só acerta
+  // quando a pergunta bate o bastante com o título/corpo de UMA seção — boa
+  // pra uma pergunta certeira ("como funciona a lixeira?"), mas não ajuda
+  // quem não sabe nem por onde começar, ou escreveu de um jeito que não
+  // bateu o limiar. "/help" (ou "/ajuda") resolve isso: lista TODOS os
+  // assuntos do "Como usar"/Privacidade, numerados — e "/help <número ou
+  // palavra>" abre um deles direto, sem precisar do mesmo limiar da leitura
+  // automática (é um pedido explícito, não uma adivinhação). Sempre sem
+  // gastar IA nenhuma, funciona mesmo sem nenhuma chave de API configurada
+  // — mesma garantia da resposta automática por palavra-chave.
+  const COMANDOS_HELP = ['/help', '/ajuda'];
+
+  // Devolve '' se a mensagem for só o comando ("/help"), o texto depois dele
+  // ("lixeira", "3") se vier algo junto, ou null se a mensagem não é um
+  // comando de ajuda (segue pro fluxo normal).
+  function argumentoComandoHelp(mensagem){
+    const normalizado = normalizarTextoAjuda((mensagem || '').trim());
+    for(const cmd of COMANDOS_HELP){
+      if(normalizado === cmd) return '';
+      if(normalizado.startsWith(cmd + ' ')) return mensagem.trim().slice(cmd.length).trim();
+    }
+    return null;
+  }
+
+  function montarMenuAjudaHtml(){
+    const porOrigem = new Map();
+    coletarSecoesAjuda().forEach((secao, i) => {
+      const numero = i + 1;
+      if(!porOrigem.has(secao.origem)) porOrigem.set(secao.origem, []);
+      porOrigem.get(secao.origem).push(`<li><code>/help ${numero}</code> — ${escapeHtml(secao.titulo)}</li>`);
+    });
+    let html = '<p><b>📚 Tudo que dá pra perguntar aqui, sem gastar IA</b></p>' +
+      '<p>Digite o comando de um item abaixo, ou pergunte sobre o assunto com suas próprias palavras.</p>';
+    porOrigem.forEach((itens, origem) => {
+      html += `<p><b>${escapeHtml(origem)}</b></p><ul>${itens.join('')}</ul>`;
+    });
+    return html;
+  }
+
+  function montarMenuAjudaTexto(){
+    let texto = 'Tudo que dá pra perguntar aqui, sem gastar IA:\n';
+    coletarSecoesAjuda().forEach((secao, i) => {
+      texto += `${i + 1}. [${secao.origem}] ${secao.titulo}\n`;
+    });
+    return texto.trim();
+  }
+
+  // "/help 3" (número da lista acima) ou "/help lixeira" (palavra do
+  // assunto) — sem limiar mínimo de pontuação (ver melhorSecaoAjudaPara):
+  // um pedido explícito já é intenção suficiente, mesmo que o casamento de
+  // palavras seja fraco.
+  function acharSecaoPorComando(argumento){
+    const secoes = coletarSecoesAjuda();
+    const numero = parseInt(argumento, 10);
+    if(!isNaN(numero) && numero >= 1 && numero <= secoes.length) return secoes[numero - 1];
+    const resultado = melhorSecaoAjudaPara(argumento);
+    return resultado ? resultado.secao : null;
   }
 
   // Lê a versão direto do manifest.json (nunca hardcoded aqui), pra nunca
@@ -660,6 +735,25 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }, 1000);
   }
 
+  // Fecha o turno de uma resposta que não precisou de IA (achado automático
+  // por palavra-chave, OU o comando /help, mais abaixo) — sempre a mesma
+  // sequência: mostra a bolha, guarda na conversa em andamento e no
+  // Histórico do Bot persistente, cancela um aviso de "sem chave" de uma
+  // pergunta ANTERIOR que porventura ainda estivesse contando (ver
+  // mostrarAvisoSemChave — sem isto ele dispararia sozinho daqui a pouco e
+  // navegaria pra Configurações mesmo a pessoa acabando de receber uma
+  // resposta útil), e libera a caixa de novo. Compartilhada pelas duas
+  // origens de resposta sem IA pra não duplicar essa sequência.
+  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
+    renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
+    chatHistorico.push({ role: 'ai', texto: respostaTexto });
+    registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
+    cancelarAvisoSemChave();
+    chatOcupado = false;
+    elSend().disabled = false;
+    input.focus();
+  }
+
   async function enviarMensagemChat(){
     if(chatOcupado) return;
     const input = elInput();
@@ -682,13 +776,40 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     renderMensagem('user', texto);
     chatHistorico.push({ role: 'user', texto });
 
+    // "/help" (lista completa dos assuntos) ou "/help <número ou palavra>"
+    // (abre um deles direto) — ver argumentoComandoHelp/acharSecaoPorComando
+    // acima. Checado ANTES da leitura automática por palavra-chave, logo
+    // abaixo: um comando explícito nunca deveria "perder" pra IA só porque a
+    // pergunta não bateu o limiar de relevância — é justamente o caminho
+    // pra quando aquela leitura automática não ajuda. Sem nenhum await até
+    // aqui, não há risco de troca de lead no meio do caminho.
+    const argumentoHelp = argumentoComandoHelp(texto);
+    if(argumentoHelp !== null){
+      if(!argumentoHelp){
+        finalizarRespostaSemIA(texto, montarMenuAjudaTexto(), montarMenuAjudaHtml(),
+          '📖 Menu de ajuda — sem usar IA', leadIdDoEnvio, input);
+      }else{
+        const secao = acharSecaoPorComando(argumentoHelp);
+        if(secao){
+          const respostaTexto = `${secao.titulo}\n\n${secao.texto}`;
+          const respostaHtml = `<p><b>${escapeHtml(secao.titulo)}</b></p>${secao.html}`;
+          finalizarRespostaSemIA(texto, respostaTexto, respostaHtml,
+            `📖 Direto de "${secao.origem}" — sem usar IA`, leadIdDoEnvio, input);
+        }else{
+          finalizarRespostaSemIA(texto,
+            `Não encontrei nada sobre "${argumentoHelp}". Digite só "/help" pra ver a lista completa de assuntos.`,
+            null, '📖 Sem usar IA', leadIdDoEnvio, input);
+        }
+      }
+      return;
+    }
+
     // Pergunta claramente sobre o próprio Co-piloto (achou uma seção de
     // ajuda bem casada — ver encontrarSecaoAjudaRelevante) responde direto
     // do guia "Como usar"/"Privacidade", sem gastar IA nenhuma — funciona
     // mesmo sem nenhuma chave de API configurada. Só perguntas SEM uma
     // seção clara (a maioria: sobre o lead/venda) seguem pro fluxo de IA
-    // normal, logo abaixo. Sem nenhum await entre o clique e este ponto,
-    // não há risco de troca de lead no meio do caminho aqui.
+    // normal, logo abaixo.
     const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
     if(secaoAjudaDireta){
       // respostaDireta (texto puro) é o que vai pro histórico salvo e pro
@@ -698,18 +819,8 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       // apresentações — nenhuma palavra muda entre as duas.
       const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
       const respostaDiretaHtml = `<p><b>${escapeHtml(secaoAjudaDireta.titulo)}</b></p>${secaoAjudaDireta.html}`;
-      renderMensagem('ai', respostaDireta, { legenda: `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, html: respostaDiretaHtml });
-      chatHistorico.push({ role: 'ai', texto: respostaDireta });
-      registrarTrocaNoHistoricoBot(texto, respostaDireta, leadIdDoEnvio);
-      // Esta resposta não precisou de chave nenhuma — mas se um aviso de
-      // "sem chave" de uma pergunta ANTERIOR ainda estiver contando (ver
-      // mostrarAvisoSemChave), sem cancelar aqui ele dispararia sozinho
-      // daqui a pouco e navegaria pra Configurações mesmo a pessoa
-      // acabando de receber uma resposta útil, sem ter pedido isso.
-      cancelarAvisoSemChave();
-      chatOcupado = false;
-      elSend().disabled = false;
-      input.focus();
+      finalizarRespostaSemIA(texto, respostaDireta, respostaDiretaHtml,
+        `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, leadIdDoEnvio, input);
       return;
     }
 
