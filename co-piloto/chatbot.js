@@ -737,16 +737,28 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
   // Fecha o turno de uma resposta que não precisou de IA (achado automático
   // por palavra-chave, OU o comando /help, mais abaixo) — sempre a mesma
-  // sequência: mostra a bolha, guarda na conversa em andamento e no
-  // Histórico do Bot persistente, cancela um aviso de "sem chave" de uma
-  // pergunta ANTERIOR que porventura ainda estivesse contando (ver
-  // mostrarAvisoSemChave — sem isto ele dispararia sozinho daqui a pouco e
-  // navegaria pra Configurações mesmo a pessoa acabando de receber uma
-  // resposta útil), e libera a caixa de novo. Compartilhada pelas duas
-  // origens de resposta sem IA pra não duplicar essa sequência.
-  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input){
+  // sequência: mostra a bolha, guarda no Histórico do Bot persistente
+  // (pra aparecer depois na tela principal do lead), cancela um aviso de
+  // "sem chave" de uma pergunta ANTERIOR que porventura ainda estivesse
+  // contando (ver mostrarAvisoSemChave — sem isto ele dispararia sozinho
+  // daqui a pouco e navegaria pra Configurações mesmo a pessoa acabando de
+  // receber uma resposta útil), e libera a caixa de novo. Compartilhada
+  // pelas duas origens de resposta sem IA pra não duplicar essa sequência.
+  //
+  // `entraNoContextoDaIA` decide se esta troca também entra em
+  // `chatHistorico` — o que é reenviado pra IA como contexto a cada NOVA
+  // mensagem desta mesma conversa (ver buildChatDynamicContext). Pra uma
+  // pergunta em linguagem natural que só por acaso bateu com uma seção do
+  // guia (a leitura automática, ver encontrarSecaoAjudaRelevante), faz
+  // sentido continuar valendo como conversa de verdade. Já "/help" e sua
+  // resposta são navegação de tela, não conversa — sem excluir do
+  // contexto, o menu inteiro (ou o texto de uma seção inteira) ficaria
+  // "andando junto", sendo reenviado (e cobrado) em TODA chamada de IA
+  // seguinte desta mesma conversa, mesmo sem nenhuma relação com o que
+  // estiver sendo perguntado dali pra frente.
+  function finalizarRespostaSemIA(perguntaOriginal, respostaTexto, respostaHtml, legenda, leadIdDoEnvio, input, entraNoContextoDaIA){
     renderMensagem('ai', respostaTexto, { legenda, html: respostaHtml });
-    chatHistorico.push({ role: 'ai', texto: respostaTexto });
+    if(entraNoContextoDaIA) chatHistorico.push({ role: 'ai', texto: respostaTexto });
     registrarTrocaNoHistoricoBot(perguntaOriginal, respostaTexto, leadIdDoEnvio);
     cancelarAvisoSemChave();
     chatOcupado = false;
@@ -774,7 +786,6 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     input.style.height = 'auto';
 
     renderMensagem('user', texto);
-    chatHistorico.push({ role: 'user', texto });
 
     // "/help" (lista completa dos assuntos) ou "/help <número ou palavra>"
     // (abre um deles direto) — ver argumentoComandoHelp/acharSecaoPorComando
@@ -782,34 +793,41 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // abaixo: um comando explícito nunca deveria "perder" pra IA só porque a
     // pergunta não bateu o limiar de relevância — é justamente o caminho
     // pra quando aquela leitura automática não ajuda. Sem nenhum await até
-    // aqui, não há risco de troca de lead no meio do caminho.
+    // aqui, não há risco de troca de lead no meio do caminho. De propósito
+    // NÃO entra em chatHistorico (nem o comando, nem a resposta) — ver o
+    // comentário de entraNoContextoDaIA em finalizarRespostaSemIA.
     const argumentoHelp = argumentoComandoHelp(texto);
     if(argumentoHelp !== null){
       if(!argumentoHelp){
         finalizarRespostaSemIA(texto, montarMenuAjudaTexto(), montarMenuAjudaHtml(),
-          '📖 Menu de ajuda — sem usar IA', leadIdDoEnvio, input);
+          '📖 Menu de ajuda — sem usar IA', leadIdDoEnvio, input, false);
       }else{
         const secao = acharSecaoPorComando(argumentoHelp);
         if(secao){
           const respostaTexto = `${secao.titulo}\n\n${secao.texto}`;
           const respostaHtml = `<p><b>${escapeHtml(secao.titulo)}</b></p>${secao.html}`;
           finalizarRespostaSemIA(texto, respostaTexto, respostaHtml,
-            `📖 Direto de "${secao.origem}" — sem usar IA`, leadIdDoEnvio, input);
+            `📖 Direto de "${secao.origem}" — sem usar IA`, leadIdDoEnvio, input, false);
         }else{
           finalizarRespostaSemIA(texto,
             `Não encontrei nada sobre "${argumentoHelp}". Digite só "/help" pra ver a lista completa de assuntos.`,
-            null, '📖 Sem usar IA', leadIdDoEnvio, input);
+            null, '📖 Sem usar IA', leadIdDoEnvio, input, false);
         }
       }
       return;
     }
+
+    chatHistorico.push({ role: 'user', texto });
 
     // Pergunta claramente sobre o próprio Co-piloto (achou uma seção de
     // ajuda bem casada — ver encontrarSecaoAjudaRelevante) responde direto
     // do guia "Como usar"/"Privacidade", sem gastar IA nenhuma — funciona
     // mesmo sem nenhuma chave de API configurada. Só perguntas SEM uma
     // seção clara (a maioria: sobre o lead/venda) seguem pro fluxo de IA
-    // normal, logo abaixo.
+    // normal, logo abaixo. Esta, diferente do /help acima, ENTRA em
+    // chatHistorico: nasceu de uma pergunta em linguagem natural (não um
+    // comando de navegação), então pode ser o início de um assunto que
+    // continua nas próximas mensagens desta conversa.
     const secaoAjudaDireta = encontrarSecaoAjudaRelevante(texto);
     if(secaoAjudaDireta){
       // respostaDireta (texto puro) é o que vai pro histórico salvo e pro
@@ -820,7 +838,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       const respostaDireta = `${secaoAjudaDireta.titulo}\n\n${secaoAjudaDireta.texto}`;
       const respostaDiretaHtml = `<p><b>${escapeHtml(secaoAjudaDireta.titulo)}</b></p>${secaoAjudaDireta.html}`;
       finalizarRespostaSemIA(texto, respostaDireta, respostaDiretaHtml,
-        `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, leadIdDoEnvio, input);
+        `📖 Direto de "${secaoAjudaDireta.origem}" — sem usar IA`, leadIdDoEnvio, input, true);
       return;
     }
 
