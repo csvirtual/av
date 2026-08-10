@@ -31,6 +31,10 @@ function filtrarLeadsPorBusca(list, query){
   );
 }
 
+// Busca da lateral (#leadSearchInput) — filtra o que aparece na tira de
+// leads recentes da tela inicial, não uma lista própria (ver
+// renderRecentLeadsStrip).
+let searchQuery = '';
 let usageStats = {};
 let historySearchQuery = '';
 let campanhaAtiva = false;
@@ -964,31 +968,44 @@ function renderLeadsList(){
 }
 
 // ---------- Tira horizontal "N últimos leads cadastrados" (tela inicial) ----------
-// Antes vivia na lateral (lista vertical, com busca) — agora fica na tela
-// inicial, num card PRÓPRIO (não colado no card branco do "Pronto para
-// atender o próximo lead" — ver #homeEmptyState em panel.html), como uma
-// tira de cartões lado a lado. A lateral hoje só tem os dois atalhos fixos
-// (@csvirtual e @C&S_BOT, ver acima); achar um lead específico por nome/
-// telefone continua em "Ver / exportar leads" (modal dedicado, com busca de
-// verdade — não perdeu a função, só de endereço). Some junto com o resto da
-// tela inicial quando um lead é aberto (goToHome/selectLead escondem
-// #homeEmptyState inteiro, ver os dois cards nele).
+// Antes vivia na lateral (lista vertical, com busca embutida) — agora fica
+// na tela inicial, num card PRÓPRIO (não colado no card branco do "Pronto
+// para atender o próximo lead" — ver #homeEmptyState em panel.html), como
+// uma tira de cartões lado a lado. A BUSCA continua na lateral
+// (#leadSearchInput, ver bindEvents) — só o RESULTADO dela mudou de
+// endereço: em vez de uma lista própria ali do lado, filtra o que aparece
+// nesta mesma tira, no lugar dos recentes (mesmo raciocínio de
+// "Resultados da busca" que a lateral já tinha antes). Some junto com o
+// resto da tela inicial quando um lead é aberto (goToHome/selectLead
+// escondem #homeEmptyState inteiro, ver os dois cards nele).
 const LEADS_RECENTES_QTD = 7;
 function renderRecentLeadsStrip(){
   const box = document.getElementById('recentLeadsStrip');
+  const titleBox = document.getElementById('recentLeadsTitle');
   if(!box) return;
   box.innerHTML = '';
 
+  const isSearching = !!searchQuery.trim();
   // Mesmo critério de ordenação de sempre: data de CADASTRO (criadoEm), não
   // a data efetiva do lead (editável manualmente, bagunçaria a ordem real
-  // de entrada no sistema).
-  const list = leads.filter(l=>l.id!==FIXED_LEAD_ID)
+  // de entrada no sistema). Buscando, mostra TODOS os que baterem (sem
+  // cortar em 7) — a tira rola horizontalmente se não couberem, mesma
+  // ideia de antes na lateral (lista vertical, sem limite ao buscar).
+  const todosOrdenados = leads.filter(l=>l.id!==FIXED_LEAD_ID)
     .slice()
-    .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm))
-    .slice(0, LEADS_RECENTES_QTD);
+    .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
+  const list = isSearching
+    ? filtrarLeadsPorBusca(todosOrdenados, searchQuery)
+    : todosOrdenados.slice(0, LEADS_RECENTES_QTD);
+
+  if(titleBox){
+    titleBox.textContent = isSearching ? 'Resultados da busca' : `${LEADS_RECENTES_QTD} últimos leads cadastrados`;
+  }
 
   if(!list.length){
-    box.innerHTML = '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
+    box.innerHTML = isSearching
+      ? '<div class="leads-empty">Nenhum lead encontrado.</div>'
+      : '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
     return;
   }
   list.forEach(l=>{
@@ -4558,6 +4575,10 @@ function bindEvents(){
     });
   }
 
+  document.getElementById('leadSearchInput').addEventListener('input', (e)=>{
+    searchQuery = e.target.value;
+    renderRecentLeadsStrip();
+  });
   document.getElementById('exportAllBtn').addEventListener('click', ()=>{
     openLeadsModal('');
   });

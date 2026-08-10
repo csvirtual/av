@@ -826,6 +826,10 @@
   .stat-num{ font-family:'Fraunces',serif; font-size:20px; color:#fff; line-height:1.1; }
   .stat-lbl{ font-size:9.5px; color:#9FC1B8; text-transform:uppercase; letter-spacing:.02em; margin-top:2px; }
 
+  .lead-search{
+    background:#0D4A42; border:1px solid #1B5E54; color:#fff;
+  }
+  .lead-search::placeholder{ color:#8FB4AB; }
   .leads-empty{ color:#9FC1B8; font-size:12.5px; padding:8px 4px; }
   .btn-sidebar{
     width:100%; display:flex; align-items:center; justify-content:center; gap:9px;
@@ -1158,12 +1162,16 @@
 
     <div class="stats-bar" id="statsBar"></div>
 
+    <!-- Filtra a tira de leads recentes na tela inicial (#recentLeadsStrip)
+         — não tem lista própria aqui na lateral: digitar troca o conteúdo
+         daquela tira pro resultado da busca, e limpar o campo volta a
+         mostrar os recentes (ver renderRecentLeadsStrip, panel.js). -->
+    <input type="text" id="leadSearchInput" class="lead-search" placeholder="🔍 Buscar lead por nome ou número">
+
     <div class="sidebar-divider"></div>
 
     <!-- Só os dois atalhos fixos (@csvirtual e @C&S_BOT) — ver
-         renderLeadsList em panel.js. Os leads recentes de verdade agora
-         aparecem na tela inicial (#recentLeadsStrip); achar um lead
-         específico continua em "Ver / exportar leads" abaixo. -->
+         renderLeadsList em panel.js. -->
     <div class="leads-list" id="leadsList"></div>
 
     <div class="sidebar-divider"></div>
@@ -1260,14 +1268,16 @@
          selectLead/deleteLead mostram/escondem #homeEmptyState inteiro de
          uma vez, em vez de mexer em cada card por dentro separadamente. -->
     <div id="homeEmptyState">
-      <!-- Tira horizontal com os leads mais recentes (ver renderRecentLeadsStrip,
-           panel.js) — substituiu a lista que antes ficava na lateral. Card
-           PRÓPRIO (não colado no card branco do "Pronto para atender" logo
-           abaixo) — mesmo padrão de cards empilhados usado no resto do app
-           (Dados do lead, Central de mensagens etc.), pra ficar coerente com
-           a aparência geral da tela em vez de inventar um visual novo. -->
+      <!-- Tira horizontal com os leads mais recentes — ou o resultado da
+           busca da lateral (#leadSearchInput), enquanto ela tiver algo
+           digitado (ver renderRecentLeadsStrip, panel.js). Substituiu a
+           lista vertical que antes ficava na lateral. Card PRÓPRIO (não
+           colado no card branco do "Pronto para atender" logo abaixo) —
+           mesmo padrão de cards empilhados usado no resto do app (Dados do
+           lead, Central de mensagens etc.), pra ficar coerente com a
+           aparência geral da tela em vez de inventar um visual novo. -->
       <div class="card recent-leads-card">
-        <div class="recent-leads-title">7 últimos leads cadastrados</div>
+        <div class="recent-leads-title" id="recentLeadsTitle">7 últimos leads cadastrados</div>
         <div class="recent-leads-strip" id="recentLeadsStrip"></div>
       </div>
 
