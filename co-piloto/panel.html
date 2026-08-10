@@ -738,7 +738,12 @@
     border-radius:18px; padding:17px 20px 17px 18px;
     box-shadow:0 4px 16px rgba(124,58,168,.10);
     position:relative; overflow:hidden;
+    transition:opacity .22s ease;
   }
+  /* Estado de transição entre os 2 avisos que se alternam a cada 5s (ver
+     iniciarRotacaoAvisoInicial, panel.js) — fica opaco só o tempo de trocar
+     o conteúdo por baixo, nunca chega a sumir de vez. */
+  .no-auto-notice.fading{ opacity:0; }
   .no-auto-notice::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
     background:linear-gradient(180deg, var(--purple), #B27FD1);
@@ -1302,13 +1307,16 @@
            espaçamento padrão entre cards (margin-bottom do próprio
            #noLeadState.card já abre o respiro), em vez de depender do fundo
            branco do card anterior. -->
+      <!-- Alterna entre 2 avisos a cada 5s (ver iniciarRotacaoAvisoInicial,
+           panel.js) — o texto/ícone daqui são só o estado inicial (1º
+           slide), antes do primeiro giro; o JS assume o controle depois. -->
       <div class="no-auto-notice">
         <div class="no-auto-notice-header">
-          <div class="no-auto-notice-icon">🔒</div>
-          <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
+          <div class="no-auto-notice-icon" id="noAutoNoticeIcon">🔒</div>
+          <div class="no-auto-notice-title" id="noAutoNoticeTitle">Sem automação dentro do WhatsApp</div>
         </div>
         <div class="no-auto-notice-body">
-          <div class="no-auto-notice-text">
+          <div class="no-auto-notice-text" id="noAutoNoticeText">
             O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
             isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
             copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
