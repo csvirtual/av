@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Co-piloto de vendas com IA - C&S Virtual",
-  "version": "2.49.1",
+  "version": "2.49.2",
   "description": "Seu braço direito nas vendas consultivas pelo WhatsApp.",
   "action": {
     "default_title": "Abrir o Co-piloto de vendas"
