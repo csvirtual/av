@@ -64,9 +64,9 @@ function filtrarLeadsPorBusca(list, query){
   });
 }
 
-// Busca da lateral (#leadSearchInput) — filtra o que aparece na tira de
-// leads recentes da tela inicial, não uma lista própria (ver
-// renderRecentLeadsStrip).
+// Busca da lateral (#leadSearchInput) — alimenta o dropdown flutuante
+// ancorado no próprio campo, não uma lista fixa na tela (ver
+// renderLeadSearchDropdown).
 let searchQuery = '';
 let usageStats = {};
 let historySearchQuery = '';
@@ -982,70 +982,75 @@ function renderLeadsList(){
     box.appendChild(pinned);
   }
 
-  renderRecentLeadsStrip();
   renderStatsBar();
   renderFunilOverview();
 }
 
-// ---------- "Resultados da busca" (tela inicial) + modal dos últimos leads ----------
-// Antes esta tira mostrava os "N últimos leads cadastrados" por padrão, fixa
-// na tela inicial. Virou só o resultado da busca da lateral
-// (#leadSearchInput, ver bindEvents): SEM busca, o card fica escondido e
-// quem ocupa o espaço é o "Pronto para atender" (#noLeadState) logo abaixo;
-// COM busca, mostra os leads encontrados. Os "N últimos cadastrados" que
-// antes apareciam aqui viraram um modal à parte (ver openUltimosLeadsModal
-// mais abaixo), aberto pelo ícone ao lado do Health Monitor — não polui
-// mais a tela inicial por padrão. Some junto com o resto da tela inicial
-// quando um lead é aberto (goToHome/selectLead escondem #homeEmptyState
-// inteiro, ver os cards nele).
+// ---------- Dropdown de busca de leads (#leadSearchInput) + modal dos últimos leads ----------
+// Antes o resultado da busca vivia fixo na tela inicial (trocando de lugar
+// com o "Pronto para atender"). Virou um dropdown flutuante ancorado no
+// próprio campo de busca (.lead-search-dropdown, CSS em panel.html) —
+// mesmo padrão de autocomplete usado por Gmail/Slack/Notion: aparece com o
+// campo focado + algo digitado, fecha ao clicar fora, ao selecionar um
+// lead ou ao apagar a busca (ver bindEvents). Por isso não depende mais do
+// ciclo de renderLeadsList — é inteiramente orientado a eventos do próprio
+// campo, e qualquer clique fora dele já fecha o dropdown antes de qualquer
+// outra ação mexer na lista de leads. Os "N últimos cadastrados" (o que
+// aparecia aqui por padrão antes de tudo isso) viraram um modal à parte
+// (ver openUltimosLeadsModal mais abaixo), aberto pelo ícone ao lado do
+// Health Monitor.
 const LEADS_RECENTES_QTD = 7;
-function renderRecentLeadsStrip(){
-  const cardWrap = document.getElementById('recentLeadsCard');
-  const box = document.getElementById('recentLeadsStrip');
-  const titleBox = document.getElementById('recentLeadsTitle');
-  const noLeadState = document.getElementById('noLeadState');
-  if(!box) return;
-  box.innerHTML = '';
+function hideLeadSearchDropdown(){
+  const dd = document.getElementById('leadSearchDropdown');
+  if(dd) dd.classList.remove('show');
+}
 
-  const isSearching = !!searchQuery.trim();
-  if(cardWrap) cardWrap.style.display = isSearching ? '' : 'none';
-  if(noLeadState) noLeadState.style.display = isSearching ? 'none' : '';
-  if(!isSearching) return;
+function renderLeadSearchDropdown(){
+  const dd = document.getElementById('leadSearchDropdown');
+  if(!dd) return;
+  if(!searchQuery.trim()){ hideLeadSearchDropdown(); return; }
 
   // Mesmo critério de ordenação de sempre: data de CADASTRO (criadoEm), não
   // a data efetiva do lead (editável manualmente, bagunçaria a ordem real
-  // de entrada no sistema). Buscando, mostra TODOS os que baterem (sem
-  // cortar em 7) — a tira rola horizontalmente se não couberem.
+  // de entrada no sistema).
   const todosOrdenados = leads.filter(l=>l.id!==FIXED_LEAD_ID)
     .slice()
     .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
   const list = filtrarLeadsPorBusca(todosOrdenados, searchQuery);
 
-  if(titleBox) titleBox.textContent = 'Resultados da busca';
-
   if(!list.length){
-    box.innerHTML = '<div class="leads-empty">Nenhum lead encontrado.</div>';
-    return;
+    dd.innerHTML = '<div class="lsd-empty">Nenhum lead encontrado.</div>';
+  } else {
+    const hint = `<div class="lsd-hint">${list.length} resultado${list.length===1?'':'s'} pra "${escapeHtml(searchQuery.trim())}"</div>`;
+    const rows = list.map(l=>{
+      const nomeExibido = nomeLeadParaExibir(l);
+      const inicial = pareceCifrado(l.nome) ? '🔒' : ((l.nome||'?').trim().charAt(0) || '?');
+      const telefone = telefoneLeadParaExibir(l);
+      return `<div class="lsd-row${l.id===currentLeadId ? ' active':''}" data-id="${l.id}">
+        <div class="lsd-avatar">${escapeHtml(inicial)}</div>
+        <div class="lsd-info">
+          <div class="lsd-name">${escapeHtml(nomeExibido)}</div>
+          ${telefone ? `<div class="lsd-meta">${escapeHtml(telefone)}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    dd.innerHTML = hint + rows;
+    dd.querySelectorAll('.lsd-row').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        hideLeadSearchDropdown();
+        selectLead(el.dataset.id);
+      });
+    });
   }
-  list.forEach(l=>{
-    const tile = document.createElement('div');
-    tile.className = 'recent-lead-tile' + (l.id===currentLeadId ? ' active':'');
-    const nomeExibido = nomeLeadParaExibir(l);
-    tile.title = nomeExibido;
-    tile.addEventListener('click', ()=>selectLead(l.id));
-    const inicial = pareceCifrado(l.nome) ? '🔒' : ((l.nome||'?').trim().charAt(0) || '?');
-    tile.innerHTML = `<div class="avatar">${escapeHtml(inicial)}</div>
-      <span class="nm">${escapeHtml(nomeExibido)}</span>`;
-    box.appendChild(tile);
-  });
+  dd.classList.add('show');
 }
 
-// Debounce pra não refiltrar/redesenhar a tira inteira a cada tecla
-// digitada em #leadSearchInput (ver bindEvents) — imperceptível com
-// dezenas/centenas de leads, mas a extensão declara "unlimitedStorage"
-// justamente pra suportar bases bem maiores, onde digitar rápido causaria
-// reflow perceptível a cada letra sem isto.
-const debouncedRenderRecentLeadsStrip = debounce(renderRecentLeadsStrip, 150);
+// Debounce pra não refiltrar/redesenhar o dropdown a cada tecla digitada em
+// #leadSearchInput (ver bindEvents) — imperceptível com dezenas/centenas de
+// leads, mas a extensão declara "unlimitedStorage" justamente pra suportar
+// bases bem maiores, onde digitar rápido causaria reflow perceptível a
+// cada letra sem isto.
+const debouncedRenderLeadSearchDropdown = debounce(renderLeadSearchDropdown, 150);
 
 // ---------- Modal "Últimos leads cadastrados" ----------
 // Abre já mostrando os LEADS_RECENTES_QTD mais recentes (mesmo critério de
@@ -4822,9 +4827,24 @@ function bindEvents(){
     });
   }
 
-  document.getElementById('leadSearchInput').addEventListener('input', (e)=>{
+  const leadSearchInputEl = document.getElementById('leadSearchInput');
+  leadSearchInputEl.addEventListener('input', (e)=>{
     searchQuery = e.target.value;
-    debouncedRenderRecentLeadsStrip();
+    debouncedRenderLeadSearchDropdown();
+  });
+  // Refoca com algo já digitado (ex: clicou em outro campo e voltou) — mostra
+  // o dropdown de novo em vez de obrigar a apagar/redigitar uma letra.
+  leadSearchInputEl.addEventListener('focus', ()=>{
+    if(searchQuery.trim()) renderLeadSearchDropdown();
+  });
+  leadSearchInputEl.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape'){ hideLeadSearchDropdown(); leadSearchInputEl.blur(); }
+  });
+  // Clique fora do campo/dropdown fecha o dropdown — mesmo padrão de
+  // qualquer autocomplete (Gmail/Slack/Notion). Não mexe em searchQuery nem
+  // no valor do campo, só esconde a lista flutuante.
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.lead-search-wrap')) hideLeadSearchDropdown();
   });
   document.getElementById('exportAllBtn').addEventListener('click', ()=>{
     openLeadsModal('');
