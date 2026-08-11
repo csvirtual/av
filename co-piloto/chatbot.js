@@ -533,6 +533,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       html += `<p><b>${escapeHtml(origem)}</b></p><ul>${itens.join('')}</ul>`;
     });
     html += '<p>💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use <code>/find &lt;palavra&gt;</code>.</p>';
+    html += '<p>🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use <code>/campanha</code>.</p>';
     return html;
   }
 
@@ -542,6 +543,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       texto += `${i + 1}. [${secao.origem}] ${secao.titulo}\n`;
     });
     texto += '\n💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use "/find <palavra>".';
+    texto += '\n🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use "/campanha".';
     return texto.trim();
   }
 
