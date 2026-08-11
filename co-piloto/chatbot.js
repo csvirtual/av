@@ -530,24 +530,24 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       porOrigem.get(secao.origem).push(`<li><code>/help ${numero}</code> — ${escapeHtml(secao.titulo)}</li>`);
     });
     let html = '<p><b>📚 Tudo que dá pra perguntar aqui, sem gastar IA</b></p>' +
-      '<p>Digite o comando de um item abaixo, ou pergunte sobre o assunto com suas próprias palavras.</p>';
+      '<p>Digite o comando de um item abaixo, ou pergunte sobre o assunto com suas próprias palavras. Este menu também abre com <code>/ajuda</code> (mesma coisa que <code>/help</code>).</p>';
     porOrigem.forEach((itens, origem) => {
       html += `<p><b>${escapeHtml(origem)}</b></p><ul>${itens.join('')}</ul>`;
     });
-    html += '<p>💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use <code>/find &lt;palavra&gt;</code>.</p>';
+    html += '<p>💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use <code>/find &lt;palavra&gt;</code> — ou, se preferir, <code>/buscar &lt;palavra&gt;</code>/<code>/localizar &lt;palavra&gt;</code>, é o mesmo comando.</p>';
     html += '<p>🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use <code>/campanha</code>.</p>';
-    html += '<p>🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use <code>/cls</code>.</p>';
+    html += '<p>🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use <code>/cls</code> — ou <code>/limpar</code>, é o mesmo comando.</p>';
     return html;
   }
 
   function montarMenuAjudaTexto(){
-    let texto = 'Tudo que dá pra perguntar aqui, sem gastar IA:\n';
+    let texto = 'Tudo que dá pra perguntar aqui, sem gastar IA (este menu também abre com "/ajuda", mesma coisa que "/help"):\n';
     coletarSecoesAjuda().forEach((secao, i) => {
       texto += `${i + 1}. [${secao.origem}] ${secao.titulo}\n`;
     });
-    texto += '\n💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use "/find <palavra>".';
+    texto += '\n💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use "/find <palavra>" — ou, se preferir, "/buscar <palavra>"/"/localizar <palavra>", é o mesmo comando.';
     texto += '\n🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use "/campanha".';
-    texto += '\n🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use "/cls".';
+    texto += '\n🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use "/cls" — ou "/limpar", é o mesmo comando.';
     return texto.trim();
   }
 
