@@ -536,6 +536,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     });
     html += '<p>💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use <code>/find &lt;palavra&gt;</code>.</p>';
     html += '<p>🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use <code>/campanha</code>.</p>';
+    html += '<p>🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use <code>/cls</code>.</p>';
     return html;
   }
 
@@ -546,6 +547,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     });
     texto += '\n💡 Quer procurar algo já conversado com ESTE lead (não sobre o app)? Use "/find <palavra>".';
     texto += '\n🎯 Quer ver, ativar ou desativar a campanha ativa sem abrir Configurações? Use "/campanha".';
+    texto += '\n🧹 Quer limpar a tela e o contexto desta conversa, como se tivesse acabado de abrir o chat? Use "/cls".';
     return texto.trim();
   }
 
@@ -1105,6 +1107,42 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return `✅ Campanha definida e ativada: "${campanhaTexto.trim()}"`;
   }
 
+  // ---------- Comando "/cls" (limpa a tela e o contexto desta conversa, sem IA) ----------
+  //
+  // Motivo de existir: na central de mensagens fixa (@csvirtual), o chat NÃO
+  // é reaberto do zero sozinho (ver abrirChatModal acima, que só mostra o
+  // overlay de novo — quem zera chatHistorico/a tela é carregarHistoricoBotChat,
+  // chamado ao TROCAR de lead na lista, não ao fechar/reabrir o modal). Então
+  // dá pra: preencher "Nome da pessoa" com o paciente A, conversar, fechar o
+  // chat, trocar o nome pro paciente B (mesmo lead fixo) e reabrir o chat —
+  // sem nada no meio, a conversa e o contexto do paciente A continuam ali,
+  // agora "por baixo" do nome do paciente B. "/cls" existe pra resolver
+  // exatamente isso: zera a tela e o contexto na mão, preparando o chat pra
+  // ser usado como se tivesse acabado de ser aberto, sem precisar sair e
+  // voltar pro lead.
+  const COMANDOS_LIMPAR = ['/cls', '/limpar'];
+
+  function ehComandoLimpar(mensagem){
+    const normalizado = normalizarTextoAjuda((mensagem || '').trim());
+    return COMANDOS_LIMPAR.includes(normalizado);
+  }
+
+  // Mesmo reset de estágio/emoção/memória que carregarHistoricoBotChat já
+  // faz ao trocar de lead (resetEstagioManual) + zera chatHistorico (o
+  // contexto reenviado pra IA a cada mensagem) e a tela de bolhas. De
+  // propósito NÃO mexe no Histórico do Bot persistido (botHistorico) nem na
+  // paginação/busca dele (botHistoryCurrentPage/botHistoryQuery) — isso é o
+  // registro salvo do lead, não "o que está na tela agora", e continua
+  // intacto pra consulta por "/find" mesmo depois do "/cls".
+  function executarComandoLimpar(){
+    chatHistorico = [];
+    resetEstagioManual();
+    cancelarAvisoSemChave();
+    elMessages().innerHTML = '';
+    atualizarBarraDeContexto();
+    return '🧹 Conversa e contexto limpos — o chat está pronto pra começar do zero, como se tivesse acabado de ser aberto.';
+  }
+
   async function enviarMensagemChat(){
     if(chatOcupado) return;
     const input = elInput();
@@ -1195,6 +1233,18 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     if(argumentoCampanha !== null){
       const respostaCampanha = await executarComandoCampanha(argumentoCampanha);
       finalizarBuscaSemIA(respostaCampanha, null, '🎯 Sem usar IA', input);
+      return;
+    }
+
+    // "/cls" ou "/limpar" — ver COMANDOS_LIMPAR acima. A bolha do próprio
+    // comando (renderMensagem('user', texto) logo acima) chega a aparecer
+    // por um instante e some junto no elMessages().innerHTML = '' de
+    // executarComandoLimpar — de propósito: sobra só a confirmação na tela,
+    // igual a um chat recém-aberto. Mesmo raciocínio de "/find"/"/campanha":
+    // nunca entra em chatHistorico nem no Histórico do Bot persistido.
+    if(ehComandoLimpar(texto)){
+      const respostaLimpar = executarComandoLimpar();
+      finalizarBuscaSemIA(respostaLimpar, null, '🧹 Sem usar IA', input);
       return;
     }
 
