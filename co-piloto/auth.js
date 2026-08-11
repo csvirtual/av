@@ -1214,22 +1214,6 @@ async function _copilotoConferirHashCredenciaisEquipe(usuario, senha){
   return copilotoVerificarHashSenhaForte(texto, hash);
 }
 
-// Versão pública, com o mesmo bloqueio por tentativas de
-// copilotoVerificarCredenciais — pro caso de algo chamar esta função
-// isoladamente (fora do fluxo de copilotoTentarLogin), continuar
-// protegida contra tentativa ilimitada.
-async function copilotoVerificarCredenciaisEquipe(usuario, senha){
-  const statusAtual = await copilotoStatusBloqueioSenha(COPILOTO_LOCKOUT_AREA_RESTRITA);
-  if(statusAtual.bloqueado) return false;
-  const ok = await _copilotoConferirHashCredenciaisEquipe(usuario, senha);
-  if(ok){
-    await copilotoLimparTentativas(COPILOTO_LOCKOUT_AREA_RESTRITA);
-  }else{
-    await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, 'Verificação de credencial de equipe');
-  }
-  return ok;
-}
-
 async function copilotoDefinirModoEquipe(valor){
   try{ await chrome.storage.session.set({ [COPILOTO_SESSAO_MODO_EQUIPE_KEY]: !!valor }); }catch(e){}
 }

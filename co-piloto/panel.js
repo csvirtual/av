@@ -4,7 +4,6 @@
 
 let leads = [];
 let currentLeadId = null;
-let config = {};
 let funil = {};
 let providerSettings = {};
 let currentHistory = [];
@@ -509,7 +508,6 @@ function ensureLeadDatesExist(){
 
 async function init(){
   const data = await copilotoStorage.local.get(['config','funil','leads_all','provider','claudeKey','claudeModel','claudeModeloBasico','geminiKey','geminiModel','geminiKeyBasico','geminiModeloBasico','geminiKeyAvancado','geminiModeloAvancado','usageStats','campanhaAtiva','campanhaTexto','precosToken']);
-  config = data.config || {};
   funil = data.funil || {};
   const dekAtivo = await obterDekAtivo();
   leads = await decifrarLeadsEmMemoria(data.leads_all || [], dekAtivo);
