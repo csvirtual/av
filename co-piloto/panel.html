@@ -435,6 +435,19 @@
   }
   .hm-open-pill:hover{ border-color:var(--purple); background:var(--purple-soft); }
 
+  /* Ícone discreto (ficha de contato) que abre o modal dos últimos leads
+     cadastrados — ver openUltimosLeadsModal, panel.js. Mesma linguagem
+     visual das pílulas ao lado (fundo branco, borda fina), só que redondo
+     e só com ícone, pra não competir com o texto das pílulas. */
+  .recentes-icon-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:34px; height:34px; background:#fff; border:1px solid var(--line);
+    border-radius:999px; cursor:pointer; color:var(--teal-dark);
+    box-shadow:0 1px 2px rgba(19,36,32,.04);
+  }
+  .recentes-icon-btn svg{ width:16px; height:16px; display:block; }
+  .recentes-icon-btn:hover{ border-color:var(--purple); background:var(--purple-soft); color:var(--purple); }
+
   .hm-modal-overlay{
     position:fixed; inset:0; background:rgba(10,20,18,.55);
     display:none; align-items:center; justify-content:center; z-index:1000; padding:24px;
@@ -763,17 +776,17 @@
   .no-auto-notice-text{ font-size:12.5px; line-height:1.65; color:var(--muted); }
   .no-auto-notice-text b{ color:var(--purple); font-weight:700; }
 
-  /* Tira horizontal "N últimos leads cadastrados" — ver renderRecentLeadsStrip
-     em panel.js. Cartões lado a lado numa linha só (overflow-x:auto rola em
+  /* Tira horizontal com o resultado da busca de leads — ver
+     renderRecentLeadsStrip em panel.js. Só aparece com algo digitado em
+     #leadSearchInput (fora de busca o card fica escondido, ver mesma
+     função). Cartões lado a lado numa linha só (overflow-x:auto rola em
      vez de quebrar linha, pra nunca virar uma grade — o pedido era "um ao
      lado do outro em linha reta"); centralizados quando cabem todos, com
-     scroll horizontal só se a tela for estreita demais pros 7.
+     scroll horizontal só se a tela for estreita demais.
      .recent-leads-card é um .card comum (mesmo branco/borda/sombra/respiro
      de qualquer outro card da tela, ex: #centralAvisoBanner, Dados do lead)
-     — não herda o fundo do card "Pronto para atender" logo abaixo; os dois
-     ficam empilhados com o espaçamento padrão entre cards (margin-bottom do
-     .card), do mesmo jeito que o resto do app já organiza vários blocos de
-     conteúdo na mesma tela. */
+     — não herda o fundo do card "Pronto para atender" logo abaixo, que fica
+     no lugar dele quando não há busca ativa. */
   /* Mesma faixa roxa vertical dos cards de aviso (.no-auto-notice::before,
      LGPD/WhatsApp) — só que do lado DIREITO, e só nesta seção específica
      (nenhum outro .card do app tem essa faixa). overflow:hidden garante que
@@ -1184,10 +1197,10 @@
 
     <div class="stats-bar" id="statsBar"></div>
 
-    <!-- Filtra a tira de leads recentes na tela inicial (#recentLeadsStrip)
-         — não tem lista própria aqui na lateral: digitar troca o conteúdo
-         daquela tira pro resultado da busca, e limpar o campo volta a
-         mostrar os recentes (ver renderRecentLeadsStrip, panel.js). -->
+    <!-- Não tem lista própria aqui na lateral: digitar mostra o resultado
+         da busca na tela inicial (#recentLeadsStrip), no lugar do "Pronto
+         para atender"; limpar o campo esconde os resultados de novo (ver
+         renderRecentLeadsStrip, panel.js). -->
     <input type="text" id="leadSearchInput" class="lead-search" placeholder="🔍 Buscar lead por nome ou número">
 
     <div class="sidebar-divider"></div>
@@ -1283,6 +1296,9 @@
       <div id="usageBadge"></div>
       <button type="button" class="hm-open-pill" id="healthMonitorOpenBtn">🩺 Health Monitor</button>
       <div id="campanhaBadge"></div>
+      <button type="button" class="recentes-icon-btn" id="ultimosLeadsOpenBtn" title="Últimos leads cadastrados" aria-label="Ver últimos leads cadastrados">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20,3H4C2.9,3,2,3.9,2,5v14c0,1.1,0.9,2,2,2h16c1.1,0,2,-0.9,2,-2V5C22,3.9,21.1,3,20,3z M9,7c1.1,0,2,0.9,2,2s-0.9,2,-2,2s-2,-0.9,-2,-2S7.9,7,9,7z M13,17H5v-1c0,-1.33,2.67,-2,4,-2s4,0.67,4,2V17z M20,16h-5v-1.5h5V16z M20,13h-5v-1.5h5V13z M20,10h-5V8.5h5V10z"/></svg>
+      </button>
     </div>
 
     <!-- Envelope só pra sincronizar a visibilidade dos dois cards abaixo com
@@ -1290,16 +1306,15 @@
          selectLead/deleteLead mostram/escondem #homeEmptyState inteiro de
          uma vez, em vez de mexer em cada card por dentro separadamente. -->
     <div id="homeEmptyState">
-      <!-- Tira horizontal com os leads mais recentes — ou o resultado da
-           busca da lateral (#leadSearchInput), enquanto ela tiver algo
-           digitado (ver renderRecentLeadsStrip, panel.js). Substituiu a
-           lista vertical que antes ficava na lateral. Card PRÓPRIO (não
-           colado no card branco do "Pronto para atender" logo abaixo) —
-           mesmo padrão de cards empilhados usado no resto do app (Dados do
-           lead, Central de mensagens etc.), pra ficar coerente com a
-           aparência geral da tela em vez de inventar um visual novo. -->
-      <div class="card recent-leads-card">
-        <div class="recent-leads-title" id="recentLeadsTitle">7 últimos leads cadastrados</div>
+      <!-- Resultado da busca da lateral (#leadSearchInput) — só aparece
+           enquanto ela tiver algo digitado (ver renderRecentLeadsStrip,
+           panel.js). Fora de busca este card fica escondido e quem ocupa o
+           espaço é o "Pronto para atender" logo abaixo; os 7 últimos leads
+           cadastrados (o que aparecia aqui por padrão antes) viraram um
+           modal à parte, aberto pelo ícone de ficha de contato ao lado do
+           Health Monitor (ver openUltimosLeadsModal). -->
+      <div class="card recent-leads-card" id="recentLeadsCard" style="display:none;">
+        <div class="recent-leads-title" id="recentLeadsTitle">Resultados da busca</div>
         <div class="recent-leads-strip" id="recentLeadsStrip"></div>
       </div>
 
@@ -1554,6 +1569,17 @@
     <div class="funnel-sidebar-title"><span class="badge-icon">📊</span>Funil por estágio</div>
     <div class="funnel-sidebar-sub">Quantos leads estão em cada etapa agora</div>
     <div class="funil-overview" id="funilOverview"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="ultimosLeadsModalOverlay" style="display:none;">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2 id="ultimosLeadsModalTitle">Últimos leads cadastrados</h2>
+      <button class="modal-close" id="ultimosLeadsModalCloseBtn" title="Fechar">✕</button>
+    </div>
+    <div class="modal-body" id="ultimosLeadsModalList"></div>
+    <div class="modal-footer" id="ultimosLeadsModalPagination"></div>
   </div>
 </div>
 
@@ -2067,7 +2093,7 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>A tela inicial mostra os 7 leads cadastrados mais recentemente, lado a lado — clique num card pra abrir aquele lead. Use o campo "🔍 Buscar lead por nome ou número", na lateral, pra achar qualquer outro: o resultado aparece nesse mesmo espaço, no lugar dos recentes, enquanto houver algo digitado. A busca por nome ignora maiúscula/minúscula e acento (buscar "joao" acha "João"); a busca por telefone ignora pontuação, DDD e DDI — funciona com ou sem eles, dos dois lados.</p>
+          <p>O ícone 🪪 ao lado do "🩺 Health Monitor", no topo, abre um modal com os leads cadastrados, mais recente primeiro — clique num item pra abrir aquele lead direto. Ele já entra mostrando os 7 mais novos; com 8 leads ou mais, aparece paginação no rodapé pra folhear os demais, sem precisar abrir a lista completa. Use o campo "🔍 Buscar lead por nome ou número", na lateral, pra achar qualquer outro: enquanto houver algo digitado, o resultado aparece na tela inicial, no lugar do "Pronto para atender o próximo lead". A busca por nome ignora maiúscula/minúscula e acento (buscar "joao" acha "João"); a busca por telefone ignora pontuação, DDD e DDI — funciona com ou sem eles, dos dois lados.</p>
           <p>Clique em "Ver / exportar leads" (ou em qualquer contador/estágio) pra abrir a lista completa, com busca, filtro por período e por estágio, e paginação de 10 em 10. Dentro dela, "Exportar em PDF" gera um relatório com os leads filtrados na tela — traz cabeçalho, resumo por estágio do funil e um card por lead com todos os dados e notas. Pra salvar como PDF, use "Imprimir / PDF" dentro do relatório e escolha "Salvar como PDF" na caixa de impressão do navegador.</p>
         </div>
       </div>

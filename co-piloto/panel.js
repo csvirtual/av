@@ -987,45 +987,44 @@ function renderLeadsList(){
   renderFunilOverview();
 }
 
-// ---------- Tira horizontal "N últimos leads cadastrados" (tela inicial) ----------
-// Antes vivia na lateral (lista vertical, com busca embutida) — agora fica
-// na tela inicial, num card PRÓPRIO (não colado no card branco do "Pronto
-// para atender o próximo lead" — ver #homeEmptyState em panel.html), como
-// uma tira de cartões lado a lado. A BUSCA continua na lateral
-// (#leadSearchInput, ver bindEvents) — só o RESULTADO dela mudou de
-// endereço: em vez de uma lista própria ali do lado, filtra o que aparece
-// nesta mesma tira, no lugar dos recentes (mesmo raciocínio de
-// "Resultados da busca" que a lateral já tinha antes). Some junto com o
-// resto da tela inicial quando um lead é aberto (goToHome/selectLead
-// escondem #homeEmptyState inteiro, ver os dois cards nele).
+// ---------- "Resultados da busca" (tela inicial) + modal dos últimos leads ----------
+// Antes esta tira mostrava os "N últimos leads cadastrados" por padrão, fixa
+// na tela inicial. Virou só o resultado da busca da lateral
+// (#leadSearchInput, ver bindEvents): SEM busca, o card fica escondido e
+// quem ocupa o espaço é o "Pronto para atender" (#noLeadState) logo abaixo;
+// COM busca, mostra os leads encontrados. Os "N últimos cadastrados" que
+// antes apareciam aqui viraram um modal à parte (ver openUltimosLeadsModal
+// mais abaixo), aberto pelo ícone ao lado do Health Monitor — não polui
+// mais a tela inicial por padrão. Some junto com o resto da tela inicial
+// quando um lead é aberto (goToHome/selectLead escondem #homeEmptyState
+// inteiro, ver os cards nele).
 const LEADS_RECENTES_QTD = 7;
 function renderRecentLeadsStrip(){
+  const cardWrap = document.getElementById('recentLeadsCard');
   const box = document.getElementById('recentLeadsStrip');
   const titleBox = document.getElementById('recentLeadsTitle');
+  const noLeadState = document.getElementById('noLeadState');
   if(!box) return;
   box.innerHTML = '';
 
   const isSearching = !!searchQuery.trim();
+  if(cardWrap) cardWrap.style.display = isSearching ? '' : 'none';
+  if(noLeadState) noLeadState.style.display = isSearching ? 'none' : '';
+  if(!isSearching) return;
+
   // Mesmo critério de ordenação de sempre: data de CADASTRO (criadoEm), não
   // a data efetiva do lead (editável manualmente, bagunçaria a ordem real
   // de entrada no sistema). Buscando, mostra TODOS os que baterem (sem
-  // cortar em 7) — a tira rola horizontalmente se não couberem, mesma
-  // ideia de antes na lateral (lista vertical, sem limite ao buscar).
+  // cortar em 7) — a tira rola horizontalmente se não couberem.
   const todosOrdenados = leads.filter(l=>l.id!==FIXED_LEAD_ID)
     .slice()
     .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
-  const list = isSearching
-    ? filtrarLeadsPorBusca(todosOrdenados, searchQuery)
-    : todosOrdenados.slice(0, LEADS_RECENTES_QTD);
+  const list = filtrarLeadsPorBusca(todosOrdenados, searchQuery);
 
-  if(titleBox){
-    titleBox.textContent = isSearching ? 'Resultados da busca' : `${LEADS_RECENTES_QTD} últimos leads cadastrados`;
-  }
+  if(titleBox) titleBox.textContent = 'Resultados da busca';
 
   if(!list.length){
-    box.innerHTML = isSearching
-      ? '<div class="leads-empty">Nenhum lead encontrado.</div>'
-      : '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
+    box.innerHTML = '<div class="leads-empty">Nenhum lead encontrado.</div>';
     return;
   }
   list.forEach(l=>{
@@ -1047,6 +1046,74 @@ function renderRecentLeadsStrip(){
 // justamente pra suportar bases bem maiores, onde digitar rápido causaria
 // reflow perceptível a cada letra sem isto.
 const debouncedRenderRecentLeadsStrip = debounce(renderRecentLeadsStrip, 150);
+
+// ---------- Modal "Últimos leads cadastrados" ----------
+// Abre já mostrando os LEADS_RECENTES_QTD mais recentes (mesmo critério de
+// ordenação da tira de busca acima: data de cadastro) — mas não trava
+// nisso: com 8 leads ou mais, aparece paginação no rodapé (mesma janela de
+// 7 já usada na primeira página) pra dar pra folhear os mais antigos sem
+// precisar abrir o modal "Todos os leads" (que tem filtro/busca, mas é bem
+// mais carregado visualmente). Reaproveita o markup .modal-lead-item/.mli-*
+// de lá (ver renderModal) e o paginacaoHtml genérico (ver renderModalPagination).
+let ultimosLeadsModalPage = 1;
+const ULTIMOS_LEADS_PAGE_WINDOW = 7;
+function renderUltimosLeadsModal(){
+  const listBox = document.getElementById('ultimosLeadsModalList');
+  if(!listBox) return;
+  const todosOrdenados = leads.filter(l=>l.id!==FIXED_LEAD_ID)
+    .slice()
+    .sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
+
+  const totalPages = Math.max(1, Math.ceil(todosOrdenados.length / LEADS_RECENTES_QTD));
+  if(ultimosLeadsModalPage > totalPages) ultimosLeadsModalPage = totalPages;
+  if(ultimosLeadsModalPage < 1) ultimosLeadsModalPage = 1;
+  const startIdx = (ultimosLeadsModalPage-1) * LEADS_RECENTES_QTD;
+  const list = todosOrdenados.slice(startIdx, startIdx + LEADS_RECENTES_QTD);
+
+  document.getElementById('ultimosLeadsModalTitle').textContent = `Últimos leads cadastrados (${todosOrdenados.length})`;
+
+  if(!list.length){
+    listBox.innerHTML = '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
+  } else {
+    listBox.innerHTML = list.map(l=>{
+      const dk = dateKeyDia(getEffectiveDate(l));
+      return `
+      <div class="modal-lead-item" data-id="${l.id}">
+        <div class="mli-main">
+          <span class="mli-nome">${escapeHtml(nomeLeadParaExibir(l))}</span>
+          ${l.telefone ? `<span class="mli-tel">${escapeHtml(telefoneLeadParaExibir(l))}</span>` : ''}
+          <span class="mli-obj">${pareceCifrado(l.objetivo) ? '🔒 protegido' : escapeHtml(l.objetivo||'sem objetivo')}</span>
+        </div>
+        <div class="mli-meta">
+          <span class="chip teal">${escapeHtml(l.estagio||'Primeiro contato')}</span>
+          <span class="mli-date">${dk ? formatDiaLabel(dk) : ''}</span>
+        </div>
+      </div>`;
+    }).join('');
+    listBox.querySelectorAll('.modal-lead-item').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const id = el.dataset.id;
+        closeUltimosLeadsModal();
+        selectLead(id);
+      });
+    });
+  }
+
+  const paginationBox = document.getElementById('ultimosLeadsModalPagination');
+  if(paginationBox) paginationBox.innerHTML = paginacaoHtml(ultimosLeadsModalPage, totalPages, ULTIMOS_LEADS_PAGE_WINDOW);
+}
+
+function openUltimosLeadsModal(){
+  ultimosLeadsModalPage = 1;
+  renderUltimosLeadsModal();
+  document.getElementById('ultimosLeadsModalOverlay').style.display = 'flex';
+  document.body.classList.add('modal-open');
+}
+
+function closeUltimosLeadsModal(){
+  document.getElementById('ultimosLeadsModalOverlay').style.display = 'none';
+  document.body.classList.remove('modal-open');
+}
 
 // ---------- Data efetiva do lead (para ordenação, contadores e filtros) ----------
 
@@ -4904,6 +4971,16 @@ function bindEvents(){
 
   document.getElementById('modalCloseBtn').addEventListener('click', closeLeadsModal);
   bindOverlayClose('leadsModalOverlay', closeLeadsModal);
+
+  document.getElementById('ultimosLeadsOpenBtn').addEventListener('click', openUltimosLeadsModal);
+  document.getElementById('ultimosLeadsModalCloseBtn').addEventListener('click', closeUltimosLeadsModal);
+  bindOverlayClose('ultimosLeadsModalOverlay', closeUltimosLeadsModal);
+  document.getElementById('ultimosLeadsModalPagination').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-page]');
+    if(!btn) return;
+    ultimosLeadsModalPage = parseInt(btn.dataset.page, 10);
+    renderUltimosLeadsModal();
+  });
   document.getElementById('modalSearchInput').addEventListener('input', (e)=>{
     modalSearchQuery = e.target.value;
     modalCurrentPage = 1;
