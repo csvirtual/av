@@ -2238,7 +2238,7 @@ const CHAVES_BACKUP_RECONHECIDAS = new Set([
   'geminiKey','geminiModel', // legado
   'geminiKeyBasico','geminiModeloBasico','geminiKeyAvancado','geminiModeloAvancado',
   'usageStats','tokenUsageStats','campanhaAtiva','campanhaTexto','precosToken',
-  'activeContact','trash','backupEmail'
+  'trash','backupEmail'
 ]);
 // Idem: campos que, se presentes no arquivo, trocam a chave de API
 // configurada — usado pelas duas funções de restauração pra mostrar o
@@ -4827,11 +4827,6 @@ function bindEvents(){
   });
 }
 
-// Chaves legadas de uma função removida (detecção automática de conversa no
-// WhatsApp) que podem ainda existir em instalações antigas — ignoradas aqui
-// pra não afetar o que init() recalcula (leads, funil, badges).
-const STORAGE_KEYS_IGNORADAS_NO_INIT = ['activeContact', 'whatsappWatchdog'];
-
 let _reinitPainelTimer = null;
 chrome.storage.onChanged.addListener(async (changes, area)=>{
   if(area!=='local' || !painelDesbloqueado || restaurandoBackup) return;
@@ -4842,11 +4837,7 @@ chrome.storage.onChanged.addListener(async (changes, area)=>{
   // que ele está vendo na tela.
   const perfilId = await copilotoPerfilAtivoId();
   const prefixo = copilotoChaveComEscopo(perfilId, '');
-  const chavesRelevantes = Object.keys(changes).filter(k => {
-    if(!k.startsWith(prefixo)) return false;
-    const chaveLogica = k.slice(prefixo.length);
-    return !STORAGE_KEYS_IGNORADAS_NO_INIT.includes(chaveLogica);
-  });
+  const chavesRelevantes = Object.keys(changes).filter(k => k.startsWith(prefixo));
   if(!chavesRelevantes.length) return;
   // Debounce: se mais de uma chave relevante mudar em sequência rápida (ex.:
   // uma restauração ou uma ação que grava em mais de uma chave), reage uma
