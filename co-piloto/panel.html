@@ -700,6 +700,11 @@
 
   .input-invalid{ border-color:#B3261E !important; }
   .field-warning{ font-size:11.5px; color:#B3261E; margin-top:4px; }
+  .telefone-estrangeiro-toggle{
+    display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600;
+    color:var(--muted); text-transform:none; cursor:pointer; white-space:nowrap;
+  }
+  .telefone-estrangeiro-toggle input{ width:14px; height:14px; accent-color:var(--purple); cursor:pointer; }
   .suggestion-box{
     background:#FBF9F5; border:1px dashed var(--line); border-radius:10px;
     padding:16px; font-size:14.5px; line-height:1.55; white-space:pre-wrap; margin:12px 0;
@@ -1365,8 +1370,17 @@
             <label>Objetivo</label>
             <input type="text" id="leadObjetivo" placeholder="ex: emagrecimento">
           </div>
-          <div class="field">
-            <label>Telefone / Número</label>
+          <div class="field" style="grid-column:span 2;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <label style="margin:0;">Telefone / Número</label>
+              <!-- Liga o modo digitação livre (ver aplicarModoTelefoneCampo,
+                   panel.js) — a máscara brasileira padrão (DDD + celular)
+                   trunca/deforma número de fora do Brasil. -->
+              <label class="telefone-estrangeiro-toggle">
+                <input type="checkbox" id="leadTelefoneEstrangeiroCheckbox">
+                Número estrangeiro
+              </label>
+            </div>
             <input type="text" id="leadTelefone" placeholder="ex: (11) 91234-5678" maxlength="16" inputmode="numeric">
           </div>
         </div>
@@ -2002,7 +2016,7 @@ Nascimento: 20/01/1992"></textarea>
           <ul>
             <li>Nome, e-mail, CEP, data de nascimento, CPF — CPF e e-mail são validados automaticamente (aviso visual se o formato estiver errado, sem impedir salvar).</li>
             <li>Objetivo — a dor/objetivo do lead, detectada na conversa (pode vir preenchida pela IA).</li>
-            <li>Telefone — o DDD é formatado sozinho; também usado na busca.</li>
+            <li>Telefone — o DDD é formatado sozinho; também usado na busca. Pra clientes de fora do Brasil, marque "Número estrangeiro" ao lado do campo: libera a digitação livre (sem a formatação de DDD/celular, que corta número internacional) e salva exatamente o que for digitado.</li>
             <li>Data do lead — editável pra leads retroativos; é o que conta nos contadores e filtros por período.</li>
             <li>Notas — informações adicionais sobre o lead.</li>
           </ul>
@@ -2018,7 +2032,7 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>A lateral mostra os 3 leads cadastrados mais recentemente — use a busca por nome ou número ali pra achar qualquer outro.</p>
+          <p>A tela inicial mostra os 7 leads cadastrados mais recentemente, lado a lado — clique num card pra abrir aquele lead. Use o campo "🔍 Buscar lead por nome ou número", na lateral, pra achar qualquer outro: o resultado aparece nesse mesmo espaço, no lugar dos recentes, enquanto houver algo digitado. A busca por nome ignora maiúscula/minúscula e acento (buscar "joao" acha "João"); a busca por telefone ignora pontuação, DDD e DDI — funciona com ou sem eles, dos dois lados.</p>
           <p>Clique em "Ver / exportar leads" (ou em qualquer contador/estágio) pra abrir a lista completa, com busca, filtro por período e por estágio, e paginação de 10 em 10. Dentro dela, "Exportar em PDF" gera um relatório com os leads filtrados na tela — traz cabeçalho, resumo por estágio do funil e um card por lead com todos os dados e notas. Pra salvar como PDF, use "Imprimir / PDF" dentro do relatório e escolha "Salvar como PDF" na caixa de impressão do navegador.</p>
         </div>
       </div>
@@ -2035,7 +2049,7 @@ Nascimento: 20/01/1992"></textarea>
           <p>Emoção do cliente: toda vez que você clica em "Gerar resposta", a IA também lê a emoção predominante do cliente na mensagem (ex: animado, hesitante, frustrado) e mostra um chip 😊 com o resultado.</p>
           <p>O campo "Informação adicional para esta resposta" é opcional — um contexto pontual que só vale pra aquela geração (ex.: avisar que um horário oferecido não foi confirmado). Junto da resposta, quando fizer sentido, o co-piloto sugere uma pergunta pra continuar a conversa. Clique em "Copiar resposta" pra levar o texto pro WhatsApp.</p>
           <p>Nada se perde ao trocar de lead ou fechar o painel — mensagem, contexto e a última resposta ficam salvos por lead. Proteção contra gasto à toa: colar a mesma mensagem que já gerou resposta antes avisa antes de gerar de novo; recolar a conversa com só mensagens novas no final manda pra IA só a parte nova, não a conversa toda. O botão "Ver mensagem do lead", que aparece perto da resposta, pula direto pro item correspondente no histórico.</p>
-          <p><b>💬 Chat rápido (C&amp;S BOT)</b> — um chat livre com a IA, pra tirar dúvida rápida sobre como agir ("como eu abordo esse lead agora?", "como respondo essa objeção de preço?", "me dá uma ideia de follow-up") sem precisar colar mensagem nem preencher os campos acima. Abre pelo botão roxo 💬, flutuante no canto inferior direito, ao lado do "voltar ao topo". Reaproveita a mesma infraestrutura: o provedor/chave configurados em Configurações, o mesmo roteamento por estágio (<a href="#" class="help-goto" data-secao="10">ver seção 10</a>) e os mesmos contadores de uso/custo. Se houver um lead selecionado no painel, o contexto dele (nome, objetivo/notas, estágio) entra automaticamente na conversa; sem lead selecionado, responde de forma genérica. Cada nova pergunta reenvia as anteriores desta mesma conversa como contexto — por isso a conversa em andamento (não o histórico salvo) é limpa sempre que você troca de lead.</p>
+          <p><b>💬 Chat rápido (C&amp;S BOT)</b> — um chat livre com a IA, pra tirar dúvida rápida sobre como agir ("como eu abordo esse lead agora?", "como respondo essa objeção de preço?", "me dá uma ideia de follow-up") sem precisar colar mensagem nem preencher os campos acima. Abre pelo botão roxo 💬, flutuante no canto inferior direito, ao lado do "voltar ao topo" — ou pelo atalho fixo "@C&amp;S_BOT" na lateral, logo abaixo do @csvirtual, que faz exatamente a mesma coisa. Reaproveita a mesma infraestrutura: o provedor/chave configurados em Configurações, o mesmo roteamento por estágio (<a href="#" class="help-goto" data-secao="10">ver seção 10</a>) e os mesmos contadores de uso/custo. Se houver um lead selecionado no painel, o contexto dele (nome, objetivo/notas, estágio) entra automaticamente na conversa; sem lead selecionado, responde de forma genérica. Cada nova pergunta reenvia as anteriores desta mesma conversa como contexto — por isso a conversa em andamento (não o histórico salvo) é limpa sempre que você troca de lead.</p>
           <p>A cada mensagem enviada, o chat lê sozinho o estágio e a emoção do cliente a partir do próprio texto (mostrado na barra "🔍 Leitura automática" acima da caixa de digitar) — mesma ideia do "🔍 Sugerir estágio com IA" logo acima, só que automática a cada envio. Se a leitura não bater, dá pra fixar um estágio manualmente no seletor da barra de contexto, valendo pras próximas mensagens desta conversa até você trocar de novo ou trocar de lead. Cada resposta tem um botão "Copiar" e mostra uma legenda discreta de qual chave/modelo respondeu (ex.: "🔀 Gemini · Chave B · nível avançado"). O <b>Histórico do Bot</b>, na tela principal do lead (abaixo do "Histórico de respostas"), guarda toda troca desse chat com aquele lead, com busca e exclusão por item ou tudo de uma vez (<a href="#" class="help-goto" data-secao="7">ver seção 7</a>).</p>
           <p><b>Perguntas sobre o próprio Co-piloto</b> (ex.: "como funciona a lixeira?", "o que o admin pode fazer?") são respondidas pela IA usando este guia e a tela de Privacidade como fonte, sempre que a pergunta bate com algum assunto conhecido — igual a qualquer pergunta no chat, precisa de uma chave configurada, mas sempre no nível mais econômico disponível (nunca o mais caro), já que consultar o próprio guia não é uma resposta que decide venda nenhuma. Digite <code>/help</code> pra ver a lista completa de assuntos disponíveis — esse comando específico continua sem gastar IA nenhuma, funciona mesmo sem nenhuma chave configurada — ou <code>/help</code> seguido do número ou de uma palavra do assunto (ex.: <code>/help lixeira</code>) pra abrir um deles direto.</p>
           <p><b>Buscar no histórico deste lead</b> — digite <code>/find &lt;palavra&gt;</code> (ou <code>/buscar</code>) pra procurar, sem gastar IA nenhuma, trechos já conversados com este lead em sessões anteriores do chat rápido (o Histórico do Bot dele, <a href="#" class="help-goto" data-secao="7">ver seção 7</a>). Cada resultado mostra a data e o trecho encontrado, com um botão "📌 Usar no contexto" — só ao clicar nele é que aquele trecho específico entra na próxima resposta da IA; nada é lembrado automaticamente, e o trecho marcado vale só pra próxima mensagem enviada. Na Central de mensagens (@csvirtual), a busca só é liberada com "Nome da pessoa desta mensagem" preenchido, pra nunca misturar conversa de uma pessoa com a de outra.</p>

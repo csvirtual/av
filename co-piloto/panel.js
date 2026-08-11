@@ -94,6 +94,10 @@ function criarLeadBase(overrides){
     estagio: 'Primeiro contato',
     notas: '',
     telefone: '',
+    // Liga o campo "Telefone / Número" no modo digitação livre (sem a
+    // máscara brasileira de DDD/celular, ver maskTelefone) — pra números de
+    // fora do Brasil, que a máscara trunca/deforma (ver aplicarModoTelefoneCampo).
+    telefoneEstrangeiro: false,
     email: '',
     cep: '',
     dataNascimento: '',
@@ -1492,7 +1496,11 @@ async function selectLead(id){
   document.getElementById('leadWorkspace').style.display='block';
   const dekDisponivel = !!(await obterDekAtivo());
   aplicarCampoProtegido('leadObjetivo', lead.objetivo, dekDisponivel);
-  document.getElementById('leadTelefone').value = maskTelefone(lead.telefone || '');
+  document.getElementById('leadTelefoneEstrangeiroCheckbox').checked = !!lead.telefoneEstrangeiro;
+  aplicarModoTelefoneCampo(!!lead.telefoneEstrangeiro);
+  document.getElementById('leadTelefone').value = lead.telefoneEstrangeiro
+    ? (lead.telefone || '')
+    : maskTelefone(lead.telefone || '');
   document.getElementById('leadEstagio').value = lead.estagio || 'Primeiro contato';
   aplicarCampoProtegido('leadNotas', lead.notas, dekDisponivel);
   document.getElementById('leadNome').value = lead.nome || '';
@@ -3080,8 +3088,49 @@ function maskTelefone(value){
   return `(${ddd}) ${resto.slice(0,5)}-${resto.slice(5)}`;
 }
 
+// Ajusta o campo "Telefone / Número" pro modo escolhido no toggle "Número
+// estrangeiro": no modo padrão (Brasil), digitação livre é sempre reescrita
+// pela máscara de DDD/celular (ver maskTelefone) e o campo aceita só
+// números, até 16 caracteres — o bastante pro formato "(DD) DDDDD-DDDD". No
+// modo estrangeiro, tira as duas travas (maxlength e inputmode=numeric,
+// que no celular chama o teclado numérico) — sem elas, digitar "+" ou
+// espaço, comuns em formato internacional, ficaria travado ou custoso.
+function aplicarModoTelefoneCampo(estrangeiro){
+  const input = document.getElementById('leadTelefone');
+  if(estrangeiro){
+    input.removeAttribute('maxlength');
+    input.removeAttribute('inputmode');
+    input.placeholder = 'ex: +1 415 555 0123';
+  }else{
+    input.maxLength = 16;
+    input.inputMode = 'numeric';
+    input.placeholder = '(11) 91234-5678';
+  }
+}
+
+async function onTelefoneEstrangeiroChange(){
+  const estrangeiro = document.getElementById('leadTelefoneEstrangeiroCheckbox').checked;
+  aplicarModoTelefoneCampo(estrangeiro);
+  const lead = getCurrentLead();
+  if(!lead) return;
+  lead.telefoneEstrangeiro = estrangeiro;
+  // Não reformata nem limpa o que já estava digitado ao trocar o modo — só
+  // muda o comportamento dali em diante (a mesma lógica de "não mexe no que
+  // já existe sem a pessoa pedir" usada nos campos protegidos). Se estava
+  // em modo Brasil e passa pra estrangeiro, o texto já mascarado continua
+  // ali, só sem mais reformatação automática a partir de agora.
+  await persistLeadFieldChange();
+}
+
 function onTelefoneKeyInput(){
   const input = document.getElementById('leadTelefone');
+  // Modo estrangeiro: digitação totalmente livre, sem a máscara brasileira
+  // de DDD/celular — ela trunca/deforma número de fora do Brasil (ver
+  // aplicarModoTelefoneCampo).
+  if(document.getElementById('leadTelefoneEstrangeiroCheckbox').checked){
+    onTelefoneInput();
+    return;
+  }
   const cursorNoFinal = input.selectionStart === input.value.length;
   input.value = maskTelefone(input.value);
   if(cursorNoFinal) input.selectionStart = input.selectionEnd = input.value.length;
@@ -4575,6 +4624,7 @@ function bindEvents(){
   document.getElementById('leadEstagio').addEventListener('change', saveEstagioNow);
   document.getElementById('leadTelefone').addEventListener('input', onTelefoneKeyInput);
   document.getElementById('leadTelefone').addEventListener('blur', saveTelefoneNow);
+  document.getElementById('leadTelefoneEstrangeiroCheckbox').addEventListener('change', onTelefoneEstrangeiroChange);
   document.getElementById('leadNome').addEventListener('input', onNomeInput);
   document.getElementById('leadNome').addEventListener('blur', saveNomeNow);
   document.getElementById('leadEmail').addEventListener('input', onEmailKeyInput);
