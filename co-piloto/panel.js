@@ -906,21 +906,8 @@ function renderLeadsList(){
   const box = document.getElementById('leadsList');
   box.innerHTML = '';
 
-  const fixedLead = leads.find(l=>l.id===FIXED_LEAD_ID);
-  if(fixedLead){
-    const pinned = document.createElement('div');
-    pinned.className = 'lead-item' + (fixedLead.id===currentLeadId ? ' active':'');
-    pinned.addEventListener('click', ()=>selectLead(fixedLead.id));
-    pinned.innerHTML = `<div class="avatar avatar-pin">📌</div>
-      <div class="info">
-        <div class="info-top"><span class="nm">${escapeHtml(fixedLead.nome)}</span></div>
-        <span class="obj">Central de mensagens fixa</span>
-      </div>`;
-    box.appendChild(pinned);
-  }
-
-  // Atalho fixo pro Chat rápido (C&S BOT), logo abaixo do @csvirtual — não é
-  // um lead de verdade (não entra em `leads`, não tem histórico próprio, não
+  // Atalho fixo pro Chat rápido (C&S BOT), acima do @csvirtual — não é um
+  // lead de verdade (não entra em `leads`, não tem histórico próprio, não
   // conta em nenhuma estatística/funil): é só um "contato" fixo, sempre no
   // topo da lista, que abre o MESMO chat que o botão flutuante 💬 (canto
   // inferior direito) já abre. Clicar simula um clique no próprio
@@ -942,6 +929,19 @@ function renderLeadsList(){
       <span class="obj">Chat rápido com IA</span>
     </div>`;
   box.appendChild(botShortcut);
+
+  const fixedLead = leads.find(l=>l.id===FIXED_LEAD_ID);
+  if(fixedLead){
+    const pinned = document.createElement('div');
+    pinned.className = 'lead-item' + (fixedLead.id===currentLeadId ? ' active':'');
+    pinned.addEventListener('click', ()=>selectLead(fixedLead.id));
+    pinned.innerHTML = `<div class="avatar avatar-pin">📌</div>
+      <div class="info">
+        <div class="info-top"><span class="nm">${escapeHtml(fixedLead.nome)}</span></div>
+        <span class="obj">Central de mensagens fixa</span>
+      </div>`;
+    box.appendChild(pinned);
+  }
 
   renderRecentLeadsStrip();
   renderStatsBar();
