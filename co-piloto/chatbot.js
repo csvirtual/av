@@ -578,7 +578,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // _memoriaAtivada/adicionarTrechoNaMemoria, mais abaixo). Nunca escreve no
   // Histórico do Bot (diferente do "/help") — uma busca não é uma conversa
   // nova, não faz sentido virar mais uma entrada pesquisável nela mesma.
-  const COMANDOS_FIND = ['/find', '/buscar'];
+  const COMANDOS_FIND = ['/find', '/buscar', '/localizar'];
 
   // Mesma forma de argumentoComandoHelp — '' pro comando sozinho, o termo
   // buscado se vier algo junto, ou null se não é um comando de busca.
@@ -1192,7 +1192,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       return;
     }
 
-    // "/find <termo>" ou "/buscar <termo>" — busca no Histórico do Bot
+    // "/find <termo>", "/buscar <termo>" ou "/localizar <termo>" — busca no Histórico do Bot
     // (persistente, entre sessões) do lead atual, sem gastar IA — ver
     // COMANDOS_FIND/buscarNoHistoricoBot acima. Mesmo raciocínio do "/help"
     // acima: checado antes de qualquer await, de propósito NÃO entra em
