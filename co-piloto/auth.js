@@ -106,16 +106,46 @@ async function copilotoVerificarHashSenhaForte(texto, hashSalvo){
 // perfis.js — ver o comentário de COPILOTO_CREDENCIAIS_HASH_V2_KEY acima
 // pro porquê.
 
-async function copilotoVerificarCredenciais(usuario, senha){
+// Núcleo da conferência em si, sem nenhuma lógica de bloqueio — separado
+// só pra copilotoTentarLogin (mais abaixo) poder tentar a credencial
+// PRINCIPAL em silêncio, sem contar uma tentativa falha ainda, antes de
+// também tentar a credencial de EQUIPE: se contasse aqui, todo login de
+// equipe bem-sucedido (que sempre falha a credencial principal primeiro,
+// antes de cair no fallback) registraria uma tentativa falha fantasma a
+// cada vez. Nunca chamada direto por fora deste arquivo.
+async function _copilotoConferirHashCredenciais(usuario, senha){
   const textoCompleto = `${(usuario||'').trim().toLowerCase()}|${senha||''}`;
-
   try{
     const dataV2 = await chrome.storage.local.get(COPILOTO_CREDENCIAIS_HASH_V2_KEY);
     const hashV2 = dataV2[COPILOTO_CREDENCIAIS_HASH_V2_KEY];
     if(hashV2) return copilotoVerificarHashSenhaForte(textoCompleto, hashV2);
   }catch(e){ /* sem hash gravado ainda ou storage indisponível — sem credencial válida */ }
-
   return false;
+}
+
+// Bloqueio por tentativas erradas (3 erros = 60s travado, mesmo mecanismo
+// de copilotoRegistrarTentativaFalha/copilotoStatusBloqueioSenha,
+// perfis.js) é checado e registrado AQUI DENTRO — uma chamada direta a
+// esta função (ex.: console do navegador), pulando a tela de login
+// inteira, nunca passava por nenhuma checagem de bloqueio antes disto.
+// `contexto` (opcional) é só texto livre pro log de auditoria, repassado
+// pra copilotoRegistrarTentativaFalha quando a senha estiver errada.
+// copilotoTentarLogin (o caminho normal de login) NÃO usa esta função —
+// usa _copilotoConferirHashCredenciais direto, porque ele mesmo já faz o
+// controle de bloqueio completo em cima do resultado COMBINADO (principal
+// OU equipe, ver comentário lá); esta função aqui é pra quem só confere a
+// credencial principal sozinha (troca de credencial, console).
+async function copilotoVerificarCredenciais(usuario, senha, contexto){
+  const statusAtual = await copilotoStatusBloqueioSenha(COPILOTO_LOCKOUT_AREA_RESTRITA);
+  if(statusAtual.bloqueado) return false;
+
+  const ok = await _copilotoConferirHashCredenciais(usuario, senha);
+  if(ok){
+    await copilotoLimparTentativas(COPILOTO_LOCKOUT_AREA_RESTRITA);
+  }else{
+    await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, contexto || 'Verificação de credencial geral');
+  }
+  return ok;
 }
 
 // Verdadeiro se esta instalação ainda usa a credencial aleatória gerada
@@ -137,7 +167,7 @@ async function copilotoCredenciaisSaoPadrao(){
 // nesta instalação — copilotoVerificarCredenciais passa a confiar só no
 // hash novo.
 async function copilotoAlterarCredenciaisPrincipais(usuarioAtual, senhaAtual, novoUsuario, novaSenha){
-  const credenciaisOk = await copilotoVerificarCredenciais(usuarioAtual, senhaAtual);
+  const credenciaisOk = await copilotoVerificarCredenciais(usuarioAtual, senhaAtual, 'Troca da credencial principal');
   if(!credenciaisOk) return { ok:false, erro: 'Usuário ou senha atuais incorretos.' };
 
   const usuarioLimpo = (novoUsuario || '').trim();
@@ -1172,12 +1202,32 @@ async function copilotoRemoverCredenciaisEquipe(){
   try{ await chrome.storage.local.remove(COPILOTO_CREDENCIAIS_EQUIPE_HASH_KEY); }catch(e){}
 }
 
-async function copilotoVerificarCredenciaisEquipe(usuario, senha){
+// Núcleo sem bloqueio — usada por copilotoTentarLogin (mesmo motivo de
+// _copilotoConferirHashCredenciais, logo acima: o bloqueio de verdade é
+// conferido/registrado lá, em cima do resultado COMBINADO principal+equipe,
+// não aqui isoladamente).
+async function _copilotoConferirHashCredenciaisEquipe(usuario, senha){
   const data = await chrome.storage.local.get(COPILOTO_CREDENCIAIS_EQUIPE_HASH_KEY);
   const hash = data[COPILOTO_CREDENCIAIS_EQUIPE_HASH_KEY];
   if(!hash) return false;
   const texto = `${(usuario||'').trim().toLowerCase()}|${senha||''}`;
   return copilotoVerificarHashSenhaForte(texto, hash);
+}
+
+// Versão pública, com o mesmo bloqueio por tentativas de
+// copilotoVerificarCredenciais — pro caso de algo chamar esta função
+// isoladamente (fora do fluxo de copilotoTentarLogin), continuar
+// protegida contra tentativa ilimitada.
+async function copilotoVerificarCredenciaisEquipe(usuario, senha){
+  const statusAtual = await copilotoStatusBloqueioSenha(COPILOTO_LOCKOUT_AREA_RESTRITA);
+  if(statusAtual.bloqueado) return false;
+  const ok = await _copilotoConferirHashCredenciaisEquipe(usuario, senha);
+  if(ok){
+    await copilotoLimparTentativas(COPILOTO_LOCKOUT_AREA_RESTRITA);
+  }else{
+    await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, 'Verificação de credencial de equipe');
+  }
+  return ok;
 }
 
 async function copilotoDefinirModoEquipe(valor){
@@ -1320,14 +1370,21 @@ async function copilotoTentarLogin({ userInputId, passInputId, errorId, submitBt
 
   const usuario = document.getElementById(userInputId).value;
   const senha = document.getElementById(passInputId).value;
-  let ok = await copilotoVerificarCredenciais(usuario, senha);
+  // Versão CRUA (sem bloqueio próprio, ver _copilotoConferirHashCredenciais):
+  // esta função já controla o bloqueio por conta própria em cima do
+  // resultado COMBINADO (principal OU equipe, logo abaixo) — usar a versão
+  // pública aqui contaria uma tentativa falha fantasma toda vez que a
+  // credencial de equipe autenticasse com sucesso (ela sempre falha a
+  // principal primeiro, antes do fallback).
+  let ok = await _copilotoConferirHashCredenciais(usuario, senha);
   if(ok){
     await copilotoDefinirModoEquipe(false);
   }else{
     // Só tenta a credencial de equipe se a principal falhou — evita duas
     // verificações de hash à toa no caminho comum (login com a credencial
-    // real, que é o de longe mais frequente).
-    ok = await copilotoVerificarCredenciaisEquipe(usuario, senha);
+    // real, que é o de longe mais frequente). Versão CRUA (sem bloqueio
+    // próprio) pelo mesmo motivo de _copilotoConferirHashCredenciais acima.
+    ok = await _copilotoConferirHashCredenciaisEquipe(usuario, senha);
     if(ok) await copilotoDefinirModoEquipe(true);
   }
   if(ok){

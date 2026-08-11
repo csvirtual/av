@@ -409,11 +409,11 @@ async function copilotoDefinirTrocaSemSenha(id, permitir) {
   });
 }
 
-// Confere a senha de um perfil. Perfis antigos, cadastrados antes desta
-// versão (sem senha própria ainda), não têm "senhaHash" — nesse caso trata
-// como "sem senha" e libera a entrada, só pra não travar quem já usava a
-// extensão; a própria tela sugere cadastrar uma senha assim que entrar.
-async function copilotoVerificarSenhaPerfil(perfilId, senha) {
+// Núcleo da conferência em si, sem nenhuma lógica de bloqueio — separado
+// só pra copilotoVerificarSenhaPerfil (logo abaixo) poder envolver ESTE
+// núcleo com a checagem/registro de tentativas, sem duplicar a lógica de
+// hash/migração. Nunca chamada direto por fora deste arquivo.
+async function _copilotoConferirHashSenhaPerfil(perfilId, senha) {
   const perfil = await copilotoObterPerfilPorId(perfilId);
   if (!perfil) return false;
   if (!perfil.senhaHash) return true;
@@ -441,6 +441,36 @@ async function copilotoVerificarSenhaPerfil(perfilId, senha) {
   return ok;
 }
 
+// Confere a senha de um perfil. Perfis antigos, cadastrados antes desta
+// versão (sem senha própria ainda), não têm "senhaHash" — nesse caso trata
+// como "sem senha" e libera a entrada, só pra não travar quem já usava a
+// extensão; a própria tela sugere cadastrar uma senha assim que entrar.
+//
+// O bloqueio por tentativas erradas (3 erros = 60s travado, ver
+// copilotoStatusBloqueioSenha/copilotoRegistrarTentativaFalha) é checado e
+// registrado AQUI DENTRO, não só por quem chama — auditoria encontrou que
+// toda tela (login de perfil, lixeira, Avançado...) já conferia/registrava
+// o bloqueio por conta própria, direitinho, mas só na CAMADA DA TELA:
+// chamar esta função direto (ex.: console do navegador), pulando a tela
+// inteira, nunca passava por nenhuma dessas checagens — um jeito de tentar
+// senha atrás de senha sem limite nenhum, mesmo com o bloqueio "ativo" pra
+// quem usa a tela normalmente. `contexto` (opcional) é só texto livre pro
+// log de auditoria, igual ao parâmetro homônimo de
+// copilotoRegistrarTentativaFalha — cada tela ainda escolhe sua própria
+// frase (ex.: "Login de perfil", "Senha para abrir a lixeira").
+async function copilotoVerificarSenhaPerfil(perfilId, senha, contexto) {
+  const statusAtual = await copilotoStatusBloqueioSenha(perfilId);
+  if (statusAtual.bloqueado) return false;
+
+  const ok = await _copilotoConferirHashSenhaPerfil(perfilId, senha);
+  if (ok) {
+    await copilotoLimparTentativas(perfilId);
+  } else {
+    await copilotoRegistrarTentativaFalha(perfilId, contexto || 'Verificação de senha de perfil');
+  }
+  return ok;
+}
+
 // Confere a senha e, se estiver certa, também desembrulha o DEK do perfil
 // (a chave que cifra os campos protegidos — ver copilotoCriarPerfil) e, se
 // for o perfil admin, a chave-mestra (AMK) também. Chamada em todo login
@@ -455,8 +485,8 @@ async function copilotoVerificarSenhaPerfil(perfilId, senha) {
 // outra chave pra reconciliar). `codigoRecuperacaoNovo` vem preenchido só
 // nesse caso específico — quem chamou deve mostrar esse código pra pessoa
 // guardar, do mesmo jeito que uma palavra-chave nova.
-async function copilotoDesbloquearPerfilComSenha(perfilId, senha) {
-  const ok = await copilotoVerificarSenhaPerfil(perfilId, senha);
+async function copilotoDesbloquearPerfilComSenha(perfilId, senha, contexto) {
+  const ok = await copilotoVerificarSenhaPerfil(perfilId, senha, contexto);
   if (!ok) return { ok: false, dek: null, amk: null, codigoRecuperacaoNovo: null };
 
   const perfil = await copilotoObterPerfilPorId(perfilId);
@@ -702,7 +732,7 @@ async function copilotoAlterarSenhaPerfil(perfilId, { senhaAtual, novaSenha, for
   let amkConhecida = null;
 
   if (!forcar) {
-    const senhaOk = await copilotoVerificarSenhaPerfil(perfilId, senhaAtual);
+    const senhaOk = await copilotoVerificarSenhaPerfil(perfilId, senhaAtual, 'Troca de senha do perfil');
     if (!senhaOk) return { ok: false, erro: 'Senha atual incorreta.' };
 
     // Pro admin, o PIN alfanumérico (o mesmo código de recuperação dele —
@@ -824,24 +854,20 @@ async function copilotoRecuperarSenhaComCodigo(perfilId, codigoRecuperacao, nova
 async function copilotoRecuperarSenhaAdmin(usuarioGeral, senhaGeral, novaSenha, codigoRecuperacao) {
   // Mesmo bloqueio por tentativas erradas que protege usuário/senha GERAL em
   // todo outro lugar que os confere (login normal, Avançado, confirmação de
-  // reset total — ver COPILOTO_LOCKOUT_AREA_RESTRITA e seus chamadores em
-  // auth.js). Esta tela de recuperação confere a MESMA credencial, mas
-  // ficava fora desse bloqueio compartilhado — na prática, uma quinta porta
-  // pra adivinhar usuário/senha geral sem limite nenhum de tentativas.
+  // reset total) — checado/registrado DENTRO de copilotoVerificarCredenciais
+  // (auth.js) mesmo, não precisa mais duplicar a contagem aqui: esta tela
+  // de recuperação confere a MESMA credencial, pelo mesmo caminho, então
+  // herda o mesmo bloqueio automaticamente. Só a mensagem específica de
+  // "muitas tentativas" continua checada aqui antes — só pra distinguir
+  // essa causa de uma senha genuinamente errada na resposta.
   if (typeof COPILOTO_LOCKOUT_AREA_RESTRITA !== 'undefined') {
     const statusAtual = await copilotoStatusBloqueioSenha(COPILOTO_LOCKOUT_AREA_RESTRITA);
     if (statusAtual.bloqueado) return { ok: false, erro: 'Muitas tentativas erradas. Tente novamente em instantes.' };
   }
 
-  const credenciaisOk = await copilotoVerificarCredenciais(usuarioGeral, senhaGeral);
+  const credenciaisOk = await copilotoVerificarCredenciais(usuarioGeral, senhaGeral, 'Recuperação de senha do admin (login geral)');
   if (!credenciaisOk) {
-    if (typeof COPILOTO_LOCKOUT_AREA_RESTRITA !== 'undefined') {
-      await copilotoRegistrarTentativaFalha(COPILOTO_LOCKOUT_AREA_RESTRITA, 'Recuperação de senha do admin (login geral)');
-    }
     return { ok: false, erro: 'Usuário ou senha geral do sistema incorretos.' };
-  }
-  if (typeof COPILOTO_LOCKOUT_AREA_RESTRITA !== 'undefined') {
-    await copilotoLimparTentativas(COPILOTO_LOCKOUT_AREA_RESTRITA);
   }
 
   const admin = await copilotoObterPerfilAdmin();

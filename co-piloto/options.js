@@ -733,3 +733,23 @@ initSettingsNav();
 // tela explicando o porquê. Mesma lógica de panel.js, espelhada aqui.
 copilotoExibirCredencialInicialSePendente('configUserInput');
 
+// panel.html e options.html são páginas SEPARADAS, cada uma com sua
+// própria trava de aba oficial (ver copilotoRegistrarOuChecarAba,
+// background.js) — nada impede as duas de estarem legitimamente abertas
+// ao mesmo tempo, em janelas diferentes. Um "reset total" feito pelo
+// painel (executarResetTotal, panel.js) apaga TUDO via
+// chrome.storage.local.clear() — mas só recarrega a aba que executou o
+// reset; esta aba de Configurações, se estiver aberta em outra janela no
+// momento, continuaria mostrando dados/telas de uma instalação que já não
+// existe mais, sem nada avisando. A credencial principal (hashV2) sempre
+// existe do primeiro uso em diante e só desaparece de verdade num reset
+// total — sinal inequívoco pra recarregar sozinha, sem depender de
+// ninguém perceber e recarregar manualmente.
+chrome.storage.onChanged.addListener((changes, area)=>{
+  if(area !== 'local') return;
+  const mudouCredencial = changes[COPILOTO_CREDENCIAIS_HASH_V2_KEY];
+  if(mudouCredencial && mudouCredencial.oldValue !== undefined && mudouCredencial.newValue === undefined){
+    window.location.reload();
+  }
+});
+

@@ -174,17 +174,46 @@ function construirChipsHtml(lead){
 
 // ---------- Campos protegidos do lead (cifrados em repouso) ----------
 //
-// CPF, e-mail, CEP, data de nascimento, notas e objetivo — os campos mais
-// sensíveis de cada lead — ficam cifrados (AES-256-GCM) no storage. Nome,
-// telefone e estágio ficam de fora de propósito: telefone e nome são
-// usados na busca da lateral e na identificação automática do contato do
-// WhatsApp (que roda no service worker, sem acesso a nenhuma chave —
-// cifrá-los quebraria essa função); estágio é usado o tempo todo pra
+// CPF, e-mail, CEP, data de nascimento, notas, objetivo, nome e telefone —
+// os campos mais sensíveis de cada lead — ficam cifrados (AES-256-GCM) no
+// storage. Nome e telefone entraram nesta lista depois dos outros seis:
+// a justificativa original pra deixá-los de fora ("usados na identificação
+// automática do contato do WhatsApp, que roda no service worker sem
+// acesso a nenhuma chave") citava uma função que já não existe neste
+// projeto (nenhum content_script, nenhuma permissão pra whatsapp.com no
+// manifest — auditoria confirmou) — e são, junto com o telefone, o dado
+// mais identificável de todo o cadastro sob a LGPD, o mesmo texto que a
+// tela de Privacidade cita. A única razão que ainda fazia sentido (busca
+// na lateral) não se sustenta: a lista `leads` só é populada depois do
+// painel desbloqueado, com o DEK já disponível — decifrar nome/telefone
+// junto com os outros seis, em decifrarLeadsEmMemoria, não quebra a
+// busca nenhuma (ela roda sobre `leads` já em memória, decifrada).
+// Estágio continua de fora de propósito: usado o tempo todo pra
 // contar/agrupar (funil por estágio, contadores), o que exigiria
-// descriptar TODOS os leads só pra desenhar um número. Ver
+// decifrar TODOS os leads só pra desenhar um número. Ver
 // copilotoCifrarAesGcm/copilotoDecifrarAesGcm em auth.js e a tela de
 // Privacidade (botão na lateral) pra como isso é explicado pro usuário.
-const CAMPOS_LEAD_CIFRADOS = ['cpf', 'email', 'cep', 'dataNascimento', 'notas', 'objetivo'];
+const CAMPOS_LEAD_CIFRADOS = ['cpf', 'email', 'cep', 'dataNascimento', 'notas', 'objetivo', 'nome', 'telefone'];
+
+// Nome/telefone "pra exibir" — devolve o valor real quando decifrável, ou
+// um aviso curto quando o campo ainda está cifrado (DEK indisponível
+// nesta sessão pra este lead específico — ex.: backup restaurado de outro
+// perfil/instalação sem a senha/código de recuperação original, ver
+// restaurarBackup). Usado em todo lugar que MOSTRA nome/telefone pra uma
+// pessoa (tira de recentes, modal "Todos os leads", relatório, ficha,
+// lixeira, log de auditoria) — nunca no valor bruto do campo, que nesse
+// estado é só o texto cifrado (formato "gcm:<iv>:<texto>"), ilegível e
+// enganoso se aparecesse cru na tela.
+function nomeLeadParaExibir(lead){
+  if(!lead) return '(sem nome)';
+  if(pareceCifrado(lead.nome)) return '🔒 Protegido';
+  return lead.nome || '(sem nome)';
+}
+function telefoneLeadParaExibir(lead){
+  if(!lead || !lead.telefone) return '';
+  if(pareceCifrado(lead.telefone)) return '🔒 Protegido';
+  return lead.telefone;
+}
 
 // pareceCifrado vive em auth.js (compartilhada com options.js, que também
 // precisa reconhecer campo protegido — as chaves de API).
@@ -377,20 +406,23 @@ async function copilotoFlusharSalvamentosPendentes(){
 // navegador), qualquer campo protegido que esteja aberto pra edição neste
 // momento — chamado sempre ANTES de trocar de perfil ativo ou encerrar a
 // sessão, junto com copilotoFlusharSalvamentosPendentes acima. Cobre um
-// buraco que o flush sozinho não fecha: notas/objetivo/e-mail/CEP/CPF/
-// nascimento salvam na hora ao perder o FOCO (ver bindEvents, blur), não
-// só depois de 600ms parado — e um clique num botão que muda de tela
-// (como "Trocar de perfil") dispara esse blur de forma assíncrona, que
-// pode terminar DEPOIS da troca já concluída, gravando sob o perfil/chave
-// errados. Chamando estas funções aqui, direto e aguardadas, o valor mais
-// recente de cada campo é salvo com o perfil/chave ainda válidos ANTES de
-// qualquer outra coisa acontecer — não depende de nenhum evento do
-// navegador correr a tempo. Todas já se protegem sozinhas (campo
-// desabilitado, sem lead selecionado, sem chave disponível), então
-// chamá-las aqui mesmo sem nada pendente é sempre seguro.
+// buraco que o flush sozinho não fecha: notas/objetivo/nome/telefone/
+// e-mail/CEP/CPF/nascimento salvam na hora ao perder o FOCO (ver
+// bindEvents, blur), não só depois de 600ms parado — e um clique num
+// botão que muda de tela (como "Trocar de perfil") dispara esse blur de
+// forma assíncrona, que pode terminar DEPOIS da troca já concluída,
+// gravando sob o perfil/chave errados. Chamando estas funções aqui,
+// direto e aguardadas, o valor mais recente de cada campo é salvo com o
+// perfil/chave ainda válidos ANTES de qualquer outra coisa acontecer —
+// não depende de nenhum evento do navegador correr a tempo. Todas já se
+// protegem sozinhas (campo desabilitado, sem lead selecionado, sem chave
+// disponível), então chamá-las aqui mesmo sem nada pendente é sempre
+// seguro.
 async function copilotoSalvarCamposAbertosAgora(){
   await saveNotasNow();
   await saveObjetivoNow();
+  await saveNomeNow();
+  await saveTelefoneNow();
   await saveEmailNow();
   await saveCepNow();
   await saveCpfNow();
@@ -937,7 +969,7 @@ function renderLeadsList(){
     pinned.addEventListener('click', ()=>selectLead(fixedLead.id));
     pinned.innerHTML = `<div class="avatar avatar-pin">📌</div>
       <div class="info">
-        <div class="info-top"><span class="nm">${escapeHtml(fixedLead.nome)}</span></div>
+        <div class="info-top"><span class="nm">${escapeHtml(nomeLeadParaExibir(fixedLead))}</span></div>
         <span class="obj">Central de mensagens fixa</span>
       </div>`;
     box.appendChild(pinned);
@@ -992,14 +1024,22 @@ function renderRecentLeadsStrip(){
   list.forEach(l=>{
     const tile = document.createElement('div');
     tile.className = 'recent-lead-tile' + (l.id===currentLeadId ? ' active':'');
-    tile.title = l.nome || '(sem nome)';
+    const nomeExibido = nomeLeadParaExibir(l);
+    tile.title = nomeExibido;
     tile.addEventListener('click', ()=>selectLead(l.id));
-    const inicial = (l.nome||'?').trim().charAt(0) || '?';
+    const inicial = pareceCifrado(l.nome) ? '🔒' : ((l.nome||'?').trim().charAt(0) || '?');
     tile.innerHTML = `<div class="avatar">${escapeHtml(inicial)}</div>
-      <span class="nm">${escapeHtml(l.nome||'(sem nome)')}</span>`;
+      <span class="nm">${escapeHtml(nomeExibido)}</span>`;
     box.appendChild(tile);
   });
 }
+
+// Debounce pra não refiltrar/redesenhar a tira inteira a cada tecla
+// digitada em #leadSearchInput (ver bindEvents) — imperceptível com
+// dezenas/centenas de leads, mas a extensão declara "unlimitedStorage"
+// justamente pra suportar bases bem maiores, onde digitar rápido causaria
+// reflow perceptível a cada letra sem isto.
+const debouncedRenderRecentLeadsStrip = debounce(renderRecentLeadsStrip, 150);
 
 // ---------- Data efetiva do lead (para ordenação, contadores e filtros) ----------
 
@@ -1188,8 +1228,8 @@ function renderModal(){
       return `
       <div class="modal-lead-item" data-id="${l.id}">
         <div class="mli-main">
-          <span class="mli-nome">${escapeHtml(l.nome||'(sem nome)')}</span>
-          ${l.telefone ? `<span class="mli-tel">${escapeHtml(l.telefone)}</span>` : ''}
+          <span class="mli-nome">${escapeHtml(nomeLeadParaExibir(l))}</span>
+          ${l.telefone ? `<span class="mli-tel">${escapeHtml(telefoneLeadParaExibir(l))}</span>` : ''}
           <span class="mli-obj">${pareceCifrado(l.objetivo) ? '🔒 protegido' : escapeHtml(l.objetivo||'sem objetivo')}</span>
         </div>
         <div class="mli-meta">
@@ -1291,11 +1331,11 @@ function renderLeadsReportHtml(leadsToExport){
 
     return `<div class="relatorio-lead">
       <div class="relatorio-lead-head">
-        <span class="relatorio-lead-nome">${escapeHtml(l.nome || '(sem nome)')}</span>
+        <span class="relatorio-lead-nome">${escapeHtml(nomeLeadParaExibir(l))}</span>
         <span class="chip teal">${escapeHtml(estagio)}</span>
       </div>
       <div class="relatorio-lead-grid">
-        ${campoFichaLinha('Telefone / Número', l.telefone ? escapeHtml(l.telefone) : VALOR_NAO_INFORMADO)}
+        ${campoFichaLinha('Telefone / Número', valorFichaOuProtegido(l.telefone))}
         ${campoFichaLinha('E-mail', valorFichaOuProtegido(l.email))}
         ${campoFichaLinha('CEP', valorFichaOuProtegido(l.cep))}
         ${campoFichaLinha('Data de nascimento', dataNascFmt === null ? VALOR_PROTEGIDO : (dataNascFmt ? escapeHtml(dataNascFmt) : VALOR_NAO_INFORMADO))}
@@ -1383,7 +1423,7 @@ async function deleteLead(){
     toast('Este lead é fixo e não pode ser excluído 📌');
     return;
   }
-  const confirmado = await copilotoConfirmar(`Mover "${lead.nome||'este lead'}" e seu histórico para os leads excluídos?`,
+  const confirmado = await copilotoConfirmar(`Mover "${nomeLeadParaExibir(lead)}" e seu histórico para os leads excluídos?`,
     { titulo: 'Mover para excluídos?', textoConfirmar: 'Mover para excluídos' });
   if(!confirmado) return;
 
@@ -1440,14 +1480,24 @@ async function selectLead(id){
   document.getElementById('leadWorkspace').style.display='block';
   const dekDisponivel = !!(await obterDekAtivo());
   aplicarCampoProtegido('leadObjetivo', lead.objetivo, dekDisponivel);
+  // Telefone é protegido como os outros 5 campos "clássicos" (ver
+  // aplicarCampoProtegido), só que sem usar a função genérica: o valor
+  // exibido não é o campo cru, é ou a versão mascarada (modo Brasil) ou o
+  // texto livre (modo estrangeiro) — então a checagem de "está cifrado?"
+  // acontece aqui, antes de decidir qual dessas duas formatações aplicar.
+  const telefoneProtegido = pareceCifrado(lead.telefone) || !dekDisponivel;
   document.getElementById('leadTelefoneEstrangeiroCheckbox').checked = !!lead.telefoneEstrangeiro;
+  document.getElementById('leadTelefoneEstrangeiroCheckbox').disabled = telefoneProtegido;
   aplicarModoTelefoneCampo(!!lead.telefoneEstrangeiro);
-  document.getElementById('leadTelefone').value = lead.telefoneEstrangeiro
+  const leadTelefoneInput = document.getElementById('leadTelefone');
+  leadTelefoneInput.value = telefoneProtegido ? '' : (lead.telefoneEstrangeiro
     ? (lead.telefone || '')
-    : maskTelefone(lead.telefone || '');
+    : maskTelefone(lead.telefone || ''));
+  leadTelefoneInput.disabled = telefoneProtegido;
+  if(telefoneProtegido) leadTelefoneInput.placeholder = '🔒 Protegido — só o próprio profissional pode ver/editar';
   document.getElementById('leadEstagio').value = lead.estagio || 'Primeiro contato';
   aplicarCampoProtegido('leadNotas', lead.notas, dekDisponivel);
-  document.getElementById('leadNome').value = lead.nome || '';
+  aplicarCampoProtegido('leadNome', lead.nome, dekDisponivel);
   aplicarCampoProtegido('leadEmail', lead.email, dekDisponivel);
   aplicarCampoProtegido('leadCep', lead.cep, dekDisponivel);
   aplicarCampoProtegido('leadDataNascimento', lead.dataNascimento, dekDisponivel);
@@ -1653,7 +1703,7 @@ async function deleteHistoryEntry(entryId){
     type: 'historyEntry',
     deletedAt: new Date().toISOString(),
     leadId: leadId,
-    leadNome: (entry.pessoa || (lead ? lead.nome : '')),
+    leadNome: (entry.pessoa || (lead ? nomeLeadParaExibir(lead) : '')),
     entryData: entryCifrada
   });
 
@@ -1694,7 +1744,7 @@ async function clearHistory(){
         type: 'historyEntry',
         deletedAt: now,
         leadId: leadId,
-        leadNome: (entry.pessoa || (lead ? lead.nome : '')),
+        leadNome: (entry.pessoa || (lead ? nomeLeadParaExibir(lead) : '')),
         entryData: entryCifrada
       });
     }
@@ -1863,9 +1913,12 @@ async function confirmarSenhaLixeiraClick(){
 
   const senha = document.getElementById('trashSenhaInput').value;
   const errorEl = document.getElementById('trashSenhaError');
-  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha);
+  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha, 'Senha para abrir a lixeira');
   if(!ok){
-    const estado = await copilotoRegistrarTentativaFalha(perfil.id, 'Senha para abrir a lixeira');
+    // copilotoVerificarSenhaPerfil já registrou a tentativa falha (e o
+    // bloqueio, se for o caso) internamente — só lê o estado resultante
+    // pra decidir qual mensagem mostrar.
+    const estado = await copilotoObterTentativas(perfil.id);
     document.getElementById('trashSenhaInput').value = '';
     if(estado.bloqueadoAte > Date.now()){
       mostrarBloqueioSenhaLixeira(estado.bloqueadoAte - Date.now());
@@ -1877,7 +1930,7 @@ async function confirmarSenhaLixeiraClick(){
     return;
   }
 
-  await copilotoLimparTentativas(perfil.id);
+  // copilotoVerificarSenhaPerfil já limpou as tentativas internamente.
   copilotoLimparErroDoCampo(errorEl);
   fecharModalSenhaLixeira();
 
@@ -1953,9 +2006,12 @@ async function tentarDesbloquearAvancado(){
 
   const senha = document.getElementById('avancadoPasswordInput').value;
   const errorEl = document.getElementById('avancadoLockError');
-  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha);
+  const ok = await copilotoVerificarSenhaPerfil(perfil.id, senha, 'Senha para abrir o Avançado');
   if(!ok){
-    const estado = await copilotoRegistrarTentativaFalha(perfil.id, 'Senha para abrir o Avançado');
+    // copilotoVerificarSenhaPerfil já registrou a tentativa falha (e o
+    // bloqueio, se for o caso) internamente — só lê o estado resultante
+    // pra decidir qual mensagem mostrar.
+    const estado = await copilotoObterTentativas(perfil.id);
     document.getElementById('avancadoPasswordInput').value = '';
     if(estado.bloqueadoAte > Date.now()){
       mostrarBloqueioSenhaAvancado(estado.bloqueadoAte - Date.now());
@@ -1967,7 +2023,7 @@ async function tentarDesbloquearAvancado(){
     return;
   }
 
-  await copilotoLimparTentativas(perfil.id);
+  // copilotoVerificarSenhaPerfil já limpou as tentativas internamente.
   copilotoLimparErroDoCampo(errorEl);
   document.getElementById('avancadoLockScreen').style.display = 'none';
   document.getElementById('avancadoContent').style.display = 'block';
@@ -2202,6 +2258,30 @@ function openHandleDb(){
   });
 }
 
+// Apaga o IndexedDB inteiro do handle de pasta de backup — chamada só por
+// executarResetTotal(). Sem isto, um "reset total" não era total de
+// verdade: chrome.storage.local.clear() nunca tocava neste banco (fonte de
+// dado separada, própria da File System Access API), e a referência à
+// pasta de backup escolhida antes sobrevivia ao reset. Nunca deixa o reset
+// esperando mais que 1s por isto — se outra conexão aberta ao banco
+// atrasar a exclusão (IndexedDB só conclui deleteDatabase depois que toda
+// conexão existente fechar), o reset segue em frente do mesmo jeito; a
+// exclusão completa sozinha assim que essa conexão fechar, mesmo depois do
+// reload que executarResetTotal já dispara na sequência.
+function limparHandleDbBackup(){
+  return new Promise((resolve)=>{
+    let resolvido = false;
+    const finalizar = () => { if(!resolvido){ resolvido = true; resolve(); } };
+    try{
+      const req = indexedDB.deleteDatabase(HANDLE_DB_NAME);
+      req.onsuccess = finalizar;
+      req.onerror = finalizar;
+      req.onblocked = finalizar;
+    }catch(e){ finalizar(); }
+    setTimeout(finalizar, 1000);
+  });
+}
+
 async function saveDirHandle(handle){
   const db = await openHandleDb();
   await new Promise((resolve, reject)=>{
@@ -2390,7 +2470,7 @@ async function restaurarBackup(){
     ? '\n\n⚠️ Este arquivo também contém chave(s) de API de IA — restaurar vai SUBSTITUIR a(s) chave(s) configurada(s) agora pela(s) do arquivo. Só continue se tiver certeza de onde este arquivo veio: uma chave de terceiro faria suas conversas de IA passarem pela conta de quem a forneceu.'
     : '';
 
-  const confirmMsg = `Isso vai substituir TODOS os dados do perfil atual (leads, funil, campanha, configurações e chaves) pelos dados desse backup. Os demais profissionais cadastrados nesta instalação não são afetados. Essa ação não pode ser desfeita.\n\nSe este backup for de OUTRO perfil ou de outra instalação (ex: computador novo), os campos protegidos (CPF, e-mail, CEP, nascimento, notas, chaves de API) podem aparecer como "🔒 protegido" — eles só abrem de volta com a senha/código de recuperação do perfil ORIGINAL de onde o backup veio. Restaurar no mesmo perfil de origem não tem esse problema.${avisoChaveApi}\n\nQuer continuar?`;
+  const confirmMsg = `Isso vai substituir TODOS os dados do perfil atual (leads, funil, campanha, configurações e chaves) pelos dados desse backup. Os demais profissionais cadastrados nesta instalação não são afetados. Essa ação não pode ser desfeita.\n\nSe este backup for de OUTRO perfil ou de outra instalação (ex: computador novo), os campos protegidos (nome, telefone, CPF, e-mail, CEP, nascimento, notas, chaves de API) podem aparecer como "🔒 protegido" — eles só abrem de volta com a senha/código de recuperação do perfil ORIGINAL de onde o backup veio. Restaurar no mesmo perfil de origem não tem esse problema.${avisoChaveApi}\n\nQuer continuar?`;
   const confirmadoBackup = await copilotoConfirmar(confirmMsg, { titulo: 'Restaurar backup?', textoConfirmar: 'Restaurar backup', perigo: true });
   if(!confirmadoBackup) return;
 
@@ -2511,6 +2591,7 @@ async function executarResetTotal(){
   }
   fecharModalResetConfirm();
   await chrome.storage.local.clear();
+  await limparHandleDbBackup(); // ver comentário na função — banco separado, chrome.storage.local.clear() não alcança
   await copilotoEncerrarSessao();
   await copilotoLimparPerfilAtivo();
   await copilotoLimparSessaoAdmin();
@@ -2553,7 +2634,7 @@ async function enviarBackupPorEmail(){
 
   const assunto = `Backup do Co-piloto de vendas — ${new Date().toLocaleDateString('pt-BR')}`;
   const corpo = `Segue backup do Co-piloto de vendas.\n\nIMPORTANTE: anexe manualmente o arquivo "${filename}" que acabou de ser baixado na sua pasta de Downloads antes de enviar este e-mail.`;
-  const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
   window.open(mailtoUrl, '_blank', 'noopener,noreferrer');
 
   toast('Backup baixado — anexe o arquivo no e-mail que abriu e envie ✅');
@@ -2657,7 +2738,10 @@ async function renderTrashModal(){
   box.innerHTML = sorted.map(item=>{
     if(item.type === 'lead'){
       const histCount = (item.historyData||[]).length;
-      return linhaLixeiraHtml('👤', escapeHtml(item.leadData.nome||'(sem nome)'),
+      // item.leadData vem CIFRADO da lixeira (ver deleteLead) — nome é
+      // campo protegido (CAMPOS_LEAD_CIFRADOS) desde que decifrado uma
+      // única vez ao restaurar, nunca aqui, só pra uma prévia.
+      return linhaLixeiraHtml('👤', escapeHtml(nomeLeadParaExibir(item.leadData)),
         `Lead excluído em ${formatDataHora(item.deletedAt)} · ${histCount} resposta${histCount===1?'':'s'} no histórico`,
         item.id);
     }
@@ -2754,7 +2838,7 @@ async function restoreTrashItem(itemId){
 // de vez e o log é o único registro que sobra de que ele existiu.
 function descreverItemLixeiraParaLog(item){
   if(!item) return '(item não encontrado)';
-  if(item.type === 'lead') return `lead "${(item.leadData && item.leadData.nome) || '(sem nome)'}"`;
+  if(item.type === 'lead') return `lead "${item.leadData ? nomeLeadParaExibir(item.leadData) : '(sem nome)'}"`;
   if(item.type === 'botHistoryEntry') return `conversa do C&S - BOT com ${item.leadNome || '(lead removido)'}`;
   return `resposta do histórico de ${item.leadNome || '(lead removido)'}`; // historyEntry
 }
@@ -2849,7 +2933,7 @@ async function registrarAlteracaoLeadNoLog(lead, campo, antes, depois){
     const d = (depois === null || depois === undefined) ? '' : String(depois);
     if(a === d) return;
     const rotulo = LOG_CAMPO_LEAD_ROTULO[campo] || campo;
-    const alvo = (lead && lead.nome) ? lead.nome : '(sem nome)';
+    const alvo = lead ? nomeLeadParaExibir(lead) : '(sem nome)';
     let detalhe;
     if(CAMPOS_LEAD_CIFRADOS.includes(campo)){
       // Campo protegido: diz o que aconteceu, nunca o conteúdo.
@@ -2872,7 +2956,7 @@ async function registrarAlteracaoLeadNoLog(lead, campo, antes, depois){
 // Criação, exclusão e restauração — o ciclo de vida do registro.
 async function registrarEventoLeadNoLog(tipo, lead, complemento){
   try{
-    const alvo = (lead && lead.nome) ? lead.nome : '(sem nome)';
+    const alvo = lead ? nomeLeadParaExibir(lead) : '(sem nome)';
     const detalhe = `Lead "${alvo}"` + (complemento ? ' · ' + complemento : '');
     await copilotoRegistrarEventoLog(tipo, await copilotoObterPerfilAtivo(), detalhe);
   }catch(e){
@@ -2965,8 +3049,15 @@ async function saveEstagioNow(){
 async function saveTelefoneNow(){
   const lead = getCurrentLead();
   if(!lead) return;
+  // Campo protegido bloqueado (ver aplicarCampoProtegido/selectLead) nunca
+  // é salvo — ver saveNotasNow pro porquê (sem isso, o valor vazio que o
+  // campo mostra enquanto bloqueado sobrescreveria o telefone real, ainda
+  // cifrado, no storage).
+  if(document.getElementById('leadTelefone').disabled) return;
+  const valor = document.getElementById('leadTelefone').value; // ver saveNotasNow (lê antes do await)
+  if(!(await copilotoDekParaSalvarCampoProtegido())) return;
   const antesTelefone = lead.telefone || '';
-  lead.telefone = document.getElementById('leadTelefone').value;
+  lead.telefone = valor;
   await persistLeadFieldChange();
   await registrarAlteracaoLeadNoLog(lead, 'telefone', antesTelefone, lead.telefone);
 }
@@ -3163,8 +3254,13 @@ function onCepKeyInput(){
 async function saveNomeNow(){
   const lead = getCurrentLead();
   if(!lead) return;
+  // Campo protegido bloqueado (ver aplicarCampoProtegido/selectLead) nunca
+  // é salvo — ver saveNotasNow pro porquê.
+  if(document.getElementById('leadNome').disabled) return;
+  const valor = document.getElementById('leadNome').value.trim(); // ver saveNotasNow (lê antes do await)
+  if(!(await copilotoDekParaSalvarCampoProtegido())) return;
   const antesNome = lead.nome || '';
-  lead.nome = document.getElementById('leadNome').value.trim();
+  lead.nome = valor;
   await persistLeadFieldChange();
   await registrarAlteracaoLeadNoLog(lead, 'nome', antesNome, lead.nome);
 }
@@ -3265,7 +3361,7 @@ function renderFichaCompleta(lead){
   const idade = dataNascCifrada ? null : calcularIdade(lead.dataNascimento);
 
   const dadosContato =
-    campoFichaLinha('Telefone / Número', lead.telefone ? escapeHtml(lead.telefone) : VALOR_NAO_INFORMADO) +
+    campoFichaLinha('Telefone / Número', valorFichaOuProtegido(lead.telefone)) +
     campoFichaLinha('E-mail', valorFichaOuProtegido(lead.email)) +
     campoFichaLinha('CEP', valorFichaOuProtegido(lead.cep));
 
@@ -3306,12 +3402,15 @@ function renderFichaCompleta(lead){
       }).join('')
     : '<div class="ficha-vazio">Nenhuma resposta gerada ainda para este lead.</div>';
 
+  const nomeExibido = nomeLeadParaExibir(lead);
+  const inicialFicha = pareceCifrado(lead.nome) ? '🔒' : ((lead.nome||'?').trim().charAt(0) || '?');
+  const telefoneExibido = telefoneLeadParaExibir(lead);
   return `
     <div class="ficha-header">
-      <div class="ficha-avatar">${escapeHtml((lead.nome||'?').trim().charAt(0) || '?')}</div>
+      <div class="ficha-avatar">${escapeHtml(inicialFicha)}</div>
       <div>
-        <div class="ficha-nome">${escapeHtml(lead.nome || '(sem nome)')}</div>
-        <div class="ficha-sub">${lead.telefone ? escapeHtml(lead.telefone) + ' · ' : ''}<span class="chip teal">${escapeHtml(lead.estagio || 'Primeiro contato')}</span></div>
+        <div class="ficha-nome">${escapeHtml(nomeExibido)}</div>
+        <div class="ficha-sub">${telefoneExibido ? escapeHtml(telefoneExibido) + ' · ' : ''}<span class="chip teal">${escapeHtml(lead.estagio || 'Primeiro contato')}</span></div>
       </div>
     </div>
 
@@ -3345,7 +3444,7 @@ function renderFichaCompleta(lead){
 function openFichaModal(){
   const lead = getCurrentLead();
   if(!lead || lead.fixo) return;
-  document.getElementById('fichaModalTitle').textContent = `🗂️ Ficha — ${lead.nome || '(sem nome)'}`;
+  document.getElementById('fichaModalTitle').textContent = `🗂️ Ficha — ${nomeLeadParaExibir(lead)}`;
   document.getElementById('fichaModalBody').innerHTML = renderFichaCompleta(lead);
   document.getElementById('fichaModalOverlay').style.display = 'flex';
   document.body.classList.add('modal-open');
@@ -3409,12 +3508,12 @@ function buildContextoDinamicoBloco(lead, personName, extraContext, continuidade
 - A pessoa desta mensagem específica é: ${personName}.
 - Estágio no funil desta pessoa, escolhido manualmente para esta resposta (definido pelo humano, não é palpite da IA): ${lead.estagio || 'Primeiro contato'}
 - Trate esta pessoa de forma totalmente isolada. Não misture, presuma ou reaproveite informações, contexto, objeções ou histórico de qualquer outra pessoa que já tenha passado por esta central antes. Baseie-se apenas na mensagem atual (e na informação adicional abaixo, se houver) para responder a ${personName}.`
-    // objetivo/notas são campos protegidos (ver auth.js) — se ainda
+    // nome/objetivo/notas são campos protegidos (ver auth.js) — se ainda
     // estiverem cifrados aqui (DEK indisponível nesta sessão, ver
     // decifrarLeadsEmMemoria), NUNCA manda o texto cifrado bruto pra IA;
     // trata como se estivesse vazio, igual a um lead sem essa informação.
     : `CONTEXTO ATUAL DESTE LEAD:
-- Nome: ${lead.nome || 'ainda não informado'}
+- Nome: ${!pareceCifrado(lead.nome) && lead.nome || 'ainda não informado'}
 - Objetivo detectado até agora: ${!pareceCifrado(lead.objetivo) && lead.objetivo || 'ainda não informado'}
 - Estágio atual no funil (definido manualmente, não é palpite da IA): ${lead.estagio || 'Primeiro contato'}
 - Notas/informações adicionais sobre o lead: ${!pareceCifrado(lead.notas) && lead.notas || 'nenhuma'}`;
@@ -4601,7 +4700,7 @@ function bindEvents(){
 
   document.getElementById('leadSearchInput').addEventListener('input', (e)=>{
     searchQuery = e.target.value;
-    renderRecentLeadsStrip();
+    debouncedRenderRecentLeadsStrip();
   });
   document.getElementById('exportAllBtn').addEventListener('click', ()=>{
     openLeadsModal('');
@@ -5248,9 +5347,13 @@ async function confirmarSenhaPerfilClick(){
   // copilotoDesbloquearPerfilComSenha confere a senha E, se estiver certa,
   // já desembrulha o DEK (e a AMK, se for o admin) — ver perfis.js. Se a
   // senha estiver errada, resultado.ok vem false, igual antes.
-  const resultado = await copilotoDesbloquearPerfilComSenha(perfilAlvo.id, senha);
+  const resultado = await copilotoDesbloquearPerfilComSenha(perfilAlvo.id, senha, 'Login de perfil');
   if(!resultado.ok){
-    const estado = await copilotoRegistrarTentativaFalha(perfilAlvo.id, 'Login de perfil');
+    // copilotoDesbloquearPerfilComSenha (via copilotoVerificarSenhaPerfil)
+    // já registrou a tentativa falha (e o bloqueio, se for o caso)
+    // internamente — só lê o estado resultante pra decidir qual mensagem
+    // mostrar.
+    const estado = await copilotoObterTentativas(perfilAlvo.id);
     const card = document.querySelector('#perfilPassoSenha .perfil-senha-card');
     card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
     document.getElementById('perfilSenhaInput').value = '';
@@ -5266,7 +5369,7 @@ async function confirmarSenhaPerfilClick(){
     return;
   }
 
-  await copilotoLimparTentativas(perfilAlvo.id);
+  // copilotoDesbloquearPerfilComSenha já limpou as tentativas internamente.
   if(perfilAlvo.admin){
     // senha acabou de ser conferida certa por copilotoDesbloquearPerfilComSenha
     // acima — copilotoDefinirSessaoAdmin reconfere ela mesma de novo, aqui
