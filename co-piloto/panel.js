@@ -18,6 +18,21 @@ function apenasDigitos(valor){
   return (valor || '').replace(/\D/g, '');
 }
 
+// Tira o "55" (DDI do Brasil) de uma sequência de dígitos de telefone — só
+// quando o comprimento total bate com um número BR completo COM DDI (13
+// dígitos: 55 + DDD + celular de 9 dígitos; ou 12: 55 + DDD + fixo de 8),
+// pra nunca cortar um "55" que por coincidência apareça no início de um
+// número que não seja DDI de verdade. Mesma regra usada por maskTelefone()
+// (números capturados do WhatsApp costumam vir com o "55" na frente) e
+// agora também por filtrarLeadsPorBusca — uma função só, pra busca e
+// salvamento nunca discordarem sobre o que conta como DDI.
+function removerDDIBrasil(digits){
+  if(digits.length > 11 && digits.startsWith('55') && (digits.length === 12 || digits.length === 13)){
+    return digits.slice(2);
+  }
+  return digits;
+}
+
 // Minúsculo + sem acento — pra buscar "joao"/"José" batendo com "João"/"jose"
 // dos dois lados, não só maiúscula/minúscula (que já era ignorada antes).
 // normalize('NFD') separa cada letra acentuada em base + marca de acento; o
@@ -30,27 +45,22 @@ function normalizarParaBusca(texto){
 // Filtra leads por nome ou telefone (com ou sem pontuação) — usado tanto na
 // lista lateral quanto no modal "Ver todos".
 //
-// Telefone compara nos DOIS sentidos (leadDigits.includes(qDigits) OU
-// qDigits.includes(leadDigits)), não só um: cobre tanto buscar sem DDI/DDD
-// um número que foi salvo com eles (já funcionava, um contém o outro nessa
-// ordem) quanto o caso inverso — buscar COM DDI/DDD ("5511912345678") um
-// número que foi salvo sem ("91234-5678"), que antes não achava porque o
-// texto digitado ficava mais comprido que o salvo, e um "contém" só nesse
-// sentido não teria como bater nunca.
-// `leadDigits &&` é obrigatório aqui: sem essa checagem, um lead SEM
-// telefone (string vazia) faria `qDigits.includes('')` — que é sempre
-// verdadeiro pra qualquer string, já que toda string "contém" a vazia — e
-// esse lead apareceria em QUALQUER busca numérica, mesmo sem telefone
-// nenhum pra bater.
+// Telefone: remove o DDI do que foi digitado (removerDDIBrasil, mesma regra
+// que maskTelefone já usa pra salvar — nunca fica um telefone salvo COM
+// DDI, então a busca também nunca deveria exigir um) antes de comparar.
+// Com os dois lados já no mesmo padrão (sem DDI), volta a ser um "contém"
+// só num sentido — mais simples e mais preciso que comparar nos dois
+// sentidos (que podia dar falso positivo: um texto colado bem comprido que
+// só por coincidência contivesse o número de outro lead como pedaço dele).
 function filtrarLeadsPorBusca(list, query){
   const q = normalizarParaBusca(query).trim();
   if(!q) return list;
-  const qDigits = apenasDigitos(query);
+  const qDigits = removerDDIBrasil(apenasDigitos(query));
   return list.filter(l=>{
     const leadDigits = apenasDigitos(l.telefone);
     return normalizarParaBusca(l.nome).includes(q) ||
       normalizarParaBusca(l.telefone).includes(q) ||
-      (!!qDigits && !!leadDigits && (leadDigits.includes(qDigits) || qDigits.includes(leadDigits)));
+      (!!qDigits && !!leadDigits && leadDigits.includes(qDigits));
   });
 }
 
@@ -3055,14 +3065,11 @@ function maskCep(value){
 // Telefone: acrescenta o parêntese do DDD sozinho enquanto a pessoa digita.
 // Aceita celular (11 dígitos, com o 9º dígito) e fixo (10 dígitos).
 function maskTelefone(value){
-  let digits = (value || '').replace(/\D/g, '');
   // Números capturados automaticamente do WhatsApp costumam vir com o
   // código do Brasil na frente (ex: 55 71 98646-1027, 13 dígitos). Sem
   // remover o "55" aqui, ele seria confundido com o DDD e o número real
-  // ficaria cortado/errado na exibição.
-  if(digits.length > 11 && digits.startsWith('55') && (digits.length === 12 || digits.length === 13)){
-    digits = digits.slice(2);
-  }
+  // ficaria cortado/errado na exibição (ver removerDDIBrasil).
+  let digits = removerDDIBrasil((value || '').replace(/\D/g, ''));
   digits = digits.slice(0, 11);
   if(digits.length === 0) return '';
   if(digits.length <= 2) return `(${digits}`;
