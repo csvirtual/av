@@ -580,6 +580,16 @@ function nomeCurtoModeloGemini(model){
   return (model || '').replace(/^gemini-/, '');
 }
 
+// Sem NENHUMA chave configurada (Claude ou Gemini), a pílula vira um
+// atalho clicável direto pro card "Provedor de IA" em Configurações — ver
+// #providerBadge.provider-pill-clicavel (CSS) e o listener de clique em
+// bindEvents. Com chave já configurada, o texto continua só informativo
+// (nome do modelo em uso), sem virar botão.
+function marcarProviderBadgeSemChave(semChave){
+  const badge = document.getElementById('providerBadge');
+  badge.classList.toggle('provider-pill-clicavel', semChave);
+}
+
 function renderProviderBadge(){
   const badge = document.getElementById('providerBadge');
   const p = providerSettings.provider;
@@ -595,8 +605,10 @@ function renderProviderBadge(){
         ? `${escapeHtml(providerSettings.claudeModeloBasico)} → ${escapeHtml(providerSettings.claudeModel)} por etapa`
         : escapeHtml(providerSettings.claudeModel);
       badge.innerHTML = `<span class="provider-pill"><span class="dot ok"></span>Usando Claude (${textoModelo})</span>`;
+      marcarProviderBadgeSemChave(false);
     } else {
-      badge.innerHTML = `<span class="provider-pill"><span class="dot warn"></span>Nenhuma chave configurada — clique na engrenagem</span>`;
+      badge.innerHTML = `<span class="provider-pill"><span class="dot warn"></span>Nenhuma API configurada</span>`;
+      marcarProviderBadgeSemChave(true);
     }
     return;
   }
@@ -607,14 +619,17 @@ function renderProviderBadge(){
   const chaveA = providerSettings.geminiKeyBasico;
   const chaveB = providerSettings.geminiKeyAvancado;
   if(!chaveA && !chaveB){
-    badge.innerHTML = `<span class="provider-pill"><span class="dot warn"></span>Nenhuma chave configurada — clique na engrenagem</span>`;
+    badge.innerHTML = `<span class="provider-pill"><span class="dot warn"></span>Nenhuma API configurada</span>`;
+    marcarProviderBadgeSemChave(true);
   } else if(chaveA && chaveB){
     const modeloA = nomeCurtoModeloGemini(providerSettings.geminiModeloBasico);
     const modeloB = nomeCurtoModeloGemini(providerSettings.geminiModeloAvancado);
     badge.innerHTML = `<span class="provider-pill"><span class="dot ok"></span>Gemini · A: (${escapeHtml(modeloA)}) · B: (${escapeHtml(modeloB)})</span>`;
+    marcarProviderBadgeSemChave(false);
   } else {
     const modelo = chaveA ? providerSettings.geminiModeloBasico : providerSettings.geminiModeloAvancado;
     badge.innerHTML = `<span class="provider-pill"><span class="dot ok"></span>Usando Gemini (${escapeHtml(modelo)})</span>`;
+    marcarProviderBadgeSemChave(false);
   }
 }
 
@@ -4759,6 +4774,14 @@ document.addEventListener('keydown', (e) => {
 function bindEvents(){
   initHealthMonitor();
   document.getElementById('gearBtn').addEventListener('click', openOptions);
+  // Só reage ao clique quando a pílula está no estado "sem chave" (ver
+  // renderProviderBadge/marcarProviderBadgeSemChave) — com chave já
+  // configurada a pílula é só informativa, sem virar atalho de clique.
+  document.getElementById('providerBadge').addEventListener('click', ()=>{
+    if(document.getElementById('providerBadge').classList.contains('provider-pill-clicavel')){
+      window.location.href = 'options.html#cardProvedorIA';
+    }
+  });
   document.getElementById('logoutBtn').addEventListener('click', fazerLogoutPainel);
   document.getElementById('brandHome').addEventListener('click', goToHome);
   document.getElementById('addLeadBtn').addEventListener('click', addLead);
