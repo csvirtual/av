@@ -426,33 +426,19 @@
 
   /* ---------- Health Monitor (recurso extra, só leitura de status + atalho
      pra trocar o modelo selecionado; não cria nem muda nenhuma lógica de
-     roteamento). Movido de Configurações pro painel principal, fixo ao
-     lado da pílula de respostas geradas no mês. Só ícone (sem o texto
-     "Health Monitor" ao lado, que tinha antes) — mesmo tamanho/formato
-     redondo do .recentes-icon-btn ao lado (ver comentário dele, abaixo),
-     pra sobrar espaço nessa fileira sem os dois "brigarem" por linha
-     (título some do texto, mas continua em `title`/`aria-label` pra quem
-     usa leitor de tela ou passa o mouse). ---------- */
+     roteamento). Movido de Configurações pro painel principal. Mesma
+     pílula (com texto) usada pelo botão "Últimos Cadastros" ao lado — a
+     pílula de "respostas geradas" que ficava entre os dois foi removida
+     (badge some por completo da tela, ver comentário em #usageBadge nesta
+     mesma seção), sobrando espaço de sobra pros dois com texto sem quebrar
+     linha em janelas de ~1000px. ---------- */
   .hm-open-pill{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:34px; height:34px; background:#fff; border:1px solid var(--line);
-    border-radius:999px; font-size:16px; cursor:pointer;
-    box-shadow:0 1px 2px rgba(19,36,32,.04);
+    display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--line);
+    border-radius:999px; padding:6px 14px; font-size:12px; color:var(--ink); cursor:pointer;
+    font-family:'Manrope',sans-serif; box-shadow:0 1px 2px rgba(19,36,32,.04);
   }
   .hm-open-pill:hover{ border-color:var(--purple); background:var(--purple-soft); }
-
-  /* Ícone discreto (ficha de contato) que abre o modal dos últimos leads
-     cadastrados — ver openUltimosLeadsModal, panel.js. Mesma linguagem
-     visual das pílulas ao lado (fundo branco, borda fina) e mesmo tamanho
-     redondo do Health Monitor logo ali do lado (.hm-open-pill, acima). */
-  .recentes-icon-btn{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:34px; height:34px; background:#fff; border:1px solid var(--line);
-    border-radius:999px; cursor:pointer; color:var(--teal-dark);
-    box-shadow:0 1px 2px rgba(19,36,32,.04);
-  }
-  .recentes-icon-btn svg{ width:16px; height:16px; display:block; }
-  .recentes-icon-btn:hover{ border-color:var(--purple); background:var(--purple-soft); color:var(--purple); }
+  .recentes-btn-icon{ width:14px; height:14px; display:inline-block; vertical-align:-2px; }
 
   /* Mesmo ícone do botão acima, agora no título do modal — mesmo padrão dos
      outros modais do app, que sempre têm um emoji antes do texto (ex:
@@ -1296,11 +1282,18 @@
 
     <div class="badges-row">
       <div id="providerBadge"></div>
-      <div id="usageBadge"></div>
-      <button type="button" class="hm-open-pill" id="healthMonitorOpenBtn" title="Health Monitor" aria-label="Abrir Health Monitor">🩺</button>
+      <!-- Não tem mais #usageBadge aqui — a pílula de "respostas geradas
+           este mês/no total" foi removida da tela por completo. O
+           contador em si continua existindo por baixo dos panos
+           (incrementUsage/renderUsageBadge, panel.js — renderUsageBadge
+           virou no-op sem elemento pra desenhar) e continua resetável em
+           Configurações → "Contador de respostas geradas", só não aparece
+           mais como badge aqui. -->
+      <button type="button" class="hm-open-pill" id="healthMonitorOpenBtn" title="Health Monitor" aria-label="Abrir Health Monitor">🩺 Health Monitor</button>
       <div id="campanhaBadge"></div>
-      <button type="button" class="recentes-icon-btn" id="ultimosLeadsOpenBtn" title="Últimos leads cadastrados" aria-label="Ver últimos leads cadastrados">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20,3H4C2.9,3,2,3.9,2,5v14c0,1.1,0.9,2,2,2h16c1.1,0,2,-0.9,2,-2V5C22,3.9,21.1,3,20,3z M9,7c1.1,0,2,0.9,2,2s-0.9,2,-2,2s-2,-0.9,-2,-2S7.9,7,9,7z M13,17H5v-1c0,-1.33,2.67,-2,4,-2s4,0.67,4,2V17z M20,16h-5v-1.5h5V16z M20,13h-5v-1.5h5V13z M20,10h-5V8.5h5V10z"/></svg>
+      <button type="button" class="hm-open-pill" id="ultimosLeadsOpenBtn" title="Últimos leads cadastrados" aria-label="Ver últimos leads cadastrados">
+        <svg class="recentes-btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20,3H4C2.9,3,2,3.9,2,5v14c0,1.1,0.9,2,2,2h16c1.1,0,2,-0.9,2,-2V5C22,3.9,21.1,3,20,3z M9,7c1.1,0,2,0.9,2,2s-0.9,2,-2,2s-2,-0.9,-2,-2S7.9,7,9,7z M13,17H5v-1c0,-1.33,2.67,-2,4,-2s4,0.67,4,2V17z M20,16h-5v-1.5h5V16z M20,13h-5v-1.5h5V13z M20,10h-5V8.5h5V10z"/></svg>
+        Últimos Cadastros
       </button>
     </div>
 
@@ -2090,7 +2083,7 @@ Nascimento: 20/01/1992"></textarea>
           <span class="accordion-chevron">⌄</span>
         </button>
         <div class="accordion-panel">
-          <p>O ícone 🪪 ao lado do "🩺 Health Monitor", no topo, abre um modal com os leads cadastrados, mais recente primeiro — clique num item pra abrir aquele lead direto. Ele já entra mostrando os 7 mais novos; com 8 leads ou mais, aparece paginação no rodapé pra folhear os demais, sem precisar abrir a lista completa. Use o campo "🔍 Buscar lead por nome ou número", na lateral, pra achar qualquer outro: os resultados aparecem num painel flutuante logo abaixo do campo, sem sair da tela em que você está — clique num resultado pra abrir aquele lead, ou clique fora pra fechar o painel sem escolher nenhum. A busca por nome ignora maiúscula/minúscula e acento (buscar "joao" acha "João"); a busca por telefone ignora pontuação, DDD e DDI — funciona com ou sem eles, dos dois lados.</p>
+          <p>O botão "🪪 Últimos Cadastros", ao lado do "🩺 Health Monitor" no topo, abre um modal com os leads cadastrados, mais recente primeiro — clique num item pra abrir aquele lead direto. Ele já entra mostrando os 7 mais novos; com 8 leads ou mais, aparece paginação no rodapé pra folhear os demais, sem precisar abrir a lista completa. Use o campo "🔍 Buscar lead por nome ou número", na lateral, pra achar qualquer outro: os resultados aparecem num painel flutuante logo abaixo do campo, sem sair da tela em que você está — clique num resultado pra abrir aquele lead, ou clique fora pra fechar o painel sem escolher nenhum. A busca por nome ignora maiúscula/minúscula e acento (buscar "joao" acha "João"); a busca por telefone ignora pontuação, DDD e DDI — funciona com ou sem eles, dos dois lados.</p>
           <p>Clique em "Ver / exportar leads" (ou em qualquer contador/estágio) pra abrir a lista completa, com busca, filtro por período e por estágio, e paginação de 10 em 10. Dentro dela, "Exportar em PDF" gera um relatório com os leads filtrados na tela — traz cabeçalho, resumo por estágio do funil e um card por lead com todos os dados e notas. Pra salvar como PDF, use "Imprimir / PDF" dentro do relatório e escolha "Salvar como PDF" na caixa de impressão do navegador.</p>
         </div>
       </div>
@@ -2152,7 +2145,7 @@ Nascimento: 20/01/1992"></textarea>
         </button>
         <div class="accordion-panel">
           <p>A lateral e a coluna direita mostram, em tempo real, quantos leads você tem e onde cada um está no funil.</p>
-          <p>Na lateral: leads hoje, no mês e no total — clique em qualquer um pra abrir a lista filtrada. Na coluna direita, o funil por estágio mostra quantos leads estão em cada etapa; clique num estágio pra ver só os dele. A pílula "respostas geradas" conta o total no mês e no total (zere em Configurações). O lead @csvirtual não entra em nenhum desses números.</p>
+          <p>Na lateral: leads hoje, no mês e no total — clique em qualquer um pra abrir a lista filtrada. Na coluna direita, o funil por estágio mostra quantos leads estão em cada etapa; clique num estágio pra ver só os dele. O contador de "respostas geradas" (mês/total) continua sendo registrado nos bastidores mesmo sem badge fixo na tela — acompanhe e zere ele em Configurações. O lead @csvirtual não entra em nenhum desses números.</p>
           <p>Navegação: clique em "C&S Assistência Virtual" na lateral pra voltar à tela inicial a qualquer momento. Um botão roxo com seta (↑) aparece no canto inferior direito ao rolar a página — clique pra voltar ao topo.</p>
         </div>
       </div>
