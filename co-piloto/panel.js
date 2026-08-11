@@ -427,62 +427,6 @@ function goToHome(){
   }
 }
 
-// ---------- Card "Sem automação" da tela inicial: alterna com o aviso de LGPD ----------
-// Mesmo card (.no-auto-notice), conteúdo trocado por JS a cada 5s — dois
-// avisos de confiança que cabem no mesmo espaço em vez de um só ficar fixo
-// e o outro não ter lugar nenhum. O texto do 2º slide é o MESMO já usado em
-// outros avisos de LGPD do app (.perfil-aviso-lgpd, .avancado-lock-legal,
-// .privacidade-lgpd-destaque) — mesma fonte única de verdade, sem reescrever
-// a frase com palavras diferentes em mais um lugar.
-const AVISO_INICIAL_SLIDES = [
-  {
-    icone: '🔒',
-    titulo: 'Sem automação dentro do WhatsApp',
-    texto: 'O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> — isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.'
-  },
-  {
-    icone: '🔒',
-    titulo: 'Proteção de dados (LGPD)',
-    texto: 'Dados de clientes protegidos por criptografia. Acesso ou uso indevido de informação de terceiros pode configurar violação da <b>LGPD</b> (Lei 13.709/2018).'
-  }
-];
-const AVISO_INICIAL_INTERVALO_MS = 5000;
-let _avisoInicialIndice = 0;
-let _avisoInicialRotacaoIniciada = false; // trava contra setInterval duplicado (liberarPainel roda 1x por troca de perfil, não só no 1º unlock)
-
-function renderAvisoInicial(){
-  const slide = AVISO_INICIAL_SLIDES[_avisoInicialIndice];
-  const icone = document.getElementById('noAutoNoticeIcon');
-  const titulo = document.getElementById('noAutoNoticeTitle');
-  const texto = document.getElementById('noAutoNoticeText');
-  if(!icone || !titulo || !texto) return; // defesa: elementos estáticos do panel.html, sempre presentes a essa altura (chamada só depois de liberarPainel já ter montado a tela) — checagem por segurança, não porque haja um cenário real em que faltem
-  icone.textContent = slide.icone;
-  titulo.textContent = slide.titulo;
-  // innerHTML aqui é seguro: slide.texto é sempre um dos 2 textos FIXOS
-  // definidos acima (nunca dado de lead/terceiro) — só pra permitir o <b>
-  // de destaque, mesmo padrão que já era usado direto no HTML estático.
-  texto.innerHTML = slide.texto;
-}
-
-function iniciarRotacaoAvisoInicial(){
-  if(_avisoInicialRotacaoIniciada) return;
-  _avisoInicialRotacaoIniciada = true;
-  setInterval(()=>{
-    const card = document.querySelector('.no-auto-notice');
-    if(!card) return;
-    card.classList.add('fading');
-    // Só troca o conteúdo DEPOIS do card ter sumido (ver transition de
-    // opacity em panel.html) — trocar no mesmo instante do fade deixaria o
-    // texto novo piscando por trás da transição, em vez de aparecer só
-    // quando já estiver visível de novo.
-    setTimeout(()=>{
-      _avisoInicialIndice = (_avisoInicialIndice + 1) % AVISO_INICIAL_SLIDES.length;
-      renderAvisoInicial();
-      card.classList.remove('fading');
-    }, 220);
-  }, AVISO_INICIAL_INTERVALO_MS);
-}
-
 const FIXED_LEAD_DATA = '9999-09-09T12:00:00.000Z';
 
 function ensureFixedLeadExists(){
@@ -4892,7 +4836,6 @@ async function liberarPainel(){
   goToHome();
   copilotoMonitorarAtividade();
   copilotoIniciarChecagemInatividade(bloquearPainelPorInatividade);
-  iniciarRotacaoAvisoInicial();
 
   // Estreia DESTE perfil (não da instalação inteira, ver comentário em
   // copilotoCriarPerfil) — mostra Privacidade primeiro e, só quando ele for

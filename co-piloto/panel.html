@@ -729,7 +729,9 @@
      o respiro entre ele e o card "Pronto para atender" acima vem do
      margin-bottom:16px que já é padrão de QUALQUER .card (ver #noLeadState
      logo acima dele), o mesmo espaçamento usado entre todo par de cards
-     empilhados no resto do app. */
+     empilhados no resto do app. Usada duas vezes, empilhada (LGPD e "Sem
+     automação dentro do WhatsApp") — eram um card só alternando conteúdo a
+     cada 5s, viraram dois cards estáticos, um logo abaixo do outro. */
   .no-auto-notice{
     text-align:left;
     width:100%; margin:0;
@@ -737,12 +739,7 @@
     border-radius:18px; padding:17px 20px 17px 18px;
     box-shadow:0 4px 16px rgba(124,58,168,.10);
     position:relative; overflow:hidden;
-    transition:opacity .22s ease;
   }
-  /* Estado de transição entre os 2 avisos que se alternam a cada 5s (ver
-     iniciarRotacaoAvisoInicial, panel.js) — fica opaco só o tempo de trocar
-     o conteúdo por baixo, nunca chega a sumir de vez. */
-  .no-auto-notice.fading{ opacity:0; }
   .no-auto-notice::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
     background:linear-gradient(180deg, var(--purple), #B27FD1);
@@ -1308,15 +1305,31 @@
 
       <!-- Card próprio, separado do "Pronto para atender" acima (mesma ideia
            do .recent-leads-card lá em cima — margin-bottom do #noLeadState.card
-           já abre o respiro entre os dois). Alterna entre 2 avisos a cada 5s
-           (ver iniciarRotacaoAvisoInicial, panel.js); o texto/ícone abaixo são
-           só o estado inicial (1º slide), antes do primeiro giro. -->
+           já abre o respiro entre os dois). Aviso de LGPD fixo — o mesmo
+           texto já usado em outros avisos do app (.perfil-aviso-lgpd,
+           .avancado-lock-legal, .privacidade-lgpd-destaque), mesma fonte
+           única de verdade. Os dois avisos (este e "Sem automação dentro do
+           WhatsApp" logo abaixo) eram um só card alternando a cada 5s,
+           viraram dois cards estáticos empilhados. -->
       <div class="no-auto-notice">
         <div class="no-auto-notice-header">
-          <div class="no-auto-notice-icon" id="noAutoNoticeIcon">🔒</div>
-          <div class="no-auto-notice-title" id="noAutoNoticeTitle">Sem automação dentro do WhatsApp</div>
+          <div class="no-auto-notice-icon">🔒</div>
+          <div class="no-auto-notice-title">Proteção de dados (LGPD)</div>
         </div>
-        <div class="no-auto-notice-text" id="noAutoNoticeText">
+        <div class="no-auto-notice-text">
+          Dados de clientes protegidos por criptografia. Acesso ou uso indevido de informação de
+          terceiros pode configurar violação da <b>LGPD</b> (Lei 13.709/2018).
+        </div>
+      </div>
+
+      <!-- Segundo card, empilhado logo abaixo do de LGPD acima (mesmo
+           espaçamento .card padrão do resto do app — ver margin-top). -->
+      <div class="no-auto-notice" style="margin-top:16px;">
+        <div class="no-auto-notice-header">
+          <div class="no-auto-notice-icon">🔒</div>
+          <div class="no-auto-notice-title">Sem automação dentro do WhatsApp</div>
+        </div>
+        <div class="no-auto-notice-text">
           O co-piloto nunca clica, digita ou envia mensagens por você dentro do <b>WhatsApp Web</b> —
           isso violaria os termos de uso do WhatsApp e colocaria sua conta em risco. Você continua
           copiando a mensagem do lead, colando aqui, e copiando a resposta pronta de volta.
