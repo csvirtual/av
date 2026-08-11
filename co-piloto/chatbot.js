@@ -1026,6 +1026,81 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     encerrarTurnoChat(input);
   }
 
+  // ---------- Comando "/campanha" (ver/ativar/desativar/definir, sem IA) ----------
+  //
+  // A campanha ativa já entra sozinha no contexto de toda resposta de IA —
+  // Gerar resposta, Follow-up e este chat, todos usam a mesma
+  // buildBlocoEstaticoFunil()/buildCampanhaBloco() (panel.js), então não
+  // precisa de nada especial pra o bot SABER e USAR a campanha. Isto aqui
+  // é só o CONTROLE dela pelo chat, sem precisar abrir Configurações.
+  //
+  // De propósito não usa IA nenhuma pra interpretar a intenção ("acho que
+  // ela quis ativar?") — mesma decisão de design do resto do app (o
+  // checkbox de campanha em Configurações, "/find", troca de perfil):
+  // nenhuma ação que muda um dado real do negócio acontece por
+  // adivinhação de linguagem natural, só por um comando explícito e
+  // determinístico. Grava na MESMA chave (campanhaAtiva/campanhaTexto) que
+  // o checkbox de Configurações usa — uma fonte só de verdade — e chama
+  // renderCampanhaBadge() (panel.js) igual o checkbox já faz, pra o selo
+  // "🎯 Campanha ativa" no topo do painel atualizar na hora, sem esperar
+  // o listener de chrome.storage.onChanged (que existe pra sincronizar
+  // OUTRA aba/página, não esta).
+  const COMANDOS_CAMPANHA = ['/campanha'];
+
+  // Mesma forma de argumentoComandoHelp/argumentoComandoFind — '' pro
+  // comando sozinho, o texto depois dele se vier algo junto, ou null se a
+  // mensagem não é um comando de campanha (segue pro fluxo normal).
+  function argumentoComandoCampanha(mensagem){
+    const normalizado = normalizarTextoAjuda((mensagem || '').trim());
+    for(const cmd of COMANDOS_CAMPANHA){
+      if(normalizado === cmd) return '';
+      if(normalizado.startsWith(cmd + ' ')) return mensagem.trim().slice(cmd.length).trim();
+    }
+    return null;
+  }
+
+  function statusCampanhaTexto(){
+    return (campanhaAtiva && campanhaTexto && campanhaTexto.trim())
+      ? `🎯 Campanha ativa: "${campanhaTexto.trim()}"`
+      : '🚫 Nenhuma campanha ativa no momento.';
+  }
+
+  // Executa a ação pedida e devolve o texto de confirmação — nunca falha
+  // silenciosamente, sempre confirma de volta exatamente o que mudou (ou
+  // explica por que não mudou nada, ex: "ativar" sem nenhum texto salvo
+  // ainda).
+  async function executarComandoCampanha(argumento){
+    if(!argumento){
+      return `${statusCampanhaTexto()}\n\nUse "/campanha ativar", "/campanha desativar" ou "/campanha <texto novo>" pra mudar.`;
+    }
+
+    const normalizado = normalizarTextoAjuda(argumento);
+    if(['ativar', 'ligar', 'on'].includes(normalizado)){
+      if(!campanhaTexto || !campanhaTexto.trim()){
+        return 'Ainda não existe nenhum texto de campanha salvo pra ativar. Digite "/campanha <texto>" pra definir e ativar de uma vez, ou preencha em Configurações → Funil de vendas → Campanha ativa.';
+      }
+      campanhaAtiva = true;
+      await copilotoStorage.local.set({ campanhaAtiva });
+      renderCampanhaBadge();
+      return `✅ Campanha ativada: "${campanhaTexto.trim()}"`;
+    }
+
+    if(['desativar', 'desligar', 'off'].includes(normalizado)){
+      campanhaAtiva = false;
+      await copilotoStorage.local.set({ campanhaAtiva });
+      renderCampanhaBadge();
+      return '✅ Campanha desativada.';
+    }
+
+    // Qualquer outro texto vira o novo conteúdo da campanha, já ativado —
+    // mesma gravação de saveCampanhaNow/onCampanhaAtivaChange (panel.js).
+    campanhaTexto = argumento;
+    campanhaAtiva = true;
+    await copilotoStorage.local.set({ campanhaTexto, campanhaAtiva });
+    renderCampanhaBadge();
+    return `✅ Campanha definida e ativada: "${campanhaTexto.trim()}"`;
+  }
+
   async function enviarMensagemChat(){
     if(chatOcupado) return;
     const input = elInput();
@@ -1103,6 +1178,19 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
             '🔎 Busca no Histórico do Bot — sem usar IA', input);
         }
       }
+      return;
+    }
+
+    // "/campanha" (status), "/campanha ativar"/"desativar" ou
+    // "/campanha <texto>" (define e ativa) — ver COMANDOS_CAMPANHA acima.
+    // Mesmo raciocínio do "/find": de propósito NÃO entra em
+    // chatHistorico nem no Histórico do Bot (finalizarBuscaSemIA) — é
+    // controle de uma configuração do negócio inteiro, não uma conversa
+    // sobre este lead específico.
+    const argumentoCampanha = argumentoComandoCampanha(texto);
+    if(argumentoCampanha !== null){
+      const respostaCampanha = await executarComandoCampanha(argumentoCampanha);
+      finalizarBuscaSemIA(respostaCampanha, null, '🎯 Sem usar IA', input);
       return;
     }
 

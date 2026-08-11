@@ -3604,9 +3604,17 @@ async function imprimirFicha(){
 //      próprio por etapa (ver Configurações → Funil de vendas: hoje só
 //      existe a instrução geral, cacheada).
 function buildCampanhaBloco(){
+  // Sempre diz um dos dois estados explicitamente — nunca fica em silêncio
+  // sobre o assunto. Faz parte do bloco ESTÁTICO/cacheado (ver
+  // buildBlocoEstaticoFunil logo abaixo), então também chega ao Chat
+  // rápido (C&S BOT, ver buildChatCachedSystem em chatbot.js), que usa a
+  // mesma função — sem esta linha explícita pra quando está desligada, uma
+  // pergunta tipo "tem campanha ativa?" feita ao bot não tinha nenhuma
+  // informação segura pra responder "não" (ausência de informação no
+  // prompt não é a mesma coisa que informação de ausência).
   return (campanhaAtiva && campanhaTexto && campanhaTexto.trim())
     ? `\nCAMPANHA ATIVA (siga isso à risca, com o mesmo nível de prioridade das instruções do funil acima):\n${campanhaTexto.trim()}\nFoque nas condições e no conteúdo desta campanha ao gerar a resposta, oferecendo-a ao lead quando fizer sentido dentro do momento da conversa e do estágio do funil. Escreva sempre na mesma voz e tom usados nas etapas do funil — a campanha deve soar como parte natural da conversa, nunca como um texto de propaganda colado.\n`
-    : '';
+    : '\nNenhuma campanha promocional está ativa no momento — não ofereça nem invente desconto, prazo ou condição especial nenhuma; se perguntarem sobre promoção, diga que não há nenhuma ativa agora.\n';
 }
 
 // Único trecho que realmente muda a cada chamada — mantido pequeno de
