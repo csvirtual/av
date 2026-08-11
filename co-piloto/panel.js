@@ -70,6 +70,13 @@ function filtrarLeadsPorBusca(list, query){
 let searchQuery = '';
 let usageStats = {};
 let historySearchQuery = '';
+// Paginação do histórico de respostas (ver renderHistoryList) — sem isto,
+// um lead atendido por muito tempo (ou a Central de mensagens fixa, que
+// acumula histórico de várias pessoas) recriava a lista inteira no DOM a
+// cada render, sem limite de exibição nenhum.
+let historyCurrentPage = 1;
+const HISTORY_PAGE_SIZE = 15;
+const HISTORY_PAGE_WINDOW = 7;
 let campanhaAtiva = false;
 let campanhaTexto = '';
 
@@ -1254,16 +1261,27 @@ function renderModal(){
 function renderModalPagination(totalPages){
   const box = document.getElementById('modalPagination');
   if(!box) return;
-  if(totalPages<=1){ box.innerHTML=''; return; }
-  const windowStart = Math.floor((modalCurrentPage-1)/MODAL_PAGE_WINDOW)*MODAL_PAGE_WINDOW + 1;
-  const windowEnd = Math.min(windowStart + MODAL_PAGE_WINDOW - 1, totalPages);
+  box.innerHTML = paginacaoHtml(modalCurrentPage, totalPages, MODAL_PAGE_WINDOW);
+}
+
+// Mesmo HTML de paginação do modal "Todos os leads" acima, generalizado
+// (recebe a página atual/total/tamanho da janela em vez de ler globais
+// fixas) — reaproveitado por renderHistoryList (histórico de respostas) e,
+// em chatbot.js, pela lista do Histórico do Bot. Os dois cresciam sem
+// limite de exibição nenhum (histórico de um lead atendido por muito
+// tempo, ou a Central de mensagens fixa acumulando conversas de várias
+// pessoas), recriando a lista inteira no DOM a cada render.
+function paginacaoHtml(paginaAtual, totalPages, janela){
+  if(totalPages<=1) return '';
+  const windowStart = Math.floor((paginaAtual-1)/janela)*janela + 1;
+  const windowEnd = Math.min(windowStart + janela - 1, totalPages);
   let html = '';
   if(windowStart>1) html += `<button class="page-arrow" data-page="${windowStart-1}">‹</button>`;
   for(let p=windowStart; p<=windowEnd; p++){
-    html += `<button class="page-num ${p===modalCurrentPage?'active':''}" data-page="${p}">${p}</button>`;
+    html += `<button class="page-num ${p===paginaAtual?'active':''}" data-page="${p}">${p}</button>`;
   }
   if(windowEnd<totalPages) html += `<button class="page-arrow" data-page="${windowEnd+1}">›</button>`;
-  box.innerHTML = html;
+  return html;
 }
 
 // ---------- Exportação de leads (relatório em PDF via impressão do navegador) ----------
@@ -1610,6 +1628,7 @@ function formatDataHora(iso){
 async function loadAndRenderHistory(leadId){
   currentHistory = await loadHistory(leadId);
   historySearchQuery = '';
+  historyCurrentPage = 1;
   const searchInput = document.getElementById('historySearchInput');
   if(searchInput) searchInput.value = '';
   renderHistoryList();
@@ -1644,19 +1663,30 @@ function corpoHistoricoHtml(h){
 function renderHistoryList(){
   const box = document.getElementById('historyList');
   const countEl = document.getElementById('historyCount');
+  const pageBox = document.getElementById('historyPagination');
   if(!box) return;
   const filtered = getFilteredHistory();
   if(countEl) countEl.textContent = currentHistory.length ? `(${currentHistory.length})` : '';
   if(!currentHistory.length){
     box.innerHTML = '<div class="hist-empty">Nenhuma resposta gerada ainda para este lead.</div>';
+    if(pageBox) pageBox.innerHTML = '';
     return;
   }
   if(!filtered.length){
     box.innerHTML = '<div class="hist-empty">Nenhuma resposta do histórico bate com essa busca.</div>';
+    if(pageBox) pageBox.innerHTML = '';
     return;
   }
+
+  const ordenado = filtered.slice().reverse(); // mais recente primeiro, como sempre foi
+  const totalPages = Math.max(1, Math.ceil(ordenado.length / HISTORY_PAGE_SIZE));
+  if(historyCurrentPage > totalPages) historyCurrentPage = totalPages;
+  if(historyCurrentPage < 1) historyCurrentPage = 1;
+  const startIdx = (historyCurrentPage-1) * HISTORY_PAGE_SIZE;
+  const pageItems = ordenado.slice(startIdx, startIdx + HISTORY_PAGE_SIZE);
+
   box.innerHTML = '';
-  filtered.slice().reverse().forEach(h=>{
+  pageItems.forEach(h=>{
     const div = document.createElement('div');
     div.className = 'hist-item';
     div.id = 'hist-' + h.id;
@@ -1674,6 +1704,7 @@ function renderHistoryList(){
     `;
     box.appendChild(div);
   });
+  if(pageBox) pageBox.innerHTML = paginacaoHtml(historyCurrentPage, totalPages, HISTORY_PAGE_WINDOW);
 }
 
 async function deleteHistoryEntry(entryId){
@@ -4483,6 +4514,7 @@ async function analyzeAndSuggest(){
     if(aindaNesteLead){
       currentHistory = novoHistorico;
       lastGeneratedHistoryId = novaEntradaHistorico.id;
+      historyCurrentPage = 1; // a resposta recém-gerada é sempre a mais recente — mostra ela de cara, sem precisar clicar em "Ver mensagem do lead"
       renderHistoryList();
     }
     await incrementUsage();
@@ -4503,6 +4535,21 @@ async function analyzeAndSuggest(){
 // manualmente o item certo na lista.
 function viewLeadMessage(){
   if(!lastGeneratedHistoryId) return;
+  // Com a lista paginada (ver renderHistoryList), o item pode estar numa
+  // página diferente da que está aberta agora — acha a posição dele na
+  // mesma ordenação/filtro que a lista usa (mais recente primeiro) e pula
+  // pra página certa antes de procurar o elemento no DOM.
+  const ordenado = getFilteredHistory().slice().reverse();
+  const idx = ordenado.findIndex(h => h.id === lastGeneratedHistoryId);
+  if(idx === -1){
+    toast('Essa resposta não está mais no histórico deste lead.');
+    return;
+  }
+  const paginaDoItem = Math.floor(idx / HISTORY_PAGE_SIZE) + 1;
+  if(paginaDoItem !== historyCurrentPage){
+    historyCurrentPage = paginaDoItem;
+    renderHistoryList();
+  }
   const item = document.getElementById('hist-' + lastGeneratedHistoryId);
   if(!item){
     toast('Essa resposta não está mais no histórico deste lead.');
@@ -4686,6 +4733,7 @@ function bindEvents(){
   if(historySearchInput){
     historySearchInput.addEventListener('input', (e)=>{
       historySearchQuery = e.target.value;
+      historyCurrentPage = 1; // toda busca nova recomeça da primeira página
       renderHistoryList();
     });
   }
@@ -4695,6 +4743,15 @@ function bindEvents(){
       const btn = e.target.closest('.hist-del-btn');
       if(!btn) return;
       deleteHistoryEntry(btn.dataset.id);
+    });
+  }
+  const historyPaginationBox = document.getElementById('historyPagination');
+  if(historyPaginationBox){
+    historyPaginationBox.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-page]');
+      if(!btn) return;
+      historyCurrentPage = parseInt(btn.dataset.page, 10);
+      renderHistoryList();
     });
   }
 

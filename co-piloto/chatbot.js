@@ -28,6 +28,25 @@
   let chatHistorico = []; // { role: 'user'|'ai', texto: string }
   let chatOcupado = false;
 
+  // Teto de quantas trocas (usuário+IA) do CHAT ATUAL entram no contexto
+  // enviado pra IA a cada nova pergunta (ver buildChatDynamicContext, mais
+  // abaixo) — nunca afeta o que fica visível na tela (as bolhas do chat
+  // ficam no DOM, renderMensagem só as acrescenta; isto aqui só limita o
+  // que é REENVIADO como contexto). Sem teto, uma conversa longa e
+  // continuada com o mesmo lead (chatHistorico só zera ao trocar de lead,
+  // nunca durante a própria conversa) reenviava o histórico INTEIRO a cada
+  // mensagem nova — custo crescendo a cada troca, sem limite e sem aviso
+  // nenhum pra atendente. 24 entradas = 12 idas e voltas completas, o
+  // suficiente pra manter o fio de uma negociação sem deixar o contexto
+  // crescer pra sempre.
+  const CHAT_HISTORICO_LIMITE = 24;
+  function empurrarChatHistorico(entrada){
+    chatHistorico.push(entrada);
+    if(chatHistorico.length > CHAT_HISTORICO_LIMITE){
+      chatHistorico.splice(0, chatHistorico.length - CHAT_HISTORICO_LIMITE);
+    }
+  }
+
   // Estágio/emoção "desta mensagem" — dois jeitos de chegar nele:
   // 1) AUTOMÁTICO (padrão): a IA lê a própria mensagem que está sendo
   //    enviada, a cada envio (ver garantirLeituraEstagioParaEnvio) — não
@@ -53,6 +72,14 @@
   // trocar de lead no painel.
   let botHistorico = [];
   let botHistorySearchQuery = '';
+  // Paginação do Histórico do Bot (ver renderBotHistoryList) — mesmo
+  // motivo/mesmo padrão do histórico de respostas em panel.js
+  // (renderHistoryList/paginacaoHtml): a Central de mensagens fixa em
+  // especial acumula conversas de VÁRIAS pessoas diferentes num só balde,
+  // e sem paginação a lista inteira era recriada no DOM a cada render.
+  let botHistoryCurrentPage = 1;
+  const BOT_HISTORY_PAGE_SIZE = 15;
+  const BOT_HISTORY_PAGE_WINDOW = 7;
 
   // ---------- "Memória" — trechos do Histórico do Bot marcados pra entrar
   // no contexto da PRÓXIMA mensagem de IA (ver "/find" e "usar-memoria" mais
@@ -1079,7 +1106,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       return;
     }
 
-    chatHistorico.push({ role: 'user', texto });
+    empurrarChatHistorico({ role: 'user', texto });
 
     // Pergunta em linguagem natural (não um comando "/help") SEMPRE passa
     // pela IA — inclusive quando é sobre o próprio Co-piloto. A resposta
@@ -1138,7 +1165,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
 
       if(aindaNoMesmoLead){
         renderMensagem('ai', resposta, { meta: metaRoteamento });
-        chatHistorico.push({ role: 'ai', texto: resposta });
+        empurrarChatHistorico({ role: 'ai', texto: resposta });
       }else if(typeof toast === 'function'){
         toast('Uma resposta pendente de outro lead chegou e foi salva no histórico dele');
       }
@@ -1265,6 +1292,16 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     if(botHistorySearchInput){
       botHistorySearchInput.addEventListener('input', (e) => {
         botHistorySearchQuery = e.target.value;
+        botHistoryCurrentPage = 1; // toda busca nova recomeça da primeira página
+        renderBotHistoryList();
+      });
+    }
+    const botHistoryPaginationBox = document.getElementById('botHistoryPagination');
+    if(botHistoryPaginationBox){
+      botHistoryPaginationBox.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-page]');
+        if(!btn) return;
+        botHistoryCurrentPage = parseInt(btn.dataset.page, 10);
         renderBotHistoryList();
       });
     }
@@ -1341,6 +1378,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     leadId = leadId || null;
     botHistoricoLeadId = leadId;
     chatHistorico = [];
+    botHistoryCurrentPage = 1;
     // Estágio fixado manualmente (se houver) era sobre a conversa com o
     // lead anterior — não deve seguir pro próximo (ver resetEstagioManual).
     resetEstagioManual();
@@ -1388,19 +1426,30 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   function renderBotHistoryList(){
     const box = document.getElementById('botHistoryList');
     const countEl = document.getElementById('botHistoryCount');
+    const pageBox = document.getElementById('botHistoryPagination');
     if(!box) return;
     const filtered = getFilteredBotHistory();
     if(countEl) countEl.textContent = botHistorico.length ? `(${botHistorico.length})` : '';
     if(!botHistorico.length){
       box.innerHTML = '<div class="hist-empty">Nenhuma conversa registrada ainda no chat rápido com o C&S - BOT para este lead.</div>';
+      if(pageBox) pageBox.innerHTML = '';
       return;
     }
     if(!filtered.length){
       box.innerHTML = '<div class="hist-empty">Nenhuma conversa do histórico do bot bate com essa busca.</div>';
+      if(pageBox) pageBox.innerHTML = '';
       return;
     }
+
+    const ordenado = filtered.slice().reverse(); // mais recente primeiro, como sempre foi
+    const totalPages = Math.max(1, Math.ceil(ordenado.length / BOT_HISTORY_PAGE_SIZE));
+    if(botHistoryCurrentPage > totalPages) botHistoryCurrentPage = totalPages;
+    if(botHistoryCurrentPage < 1) botHistoryCurrentPage = 1;
+    const startIdx = (botHistoryCurrentPage-1) * BOT_HISTORY_PAGE_SIZE;
+    const pageItems = ordenado.slice(startIdx, startIdx + BOT_HISTORY_PAGE_SIZE);
+
     box.innerHTML = '';
-    filtered.slice().reverse().forEach(h => {
+    pageItems.forEach(h => {
       const div = document.createElement('div');
       div.className = 'hist-item';
       div.id = 'bot-hist-' + h.id;
@@ -1418,6 +1467,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       `;
       box.appendChild(div);
     });
+    if(pageBox) pageBox.innerHTML = paginacaoHtml(botHistoryCurrentPage, totalPages, BOT_HISTORY_PAGE_WINDOW);
   }
 
   // Mesmo destino do histórico de respostas (deleteHistoryEntry, panel.js):

@@ -910,6 +910,17 @@
   }
   .page-num:hover, .page-arrow:hover{ background:var(--paper); }
   .page-num.active{ background:var(--purple); border-color:var(--purple); color:#fff; }
+  /* Mesma paginação do modal "Todos os leads" (.modal-footer acima),
+     reaproveitada dentro de um .card comum (não um modal) — histórico de
+     resposta e Histórico do Bot de um lead atendido por muito tempo (ou a
+     Central de mensagens fixa, que acumula histórico de várias pessoas)
+     cresciam sem limite nenhum de exibição, recriando a lista inteira no
+     DOM a cada render. Sem border-top/padding de rodapé de modal, já que
+     aqui é só mais um bloco dentro do card. */
+  .history-pagination{
+    display:flex; justify-content:center; align-items:center; gap:5px; flex-wrap:wrap;
+    margin-top:12px;
+  }
 
   /* TRASH */
   .trash-item{
@@ -1523,6 +1534,7 @@
         <div class="hint">Toda resposta gerada pelo co-piloto fica registrada aqui: a mensagem do lead que originou, a resposta dada e a data/hora — para você conferir depois.</div>
         <input type="text" id="historySearchInput" class="hist-search-input" placeholder="🔍 Buscar no histórico deste lead...">
         <div class="history-list" id="historyList"></div>
+        <div class="history-pagination" id="historyPagination"></div>
       </div>
 
       <div class="card">
@@ -1533,6 +1545,7 @@
         <div class="hint">Toda conversa do chat rápido com o C&amp;S - BOT fica registrada aqui: sua pergunta, a resposta da IA e a data/hora — do lead que estiver selecionado agora (troca de lista sozinho ao trocar de lead).</div>
         <input type="text" id="botHistorySearchInput" class="hist-search-input" placeholder="🔍 Buscar no histórico do bot...">
         <div class="history-list" id="botHistoryList"></div>
+        <div class="history-pagination" id="botHistoryPagination"></div>
       </div>
     </div>
   </div>
