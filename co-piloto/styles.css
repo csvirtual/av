@@ -373,20 +373,6 @@ body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointe
 }
 .avancado-lock.shake{ animation:avancadoShake .35s; }
 
-/* Faixa de aviso LGPD no rodapé — só na tela "Quem está usando o
-   Co-piloto?" (#perfilScreen), igual ao formato de versões anteriores.
-   position:fixed continua relativo à viewport mesmo dentro de
-   #perfilScreen (que também é fixed) — não precisa de nenhum ajuste de
-   z-index especial pra ficar por cima do conteúdo da grade de perfis. */
-.perfil-aviso-lgpd{
-  position:fixed; left:0; right:0; bottom:0; z-index:2500;
-  background:var(--ink); color:#fff;
-  font-size:11px; text-align:center; line-height:1.4;
-  padding:5px 10px;
-  opacity:.72;
-  pointer-events:none;
-  font-family:'Manrope', sans-serif;
-}
 @keyframes avancadoShake{
   10%,90%{ transform:translateX(-1px); }
   20%,80%{ transform:translateX(2px); }
