@@ -29,15 +29,29 @@ function normalizarParaBusca(texto){
 
 // Filtra leads por nome ou telefone (com ou sem pontuação) — usado tanto na
 // lista lateral quanto no modal "Ver todos".
+//
+// Telefone compara nos DOIS sentidos (leadDigits.includes(qDigits) OU
+// qDigits.includes(leadDigits)), não só um: cobre tanto buscar sem DDI/DDD
+// um número que foi salvo com eles (já funcionava, um contém o outro nessa
+// ordem) quanto o caso inverso — buscar COM DDI/DDD ("5511912345678") um
+// número que foi salvo sem ("91234-5678"), que antes não achava porque o
+// texto digitado ficava mais comprido que o salvo, e um "contém" só nesse
+// sentido não teria como bater nunca.
+// `leadDigits &&` é obrigatório aqui: sem essa checagem, um lead SEM
+// telefone (string vazia) faria `qDigits.includes('')` — que é sempre
+// verdadeiro pra qualquer string, já que toda string "contém" a vazia — e
+// esse lead apareceria em QUALQUER busca numérica, mesmo sem telefone
+// nenhum pra bater.
 function filtrarLeadsPorBusca(list, query){
   const q = normalizarParaBusca(query).trim();
   if(!q) return list;
   const qDigits = apenasDigitos(query);
-  return list.filter(l=>
-    normalizarParaBusca(l.nome).includes(q) ||
-    normalizarParaBusca(l.telefone).includes(q) ||
-    (qDigits && apenasDigitos(l.telefone).includes(qDigits))
-  );
+  return list.filter(l=>{
+    const leadDigits = apenasDigitos(l.telefone);
+    return normalizarParaBusca(l.nome).includes(q) ||
+      normalizarParaBusca(l.telefone).includes(q) ||
+      (!!qDigits && !!leadDigits && (leadDigits.includes(qDigits) || qDigits.includes(leadDigits)));
+  });
 }
 
 // Busca da lateral (#leadSearchInput) — filtra o que aparece na tira de
