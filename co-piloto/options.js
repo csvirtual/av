@@ -472,19 +472,18 @@ async function savePrecos(){
   toast('Preços por token salvos');
 }
 
-// Zera só o contador "🧮 respostas geradas" (mês/total) exibido na tela
-// principal do painel. Não mexe no histórico de respostas de cada lead nem
-// no uso/custo de tokens de "Minha conta" — são três contadores
-// independentes, cada um com seu próprio propósito e seu próprio botão de
-// zerar. O painel (panel.js) escuta chrome.storage.onChanged e se
-// re-renderiza sozinho assim que "usageStats" muda, então não precisa fazer
-// nada além de gravar aqui.
+// Zera só o contador "🧮 respostas geradas" (mês/total), mostrado logo
+// acima neste mesmo card (ver renderContadorRespostas). Não mexe no
+// histórico de respostas de cada lead nem no uso/custo de tokens de "Minha
+// conta" — são três contadores independentes, cada um com seu próprio
+// propósito e seu próprio botão de zerar.
 async function resetUsageStats(){
   const confirmado = await copilotoConfirmar(
-    'Isso vai zerar o contador de "respostas geradas" (mês e total) mostrado na tela principal. Essa ação não pode ser desfeita.',
+    'Isso vai zerar o contador de "respostas geradas" (mês e total). Essa ação não pode ser desfeita.',
     { titulo: 'Zerar contador de respostas?', textoConfirmar: 'Zerar contador' });
   if(!confirmado) return;
   await copilotoStorage.local.set({ usageStats: {} });
+  renderContadorRespostas({});
   // Zerar um contador de uso é exatamente o tipo de ação que um log de
   // auditoria existe pra não deixar passar despercebida — sem isto, dava
   // pra "esconder" quanto a IA foi usada sem deixar rastro nenhum.
@@ -633,13 +632,36 @@ function liberarCampoChaveApi(inputId){
   if(btn) btn.addEventListener('click', () => liberarCampoChaveApi(inputId));
 });
 
+// Mesmo formato de chave usado por usageStats (panel.js: incrementUsage/
+// dateKeyMes) — não dá pra reaproveitar a função de lá porque panel.js não
+// é carregado nesta página; é só ano-mês, então repetir aqui é mais
+// simples que criar um arquivo compartilhado só pra isto.
+function dateKeyMesOptions(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+// Mostra o "X este mês · Y no total" no próprio card, já que o badge que
+// mostrava isso na tela principal do painel foi removido — sem isto,
+// zerar aqui era zerar um número que não aparecia em lugar nenhum.
+function renderContadorRespostas(usageStats){
+  const el = document.getElementById('contadorRespostasValor');
+  if(!el) return;
+  const key = dateKeyMesOptions(new Date().toISOString());
+  const thisMonth = usageStats[key] || 0;
+  const total = Object.values(usageStats).reduce((a,b)=>a+b, 0);
+  el.textContent = `🧮 ${thisMonth} resposta${thisMonth===1?'':'s'} geradas este mês · ${total} no total`;
+}
+
 async function init(){
   const data = await copilotoStorage.local.get([
     'provider','claudeKey','claudeModel','claudeModeloBasico',
     'geminiKey','geminiModel', // legado (chave única, de antes deste recurso existir)
     'geminiKeyBasico','geminiModeloBasico','geminiKeyAvancado','geminiModeloAvancado',
-    'config','funil','precosToken'
+    'config','funil','precosToken','usageStats'
   ]);
+  renderContadorRespostas(data.usageStats || {});
   renderProviderCards(data.provider || 'gemini');
   const dekAtivo = await obterDekAtivo();
   await preencherCampoChaveApi('claudeKey', data.claudeKey, dekAtivo);
