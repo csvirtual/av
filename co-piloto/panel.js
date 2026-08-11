@@ -1070,7 +1070,7 @@ function renderUltimosLeadsModal(){
   const startIdx = (ultimosLeadsModalPage-1) * LEADS_RECENTES_QTD;
   const list = todosOrdenados.slice(startIdx, startIdx + LEADS_RECENTES_QTD);
 
-  document.getElementById('ultimosLeadsModalTitle').textContent = `Últimos leads cadastrados (${todosOrdenados.length})`;
+  document.getElementById('ultimosLeadsModalTitleText').textContent = `Últimos leads cadastrados (${todosOrdenados.length})`;
 
   if(!list.length){
     listBox.innerHTML = '<div class="leads-empty">Nenhum lead cadastrado ainda — use o "+" na lateral.</div>';
