@@ -504,6 +504,26 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return resultado.pontuacao >= LIMIAR_RELEVANCIA ? resultado.secao : null;
   }
 
+  // Mesmo casamento de palavras-chave acima, só que com um limiar bem mais
+  // alto — usada SÓ por pedirRespostaIA, pra decidir se confia o bastante
+  // pra FORÇAR o nível econômico da IA por "isso parece pergunta sobre o
+  // Co-piloto". LIMIAR_RELEVANCIA (3) já é suficiente pra INJETAR aquela
+  // seção como pano de fundo na resposta — uma palavra batendo sozinha no
+  // título já vale a pena mostrar como possível fonte, é barato e
+  // inofensivo errar pra mais aqui. Mas essa mesma coincidência de uma
+  // palavra só (ex.: "pagamento"/"custo" batendo com a seção "Custo por
+  // token" numa pergunta que na real é sobre uma venda, tipo "como conduzo
+  // o pagamento com a lead?") não deveria bastar sozinha pra cortar o nível
+  // de custo de uma conversa que pode ser uma venda de verdade — aí o erro
+  // sai caro, não barato. Exige uma pontuação bem mais alta (título + mais
+  // alguma coisa, nunca uma palavra solta) antes de confiar o suficiente
+  // pra isso.
+  const LIMIAR_RELEVANCIA_PARA_CUSTO = 6;
+  function perguntaClaramenteSobreCoPiloto(mensagem){
+    const resultado = melhorSecaoAjudaPara(mensagem);
+    return !!(resultado && resultado.pontuacao >= LIMIAR_RELEVANCIA_PARA_CUSTO);
+  }
+
   // ---------- Comando "/help" (menu completo dos assuntos, sem IA) ----------
   //
   // A leitura automática acima (encontrarSecaoAjudaRelevante) só decide se
@@ -798,18 +818,25 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     //     bem-intencionado, mesmo aquele que existe justamente pra
     //     economizar: um falso positivo do detector de palavra-chave nunca
     //     deveria conseguir derrubar uma escolha explícita da atendente.
-    //  2) Pergunta sobre o próprio Co-piloto (secaoAjudaConhecida veio
-    //     preenchida, e NENHUM estágio foi fixado manualmente) — nível
+    //  2) Pergunta sobre o próprio Co-piloto, com ALTA confiança (nenhum
+    //     estágio fixado manualmente, e perguntaClaramenteSobreCoPiloto
+    //     concorda — limiar bem mais rígido que o usado só pra decidir se
+    //     injeta a seção como pano de fundo, ver comentário lá) — nível
     //     econômico: consultar o próprio guia não é uma resposta que
     //     decide venda nenhuma, não faz sentido pagar o nível mais caro só
     //     porque o lead selecionado agora por acaso está numa etapa de
-    //     risco.
+    //     risco. Uma coincidência de palavra solta (ex.: "pagamento" numa
+    //     pergunta de venda real, batendo o título de "Custo por token")
+    //     não é confiança suficiente pra isso — só ainda entra como fonte
+    //     de contexto (ver secaoAjudaConhecida/buildChatDynamicContext
+    //     abaixo), nunca força o nível sozinha.
     //  3) Estágio do lead selecionado, se houver — o de sempre.
     //  4) Nada disso: objeto mínimo equivalente a "Primeiro contato" (nível
     //     econômico, sem lead selecionado e papo livre).
+    const perguntaSobreCoPilotoComConfianca = !!secaoAjudaConhecida && perguntaClaramenteSobreCoPiloto(mensagemUsuario);
     const leadParaTier = chatEstagioManual
       ? { fixo: false, estagio: chatEstagioManual }
-      : secaoAjudaConhecida
+      : perguntaSobreCoPilotoComConfianca
         ? { fixo: false, estagio: 'Primeiro contato' }
         : (lead || { fixo: false, estagio: 'Primeiro contato' });
 
