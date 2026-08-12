@@ -702,6 +702,22 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       ? buildContextoDinamicoBloco(lead, nomeParaExibir(lead), '', '')
       : 'CONTEXTO ATUAL: nenhum lead está selecionado no painel agora — responda de forma genérica, sem inventar dados de um lead específico.';
 
+    // Com um lead NORMAL selecionado (não a Central de mensagens — essa já
+    // é isolada por natureza, não precisa disto), a pergunta costuma ser
+    // sobre como agir com ELE — o mesmo tipo de pergunta que "Sugerir
+    // abordagem ou Follow-up" (buildFollowupPrompt, panel.js) responde com
+    // uma análise de verdade (situação + timing + mensagem pronta), não com
+    // um parágrafo corrido qualquer. O bloco cacheado (buildChatCachedSystem,
+    // acima) manda responder curto de propósito — bom padrão pra dúvida
+    // rápida, raso demais pra estratégia de venda sobre um lead específico.
+    // Como isto entra no contexto DINÂMICO (não no cacheado — sem isso o
+    // cache do prompt vararia por lead e perderia a economia), dá pra
+    // destravar mais profundidade só quando fizer sentido, sem mexer no
+    // texto cacheado nem pagar esse custo em toda mensagem.
+    const modoConsultoriaBloco = (lead && !lead.fixo)
+      ? `\n\nPROFUNDIDADE DA RESPOSTA PARA ESTE LEAD: há um lead específico selecionado (não é a central de mensagens). Quando a pergunta for sobre como abordar, responder ou conduzir a conversa com ELE — não sobre o Co-piloto em si —, responda com a MESMA profundidade que "Sugerir abordagem ou Follow-up" daria: uma leitura objetiva da situação atual dele (o que ele sinalizou, o estágio, o risco de silêncio, se houver), quando fizer sentido uma recomendação de timing/melhor momento pra agir, e a mensagem pronta pra copiar, se for isso que a pergunta pedir. Ignore aqui o limite de "resposta curta" das instruções gerais acima — pode (e deve) ser mais completo quando o assunto for este lead, sempre em texto corrido e natural de conversa, nunca JSON nem markdown. Pra qualquer outra pergunta (sobre o Co-piloto, ou sem relação com este lead), continue respondendo curto e direto, como de costume.`
+      : '';
+
     // Estágio desta mensagem: fixado manualmente pela atendente (ver
     // onEstagioManualChange) ou lido automaticamente pela IA na própria
     // mensagem que está sendo enviada agora (ver
@@ -735,12 +751,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       ? `\n\nTRECHOS DE CONVERSAS ANTERIORES QUE A ATENDENTE MARCOU COMO RELEVANTES PRA ESTA PERGUNTA (achados com /find no Histórico do Bot deste lead — são conversas de verdade já tidas com ele antes, use como memória real, não invente continuidade além do que está escrito):\n${_memoriaAtivada.map((h, i) => `${i + 1}. [${formatDataHora(h.quando)}] Pergunta: ${h.pergunta}\nResposta: ${h.resposta}`).join('\n\n')}`
       : '';
 
-    if(!chatHistorico.length) return base + deteccao + blocoAjuda + blocoMemoria;
+    if(!chatHistorico.length) return base + modoConsultoriaBloco + deteccao + blocoAjuda + blocoMemoria;
 
     const historicoTexto = chatHistorico
       .map(m => `${m.role === 'user' ? 'Atendente' : 'Você'}: ${m.texto}`)
       .join('\n');
-    return `${base}${deteccao}${blocoAjuda}${blocoMemoria}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
+    return `${base}${modoConsultoriaBloco}${deteccao}${blocoAjuda}${blocoMemoria}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
   }
 
   async function pedirRespostaIA(mensagemUsuario, secaoAjudaConhecida){
