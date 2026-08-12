@@ -3742,7 +3742,7 @@ function aplicarConfiguracaoDoNegocio(textoFunil){
 // é por isso que pode (e deve) ser idêntico em toda chamada, o que é o
 // requisito pra cache_control funcionar.
 function buildBlocoEstaticoFunil(){
-  return `Você é um copiloto de vendas consultivas por WhatsApp para negócios de saúde/estética/serviços no Brasil.
+  return `Você é um copiloto de vendas consultivas por WhatsApp para negócios de saúde/nutrição/serviços no Brasil.
 
 INSTRUÇÕES GERAIS DE COMO USAR O FUNIL (siga isso à risca, valem para QUALQUER etapa):
 ${aplicarConfiguracaoDoNegocio((funil.instrucoes && funil.instrucoes.trim()) || DEFAULT_FUNIL_INSTRUCOES)}
