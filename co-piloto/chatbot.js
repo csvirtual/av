@@ -702,22 +702,24 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       ? buildContextoDinamicoBloco(lead, nomeParaExibir(lead), '', '')
       : 'CONTEXTO ATUAL: nenhum lead está selecionado no painel agora — responda de forma genérica, sem inventar dados de um lead específico.';
 
-    // Com um lead NORMAL selecionado OU sem nenhum lead selecionado (não a
-    // Central de mensagens — essa já é isolada por natureza, não precisa
-    // disto), a pergunta costuma ser sobre estratégia de venda — o mesmo
-    // tipo de pergunta que "Sugerir abordagem ou Follow-up"
-    // (buildFollowupPrompt, panel.js) responde com uma análise de verdade
-    // (situação + timing + mensagem pronta), não com um parágrafo corrido
-    // qualquer. O bloco cacheado (buildChatCachedSystem, acima) manda
-    // responder curto de propósito — bom padrão pra dúvida rápida, raso
-    // demais pra estratégia de venda de verdade, com ou sem lead
-    // selecionado. Como isto entra no contexto DINÂMICO (não no cacheado —
-    // sem isso o cache do prompt variaria por lead e perderia a economia),
-    // dá pra destravar mais profundidade só quando fizer sentido, sem mexer
-    // no texto cacheado nem pagar esse custo em toda mensagem.
-    const modoConsultoriaBloco = (!lead || !lead.fixo)
-      ? `\n\nPROFUNDIDADE DA RESPOSTA: quando a pergunta for sobre estratégia de venda — como abordar, responder, conduzir a conversa ou lidar com uma objeção — e não sobre o Co-piloto em si, responda com a MESMA profundidade que "Sugerir abordagem ou Follow-up" daria: uma leitura objetiva da situação (do lead selecionado acima, se houver — ou da situação descrita na própria pergunta, se nenhum lead estiver selecionado), quando fizer sentido uma recomendação de timing/melhor momento pra agir, e a mensagem pronta pra copiar, se for isso que a pergunta pedir. Ignore aqui o limite de "resposta curta" das instruções gerais acima — pode (e deve) ser mais completo quando o assunto for estratégia de venda, sempre em texto corrido e natural de conversa, nunca JSON nem markdown. Sem nenhum lead selecionado, baseie-se só no que a própria pergunta descrever — nunca invente dados de um lead que não existe. Pra qualquer outra pergunta (sobre o Co-piloto, ou papo sem relação com venda), continue respondendo curto e direto, como de costume.`
-      : '';
+    // Vale SEMPRE — lead normal selecionado, Central de mensagens
+    // (@csvirtual) ou nenhum lead selecionado — a pergunta costuma ser
+    // sobre estratégia de venda, o mesmo tipo de pergunta que "Sugerir
+    // abordagem ou Follow-up" (buildFollowupPrompt, panel.js) responde com
+    // uma análise de verdade (situação + timing + mensagem pronta), não com
+    // um parágrafo corrido qualquer. O bloco cacheado (buildChatCachedSystem,
+    // acima) manda responder curto de propósito — bom padrão pra dúvida
+    // rápida, raso demais pra estratégia de venda de verdade, em qualquer um
+    // dos três cenários. Como isto entra no contexto DINÂMICO (não no
+    // cacheado — sem isso o cache do prompt variaria por lead e perderia a
+    // economia), dá pra destravar mais profundidade só quando fizer
+    // sentido, sem mexer no texto cacheado nem pagar esse custo em toda
+    // mensagem. Na Central, a "situação" que a IA lê vem do bloco de
+    // isolamento logo acima (nome da pessoa + estágio desta mensagem) —
+    // ela já é tratada separadamente ali, então a profundidade aqui só
+    // acrescenta análise em cima do que já está isolado, nunca mistura com
+    // outra pessoa.
+    const modoConsultoriaBloco = `\n\nPROFUNDIDADE DA RESPOSTA: quando a pergunta for sobre estratégia de venda — como abordar, responder, conduzir a conversa ou lidar com uma objeção — e não sobre o Co-piloto em si, responda com a MESMA profundidade que "Sugerir abordagem ou Follow-up" daria: uma leitura objetiva da situação (do lead ou da pessoa descrita no contexto acima, se houver — ou da situação descrita na própria pergunta, se nenhum lead estiver selecionado), quando fizer sentido uma recomendação de timing/melhor momento pra agir, e a mensagem pronta pra copiar, se for isso que a pergunta pedir. Ignore aqui o limite de "resposta curta" das instruções gerais acima — pode (e deve) ser mais completo quando o assunto for estratégia de venda, sempre em texto corrido e natural de conversa, nunca JSON nem markdown. Sem nenhum lead selecionado, baseie-se só no que a própria pergunta descrever — nunca invente dados de um lead que não existe. Pra qualquer outra pergunta (sobre o Co-piloto, ou papo sem relação com venda), continue respondendo curto e direto, como de costume.`;
 
     // Estágio desta mensagem: fixado manualmente pela atendente (ver
     // onEstagioManualChange) ou lido automaticamente pela IA na própria
