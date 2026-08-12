@@ -4072,11 +4072,21 @@ const ESTAGIOS_TIER_PAGO = ['Apresentação da solução', 'Condução ao valor'
 
 // Decide o nível com base no estágio ATUAL do lead (o que já estava salvo
 // antes desta nova mensagem chegar — a classificação da mensagem em si só
-// sai DEPOIS da resposta da IA, então não dá pra usá-la aqui). A central de
-// mensagens fixa (@csvirtual) mistura pacientes diferentes, sem funil
-// linear — sempre fica no nível básico.
+// sai DEPOIS da resposta da IA, então não dá pra usá-la aqui).
+//
+// A central de mensagens fixa (@csvirtual) usava sempre o nível básico, sem
+// olhar o estágio — o raciocínio original era que ela mistura pacientes
+// diferentes, sem funil linear rastreável pra estatística. Mas isso
+// confundia duas coisas distintas: "não dá pra rastrear como jornada
+// contínua" (verdade) com "esta mensagem não merece o modelo melhor" (nem
+// sempre). Uma Objeção ou Fechamento de verdade, acontecendo AGORA na
+// Central, pesa na venda do mesmo jeito que pesaria num lead cadastrado —
+// é exatamente o tipo de momento em que uma resposta mais fraca custa mais
+// caro que a diferença de preço entre os dois modelos. Por isso a Central
+// passou a seguir a MESMA regra de qualquer lead: básico na maior parte do
+// uso (Primeiro contato, Sondagem...), avançado só quando o estágio
+// escolhido para ESTA mensagem específica for uma das etapas de risco.
 function escolherTierPorEstagio(lead){
-  if(lead.fixo) return 'basico';
   const estagioAtual = lead.estagio || 'Primeiro contato';
   return ESTAGIOS_TIER_PAGO.includes(estagioAtual) ? 'avancado' : 'basico';
 }
