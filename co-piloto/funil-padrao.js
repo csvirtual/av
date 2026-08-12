@@ -350,6 +350,13 @@ Use a resposta pra mostrar, com base real, por que uma investigação de raiz en
 **"Tenho medo" / "e se eu não gostar do resultado?"** — não prometa garantia. Ancore na consulta.
 "Entendo você. E é justamente pra isso que a primeira consulta é tão detalhada: você conversa com {{NOME_PROFISSIONAL}}, o seu caso é investigado a fundo e você entende exatamente o que está acontecendo com o seu corpo antes de qualquer passo maior. O que exatamente te deixa insegura?"
 
+**"A consulta avulsa inclui retorno?"** (ou qualquer pergunta sobre retorno, de forma geral) — não é ausência de suporte, é a estrutura do serviço avulso. Nunca responda como recusa; deixe claro o que ela ganha em vez disso.
+"A consulta avulsa é estruturada para oferecer uma *avaliação completa*, *segura* e *personalizada* para o seu caso, por isso ela não inclui retorno.
+
+Mas, isso *não significa* que você fica sem suporte após a entrega do plano alimentar.
+
+Você poderá tirar suas dúvidas e contar com a orientação necessária por aqui, diretamente com a Dra., pelo WhatsApp. 😉"
+
 ## 5. FOLLOW-UP
 - **24h:** "Percebi que não finalizamos nossa conversa sobre [objetivo]. Você se sente pronta para dar o próximo passo? Temos agenda para [dd/mm] às [hh]h ou [dd/mm] às [hh]h. 💚"
 - **3 dias:** "Você ainda está em busca de [objetivo]?"
