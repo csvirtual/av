@@ -4254,6 +4254,15 @@ async function pasteFromClipboard(){
 // pessoa atendida, não da pessoa atual, um jeito fácil de gerar a resposta
 // com o script errado sem perceber. Sempre com aviso (toast) e sempre
 // livre pra trocar depois — nunca silencioso, nunca travado.
+//
+// Nome NUNCA visto antes (sem entrada no histórico): volta pro padrão
+// "Primeiro contato", em vez de ficar quieto e deixar o que sobrou da
+// pessoa anterior. Antes disso não fazia diferença nenhuma além do tom da
+// resposta — mas agora o estágio também decide o nível/custo da IA (ver
+// escolherTierPorEstagio): sem este reset, uma pessoa nova podia herdar
+// sem querer o nível caro de quem foi atendido antes dela (ou o contrário
+// — alguém em Objeção de verdade ficar preso no nível barato "esquecido"
+// de uma etapa inicial anterior).
 async function preencherEstagioPorNomeConhecido(){
   const lead = getCurrentLead();
   if(!lead || !lead.fixo) return;
@@ -4262,10 +4271,10 @@ async function preencherEstagioPorNomeConhecido(){
 
   const entradaAnterior = currentHistory.filter(h => h.pessoa === personName).pop();
   const estagioConhecido = entradaAnterior && estagioFunilValido(entradaAnterior.estagio);
-  if(!estagioConhecido) return;
+  const estagioAlvo = estagioConhecido || 'Primeiro contato';
 
   const campoEstagio = document.getElementById('leadEstagio');
-  if(campoEstagio.value === estagioConhecido) return; // já está certo, evita aviso à toa
+  if(campoEstagio.value === estagioAlvo) return; // já está certo, evita aviso à toa
 
   // Mesma proteção de sugerirEstagioComIA: entre o blur que dispara isto e o
   // fim do save (local, quase instantâneo, mas ainda assíncrono) a pessoa
@@ -4273,14 +4282,16 @@ async function preencherEstagioPorNomeConhecido(){
   // getCurrentLead() de novo, que leria o lead errado se isso acontecer), e
   // só toca na tela se ainda for o mesmo lead exibido.
   const leadId = lead.id;
-  lead.estagio = estagioConhecido;
+  lead.estagio = estagioAlvo;
   await persistLeads();
   renderLeadsList();
 
   if(currentLeadId === leadId){
-    campoEstagio.value = estagioConhecido;
+    campoEstagio.value = estagioAlvo;
     flashIndicator('leadEstagioSaveIndicator');
-    toast(`Da última vez, ${personName} estava em "${estagioConhecido}" — já preenchi, confira antes de gerar`);
+    toast(estagioConhecido
+      ? `Da última vez, ${personName} estava em "${estagioConhecido}" — já preenchi, confira antes de gerar`
+      : `${personName} é novo por aqui — estágio voltou para "Primeiro contato", confira antes de gerar`);
   }
 }
 
