@@ -356,7 +356,7 @@ Use a resposta pra mostrar, com base real, por que uma investigação de raiz en
 
 Mas, isso *não significa* que você fica sem suporte após a entrega do plano alimentar.
 
-Você poderá tirar suas dúvidas e contar com a orientação necessária por aqui, diretamente com a Dra., pelo WhatsApp. 😉"
+Você poderá tirar suas dúvidas e contar com a orientação necessária por aqui, diretamente com {{NOME_PROFISSIONAL}}, pelo WhatsApp. 😉"
 
 ## 5. FOLLOW-UP
 - **24h:** "Percebi que não finalizamos nossa conversa sobre [objetivo]. Você se sente pronta para dar o próximo passo? Temos agenda para [dd/mm] às [hh]h ou [dd/mm] às [hh]h. 💚"
