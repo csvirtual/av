@@ -1429,6 +1429,10 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     document.body.classList.add('modal-open');
     elInput().focus();
     elMessages().scrollTop = elMessages().scrollHeight;
+    // Registra "o chat está aberto agora" (salvarUltimaTelaNaSessao vive em
+    // panel.js, que carrega ANTES deste arquivo — chamada global direta,
+    // sem precisar expor nada) — sobrevive a um F5 dentro da mesma sessão.
+    if(typeof salvarUltimaTelaNaSessao === 'function') salvarUltimaTelaNaSessao();
   }
 
   function fecharChatModal(){
@@ -1439,6 +1443,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // alguns segundos depois — "do nada", já que a pessoa nem estava mais
     // olhando pro chat.
     cancelarAvisoSemChave();
+    if(typeof salvarUltimaTelaNaSessao === 'function') salvarUltimaTelaNaSessao();
   }
 
   function init(){
@@ -1814,4 +1819,8 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // vazio na tela principal até o modal do chat ser aberto pelo menos uma
   // vez.
   window.carregarHistoricoBotChat = carregarHistoricoBotChat;
+
+  // Exposta pra panel.js reabrir o chat ao restaurar a última tela depois
+  // de um F5 (ver restaurarUltimaTelaDaSessao, panel.js).
+  window.abrirChatModal = abrirChatModal;
 })();

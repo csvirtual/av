@@ -463,6 +463,10 @@ function goToHome(){
   if(typeof window.carregarHistoricoBotChat === 'function'){
     window.carregarHistoricoBotChat(null);
   }
+  // Registra "estou na tela inicial agora" (ver salvarUltimaTelaNaSessao) —
+  // um F5 logo depois de voltar pra cá de propósito deve continuar aqui,
+  // não ressuscitar o lead que estava selecionado antes.
+  salvarUltimaTelaNaSessao();
 }
 
 const FIXED_LEAD_DATA = '9999-09-09T12:00:00.000Z';
@@ -1673,6 +1677,10 @@ async function selectLead(id){
   lastGeneratedHistoryId = (lead.draftSugestaoTexto && currentHistory.length)
     ? currentHistory[currentHistory.length - 1].id
     : null;
+
+  // Registra "este é o lead selecionado agora" (ver salvarUltimaTelaNaSessao)
+  // — sobrevive a um F5 dentro da mesma sessão de perfil.
+  salvarUltimaTelaNaSessao();
 }
 
 // ---------- Histórico de respostas geradas por lead ----------
@@ -5123,7 +5131,69 @@ function copilotoCancelarReinitPendente(){
 
 // ---------- Login de tela cheia do painel (usa auth.js compartilhado) + seleção de perfil ----------
 
-async function liberarPainel(){
+// chrome.storage.session (não .local): sobrevive a um F5/recarregamento da
+// aba, mas nunca ao fechar o navegador de verdade — mesma área já usada
+// pro DEK/AMK da sessão (ver auth.js). Escopada por perfil, mesmo padrão
+// de copilotoChaveSessaoDek (auth.js), pra nunca vazar "onde eu estava" de
+// um perfil pra outro.
+function chaveUltimaTelaSessao(perfilId){
+  return `copilotoUltimaTela_${perfilId}`;
+}
+
+// Guarda um retrato mínimo de "onde a pessoa está" — só o lead selecionado
+// e se o Chat rápido está aberto — pra restaurar depois de um F5 (ver
+// restaurarUltimaTelaDaSessao/o bootstrap no fim deste arquivo). Chamada
+// sempre que isso muda: fim de selectLead, goToHome, e abrir/fechar o chat
+// (ver window.abrirChatModal/fecharChatModal, chatbot.js — chamam esta
+// função global, já que chatbot.js carrega DEPOIS deste arquivo).
+//
+// De propósito NÃO guarda nenhuma tela que hoje pede senha de novo sempre
+// (Avançado, Ver leads excluídos) — restaurar aquilo sozinho, pulando a
+// senha, quebraria a garantia de que elas sempre confirmam identidade
+// antes de abrir. Elas simplesmente não entram neste retrato: se
+// estivessem abertas no momento do F5, a pessoa volta pro lead/tela por
+// baixo delas, nunca direto pra dentro.
+async function salvarUltimaTelaNaSessao(){
+  if(typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.session) return;
+  try{
+    const perfilAtivo = await copilotoObterPerfilAtivo();
+    if(!perfilAtivo) return;
+    const overlayChat = document.getElementById('chatModalOverlay');
+    const chatAberto = !!overlayChat && overlayChat.style.display !== 'none';
+    await chrome.storage.session.set({
+      [chaveUltimaTelaSessao(perfilAtivo.id)]: { leadId: currentLeadId || null, chatAberto }
+    });
+  }catch(e){ /* ambiente sem chrome.storage.session — segue sem lembrar tela */ }
+}
+
+// Chamada só na retomada de uma sessão já autenticada (F5/recarregamento —
+// ver o bootstrap no fim deste arquivo), nunca numa troca de perfil de
+// verdade: essa continua indo sempre pra tela inicial, de propósito (ver
+// goToHome, chamado direto por liberarPainel(false)) — trocar de perfil
+// nunca deve herdar o que estava aberto no perfil anterior.
+async function restaurarUltimaTelaDaSessao(){
+  let restaurou = false;
+  if(typeof chrome !== 'undefined' && chrome.storage && chrome.storage.session){
+    try{
+      const perfilAtivo = await copilotoObterPerfilAtivo();
+      if(perfilAtivo){
+        const chave = chaveUltimaTelaSessao(perfilAtivo.id);
+        const data = await chrome.storage.session.get(chave);
+        const salvo = data[chave];
+        if(salvo && salvo.leadId && leads.find(l => l.id === salvo.leadId)){
+          await selectLead(salvo.leadId);
+          restaurou = true;
+        }
+        if(salvo && salvo.chatAberto && typeof window.abrirChatModal === 'function'){
+          window.abrirChatModal();
+        }
+      }
+    }catch(e){}
+  }
+  if(!restaurou) goToHome();
+}
+
+async function liberarPainel(restaurarTela){
   painelDesbloqueado = true;
   document.getElementById('perfilScreen').style.display = 'none';
   document.getElementById('painelLockScreen').style.display = 'none';
@@ -5145,11 +5215,20 @@ async function liberarPainel(){
   if(typeof window.carregarHistoricoBotChat === 'function'){
     await window.carregarHistoricoBotChat();
   }
-  // Evita que o workspace de um lead do perfil ANTERIOR (nome, telefone,
-  // CPF, e-mail, notas, histórico de IA já renderizados na tela) continue
-  // visível depois de uma troca de perfil — cada perfil sempre começa pela
-  // tela inicial, nunca herdando o que estava aberto no perfil anterior.
-  goToHome();
+  if(restaurarTela){
+    // F5/recarregamento de uma sessão já autenticada — volta pra onde a
+    // pessoa estava (ver restaurarUltimaTelaDaSessao), com fallback pra
+    // tela inicial se nada foi salvo (primeira vez, ou navegador sem
+    // chrome.storage.session).
+    await restaurarUltimaTelaDaSessao();
+  }else{
+    // Troca de perfil de verdade: evita que o workspace de um lead do
+    // perfil ANTERIOR (nome, telefone, CPF, e-mail, notas, histórico de IA
+    // já renderizados na tela) continue visível — cada perfil sempre
+    // começa pela tela inicial, nunca herdando o que estava aberto no
+    // perfil anterior.
+    goToHome();
+  }
   copilotoMonitorarAtividade();
   copilotoIniciarChecagemInatividade(bloquearPainelPorInatividade);
 
@@ -6358,7 +6437,11 @@ document.getElementById('adminImpersonandoVoltarBtn').addEventListener('click', 
     // ele sem pedir de novo — senão, mostra a escolha de perfil.
     const perfilAtivo = await copilotoObterPerfilAtivo();
     if(perfilAtivo){
-      await liberarPainel();
+      // true = restaura onde a pessoa estava (lead selecionado, chat
+      // aberto) em vez de sempre cair na tela inicial — só faz sentido
+      // aqui, retomando uma sessão já autenticada (ex.: F5), nunca numa
+      // troca de perfil de verdade (ver liberarPainel/entrarNoPerfil).
+      await liberarPainel(true);
     }else{
       await aposLoginMaster();
     }
