@@ -65,6 +65,15 @@
   // A que texto pertence a leitura automática atual — evita reclassificar à
   // toa se a pessoa colou e enviou sem editar (a leitura do paste já serve).
   let chatEstagioDetectadoOrigemTexto = '';
+  // Nome (Central de mensagens, @csvirtual) associado à conversa de chat em
+  // andamento — comparado a cada envio (ver enviarMensagemChat) pra detectar
+  // sozinho quando a pessoa mudou sem trocar de lead na lista, e então
+  // limpar a conversa/contexto automaticamente (mesmo reset do "/cls",
+  // ver executarComandoLimpar), sem depender de ninguém lembrar de digitar
+  // o comando. Fica vazio fora da Central (lead normal, sem lead, ou após
+  // trocar de lead) — só compara o suficiente pra detectar troca DENTRO da
+  // mesma sessão da Central, nunca contra sessões antigas.
+  let ultimaPessoaChatCentral = '';
 
   // Histórico do Bot: guarda as conversas já tidas neste chat rápido COM O
   // LEAD ATUALMENTE SELECIONADO (ver seção mais abaixo) — sobrevive a
@@ -777,25 +786,31 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // callClaudeComTier/callGeminiComTier esperam um objeto com .estagio pra
     // decidir o tier (ver escolherTierPorEstagio em panel.js) — a ordem de
     // prioridade abaixo decide QUAL estágio usar pra isso:
-    //  1) Pergunta sobre o próprio Co-piloto (secaoAjudaConhecida veio
-    //     preenchida) — SEMPRE nível econômico, não importa nada mais:
-    //     consultar o próprio guia não é uma resposta que decide venda
-    //     nenhuma, não faz sentido pagar o nível mais caro só porque o lead
-    //     selecionado agora por acaso está numa etapa de risco.
-    //  2) Estágio fixado MANUALMENTE nesta conversa (chatEstagioManual) —
-    //     sinal mais direto e atual que existe: a atendente escolheu à mão,
-    //     agora, que esta conversa está numa etapa específica. Vale mesmo
-    //     sem nenhum lead selecionado (antes ficava travado sempre no
-    //     econômico ali, sem nenhuma forma de escapar), e vale ATÉ por cima
-    //     do estágio salvo no lead, se a atendente achar que o campo do
-    //     painel está desatualizado pra esta conversa específica.
+    //  1) Estágio fixado MANUALMENTE nesta conversa (chatEstagioManual) —
+    //     decisão humana explícita, o sinal mais forte que existe: a
+    //     atendente escolheu à mão, agora, que esta conversa está numa
+    //     etapa específica. Vale mesmo sem nenhum lead selecionado (antes
+    //     ficava travado sempre no econômico ali, sem nenhuma forma de
+    //     escapar), vale por cima do estágio salvo no lead (que pode estar
+    //     desatualizado pra esta conversa específica), e vale até por cima
+    //     da detecção automática do item 2 abaixo — decisão humana
+    //     deliberada sempre pesa mais que palpite automático, mesmo o mais
+    //     bem-intencionado, mesmo aquele que existe justamente pra
+    //     economizar: um falso positivo do detector de palavra-chave nunca
+    //     deveria conseguir derrubar uma escolha explícita da atendente.
+    //  2) Pergunta sobre o próprio Co-piloto (secaoAjudaConhecida veio
+    //     preenchida, e NENHUM estágio foi fixado manualmente) — nível
+    //     econômico: consultar o próprio guia não é uma resposta que
+    //     decide venda nenhuma, não faz sentido pagar o nível mais caro só
+    //     porque o lead selecionado agora por acaso está numa etapa de
+    //     risco.
     //  3) Estágio do lead selecionado, se houver — o de sempre.
     //  4) Nada disso: objeto mínimo equivalente a "Primeiro contato" (nível
     //     econômico, sem lead selecionado e papo livre).
-    const leadParaTier = secaoAjudaConhecida
-      ? { fixo: false, estagio: 'Primeiro contato' }
-      : chatEstagioManual
-        ? { fixo: false, estagio: chatEstagioManual }
+    const leadParaTier = chatEstagioManual
+      ? { fixo: false, estagio: chatEstagioManual }
+      : secaoAjudaConhecida
+        ? { fixo: false, estagio: 'Primeiro contato' }
         : (lead || { fixo: false, estagio: 'Primeiro contato' });
 
     const cachedSystem = buildChatCachedSystem();
@@ -1143,9 +1158,11 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // chat, trocar o nome pro paciente B (mesmo lead fixo) e reabrir o chat —
   // sem nada no meio, a conversa e o contexto do paciente A continuam ali,
   // agora "por baixo" do nome do paciente B. "/cls" existe pra resolver
-  // exatamente isso: zera a tela e o contexto na mão, preparando o chat pra
-  // ser usado como se tivesse acabado de ser aberto, sem precisar sair e
-  // voltar pro lead.
+  // exatamente isso na mão, preparando o chat pra ser usado como se
+  // tivesse acabado de ser aberto, sem precisar sair e voltar pro lead —
+  // e, desde a checagem em enviarMensagemChat (ver ultimaPessoaChatCentral),
+  // o mesmo reset também dispara SOZINHO ao detectar troca de pessoa na
+  // Central, sem precisar digitar nada.
   const COMANDOS_LIMPAR = ['/cls', '/limpar'];
 
   function ehComandoLimpar(mensagem){
@@ -1159,7 +1176,10 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
   // propósito NÃO mexe no Histórico do Bot persistido (botHistorico) nem na
   // paginação/busca dele (botHistoryCurrentPage/botHistoryQuery) — isso é o
   // registro salvo do lead, não "o que está na tela agora", e continua
-  // intacto pra consulta por "/find" mesmo depois do "/cls".
+  // intacto pra consulta por "/find" mesmo depois do "/cls". Chamada tanto
+  // pelo comando "/cls"/"/limpar" (na mão) quanto automaticamente por
+  // enviarMensagemChat ao detectar troca de pessoa na Central — nos dois
+  // casos o efeito é idêntico.
   function executarComandoLimpar(){
     chatHistorico = [];
     resetEstagioManual();
@@ -1182,6 +1202,27 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // renderização da resposta aconteceriam sob o lead ERRADO (ver
     // aindaNoMesmoLead mais abaixo e registrarTrocaNoHistoricoBot).
     const leadIdDoEnvio = (leadAtualParaChat() || {}).id || null;
+    const leadDoEnvio = leadAtualParaChat();
+
+    // Troca de pessoa na Central, sem trocar de lead na lista: limpa a
+    // conversa/contexto sozinho, antes de processar esta mensagem — mesmo
+    // reset que "/cls" já fazia na mão (ver executarComandoLimpar acima).
+    // Comparado contra QUEM foi a última mensagem de chat de verdade nesta
+    // sessão da Central (não contra o valor cru do campo "Nome da pessoa",
+    // que se limpa sozinho depois de cada "Gerar resposta" — comparar
+    // contra isso geraria falso alarme na segunda mensagem da MESMA
+    // pessoa). Fora da Central, só mantém a marcação zerada pra não
+    // comparar contra uma sessão antiga quando voltar pra lá depois.
+    if(leadDoEnvio && leadDoEnvio.fixo){
+      const pessoaDoEnvio = nomeParaExibir(leadDoEnvio);
+      if(pessoaDoEnvio && ultimaPessoaChatCentral && pessoaDoEnvio !== ultimaPessoaChatCentral){
+        executarComandoLimpar();
+        renderMensagem('ai', '🧹 Nome da pessoa mudou — conversa e contexto limpos automaticamente, pra não misturar com quem foi atendido antes.', { legenda: '🧹 Automático' });
+      }
+      if(pessoaDoEnvio) ultimaPessoaChatCentral = pessoaDoEnvio;
+    }else{
+      ultimaPessoaChatCentral = '';
+    }
 
     chatOcupado = true;
     elSend().disabled = true;
@@ -1550,6 +1591,12 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // Estágio fixado manualmente (se houver) era sobre a conversa com o
     // lead anterior — não deve seguir pro próximo (ver resetEstagioManual).
     resetEstagioManual();
+    // Troca de LEAD (não só de pessoa dentro da Central) — zera a marcação
+    // de "última pessoa da Central" também, defesa extra além da checagem
+    // em enviarMensagemChat: sem isto, sair da Central pra outro lead sem
+    // nunca enviar mensagem nele e depois voltar pra Central manteria a
+    // marcação antiga, arriscando não detectar a próxima troca de pessoa.
+    ultimaPessoaChatCentral = '';
     // Defesa extra: se por algum caminho futuro isto rodar com o chat
     // ainda aberto e um aviso "sem chave" contando (ver mostrarAvisoSemChave),
     // não faz sentido redirecionar pra Configurações sobre uma pergunta que
