@@ -791,7 +791,7 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     return `${base}${modoConsultoriaBloco}${deteccao}${blocoAjuda}${blocoMemoria}\n\nHISTÓRICO DESTA CONVERSA DE CHAT (mais antigas primeiro):\n${historicoTexto}`;
   }
 
-  async function pedirRespostaIA(mensagemUsuario, secaoAjudaConhecida){
+  async function pedirRespostaIA(mensagemUsuario, secaoAjudaConhecida, resultadoMelhorSecaoAjudaConhecido){
     const provider = providerSettings.provider;
     const key = provider === 'claude'
       ? providerSettings.claudeKey
@@ -819,21 +819,30 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     //     economizar: um falso positivo do detector de palavra-chave nunca
     //     deveria conseguir derrubar uma escolha explícita da atendente.
     //  2) Pergunta sobre o próprio Co-piloto, com ALTA confiança (nenhum
-    //     estágio fixado manualmente, e perguntaClaramenteSobreCoPiloto
-    //     concorda — limiar bem mais rígido que o usado só pra decidir se
-    //     injeta a seção como pano de fundo, ver comentário lá) — nível
-    //     econômico: consultar o próprio guia não é uma resposta que
-    //     decide venda nenhuma, não faz sentido pagar o nível mais caro só
-    //     porque o lead selecionado agora por acaso está numa etapa de
-    //     risco. Uma coincidência de palavra solta (ex.: "pagamento" numa
-    //     pergunta de venda real, batendo o título de "Custo por token")
-    //     não é confiança suficiente pra isso — só ainda entra como fonte
-    //     de contexto (ver secaoAjudaConhecida/buildChatDynamicContext
-    //     abaixo), nunca força o nível sozinha.
+    //     estágio fixado manualmente, e a pontuação do casamento de
+    //     palavras-chave passa do limiar mais rígido — ver
+    //     LIMIAR_RELEVANCIA_PARA_CUSTO/perguntaClaramenteSobreCoPiloto,
+    //     acima) — nível econômico: consultar o próprio guia não é uma
+    //     resposta que decide venda nenhuma, não faz sentido pagar o nível
+    //     mais caro só porque o lead selecionado agora por acaso está numa
+    //     etapa de risco. Uma coincidência de palavra solta (ex.:
+    //     "pagamento" numa pergunta de venda real, batendo o título de
+    //     "Custo por token") não é confiança suficiente pra isso — só ainda
+    //     entra como fonte de contexto (ver secaoAjudaConhecida/
+    //     buildChatDynamicContext abaixo), nunca força o nível sozinha.
     //  3) Estágio do lead selecionado, se houver — o de sempre.
     //  4) Nada disso: objeto mínimo equivalente a "Primeiro contato" (nível
     //     econômico, sem lead selecionado e papo livre).
-    const perguntaSobreCoPilotoComConfianca = !!secaoAjudaConhecida && perguntaClaramenteSobreCoPiloto(mensagemUsuario);
+    //
+    // resultadoMelhorSecaoAjudaConhecido, quando informado por quem chama
+    // (ver enviarMensagemChat), evita rodar o mesmo casamento de
+    // palavras-chave de novo só pra aplicar o limiar mais rígido — sem ele
+    // (chamada eventual de outro lugar no futuro), recalcula na hora.
+    const perguntaSobreCoPilotoComConfianca = !!secaoAjudaConhecida && (
+      resultadoMelhorSecaoAjudaConhecido
+        ? resultadoMelhorSecaoAjudaConhecido.pontuacao >= LIMIAR_RELEVANCIA_PARA_CUSTO
+        : perguntaClaramenteSobreCoPiloto(mensagemUsuario)
+    );
     const leadParaTier = chatEstagioManual
       ? { fixo: false, estagio: chatEstagioManual }
       : perguntaSobreCoPilotoComConfianca
@@ -1240,9 +1249,16 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // contra isso geraria falso alarme na segunda mensagem da MESMA
     // pessoa). Fora da Central, só mantém a marcação zerada pra não
     // comparar contra uma sessão antiga quando voltar pra lá depois.
+    //
+    // Se a própria mensagem já for "/cls"/"/limpar" (ver ehComandoLimpar
+    // acima), o despacho de comando logo abaixo já vai limpar sozinho —
+    // pular a limpeza automática aqui evita rodar executarComandoLimpar()
+    // duas vezes seguidas à toa pela mesma mensagem. A marcação de "quem é
+    // a pessoa agora" ainda é atualizada normalmente nos dois casos.
+    const eComandoDeLimparExplicito = ehComandoLimpar(texto);
     if(leadDoEnvio && leadDoEnvio.fixo){
       const pessoaDoEnvio = nomeParaExibir(leadDoEnvio);
-      if(pessoaDoEnvio && ultimaPessoaChatCentral && pessoaDoEnvio !== ultimaPessoaChatCentral){
+      if(pessoaDoEnvio && ultimaPessoaChatCentral && pessoaDoEnvio !== ultimaPessoaChatCentral && !eComandoDeLimparExplicito){
         executarComandoLimpar();
         renderMensagem('ai', '🧹 Nome da pessoa mudou — conversa e contexto limpos automaticamente, pra não misturar com quem foi atendido antes.', { legenda: '🧹 Automático' });
       }
@@ -1352,16 +1368,16 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     // uma única seção — qualquer coisa parafraseada, mais vaga ou mais
     // conversacional caía fora do limiar e ia pra IA do mesmo jeito, só que
     // SEM o conteúdo de ajuda no contexto (só a leitura automática decidia
-    // se algo entrava ou não). Agora encontrarSecaoAjudaRelevante() continua
-    // rodando (mesmo casamento de palavras-chave, zero custo, mesmo limiar
-    // de confiança) mas só pra decidir SE injeta a seção encontrada no
-    // contexto desta chamada de IA (ver buildChatDynamicContext/
-    // pedirRespostaIA) — quem responde de verdade é sempre a IA, lendo esse
-    // conteúdo como fonte quando ele existe. pedirRespostaIA força o nível
-    // básico/econômico (ou o que estiver disponível) sempre que uma seção é
-    // encontrada, já que consultar o próprio guia não é uma resposta que
-    // decide venda nenhuma.
-    const secaoAjudaConhecida = encontrarSecaoAjudaRelevante(texto);
+    // se algo entrava ou não). Calcula UMA vez só aqui (melhorSecaoAjudaPara)
+    // e repassa o resultado adiante — pedirRespostaIA/buildChatDynamicContext
+    // usam a MESMA pontuação pra decidir SE injeta a seção como fonte
+    // (limiar normal, LIMIAR_RELEVANCIA) e SE isso é confiança suficiente
+    // pra também forçar o nível econômico (limiar mais rígido,
+    // LIMIAR_RELEVANCIA_PARA_CUSTO — ver perguntaClaramenteSobreCoPiloto)
+    // — sem escanear as seções de ajuda de novo pra cada decisão.
+    const resultadoMelhorSecaoAjuda = melhorSecaoAjudaPara(texto);
+    const secaoAjudaConhecida = (resultadoMelhorSecaoAjuda && resultadoMelhorSecaoAjuda.pontuacao >= LIMIAR_RELEVANCIA)
+      ? resultadoMelhorSecaoAjuda.secao : null;
 
     const loadingEl = renderMensagem('ai', 'digitando...', { loading: true, id: 'chatLoadingMsg' });
 
@@ -1372,10 +1388,10 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
       await garantirLeituraEstagioParaEnvio(texto);
       atualizarBarraDeContexto();
 
-      // secaoAjudaConhecida já foi calculada logo acima — repassa em vez de
-      // deixar pedirRespostaIA/buildChatDynamicContext varrerem as seções de
-      // ajuda de novo pra chegar no mesmo resultado.
-      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaConhecida);
+      // secaoAjudaConhecida/resultadoMelhorSecaoAjuda já foram calculados
+      // logo acima — repassa em vez de deixar pedirRespostaIA varrer as
+      // seções de ajuda de novo pra chegar no mesmo resultado.
+      const { texto: resposta, meta: metaRoteamento } = await pedirRespostaIA(texto, secaoAjudaConhecida, resultadoMelhorSecaoAjuda);
       loadingEl.remove();
       // Resposta da IA veio com sucesso — se havia um aviso de "sem chave"
       // de uma pergunta anterior ainda contando, não faz mais sentido
