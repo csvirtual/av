@@ -3637,11 +3637,23 @@ function buildContextoDinamicoBloco(lead, personName, extraContext, continuidade
     // estiverem cifrados aqui (DEK indisponível nesta sessão, ver
     // decifrarLeadsEmMemoria), NUNCA manda o texto cifrado bruto pra IA;
     // trata como se estivesse vazio, igual a um lead sem essa informação.
+    //
+    // A última linha ("Objetivo/notas são cumulativos...") existe porque,
+    // diferente da Central de mensagens acima (que já avisa a IA pra
+    // ignorar tudo que não seja a mensagem atual), objetivo/notas de um lead
+    // normal só são preenchidos uma vez e raramente são atualizados depois —
+    // iam entrando, cada vez mais desatualizados, em toda resposta futura,
+    // mesmo quando não tinham nada a ver com o assunto do momento (puxando
+    // o foco da resposta pra longe do que o lead está perguntando agora).
+    // Não removemos o campo (continua útil quando está em dia): só
+    // ensinamos a IA a tratá-lo como pano de fundo, não como algo pra forçar
+    // dentro da resposta quando destoa da mensagem atual.
     : `CONTEXTO ATUAL DESTE LEAD:
 - Nome: ${!pareceCifrado(lead.nome) && lead.nome || 'ainda não informado'}
 - Objetivo detectado até agora: ${!pareceCifrado(lead.objetivo) && lead.objetivo || 'ainda não informado'}
 - Estágio atual no funil (definido manualmente, não é palpite da IA): ${lead.estagio || 'Primeiro contato'}
-- Notas/informações adicionais sobre o lead: ${!pareceCifrado(lead.notas) && lead.notas || 'nenhuma'}`;
+- Notas/informações adicionais sobre o lead: ${!pareceCifrado(lead.notas) && lead.notas || 'nenhuma'}
+- Objetivo/notas acima são informação cumulativa, registrada ao longo do tempo e nem sempre atualizada — podem estar desatualizadas ou não terem relação com a mensagem de agora. Priorize sempre o que a mensagem colada (e a informação adicional desta resposta, se houver) realmente pedem; use objetivo/notas como pano de fundo, nunca force esse conteúdo dentro da resposta quando não fizer sentido com o que foi perguntado agora.`;
 
   const extraContextoBloco = (extraContext && extraContext.trim())
     ? `\n\nINFORMAÇÃO ADICIONAL FORNECIDA PARA ESTA RESPOSTA (pode sobrepor informação desatualizada presente na conversa colada, ex: horário/data que já não vale mais):\n${extraContext.trim()}`
