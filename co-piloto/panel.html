@@ -2322,6 +2322,7 @@ Nascimento: 20/01/1992"></textarea>
           <li>Configurações do funil de vendas e campanha ativa.</li>
           <li>Chaves de API da Anthropic/Google configuradas por cada profissional.</li>
           <li>Usuário/senha geral (principal e de equipe, se configurada), senha de cada perfil e o código de recuperação (o PIN, no caso do admin) de cada um — nenhuma delas em texto puro (explicamos como, na seção de segurança abaixo). Única exceção: a credencial gerada automaticamente no primeiro uso da instalação fica em texto puro só até você confirmar que a guardou (ou fazer o primeiro login com ela) — depois disso é apagada, restando só o hash.</li>
+          <li>Um marcador técnico de navegação — qual lead está selecionado e se o Chat rápido está aberto — só pra voltar pra onde você estava ao atualizar a página (F5), em vez de sempre cair na tela inicial. Fica na memória temporária da sessão do navegador (não no armazenamento permanente): some sozinho quando o navegador fecha, e nunca inclui "Avançado" nem "Ver leads excluídos" — essas continuam sempre pedindo senha de novo, mesmo depois de um F5.</li>
         </ul>
       </div>
 
