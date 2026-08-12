@@ -774,22 +774,29 @@ DÚVIDAS SOBRE O CO-PILOTO (não sobre o lead/venda): se o contexto abaixo troux
     }
 
     const lead = leadAtualParaChat();
-    // callClaudeComTier/callGeminiComTier esperam um lead com .fixo/.estagio
-    // pra decidir o tier (ver escolherTierPorEstagio em panel.js) — um
-    // objeto mínimo equivalente a "Primeiro contato" sempre resolve pro
-    // nível econômico (o mais barato, e o que resolverCredenciaisGemini/
-    // callClaudeComTier já sabem sozinhos resolver pro que estiver
-    // disponível — só a Chave B configurada, só o modelo principal, etc.).
-    // Dois casos usam esse objeto mínimo em vez do lead de verdade: sem
-    // nenhum lead selecionado (papo livre, sem venda em jogo — comportamento
-    // de sempre), e sempre que a pergunta é sobre o próprio Co-piloto
-    // (secaoAjudaConhecida veio preenchida, ver encontrarSecaoAjudaRelevante
-    // em enviarMensagemChat) — consultar o próprio guia não é uma resposta
-    // que decide venda nenhuma, não faz sentido pagar o nível mais caro só
-    // porque o lead selecionado agora por acaso está numa etapa de risco.
+    // callClaudeComTier/callGeminiComTier esperam um objeto com .estagio pra
+    // decidir o tier (ver escolherTierPorEstagio em panel.js) — a ordem de
+    // prioridade abaixo decide QUAL estágio usar pra isso:
+    //  1) Pergunta sobre o próprio Co-piloto (secaoAjudaConhecida veio
+    //     preenchida) — SEMPRE nível econômico, não importa nada mais:
+    //     consultar o próprio guia não é uma resposta que decide venda
+    //     nenhuma, não faz sentido pagar o nível mais caro só porque o lead
+    //     selecionado agora por acaso está numa etapa de risco.
+    //  2) Estágio fixado MANUALMENTE nesta conversa (chatEstagioManual) —
+    //     sinal mais direto e atual que existe: a atendente escolheu à mão,
+    //     agora, que esta conversa está numa etapa específica. Vale mesmo
+    //     sem nenhum lead selecionado (antes ficava travado sempre no
+    //     econômico ali, sem nenhuma forma de escapar), e vale ATÉ por cima
+    //     do estágio salvo no lead, se a atendente achar que o campo do
+    //     painel está desatualizado pra esta conversa específica.
+    //  3) Estágio do lead selecionado, se houver — o de sempre.
+    //  4) Nada disso: objeto mínimo equivalente a "Primeiro contato" (nível
+    //     econômico, sem lead selecionado e papo livre).
     const leadParaTier = secaoAjudaConhecida
       ? { fixo: false, estagio: 'Primeiro contato' }
-      : (lead || { fixo: false, estagio: 'Primeiro contato' });
+      : chatEstagioManual
+        ? { fixo: false, estagio: chatEstagioManual }
+        : (lead || { fixo: false, estagio: 'Primeiro contato' });
 
     const cachedSystem = buildChatCachedSystem();
     const dynamicContext = buildChatDynamicContext(lead, mensagemUsuario, secaoAjudaConhecida);
