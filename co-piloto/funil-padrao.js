@@ -175,7 +175,7 @@ Para agendar cobramos um sinal de *{{VALOR_SINAL}}* (Pix ou cartão) que é abat
 
 **8 — Fechamento**
 *Posso te passar a disponibilidade de horário para agendarmos?* 💚
-Alternativas: *Tem mais algum ponto que deseja entender melhor, ou podemos dar prosseguimento para a disponibilidade de horários?* 😄 / *Gostaria de esclarecer algum ponto antes, ou já posso te passar a disponibilidade de horário para agendarmos?* 💚
+Alternativas: *Tem mais algum ponto que deseja entender melhor, ou podemos dar prosseguimento para a disponibilidade de horários?* 😄 / *Gostaria de esclarecer algum ponto antes, ou já posso te passar a disponibilidade de horário para agendarmos?* 💚 / *Tem mais algum ponto que deseja conhecer melhor, ou podemos dar prosseguimento para a disponibilidade de horários?* 😄
 
 **8.1 — Período + oferta** (as duas mensagens em sequência, sem esperar resposta da primeira)
 *Você prefere ser atendida no período da manhã ou da tarde?*
