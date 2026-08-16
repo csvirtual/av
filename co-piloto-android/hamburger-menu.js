@@ -96,7 +96,29 @@
     painelApp.appendChild(overlay);
     painelApp.appendChild(drawer);
 
+    // A gaveta precisa começar exatamente onde a faixa de topo termina
+    // (nunca por cima dela) e ocupar o resto da tela inteira, da direita
+    // pra esquerda — não um valor de altura chutado no CSS: a fonte
+    // carregando depois, ou o notch/status bar do aparelho, mudam a altura
+    // de verdade da faixa. Mede o elemento real e publica como variável
+    // CSS (--copiloto-topo-altura, usada em mobile.css).
+    //
+    // A medição NÃO pode rodar só uma vez aqui no montar() — nesse momento
+    // #painelApp ainda está com display:none (ninguém logou ainda), e todo
+    // elemento dentro de um ancestral display:none mede 0 de altura,
+    // sempre (é assim que o layout do navegador funciona, não é bug de
+    // timing). Por isso mede de novo bem na hora de abrir a gaveta —
+    // nesse momento #painelApp com certeza já está visível, porque a
+    // própria pessoa acabou de tocar num botão que só aparece visível
+    // depois do login.
+    function medirAlturaDoTopo(){
+      document.documentElement.style.setProperty('--copiloto-topo-altura', topo.getBoundingClientRect().height + 'px');
+    }
+    window.addEventListener('resize', medirAlturaDoTopo);
+    window.addEventListener('orientationchange', () => setTimeout(medirAlturaDoTopo, 200));
+
     function abrir(){
+      medirAlturaDoTopo();
       document.body.classList.add('copiloto-menu-aberto');
       hamburgerBtn.setAttribute('aria-expanded', 'true');
     }

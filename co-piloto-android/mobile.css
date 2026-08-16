@@ -34,18 +34,22 @@
   min-height:0; /* estavam esticadas por align-items:stretch do grid antigo; dentro da gaveta só precisam da própria altura */
 }
 
-/* ---------- Gaveta única (sidebar + funil), deslizando da direita ---------- */
+/* ---------- Gaveta única (sidebar + funil) — ocupa a tela inteira, da
+   direita pra esquerda, logo abaixo da faixa de topo (nunca por cima
+   dela). --copiloto-topo-altura é medida de verdade em hamburger-menu.js
+   (a altura da faixa varia com a fonte carregada e o notch do aparelho —
+   um valor fixo no CSS ia ficar errado em algum caso). ---------- */
 .copiloto-menu-drawer{
   position:fixed;
-  top:0; right:0; bottom:0;
-  width:min(86vw, 340px);
+  top:var(--copiloto-topo-altura, 72px);
+  left:0; right:0; bottom:0;
+  width:100%;
   z-index:9200;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   transform:translateX(100%);
   transition:transform .28s ease;
-  box-shadow:-8px 0 32px rgba(0,0,0,.35);
-  padding-top:env(safe-area-inset-top, 0px);
+  box-shadow:0 -8px 32px rgba(0,0,0,.25);
   padding-bottom:env(safe-area-inset-bottom, 0px);
 }
 body.copiloto-menu-aberto .copiloto-menu-drawer{
