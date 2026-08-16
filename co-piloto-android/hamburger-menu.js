@@ -8,22 +8,30 @@
 // são dezenas de regras espalhadas, escritas pensando em grid de 3
 // colunas), este script MOVE (não clona) as duas — elemento físico
 // intacto, mesmos listeners, mesmo estado — pra dentro de uma gaveta
-// única, deslizando da direita, acionada por um botão de hambúrguer fixo
-// no canto superior direito. O CSS que faz a gaveta ficar fora da tela por
-// padrão e a largura da .app virar 100% mora em build.js (bloco "Fase 4 —
-// layout mobile"), sempre depois do <style> original no <head> — última
+// única, deslizando da direita.
+//
+// O botão que abre essa gaveta mora dentro de uma barra de topo própria
+// (#copilotoTopoMobile) — não é um botão flutuando isolado por cima de
+// qualquer conteúdo que esteja embaixo dele (isso ficava com cara de
+// remendo: cobria banners, título, o que estivesse ali). A barra entra no
+// fluxo normal do grid (não é position:fixed), então empurra o resto do
+// conteúdo pra baixo em vez de sobrepor. Ela também reaproveita a própria
+// marca (.brand — "C&S Assistência Virtual", mesmo elemento, mesmo clique
+// de "voltar ao início"), movida de dentro da .sidebar pra virar o lado
+// esquerdo dessa barra. O CSS de tudo isso mora em build.js (bloco "Fase 4
+// — layout mobile"), sempre depois do <style> original no <head> — última
 // regra do mesmo seletor vence, sem precisar de !important em quase nada.
 //
-// Por que os elementos criados aqui (hambúrguer, fundo escuro, gaveta)
+// Por que os elementos criados aqui (barra de topo, fundo escuro, gaveta)
 // entram como filhos de #painelApp, e não direto do <body>: assim herdam
 // de graça o display:none/grid que o próprio painel já controla (login,
 // logout, bloqueio por inatividade) — sem precisar duplicar essa lógica
-// aqui. position:fixed tira os três da grade visualmente, mas continuam
-// dentro da árvore do painel, então: (a) somem quando o painel não está
-// desbloqueado, exatamente como o resto da tela; (b) são estacionados e
-// restaurados automaticamente pelo screen-manager.js (Fase 3) junto com o
-// resto do painel ao ir/voltar de Configurações — sem exigir nenhum ajuste
-// lá.
+// aqui. Overlay e gaveta usam position:fixed (saem da grade visualmente),
+// mas continuam dentro da árvore do painel, então: (a) somem quando o
+// painel não está desbloqueado, exatamente como o resto da tela; (b) são
+// estacionados e restaurados automaticamente pelo screen-manager.js (Fase
+// 3) junto com o resto do painel ao ir/voltar de Configurações — sem
+// exigir nenhum ajuste lá.
 (function(){
   'use strict';
 
@@ -31,6 +39,7 @@
     const painelApp = document.getElementById('painelApp');
     const sidebar = painelApp && painelApp.querySelector('.sidebar');
     const funnelSidebar = painelApp && painelApp.querySelector('.funnel-sidebar');
+    const brand = sidebar && sidebar.querySelector('.brand');
     if(!painelApp || !sidebar){
       console.error('[hamburger-menu] #painelApp ou .sidebar não encontrado — menu mobile não montado.');
       return;
@@ -68,9 +77,24 @@
     hamburgerBtn.setAttribute('aria-expanded', 'false');
     hamburgerBtn.textContent = '☰';
 
+    // Barra de topo fixa (fica no fluxo normal do grid — não sobrepõe
+    // conteúdo, empurra o resto pra baixo): a marca (movida da .sidebar,
+    // mesmo elemento, mesmo clique de "voltar ao início") à esquerda, o
+    // hambúrguer à direita, dentro de um cartão branco arredondado — em
+    // vez do botão flutuando solto por cima de qualquer conteúdo que
+    // esteja embaixo dele.
+    const topo = document.createElement('div');
+    topo.id = 'copilotoTopoMobile';
+    topo.className = 'copiloto-topo-mobile';
+    if(brand) topo.appendChild(brand);
+    const hamburgerWrap = document.createElement('div');
+    hamburgerWrap.className = 'copiloto-hamburger-wrap';
+    hamburgerWrap.appendChild(hamburgerBtn);
+    topo.appendChild(hamburgerWrap);
+
+    painelApp.insertBefore(topo, painelApp.firstChild);
     painelApp.appendChild(overlay);
     painelApp.appendChild(drawer);
-    painelApp.appendChild(hamburgerBtn);
 
     function abrir(){
       document.body.classList.add('copiloto-menu-aberto');

@@ -80,21 +80,57 @@ body.copiloto-menu-aberto .copiloto-menu-overlay{
   pointer-events:auto;
 }
 
-/* Botão fixo que abre a gaveta — canto superior direito, sempre visível
-   (enquanto o painel estiver desbloqueado; ver comentário em
-   hamburger-menu.js sobre herdar o display do #painelApp). env(...) evita
-   ficar embaixo do relógio/câmera em aparelhos com notch. */
-.copiloto-hamburger-btn{
-  position:fixed;
-  top:calc(12px + env(safe-area-inset-top, 0px));
-  right:12px;
-  z-index:9000;
-  width:46px; height:46px; border-radius:50%;
-  background:var(--teal-dark); color:#fff; border:none;
-  font-size:20px; line-height:1; cursor:pointer;
-  box-shadow:0 4px 14px rgba(0,0,0,.25);
+/* ---------- Barra de topo (marca + botão do menu) ----------
+   Antes o botão era um círculo flutuando sozinho por cima de qualquer
+   conteúdo que estivesse ali embaixo (banner, título...) — ficava com
+   cara de remendo. Agora é uma barra de verdade, no fluxo normal do grid
+   (não é position:fixed — empurra o resto do conteúdo pra baixo em vez de
+   cobrir), na mesma cor de fundo que a .sidebar já usava, com a marca
+   original (mesmo elemento, mesmo clique de "voltar ao início") de um
+   lado e o botão do menu do outro, num cartão branco arredondado. */
+.copiloto-topo-mobile{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:var(--teal-dark);
+  padding:16px 18px calc(16px + env(safe-area-inset-bottom, 0px)) 18px;
+  padding-top:calc(16px + env(safe-area-inset-top, 0px));
+  position:sticky;
+  top:0;
+  z-index:500;
 }
-.copiloto-hamburger-btn:active{ transform:scale(.95); }
+/* .sidebar .brand{...} não se aplica mais aqui (o elemento saiu de dentro
+   da .sidebar) — reaplica o mesmo visual, escopado à barra de topo. */
+.copiloto-topo-mobile .brand{
+  color:#fff; font-size:18px; line-height:1.25; cursor:pointer;
+  transition:opacity .15s; width:fit-content; margin:0;
+}
+.copiloto-topo-mobile .brand:hover{ opacity:.8; }
+.copiloto-topo-mobile .brand span{ color:#D9AEE8; }
+
+.copiloto-hamburger-wrap{
+  background:#fff;
+  border-radius:16px;
+  padding:8px;
+  display:flex;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);
+  flex-shrink:0;
+}
+.copiloto-hamburger-btn{
+  width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  background:none; border:none; color:var(--teal-dark);
+  font-size:20px; line-height:1; cursor:pointer; padding:0;
+}
+.copiloto-hamburger-btn:active{ transform:scale(.92); }
+/* Com o menu aberto, a gaveta já cobre esse canto com o próprio botão "✕"
+   — sem esconder o cartão branco do hambúrguer por baixo, os dois
+   ficavam se sobrepondo ali (visual "fantasma"). */
+body.copiloto-menu-aberto .copiloto-hamburger-wrap{
+  opacity:0;
+  pointer-events:none;
+}
 
 /* ---------- Modais: 100vh/85vh -> dvh (mesmo motivo do .app acima) e
    botões de fechar maiores (alvo de toque confortável, ~40px em vez de
