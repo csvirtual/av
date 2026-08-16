@@ -95,6 +95,7 @@ function main(){
   panelHead = trocarExato(panelHead, '<link rel="stylesheet" href="styles.css">', `<style>\n${stylesCss}\n</style>`, 'panel.html (inlinando styles.css)');
 
   const optionsStyle = extrairEntre(optionsHtml, '<style>', '</style>', 'options.html');
+  const mobileCss = ler('mobile.css', DIR_ANDROID);
   const headFinal = `${panelHead}
 <meta name="copiloto-versao" content="${manifest.version}">
 <style>
@@ -105,6 +106,9 @@ function main(){
 @scope (#configApp) {
 ${optionsStyle}
 }
+</style>
+<style>
+${mobileCss}
 </style>`;
 
   // ---------- corpo do painel (sem os <script src> — entram inline mais embaixo) ----------
@@ -152,6 +156,7 @@ ${optionsStyle}
   const storageAdapterJs = ler('storage-adapter.js', DIR_ANDROID);
   const runtimeAdapterJs = ler('runtime-adapter.js', DIR_ANDROID);
   const screenManagerJs = ler('screen-manager.js', DIR_ANDROID);
+  const hamburgerMenuJs = ler('hamburger-menu.js', DIR_ANDROID);
 
   const tag = (nome, codigo) => `<script>\n${escaparFechamentoDeScript(codigo, nome)}\n</script>`;
 
@@ -179,6 +184,7 @@ ${tag('funil-padrao.js', funilPadraoJs)}
 ${tag('auth.js', authJs)}
 ${tag('perfis.js', perfisJs)}
 ${tag('screen-manager.js', screenManagerJs)}
+${tag('hamburger-menu.js', hamburgerMenuJs)}
 ${tag('panel.js', panelJs)}
 ${tag('panel/importarContatos.js', importarContatosJs)}
 ${tag('backtotop.js', backtotopJs)}

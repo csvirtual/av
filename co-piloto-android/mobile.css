@@ -1,0 +1,110 @@
+/* Co-piloto Android — Fase 4: layout mobile (menu hambúrguer + telas
+   cheias). Sempre ativo neste build — não depende de media query, porque
+   este arquivo é exclusivo pra Android, nunca serve o layout desktop.
+   Vem DEPOIS do <style> original de panel.html/options.html no <head> (ver
+   build.js): entre duas regras do mesmo seletor com a mesma
+   especificidade, a que vem depois vence — por isso quase nada aqui
+   precisa de !important. */
+
+/* .app era um grid de 3 colunas (sidebar 280px / conteúdo / funil 240px) —
+   as duas colunas viram uma gaveta (ver hamburger-menu.js), então vira
+   1 coluna só, ocupando a tela inteira.
+
+   De propósito NÃO mexemos na propriedade `display` aqui: panel.js liga/
+   desliga #painelApp trocando o `display` DIRETO no atributo style (none
+   antes do login, grid depois) — um `!important` na propriedade `display`
+   de uma regra .app{} venceria SEMPRE esse inline, inclusive o
+   `display:none` de antes do login, deixando o painel "vazando" visível
+   atrás da tela de senha (bug real, encontrado testando). Em vez de trocar
+   `display:grid` por `display:block`, achatamos o PRÓPRIO grid pra 1
+   coluna (grid-template-columns) — o `display` continua sendo o que
+   panel.js decidir, sempre. */
+.app{
+  grid-template-columns:1fr !important;
+  min-height:100dvh;
+}
+/* A regra original só existe dentro de @media(max-width:1180px) — nesta
+   página ela pode não estar "ativa" dependendo da largura real da tela.
+   Aqui garantimos display:block sempre, porque a .funnel-sidebar não fica
+   mais numa coluna: mora dentro da gaveta, junto com a .sidebar. Nenhum
+   dos dois tem display controlado via JS/inline, então dispensa
+   !important — a ordem no <head> (depois do <style> original) já basta. */
+.sidebar, .funnel-sidebar{
+  display:block;
+  min-height:0; /* estavam esticadas por align-items:stretch do grid antigo; dentro da gaveta só precisam da própria altura */
+}
+
+/* ---------- Gaveta única (sidebar + funil), deslizando da direita ---------- */
+.copiloto-menu-drawer{
+  position:fixed;
+  top:0; right:0; bottom:0;
+  width:min(86vw, 340px);
+  z-index:9200;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  transform:translateX(100%);
+  transition:transform .28s ease;
+  box-shadow:-8px 0 32px rgba(0,0,0,.35);
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+}
+body.copiloto-menu-aberto .copiloto-menu-drawer{
+  transform:translateX(0);
+}
+.copiloto-menu-drawer .sidebar{
+  border-right:none;
+}
+.copiloto-menu-drawer .funnel-sidebar{
+  border-top:1px solid var(--line);
+}
+.copiloto-menu-fechar-btn{
+  position:sticky; top:8px; z-index:1;
+  margin:8px 8px 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,.14); color:#fff; border:none;
+  font-size:18px; line-height:1; cursor:pointer;
+}
+.copiloto-menu-fechar-btn:hover{ background:rgba(255,255,255,.22); }
+
+.copiloto-menu-overlay{
+  position:fixed; inset:0;
+  background:rgba(6,14,12,.5);
+  z-index:9100;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .28s ease;
+}
+body.copiloto-menu-aberto .copiloto-menu-overlay{
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* Botão fixo que abre a gaveta — canto superior direito, sempre visível
+   (enquanto o painel estiver desbloqueado; ver comentário em
+   hamburger-menu.js sobre herdar o display do #painelApp). env(...) evita
+   ficar embaixo do relógio/câmera em aparelhos com notch. */
+.copiloto-hamburger-btn{
+  position:fixed;
+  top:calc(12px + env(safe-area-inset-top, 0px));
+  right:12px;
+  z-index:9000;
+  width:46px; height:46px; border-radius:50%;
+  background:var(--teal-dark); color:#fff; border:none;
+  font-size:20px; line-height:1; cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
+}
+.copiloto-hamburger-btn:active{ transform:scale(.95); }
+
+/* ---------- Modais: 100vh/85vh -> dvh (mesmo motivo do .app acima) e
+   botões de fechar maiores (alvo de toque confortável, ~40px em vez de
+   ~32px) ---------- */
+.modal-dialog, .hm-modal-dialog{
+  max-height:85dvh;
+}
+.chat-modal-dialog{
+  max-height:78dvh;
+}
+.modal-close, .hm-modal-close{
+  width:40px; height:40px;
+}
