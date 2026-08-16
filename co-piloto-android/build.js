@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// Co-piloto Android — build.js (Fase 3, primeira versão)
+// Co-piloto Android — build.js
 //
-// Monta o HTML único juntando panel.html + options.html + os adaptadores
-// (storage-adapter.js, runtime-adapter.js, screen-manager.js), lendo os
-// arquivos de negócio direto de ../co-piloto — NUNCA uma cópia hand-made:
-// toda vez que o Co-piloto "de verdade" mudar, rodar este script de novo
-// já traz a mudança pro Android, sem precisar lembrar de replicar nada à
-// mão. Nenhum arquivo de ../co-piloto é escrito por este script.
+// Monta o pacote final (dist/) juntando panel.html + options.html + os
+// adaptadores das Fases 1-4 (storage-adapter.js, runtime-adapter.js,
+// screen-manager.js, hamburger-menu.js, mobile.css) + o manifesto/service
+// worker de PWA, lendo os arquivos de negócio direto de ../co-piloto —
+// NUNCA uma cópia hand-made: toda vez que o Co-piloto "de verdade" mudar,
+// rodar este script de novo já traz a mudança pro Android, sem precisar
+// lembrar de replicar nada à mão. Nenhum arquivo de ../co-piloto é escrito
+// por este script.
 //
 // O que este script muda no texto original (só isso, nada de lógica):
 //   1. Remove as tags <script src="..."> dos dois HTMLs (os arquivos
@@ -30,7 +32,11 @@ const path = require('path');
 const DIR_CO_PILOTO = path.join(__dirname, '..', 'co-piloto');
 const DIR_ANDROID = __dirname;
 const DIR_SAIDA = path.join(__dirname, 'dist');
-const ARQUIVO_SAIDA = path.join(DIR_SAIDA, 'copiloto-android.html');
+// index.html (não mais copiloto-android.html): dist/ agora é um pacote
+// pronto pra hospedar direto num site estático (Netlify etc.) — precisa
+// desse nome porque é o que qualquer host de site estático serve por
+// padrão na raiz, e é o que o manifest.webmanifest e o sw.js referenciam.
+const ARQUIVO_SAIDA = path.join(DIR_SAIDA, 'index.html');
 
 function ler(nomeArquivo, base){
   return fs.readFileSync(path.join(base || DIR_CO_PILOTO, nomeArquivo), 'utf-8');
@@ -98,6 +104,19 @@ function main(){
   const mobileCss = ler('mobile.css', DIR_ANDROID);
   const headFinal = `${panelHead}
 <meta name="copiloto-versao" content="${manifest.version}">
+<!-- PWA: instalabilidade ("Adicionar à tela inicial" no Android). O
+     manifest.webmanifest e o sw.js são os 2 únicos arquivos que NÃO dá
+     pra embutir no HTML (são referenciados por URL própria, é assim que a
+     especificação de Web App Manifest e Service Worker funciona) — por
+     isso dist/ vira uma pastinha (index.html + manifest.webmanifest +
+     sw.js + icons/), não mais um único arquivo solto. Tudo o resto (CSS,
+     JS de negócio, fontes) continua 100% embutido igual antes. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0A423B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 /* CSS de options.html, escopado: só se aplica dentro de #configApp (que é
    também a raiz do escopo — @scope inclui a própria raiz, não só os
@@ -189,6 +208,20 @@ ${tag('panel.js', panelJs)}
 ${tag('panel/importarContatos.js', importarContatosJs)}
 ${tag('backtotop.js', backtotopJs)}
 ${tag('chatbot.js', chatbotJs)}
+<script>
+// Registro do service worker (ver sw.js) — só instalabilidade + cache do
+// casco do app; nenhuma lógica de negócio mora aqui. Falha em silêncio de
+// propósito (ex.: aberto local via file://, onde SW não roda): o app
+// inteiro já funciona sem isto, é só a parte de "instalar/usar offline"
+// que fica de fora nesse caso.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => {
+      console.warn('[pwa] service worker não registrado (normal se aberto via file://):', e && e.message);
+    });
+  });
+}
+</script>
 `;
 
   const htmlFinal = `<!doctype html>
@@ -205,6 +238,17 @@ ${corpoFinal}
   fs.mkdirSync(DIR_SAIDA, { recursive: true });
   fs.writeFileSync(ARQUIVO_SAIDA, htmlFinal, 'utf-8');
   console.log(`Gerado: ${ARQUIVO_SAIDA} (${(htmlFinal.length / 1024).toFixed(0)} KB, versão ${manifest.version})`);
+
+  // ---------- Pacote PWA: manifest, service worker e ícones, copiados
+  // direto (nunca gerados por texto/template — são JSON/JS/PNG prontos) ----------
+  fs.copyFileSync(path.join(DIR_ANDROID, 'manifest.webmanifest'), path.join(DIR_SAIDA, 'manifest.webmanifest'));
+  fs.copyFileSync(path.join(DIR_ANDROID, 'sw.js'), path.join(DIR_SAIDA, 'sw.js'));
+  const dirIconesSaida = path.join(DIR_SAIDA, 'icons');
+  fs.mkdirSync(dirIconesSaida, { recursive: true });
+  ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'].forEach(nomeIcone => {
+    fs.copyFileSync(path.join(DIR_ANDROID, 'icons', nomeIcone), path.join(dirIconesSaida, nomeIcone));
+  });
+  console.log(`Pacote PWA pronto em: ${DIR_SAIDA}/ (index.html + manifest.webmanifest + sw.js + icons/) — hospede a pasta inteira.`);
 }
 
 main();
