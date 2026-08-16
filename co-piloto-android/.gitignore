@@ -1,0 +1,3 @@
+# Saída gerada pelo build.js — sempre reconstruída a partir de ../co-piloto,
+# nunca editada à mão, então não precisa (e não deve) ficar versionada.
+dist/

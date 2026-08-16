@@ -66,8 +66,26 @@
   // segura o lock, o callback roda imediatamente com `lock === null`, em
   // vez de ficar pendurado esperando a vez (que nunca chegaria, já que
   // quem segura só solta ao fechar).
+  // Na extensão real, esta resposta vem de um roundtrip de mensageria até o
+  // service worker — sempre leva pelo menos alguns milissegundos de IPC de
+  // verdade. Scripts que rodam no "DOMContentLoaded" (ex.: o init() do chat
+  // rápido, em chatbot.js) contam com essa folga, mesmo sem saber disso:
+  // DOMContentLoaded dispara bem antes desse roundtrip terminar, então eles
+  // sempre têm a chance de rodar em cima de um DOM ainda vivo antes de
+  // qualquer wipe de "aba duplicada" acontecer. Sem essa mesma folga aqui —
+  // o Web Locks abaixo resolve rápido demais, sem IPC real —, esse mesmo
+  // código podia rodar DEPOIS do wipe (confirmado com um teste de 2 abas:
+  // TypeError em cima de elemento já removido). Esperar o documento pelo
+  // menos terminar de parsear antes de responder recria a mesma folga, sem
+  // mudar uma linha do código que conta com ela.
+  async function esperarDocumentoAoMenosInterativo(){
+    if(typeof document === 'undefined' || document.readyState !== 'loading') return;
+    await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+  }
+
   async function registrarOuChecarInstanciaOficial(pagina){
     const nomeChave = pagina === 'options' ? 'copilotoInstanciaOficial:options' : 'copilotoInstanciaOficial:painel';
+    await esperarDocumentoAoMenosInterativo();
     if(typeof navigator === 'undefined' || !navigator.locks){
       return true; // sem Web Locks não dá pra checar — não trava quem tem uso legítimo (mesmo princípio do catch original)
     }
