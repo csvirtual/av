@@ -46,12 +46,33 @@
   width:100%;
   z-index:9200;
   overflow-y:auto;
+  overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
   transform:translateX(100%);
   transition:transform .28s ease;
   box-shadow:0 -8px 32px rgba(0,0,0,.25);
-  padding-bottom:env(safe-area-inset-bottom, 0px);
+  padding-bottom:calc(24px + env(safe-area-inset-bottom, 0px));
+  /* A gaveta em si NUNCA tinha fundo próprio — só contava com o fundo de
+     .sidebar/.funnel-sidebar por dentro. O botão "✕" é sticky, mas ainda
+     reserva o próprio espaço no fluxo normal (autoexplicado: é assim que
+     sticky funciona — sem isso ele não teria de onde "grudar"); essa
+     reserva ficava transparente, vazando o fundo da PÁGINA por trás logo
+     ao abrir o menu. Um fundo sólido aqui, atrás de tudo, fecha isso. */
+  background:var(--teal-dark);
 }
+/* overscroll-behavior:contain + a folga extra no padding-bottom resolvem
+   um bug à parte, achado testando: ao rolar a gaveta até o EXATO fim do
+   conteúdo (scrollTop no máximo possível, nem 1px a mais nem a menos), o
+   Chrome pinta por cima um resquício do cabeçalho da página — reproduzido
+   de forma 100% consistente só nesse limite exato (confirmado testando
+   vários pontos de rolagem: nunca acontece antes do fim, sempre acontece
+   exatamente nele), então é um caso conhecido de artefato de composição
+   no limite de scroll de containers overflow:auto dentro de position:fixed
+   — não um erro de posicionamento (o DOM sob o cursor, checado ponto a
+   ponto, sempre reportava o elemento certo). overscroll-behavior:contain
+   impede o "estouro" de rolagem chegar no limite de um jeito que dispara
+   esse artefato; a folga extra garante que o fim real do conteúdo nunca
+   coincide exatamente com o fim do container. */
 body.copiloto-menu-aberto .copiloto-menu-drawer{
   transform:translateX(0);
 }
@@ -60,6 +81,21 @@ body.copiloto-menu-aberto .copiloto-menu-drawer{
 }
 .copiloto-menu-drawer .funnel-sidebar{
   border-top:1px solid var(--line);
+}
+/* .btn-sidebar (Ajuda, Privacidade, Avançado...) nasceu centralizado
+   (justify-content:center) pensando numa coluna de 280px — ali, ícone +
+   texto centralizados como um bloco só ficava equilibrado. Esticado pra
+   tela inteira, cada botão tem um rótulo de tamanho diferente, e cada
+   ícone acaba centralizado numa posição horizontal DIFERENTE do botão de
+   cima/baixo — a lista inteira fica com os ícones "andando" de um lado
+   pro outro entre uma linha e a próxima, em vez de alinhados numa coluna
+   reta (o que lê como desalinhado/desleixado). Alinhando à esquerda, com
+   o mesmo respiro nas duas pontas, todo ícone cai exatamente na mesma
+   posição — visual de lista de verdade, não de botão avulso esticado. */
+.copiloto-menu-drawer .btn-sidebar{
+  justify-content:flex-start;
+  padding-left:16px;
+  padding-right:16px;
 }
 .copiloto-menu-fechar-btn{
   position:sticky; top:8px; z-index:1;
