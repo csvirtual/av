@@ -25,6 +25,9 @@ const TOPICS = [
 
       <h3>Vendedores</h3>
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
+
+      <h3>Aparência (claro ou escuro)</h3>
+      <p>Em <strong>Personalização</strong>, no menu lateral, dá pra escolher se o sistema aparece com fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
     `,
   },
   {
