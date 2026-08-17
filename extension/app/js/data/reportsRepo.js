@@ -34,10 +34,17 @@ export async function computeSalesReport({ from = null, to = null } = {}) {
 
   const byProductMap = {};
   for (const s of sales) {
+    // item.lineTotal só reflete o desconto por item — o desconto geral do
+    // carrinho (aplicado sobre o total da venda, não guardado por item) fica
+    // de fora dele. Sem ratear essa diferença aqui, a soma da receita por
+    // produto/categoria ficaria maior que o faturamento total de vendas com
+    // desconto geral. `ratio` traz cada item pro mesmo total líquido da venda.
+    const itemsLineSum = s.items.reduce((sum, i) => sum + i.lineTotal, 0);
+    const ratio = itemsLineSum > 0 ? netSaleTotal(s) / itemsLineSum : 1;
     for (const item of s.items) {
       const soldQty = item.qty - item.qtyRefunded;
       if (soldQty <= 0) continue;
-      const unitNet = item.lineTotal / item.qty;
+      const unitNet = (item.lineTotal / item.qty) * ratio;
       const revenue = unitNet * soldQty;
       const product = productMap[item.productId];
       const cost = (product?.costPrice || 0) * soldQty;

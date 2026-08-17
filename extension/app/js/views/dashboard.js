@@ -4,13 +4,19 @@ import { listProducts } from '../data/productsRepo.js';
 import { listSales } from '../data/salesRepo.js';
 import { getOpenSession } from '../data/cashRepo.js';
 import { getAllBalances } from '../data/customersRepo.js';
+import { getAllPointsBalances } from '../data/loyaltyRepo.js';
+import { getCompany } from '../data/companyRepo.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 
 export async function renderDashboard(container, ctx) {
   container.innerHTML = '<div class="card">Carregando painel…</div>';
 
-  const [products, sales, cashSession, balances] = await Promise.all([listProducts(), listSales(), getOpenSession(), getAllBalances()]);
+  const [products, sales, cashSession, balances, pointsBalances, company] = await Promise.all([
+    listProducts(), listSales(), getOpenSession(), getAllBalances(), getAllPointsBalances(), getCompany(),
+  ]);
   const totalFiado = Object.values(balances).reduce((sum, v) => sum + v, 0);
+  const totalPoints = Object.values(pointsBalances).reduce((sum, v) => sum + v, 0);
+  const loyaltyOn = (company?.policies?.loyaltyPointsPerReal ?? 0) > 0;
 
   const activeProducts = products.filter((p) => p.active);
   const lowStock = activeProducts.filter((p) => p.quantity <= p.minStock);
@@ -61,6 +67,12 @@ export async function renderDashboard(container, ctx) {
         <div class="label">Total em fiado</div>
         <div class="value ${totalFiado > 0 ? 'warn' : ''}">${formatMoney(totalFiado)}</div>
       </div>
+      ${loyaltyOn || totalPoints > 0 ? `
+        <div class="stat-card" id="points-stat-card" style="cursor:pointer;">
+          <div class="label">Pontos de fidelidade em aberto</div>
+          <div class="value">${totalPoints}</div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="card" style="margin-bottom:20px;">
@@ -77,6 +89,7 @@ export async function renderDashboard(container, ctx) {
   container.querySelector('#go-venda').addEventListener('click', () => ctx.navigate('venda'));
   container.querySelector('#cash-stat-card').addEventListener('click', () => ctx.navigate('caixa'));
   container.querySelector('#fiado-stat-card').addEventListener('click', () => ctx.navigate('clientes'));
+  container.querySelector('#points-stat-card')?.addEventListener('click', () => ctx.navigate('clientes'));
 }
 
 function renderSalesTable(sales) {

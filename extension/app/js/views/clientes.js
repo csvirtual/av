@@ -19,6 +19,11 @@ import { openModal, confirmDialog } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 
 const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix'];
+const LOYALTY_BADGE = {
+  ganho: '<span class="badge badge-green">Ganho</span>',
+  resgate: '<span class="badge badge-gold">Resgate</span>',
+  estorno: '<span class="badge badge-red">Estorno</span>',
+};
 
 export async function renderClientes(container, ctx) {
   const isAdmin = ctx.user.role === 'admin';
@@ -46,7 +51,7 @@ export async function renderClientes(container, ctx) {
     const customers = currentTerm ? await searchCustomers(currentTerm) : await listCustomers();
     const balances = await getAllBalances();
     tableBox.innerHTML = renderTable(customers, balances);
-    wireRowActions(customers, balances);
+    wireRowActions(customers);
   }
 
   document.getElementById('search-input').addEventListener('input', (e) => {
@@ -55,9 +60,9 @@ export async function renderClientes(container, ctx) {
   });
   document.getElementById('new-customer-btn').addEventListener('click', () => openCustomerModal(null));
 
-  function wireRowActions(customers, balances) {
+  function wireRowActions(customers) {
     tableBox.querySelectorAll('[data-detail]').forEach((btn) => {
-      btn.addEventListener('click', () => openDetailModal(customers.find((c) => c.id === btn.dataset.detail), balances));
+      btn.addEventListener('click', () => openDetailModal(customers.find((c) => c.id === btn.dataset.detail)));
     });
     tableBox.querySelectorAll('[data-edit]').forEach((btn) => {
       btn.addEventListener('click', () => openCustomerModal(customers.find((c) => c.id === btn.dataset.edit)));
@@ -233,7 +238,7 @@ export async function renderClientes(container, ctx) {
                 ${loyaltyLedger.map((e) => `
                   <tr>
                     <td>${formatDateTime(e.timestamp)}</td>
-                    <td>${e.type === 'ganho' ? '<span class="badge badge-green">Ganho</span>' : '<span class="badge badge-gold">Resgate</span>'}</td>
+                    <td>${LOYALTY_BADGE[e.type] || e.type}</td>
                     <td>${e.type === 'ganho' ? '+' : '−'}${e.points}</td>
                     <td>${escapeHtml(e.userName)}</td>
                   </tr>

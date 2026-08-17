@@ -43,6 +43,21 @@ export async function recordRedemption({ customerId, points, note = '', userId, 
   return entry;
 }
 
+/** Reverte pontos ganhos por uma venda que foi estornada — chamado pelo
+ * salesRepo depois de um estorno. Pontos negativos "puxados de volta" (o
+ * cliente já pode ter gastado/resgatado desde então) deixam o saldo
+ * negativo até a próxima compra — mesmo compromisso adotado por qualquer
+ * programa de fidelidade real, não é um erro de cálculo. */
+export async function recordReversal({ customerId, points, saleId, userId, userName }) {
+  if (points <= 0) return null;
+  const entry = {
+    id: newId(), customerId, type: 'estorno', points, saleId,
+    note: '', userId, userName, timestamp: Date.now(),
+  };
+  await dbAdd('loyaltyEntries', entry);
+  return entry;
+}
+
 export async function getAllPointsBalances() {
   const all = await dbGetAll('loyaltyEntries');
   const balances = {};

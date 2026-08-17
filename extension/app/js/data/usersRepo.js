@@ -70,9 +70,3 @@ export async function resetUserPassword(id, newPassword) {
   await dbPut('users', user);
   return user;
 }
-
-export function publicUser(user) {
-  if (!user) return null;
-  const { passwordSalt, passwordHash, ...rest } = user;
-  return rest;
-}

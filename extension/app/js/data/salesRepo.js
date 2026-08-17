@@ -12,7 +12,7 @@ import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
-import { recordEarn } from './loyaltyRepo.js';
+import { recordEarn, recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
 import { getCompany } from './companyRepo.js';
 import { applyDiscount, discountAmount } from '../utils/pricing.js';
 
@@ -144,6 +144,15 @@ export async function refundSaleItems({ saleId, userId, userName, reason, items,
   const sale = await getSale(saleId);
   if (!sale) throw new Error('Venda não encontrada.');
 
+  // `lineTotal` de cada item reflete só o desconto por item — o desconto
+  // geral do carrinho (aplicado sobre o total da venda, não guardado por
+  // item) fica de fora dele. Sem ratear essa diferença aqui, um estorno
+  // devolveria mais do que o cliente pagou de fato numa venda com desconto
+  // geral. `discountRatio` traz o valor de cada unidade pro preço líquido
+  // realmente cobrado (mesmo raciocínio usado em reportsRepo.js).
+  const lineTotalSum = sale.items.reduce((sum, i) => sum + i.lineTotal, 0);
+  const discountRatio = lineTotalSum > 0 ? sale.total / lineTotalSum : 1;
+
   const refundItems = [];
   let totalRefunded = 0;
 
@@ -156,7 +165,7 @@ export async function refundSaleItems({ saleId, userId, userName, reason, items,
     if (qty > available) {
       throw new Error(`Só é possível estornar até ${available} de "${saleItem.name}" (já estornado: ${saleItem.qtyRefunded}).`);
     }
-    const unitNet = saleItem.lineTotal / saleItem.qty; // preço médio já líquido de desconto
+    const unitNet = (saleItem.lineTotal / saleItem.qty) * discountRatio;
     const amount = unitNet * qty;
     refundItems.push({ productId: saleItem.productId, name: saleItem.name, qty, amount });
     totalRefunded += amount;
@@ -184,6 +193,23 @@ export async function refundSaleItems({ saleId, userId, userName, reason, items,
   sale.refunds.push(refund);
   sale.refundedTotal += totalRefunded;
   await dbPut('sales', sale);
+
+  // Reverte proporcionalmente os pontos de fidelidade ganhos por esta
+  // venda — sem isso, um cliente manteria pontos de compras que devolveu.
+  // Fica negativo se ele já tiver resgatado esses pontos antes do estorno;
+  // é o mesmo compromisso de qualquer programa de fidelidade real.
+  if (sale.customerId && sale.total > 0) {
+    const ledger = await listCustomerLoyaltyLedger(sale.customerId);
+    const pointsEarned = ledger
+      .filter((e) => e.saleId === sale.id && e.type === 'ganho')
+      .reduce((sum, e) => sum + e.points, 0);
+    if (pointsEarned > 0) {
+      const pointsToReverse = Math.floor(pointsEarned * (totalRefunded / sale.total));
+      if (pointsToReverse > 0) {
+        await recordReversal({ customerId: sale.customerId, points: pointsToReverse, saleId: sale.id, userId, userName });
+      }
+    }
+  }
 
   return { sale, refund };
 }

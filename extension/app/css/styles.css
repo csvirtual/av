@@ -117,7 +117,6 @@ a { color: var(--primary); }
   border-color: var(--primary);
 }
 .field .hint { font-size: 12px; color: var(--text-muted); }
-.field .error-text { font-size: 12px; color: var(--danger); }
 .field input.invalid { border-color: var(--danger); }
 
 .form-row { display: flex; gap: 12px; }
@@ -493,14 +492,6 @@ tbody tr:hover { background: var(--surface-alt); }
   padding: 10px 14px;
   font-size: 13px;
   margin: 4px 0 16px;
-}
-.help-content kbd {
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 12px;
-  font-family: inherit;
 }
 
 @media (max-width: 760px) {

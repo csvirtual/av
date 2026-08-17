@@ -4,7 +4,7 @@
 // pagamento também deve virar uma sangria/suprimento manual no caixa, se
 // for o caso. Cada conta pode opcionalmente ficar vinculada a um
 // fornecedor, pra facilitar achar "quanto devo pra fulano".
-import { dbGetAll, dbGet, dbPut, dbAdd, dbDelete, newId } from '../db.js';
+import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
 
 export async function listEntries() {
   const entries = await dbGetAll('financialEntries');
@@ -47,9 +47,11 @@ export async function markAsPaid({ id, paidAmount, paymentMethod, userId, userNa
   if (!entry) throw new Error('Conta não encontrada.');
   if (entry.status === 'pago') throw new Error('Esta conta já está paga.');
   if (entry.status === 'cancelado') throw new Error('Esta conta foi cancelada.');
+  const value = Number(paidAmount);
+  if (!(value > 0)) throw new Error('Informe um valor pago maior que zero.');
   entry.status = 'pago';
   entry.paidAt = Date.now();
-  entry.paidAmount = Number(paidAmount) || entry.amount;
+  entry.paidAmount = value;
   entry.paymentMethod = paymentMethod;
   entry.paidBy = { userId, userName };
   await dbPut('financialEntries', entry);
@@ -63,10 +65,6 @@ export async function cancelEntry(id) {
   entry.status = 'cancelado';
   await dbPut('financialEntries', entry);
   return entry;
-}
-
-export async function deleteEntry(id) {
-  await dbDelete('financialEntries', id);
 }
 
 /** Status pra exibição: 'vencido' não é gravado, é calculado comparando o

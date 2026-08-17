@@ -21,8 +21,8 @@ export async function renderCompanySettings(container, ctx) {
       <form id="company-form" novalidate>
         <div id="form-error"></div>
         <div class="form-row">
-          <div class="field"><label for="cnpj">CNPJ *</label><input id="cnpj" value="${company.cnpj}" maxlength="18" required></div>
-          <div class="field"><label for="telefone">Telefone *</label><input id="telefone" value="${company.telefone}" required></div>
+          <div class="field"><label for="cnpj">CNPJ *</label><input id="cnpj" value="${escAttr(company.cnpj)}" maxlength="18" required></div>
+          <div class="field"><label for="telefone">Telefone *</label><input id="telefone" value="${escAttr(company.telefone)}" required></div>
         </div>
         <div class="form-row">
           <div class="field"><label for="razaoSocial">Razão social *</label><input id="razaoSocial" value="${escAttr(company.razaoSocial)}" required></div>
