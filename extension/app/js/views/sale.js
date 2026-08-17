@@ -15,7 +15,7 @@ import { verifyLogin } from '../data/usersRepo.js';
 import { getOpenSession } from '../data/cashRepo.js';
 import { searchCustomers, createCustomer, getCustomerBalance } from '../data/customersRepo.js';
 import { getPendingCredit, setPendingCredit, clearPendingCredit } from '../session.js';
-import { bindBarcodeInput } from '../utils/barcode.js';
+import { bindBarcodeInput, installGlobalScannerListener } from '../utils/barcode.js';
 import { formatMoney, escapeHtml } from '../utils/format.js';
 import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
 import { showToast } from '../components/toast.js';
@@ -27,7 +27,17 @@ const FIADO_METHOD = 'Fiado';
 const CREDIT_CARD_METHOD = 'Cartão de crédito';
 const MAX_INSTALLMENTS = 12; // padrão comum de "parcelamento sem juros" no varejo brasileiro
 
+// Guarda a função de desligar o "reforço" global de leitura entre uma
+// renderização da tela e outra — sem isso, cada visita à Nova Venda
+// empilharia mais um listener em document (o router não tem um hook de
+// "desmontar tela"), e um scan acabaria disparando handleScan() várias
+// vezes ao mesmo tempo.
+let stopGlobalScanner = null;
+
 export async function renderSale(container, ctx) {
+  stopGlobalScanner?.();
+  stopGlobalScanner = null;
+
   let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
   let overallDiscountType = null;
   let overallDiscountValue = 0;
@@ -511,6 +521,11 @@ export async function renderSale(container, ctx) {
   }
 
   bindBarcodeInput(scanInput, handleScan);
+  // Reforço: se o foco escapar do campo de busca por qualquer motivo (o
+  // vendedor clicou em outro lugar da tela, por exemplo), um scan ainda é
+  // capturado em qualquer ponto da página — sem isso, o leitor "digitava"
+  // o código em silêncio pra um campo que não estava mais ouvindo.
+  stopGlobalScanner = installGlobalScannerListener(handleScan);
 
   let searchDebounce;
   scanInput.addEventListener('input', () => {

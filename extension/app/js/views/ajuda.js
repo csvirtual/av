@@ -41,9 +41,12 @@ const TOPICS = [
       <h3>Cadastrar um produto novo (só administrador)</h3>
       <p>Na tela <strong>Estoque</strong>, clique em <strong>+ Novo produto</strong>. Preencha nome, categoria (material de construção ou mercearia), unidade (un, kg, saco...), código de barras, preço de venda, preço de custo e a quantidade inicial.</p>
 
-      <h3>Código de barras</h3>
-      <p>Se você tem um leitor de código de barras USB, é só deixar o campo focado e passar o produto — ele "digita" o código sozinho, não precisa de nenhuma configuração.</p>
-      <p>Produto sem código de fábrica (item a granel, por exemplo)? Clique em <strong>Gerar código interno</strong> — o sistema cria um código só dele, que também pode ser escaneado se você imprimir uma etiqueta.</p>
+      <h3>Código de barras — compatibilidade com o leitor</h3>
+      <p>O sistema não conversa diretamente com o leitor (nenhum driver, nenhuma permissão especial) — ele funciona com <strong>qualquer leitor USB (ou Bluetooth) configurado no modo "teclado" (HID)</strong>, que é o modo padrão de fábrica de praticamente todo leitor vendido pra mercado ou loja hoje em dia, seja de pistola (laser) ou de câmera (imager). Nesse modo, o leitor não é visto como um "leitor" pelo computador — ele é visto como um teclado, e "digita" os números do código muito rápido, terminando com a tecla Enter. O sistema só precisa disso: um campo de texto recebendo essas teclas.</p>
+      <p>Na prática, isso quer dizer: <strong>se o leitor já funciona digitando o código em qualquer programa comum (Bloco de Notas, uma planilha, a barra de endereço do navegador) e aperta Enter sozinho no final, ele funciona aqui também</strong> — sem nenhum ajuste. É assim que a esmagadora maioria dos leitores de mercado/loja de material vem configurada de fábrica.</p>
+      <p>Na tela <strong>Nova venda</strong>, dá pra escanear com o campo de busca focado <em>ou não</em> — se o foco escapar do campo (você clicou em outro lugar da tela sem querer), o sistema ainda reconhece o scan em qualquer ponto da página, contanto que nenhum campo de texto ou janela esteja aberta na frente.</p>
+      <div class="tip"><strong>Leitor não funciona?</strong> Confira duas coisas na configuração dele (geralmente ajustadas escaneando um "código de configuração" que vem no manual do aparelho): (1) que está no modo <strong>teclado/HID</strong>, não em modo "porta serial/COM virtual" (esse exige driver e não funciona aqui); (2) que o <strong>sufixo é Enter</strong> (às vezes chamado de "CR" ou "Carriage Return") — não Tab nem "nenhum". Testando num campo de texto qualquer fora do sistema (como a busca do navegador) você já descobre se o problema é do leitor ou de outra coisa.</div>
+      <p>Produto sem código de fábrica (item a granel, por exemplo)? Clique em <strong>Gerar código interno</strong> — o sistema cria um código só dele, que também pode ser escaneado se você imprimir uma etiqueta (qualquer leitor comum lê tanto código de barras numérico quanto os alfanuméricos gerados aqui).</p>
 
       <h3>Editar, ajustar e inativar (só administrador)</h3>
       <ul>

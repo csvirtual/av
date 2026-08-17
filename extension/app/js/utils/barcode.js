@@ -22,7 +22,12 @@ export function bindBarcodeInput(inputEl, onScan) {
   });
 }
 
-const SCAN_GAP_MS = 40; // intervalo entre teclas típico de leitor (humano digita bem mais devagar)
+// Folga generosa acima do que qualquer leitor USB real leva pra "digitar"
+// um código inteiro (a grande maioria emite cada tecla em poucos
+// milissegundos) — cobre até leitores mais lentos/baratos sem deixar de
+// distinguir de digitação humana sustentada, que raramente mantém menos de
+// 60ms entre teclas por um código inteiro de 8 a 13 dígitos.
+const SCAN_GAP_MS = 60;
 const MIN_SCAN_LENGTH = 4;
 
 export function installGlobalScannerListener(onScan) {
@@ -30,10 +35,14 @@ export function installGlobalScannerListener(onScan) {
   let lastKeyTime = 0;
 
   function handler(e) {
-    // Não interfere quando o usuário está digitando normalmente num campo
-    // de texto focado (esse campo já deve ter seu próprio bindBarcodeInput).
+    // Não interfere quando o usuário está digitando/selecionando num campo
+    // focado (input, textarea ou select — esse campo já deve ter seu
+    // próprio bindBarcodeInput se precisar) nem quando algum modal está
+    // aberto — não faz sentido um scan em segundo plano adicionar item ao
+    // carrinho por trás de um diálogo que está bloqueando a tela.
     const tag = document.activeElement?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (document.querySelector('.modal-backdrop')) return;
 
     const now = Date.now();
     if (now - lastKeyTime > SCAN_GAP_MS) {
