@@ -220,11 +220,17 @@ export async function renderSale(container, ctx) {
         const gross = item.unitPrice * item.qty;
         const net = applyDiscount(gross, item.discountType, item.discountValue);
         const hasDiscount = net < gross - 0.001;
+        // Estoque que sobra do produto depois desta venda — não o total
+        // absoluto, que já não muda mais depois de escaneado. É essa conta
+        // (o que ainda vai restar) que importa pro vendedor decidir se dá
+        // pra vender mais um pouco pro próximo cliente.
+        const remaining = item.qtyAvailable - item.qty;
+        const remainingColor = remaining <= 0 ? 'color:var(--danger);font-weight:600;' : remaining <= 2 ? 'color:var(--warning);font-weight:600;' : '';
         return `
         <div class="cart-item">
           <div style="flex:1;min-width:0;">
             <div class="name">${escapeHtml(item.name)}</div>
-            <div class="meta">${formatMoney(item.unitPrice)} / ${escapeHtml(item.unit)} · código ${escapeHtml(item.barcode)}</div>
+            <div class="meta">${formatMoney(item.unitPrice)} / ${escapeHtml(item.unit)} · código ${escapeHtml(item.barcode)} · <span style="${remainingColor}">estoque restante: ${remaining} ${escapeHtml(item.unit)}</span></div>
           </div>
           <input type="number" class="qty-input" min="1" max="${item.qtyAvailable}" value="${item.qty}" data-idx="${idx}">
           <button class="btn btn-ghost btn-sm" data-discount="${idx}" title="Desconto no item">${hasDiscount ? '% editar' : '% desconto'}</button>
