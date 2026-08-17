@@ -48,6 +48,15 @@ export async function saveCompany(data) {
       requireOpenCashSession: data.policies?.requireOpenCashSession
         ?? existing?.policies?.requireOpenCashSession
         ?? false,
+      // Fidelidade: pontos ganhos por real gasto (0 = programa desligado) e
+      // quantos pontos valem R$1 na hora de resgatar. Só ganha ponto venda
+      // com cliente selecionado — venda avulsa não acumula.
+      loyaltyPointsPerReal: data.policies?.loyaltyPointsPerReal
+        ?? existing?.policies?.loyaltyPointsPerReal
+        ?? 0,
+      loyaltyRedemptionRate: data.policies?.loyaltyRedemptionRate
+        ?? existing?.policies?.loyaltyRedemptionRate
+        ?? 100,
     },
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),

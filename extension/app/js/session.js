@@ -37,3 +37,23 @@ export async function setPendingCredit(credit) {
 export async function clearPendingCredit() {
   await chrome.storage.session.remove(CREDIT_KEY);
 }
+
+/** Soma um crédito novo (de um estorno, de um resgate de pontos etc.) ao
+ * que já estiver pendente, em vez de sobrescrever — sem isso, gerar um
+ * segundo crédito de troca antes do primeiro ser usado apagaria o
+ * primeiro sem aviso nenhum. Quem só precisa AJUSTAR o crédito já
+ * existente (uso parcial, devolver ao remover um pagamento) continua
+ * usando setPendingCredit diretamente. */
+export async function addPendingCredit({ amount, sourceSaleId = null, sourceRefundId = null, reason }) {
+  const existing = await getPendingCredit();
+  const credit = existing && existing.amount > 0
+    ? {
+      amount: existing.amount + amount,
+      sourceSaleId: sourceSaleId ?? existing.sourceSaleId,
+      sourceRefundId: sourceRefundId ?? existing.sourceRefundId,
+      reason: `${existing.reason} + ${reason}`,
+    }
+    : { amount, sourceSaleId, sourceRefundId, reason };
+  await setPendingCredit(credit);
+  return credit;
+}

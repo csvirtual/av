@@ -11,7 +11,7 @@ import { listSales, refundSaleItems, saleStatus } from '../data/salesRepo.js';
 import { listUsers } from '../data/usersRepo.js';
 import { listCustomers } from '../data/customersRepo.js';
 import { logAction } from '../data/auditRepo.js';
-import { setPendingCredit } from '../session.js';
+import { addPendingCredit } from '../session.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 import { openModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
@@ -223,7 +223,7 @@ export async function renderSalesHistory(container, ctx) {
             entity: 'sale', entityId: sale.id,
           });
           if (generateCredit) {
-            await setPendingCredit({ amount: refund.totalRefunded, sourceSaleId: sale.id, sourceRefundId: refund.id, reason: `Troca da venda de ${formatDateTime(sale.timestamp)}` });
+            await addPendingCredit({ amount: refund.totalRefunded, sourceSaleId: sale.id, sourceRefundId: refund.id, reason: `Troca da venda de ${formatDateTime(sale.timestamp)}` });
             showToast(`Estorno confirmado. Crédito de ${formatMoney(refund.totalRefunded)} disponível na próxima venda.`, 'success');
           } else {
             showToast(`Estorno de ${formatMoney(refund.totalRefunded)} confirmado.`, 'success');

@@ -12,6 +12,8 @@ import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
+import { recordEarn } from './loyaltyRepo.js';
+import { getCompany } from './companyRepo.js';
 import { applyDiscount, discountAmount } from '../utils/pricing.js';
 
 const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
@@ -105,6 +107,15 @@ export async function createSale({
 
   if (fiadoTotal > 0) {
     await recordDebt({ customerId, amount: fiadoTotal, saleId: sale.id, userId, userName });
+  }
+
+  if (customerId) {
+    const company = await getCompany();
+    const rate = company?.policies?.loyaltyPointsPerReal ?? 0;
+    if (rate > 0) {
+      const points = Math.floor(total * rate);
+      if (points > 0) await recordEarn({ customerId, points, saleId: sale.id, userId, userName });
+    }
   }
 
   return sale;

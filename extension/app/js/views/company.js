@@ -69,6 +69,19 @@ export async function renderCompanySettings(container, ctx) {
           Exigir caixa aberto para registrar vendas
         </label>
 
+        <p class="section-title">Fidelidade</p>
+        <div class="form-row" style="max-width:520px;">
+          <div class="field">
+            <label for="loyaltyPointsPerReal">Pontos ganhos por R$1 gasto</label>
+            <input id="loyaltyPointsPerReal" type="number" min="0" step="0.1" value="${company.policies?.loyaltyPointsPerReal ?? 0}">
+            <span class="hint">0 desliga o programa de fidelidade. Só conta em vendas com cliente selecionado.</span>
+          </div>
+          <div class="field">
+            <label for="loyaltyRedemptionRate">Pontos que valem R$1 no resgate</label>
+            <input id="loyaltyRedemptionRate" type="number" min="1" step="1" value="${company.policies?.loyaltyRedemptionRate ?? 100}">
+          </div>
+        </div>
+
         <div class="modal-actions" style="justify-content:flex-end;">
           <button type="submit" class="btn">Salvar alterações</button>
         </div>
@@ -115,6 +128,8 @@ export async function renderCompanySettings(container, ctx) {
       policies: {
         vendorMaxDiscountPercent: Math.max(0, Math.min(100, Number(document.getElementById('vendorMaxDiscount').value) || 0)),
         requireOpenCashSession: document.getElementById('requireCashSession').checked,
+        loyaltyPointsPerReal: Math.max(0, Number(document.getElementById('loyaltyPointsPerReal').value) || 0),
+        loyaltyRedemptionRate: Math.max(1, Number(document.getElementById('loyaltyRedemptionRate').value) || 100),
       },
       endereco: {
         logradouro: document.getElementById('logradouro').value.trim(),

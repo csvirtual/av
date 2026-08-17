@@ -7,7 +7,12 @@ import {
   setCustomerActive, deleteCustomer, listCustomerLedger, getCustomerBalance,
   getAllBalances, recordPayment,
 } from '../data/customersRepo.js';
+import {
+  listCustomerLoyaltyLedger, getCustomerPoints, recordRedemption,
+} from '../data/loyaltyRepo.js';
 import { getOpenSession } from '../data/cashRepo.js';
+import { getCompany } from '../data/companyRepo.js';
+import { addPendingCredit } from '../session.js';
 import { logAction } from '../data/auditRepo.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 import { openModal, confirmDialog } from '../components/modal.js';
@@ -170,7 +175,12 @@ export async function renderClientes(container, ctx) {
   }
 
   async function openDetailModal(customer) {
-    const [ledger, balance] = await Promise.all([listCustomerLedger(customer.id), getCustomerBalance(customer.id)]);
+    const [ledger, balance, loyaltyLedger, points, company] = await Promise.all([
+      listCustomerLedger(customer.id), getCustomerBalance(customer.id),
+      listCustomerLoyaltyLedger(customer.id), getCustomerPoints(customer.id), getCompany(),
+    ]);
+    const loyaltyOn = (company?.policies?.loyaltyPointsPerReal ?? 0) > 0;
+
     openModal({
       title: escapeHtml(customer.nome),
       submitLabel: balance > 0.01 ? 'Registrar pagamento' : 'Fechar',
@@ -182,11 +192,20 @@ export async function renderClientes(container, ctx) {
           ${escapeHtml(customer.telefone || 'sem telefone')} ${customer.documento ? `· ${escapeHtml(customer.documento)}` : ''}
           ${customer.creditLimit > 0 ? `· limite de crédito ${formatMoney(customer.creditLimit)}` : ''}
         </p>
-        <div class="stat-card" style="max-width:220px;margin-bottom:16px;">
-          <div class="label">Saldo devedor</div>
-          <div class="value ${balance > 0.01 ? 'danger' : ''}">${formatMoney(balance)}</div>
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <div class="stat-card" style="max-width:220px;">
+            <div class="label">Saldo devedor</div>
+            <div class="value ${balance > 0.01 ? 'danger' : ''}">${formatMoney(balance)}</div>
+          </div>
+          ${loyaltyOn || points > 0 ? `
+            <div class="stat-card" style="max-width:220px;">
+              <div class="label">Pontos de fidelidade</div>
+              <div class="value">${points}</div>
+              ${points > 0 ? '<button type="button" class="btn btn-ghost btn-sm" id="redeem-points-btn" style="margin-top:6px;">Resgatar pontos</button>' : ''}
+            </div>
+          ` : ''}
         </div>
-        <p class="section-title">Extrato</p>
+        <p class="section-title">Extrato de fiado</p>
         ${ledger.length === 0 ? '<div class="table-empty">Nenhum lançamento ainda.</div>' : `
           <div class="table-wrap">
             <table>
@@ -205,12 +224,79 @@ export async function renderClientes(container, ctx) {
             </table>
           </div>
         `}
+        ${loyaltyLedger.length > 0 ? `
+          <p class="section-title" style="margin-top:16px;">Extrato de pontos</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Data</th><th>Tipo</th><th>Pontos</th><th>Usuário</th></tr></thead>
+              <tbody>
+                ${loyaltyLedger.map((e) => `
+                  <tr>
+                    <td>${formatDateTime(e.timestamp)}</td>
+                    <td>${e.type === 'ganho' ? '<span class="badge badge-green">Ganho</span>' : '<span class="badge badge-gold">Resgate</span>'}</td>
+                    <td>${e.type === 'ganho' ? '+' : '−'}${e.points}</td>
+                    <td>${escapeHtml(e.userName)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
       `,
+      onMount: (modalEl, close) => {
+        modalEl.querySelector('#redeem-points-btn')?.addEventListener('click', () => {
+          close();
+          openRedeemModal(customer, points, company?.policies?.loyaltyRedemptionRate ?? 100);
+        });
+      },
       onSubmit: async (modalEl, close) => {
         if (balance <= 0.01) return true;
         close();
         openPaymentModal(customer, balance);
         return false;
+      },
+    });
+  }
+
+  function openRedeemModal(customer, points, rate) {
+    openModal({
+      title: `Resgatar pontos — ${escapeHtml(customer.nome)}`,
+      submitLabel: 'Confirmar resgate',
+      bodyHtml: `
+        <div id="modal-error"></div>
+        <p class="text-muted" style="font-size:13px;">
+          Saldo: <strong>${points} pontos</strong> · ${rate} pontos = R$ 1,00
+        </p>
+        <div class="field">
+          <label>Pontos a resgatar *</label>
+          <input id="f-points" type="number" min="1" max="${points}" step="1" value="${points}">
+        </div>
+        <p class="text-muted" style="font-size:12.5px;">O valor vira um crédito de troca, usável como forma de pagamento na próxima venda.</p>
+      `,
+      onSubmit: async (modalEl) => {
+        const errBox = modalEl.querySelector('#modal-error');
+        const pointsToRedeem = Number(modalEl.querySelector('#f-points').value) || 0;
+        try {
+          await recordRedemption({
+            customerId: customer.id, points: pointsToRedeem,
+            note: 'Resgate convertido em crédito de troca',
+            userId: ctx.user.id, userName: ctx.user.nome,
+          });
+          const amount = pointsToRedeem / rate;
+          await addPendingCredit({ amount, sourceSaleId: null, sourceRefundId: null, reason: `Resgate de ${pointsToRedeem} pontos de fidelidade` });
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: 'Resgate de pontos de fidelidade',
+            details: `${pointsToRedeem} pontos de "${customer.nome}" resgatados por ${formatMoney(amount)} de crédito.`,
+            entity: 'customer', entityId: customer.id,
+          });
+          showToast(`${pointsToRedeem} pontos resgatados: ${formatMoney(amount)} de crédito disponível na próxima venda.`, 'success');
+          refresh();
+          return true;
+        } catch (err) {
+          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          return false;
+        }
       },
     });
   }

@@ -186,6 +186,7 @@ const TOPICS = [
         <li>Estornar uma venda</li>
         <li>Excluir cliente (só inativar)</li>
         <li>Cadastrar fornecedor ou fazer pedido de compra</li>
+        <li>Ver contas a pagar/receber ou relatórios gerenciais</li>
         <li>Cadastrar ou gerenciar outros usuários</li>
         <li>Ver o log de auditoria ou mudar os dados/políticas da loja</li>
       </ul>
@@ -217,6 +218,27 @@ const TOPICS = [
 
       <h3>Inventário / balanço</h3>
       <p>Em <strong>Estoque → Fazer inventário</strong>, dá pra contar fisicamente todos os produtos de uma vez e digitar o valor encontrado — o sistema ajusta sozinho só os produtos com diferença, registrando tudo no histórico de cada um.</p>
+    `,
+  },
+  {
+    id: 'financeiro-fidelidade',
+    icon: '💵',
+    title: 'Financeiro e fidelidade',
+    html: `
+      <h2>Financeiro, relatórios e fidelidade</h2>
+      <p class="help-subtitle">Contas a pagar/receber, relatórios gerenciais e pontos (só administrador).</p>
+
+      <h3>Contas a pagar e a receber</h3>
+      <p>Em <strong>Financeiro → + Nova conta</strong>, cadastre uma conta com descrição, valor e vencimento. Uma conta pendente vira <span class="badge badge-red">Vencida</span> sozinha quando passa da data — não precisa fazer nada pra isso acontecer. Quando alguém pagar (ou você receber), clique em <strong>Marcar pago</strong> e informe a forma de pagamento.</p>
+      <div class="tip"><strong>Atenção:</strong> marcar uma conta como paga aqui não mexe automaticamente no caixa — são controles independentes nesta versão. Se o pagamento saiu/entrou em espécie da gaveta, registre a sangria ou suprimento correspondente na tela Caixa também.</div>
+
+      <h3>Relatórios</h3>
+      <p>Em <strong>Relatórios</strong>, escolha um período (hoje, últimos 7/30 dias, personalizado ou desde o início) e veja: faturamento total, número de vendas, ticket médio, vendas por vendedor, vendas por categoria, e a <strong>curva ABC</strong> de produtos — os itens que mais geram receita (A), os intermediários (B) e os que menos vendem (C).</p>
+      <p>A margem de lucro mostrada é uma <strong>estimativa</strong>: usa o preço de custo atual de cada produto, mesmo pra vendas antigas — se o custo mudou desde então, o valor exato daquela época pode ser um pouco diferente.</p>
+
+      <h3>Programa de fidelidade</h3>
+      <p>Fica desligado por padrão. Pra ativar, vá em <strong>Dados da loja → Políticas de venda → Fidelidade</strong> e defina quantos pontos o cliente ganha por real gasto. A partir daí, toda venda com cliente selecionado já soma pontos sozinha — não precisa de nenhuma ação extra na hora de vender.</p>
+      <p>Pra usar os pontos, vá no <strong>extrato do cliente</strong> (tela Clientes) e clique em <strong>Resgatar pontos</strong>. Eles viram um crédito de troca, disponível como forma de pagamento na próxima venda — o mesmo mecanismo já usado pelas trocas (veja o tópico "Estorno e troca").</p>
     `,
   },
   {

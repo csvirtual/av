@@ -3,7 +3,7 @@
 // Nenhuma regra de negócio deve viver aqui — só mecanismo de acesso ao banco,
 // reutilizado pelos repositórios em js/data/*.js.
 const DB_NAME = 'loja-gestao-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbPromise = null;
 
@@ -85,6 +85,20 @@ function openDatabase() {
         store.createIndex('bySupplierId', 'supplierId', { unique: false });
         store.createIndex('byStatus', 'status', { unique: false });
         store.createIndex('byCreatedAt', 'createdAt', { unique: false });
+      }
+
+      // v5: financeiro (contas a pagar/receber) e fidelidade — ver
+      // data/financeRepo.js e data/loyaltyRepo.js
+      if (!db.objectStoreNames.contains('financialEntries')) {
+        const store = db.createObjectStore('financialEntries', { keyPath: 'id' });
+        store.createIndex('byStatus', 'status', { unique: false });
+        store.createIndex('byDueDate', 'dueDate', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('loyaltyEntries')) {
+        const store = db.createObjectStore('loyaltyEntries', { keyPath: 'id' });
+        store.createIndex('byCustomerId', 'customerId', { unique: false });
+        store.createIndex('byTimestamp', 'timestamp', { unique: false });
       }
     };
 
