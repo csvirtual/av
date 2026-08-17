@@ -23,7 +23,7 @@ const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
 export async function createSale({
   userId, userName, items,
   overallDiscountType = null, overallDiscountValue = 0,
-  payments, discountApprovedBy = null,
+  payments, discountApprovedBy = null, cashSessionId = null,
 }) {
   if (!items || items.length === 0) throw new Error('A venda precisa ter pelo menos um item.');
   if (!payments || payments.length === 0) throw new Error('Informe ao menos uma forma de pagamento.');
@@ -87,6 +87,7 @@ export async function createSale({
     total,
     payments: payments.map((p) => ({ method: p.method, amount: Number(p.amount) || 0 })),
     discountApprovedBy,
+    cashSessionId,
     refunds: [],
     refundedTotal: 0,
   };

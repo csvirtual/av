@@ -35,14 +35,19 @@ export async function saveCompany(data) {
     email: data.email || '',
     ramos: data.ramos || [],
     horarioFuncionamento: data.horarioFuncionamento || '',
-    // Políticas de venda — hoje só o limite de desconto que o vendedor pode
-    // aplicar sem precisar de aprovação do admin. Preserva o valor existente
-    // quando saveCompany é chamado pela tela de dados da loja (que não edita
-    // isto); só é alterado por quem chama passando `policies` explicitamente.
+    // Políticas de venda. Cada campo preserva o valor existente quando quem
+    // chama saveCompany não o informa explicitamente (ex: a tela de dados da
+    // loja não edita todos de uma vez).
     policies: {
       vendorMaxDiscountPercent: data.policies?.vendorMaxDiscountPercent
         ?? existing?.policies?.vendorMaxDiscountPercent
         ?? 10,
+      // Se true, a tela de Nova Venda bloqueia a finalização da venda sem um
+      // caixa aberto. Começa desativado (opcional) — dá pra exigir depois
+      // que o hábito de abrir/fechar caixa estiver consolidado na loja.
+      requireOpenCashSession: data.policies?.requireOpenCashSession
+        ?? existing?.policies?.requireOpenCashSession
+        ?? false,
     },
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),

@@ -12,6 +12,7 @@ import { createSale } from '../data/salesRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { getCompany } from '../data/companyRepo.js';
 import { verifyLogin } from '../data/usersRepo.js';
+import { getOpenSession } from '../data/cashRepo.js';
 import { getPendingCredit, setPendingCredit, clearPendingCredit } from '../session.js';
 import { bindBarcodeInput } from '../utils/barcode.js';
 import { formatMoney, escapeHtml } from '../utils/format.js';
@@ -23,7 +24,7 @@ const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito'
 const CREDIT_METHOD = 'Crédito de troca';
 
 export async function renderSale(container, ctx) {
-  let cart = []; // [{ productId, name, barcode, unit, price, qtyAvailable, qty, discountType, discountValue }]
+  let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
   let overallDiscountType = null;
   let overallDiscountValue = 0;
   let payments = []; // [{ method, amount }]
@@ -31,6 +32,27 @@ export async function renderSale(container, ctx) {
 
   const company = await getCompany();
   const vendorMaxDiscountPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
+  const requireOpenCashSession = company?.policies?.requireOpenCashSession ?? false;
+  const cashSession = await getOpenSession();
+
+  if (requireOpenCashSession && !cashSession) {
+    container.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h1>Nova venda</h1>
+          <div class="desc">É preciso abrir o caixa antes de vender.</div>
+        </div>
+      </div>
+      <div class="card" style="max-width:480px;text-align:center;padding:40px 32px;">
+        <p style="font-size:15px;margin-bottom:18px;">
+          A loja exige caixa aberto para registrar vendas (configurado em Dados da loja → Políticas de venda).
+        </p>
+        <button class="btn" id="go-caixa">Abrir caixa</button>
+      </div>
+    `;
+    container.querySelector('#go-caixa').addEventListener('click', () => ctx.navigate('caixa'));
+    return;
+  }
 
   container.innerHTML = `
     <div class="page-header">
@@ -443,6 +465,7 @@ export async function renderSale(container, ctx) {
         overallDiscountType, overallDiscountValue,
         payments,
         discountApprovedBy,
+        cashSessionId: cashSession?.id || null,
       });
       await logAction({
         userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,

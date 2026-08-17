@@ -3,7 +3,7 @@
 // Nenhuma regra de negócio deve viver aqui — só mecanismo de acesso ao banco,
 // reutilizado pelos repositórios em js/data/*.js.
 const DB_NAME = 'loja-gestao-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise = null;
 
@@ -46,6 +46,19 @@ function openDatabase() {
         const store = db.createObjectStore('auditLog', { keyPath: 'id' });
         store.createIndex('byTimestamp', 'timestamp', { unique: false });
         store.createIndex('byUserId', 'userId', { unique: false });
+      }
+
+      // v2: caixa (abertura/fechamento/sangria/suprimento) — ver data/cashRepo.js
+      if (!db.objectStoreNames.contains('cashSessions')) {
+        const store = db.createObjectStore('cashSessions', { keyPath: 'id' });
+        store.createIndex('byOpenedAt', 'openedAt', { unique: false });
+        store.createIndex('byStatus', 'status', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('cashMovements')) {
+        const store = db.createObjectStore('cashMovements', { keyPath: 'id' });
+        store.createIndex('bySessionId', 'sessionId', { unique: false });
+        store.createIndex('byTimestamp', 'timestamp', { unique: false });
       }
     };
 

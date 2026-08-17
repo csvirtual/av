@@ -2,12 +2,13 @@
 // vendedores (todos têm acesso ao panorama geral do estoque e das vendas).
 import { listProducts } from '../data/productsRepo.js';
 import { listSales } from '../data/salesRepo.js';
+import { getOpenSession } from '../data/cashRepo.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 
 export async function renderDashboard(container, ctx) {
   container.innerHTML = '<div class="card">Carregando painel…</div>';
 
-  const [products, sales] = await Promise.all([listProducts(), listSales()]);
+  const [products, sales, cashSession] = await Promise.all([listProducts(), listSales(), getOpenSession()]);
 
   const activeProducts = products.filter((p) => p.active);
   const lowStock = activeProducts.filter((p) => p.quantity <= p.minStock);
@@ -50,6 +51,10 @@ export async function renderDashboard(container, ctx) {
         <div class="label">Faturado hoje</div>
         <div class="value">${formatMoney(totalToday)}</div>
       </div>
+      <div class="stat-card" id="cash-stat-card" style="cursor:pointer;">
+        <div class="label">Caixa</div>
+        <div class="value" style="font-size:18px;">${cashSession ? '<span class="badge badge-green">Aberto</span>' : '<span class="badge badge-gray">Fechado</span>'}</div>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:20px;">
@@ -64,6 +69,7 @@ export async function renderDashboard(container, ctx) {
   `;
 
   container.querySelector('#go-venda').addEventListener('click', () => ctx.navigate('venda'));
+  container.querySelector('#cash-stat-card').addEventListener('click', () => ctx.navigate('caixa'));
 }
 
 function renderSalesTable(sales) {

@@ -64,6 +64,10 @@ export async function renderCompanySettings(container, ctx) {
           <input id="vendorMaxDiscount" type="number" min="0" max="100" step="0.5" value="${company.policies?.vendorMaxDiscountPercent ?? 10}">
           <span class="hint">Acima disso, a venda só finaliza com a senha de um administrador.</span>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin:6px 0 16px;">
+          <input type="checkbox" id="requireCashSession" ${company.policies?.requireOpenCashSession ? 'checked' : ''}>
+          Exigir caixa aberto para registrar vendas
+        </label>
 
         <div class="modal-actions" style="justify-content:flex-end;">
           <button type="submit" class="btn">Salvar alterações</button>
@@ -110,6 +114,7 @@ export async function renderCompanySettings(container, ctx) {
       horarioFuncionamento: document.getElementById('horario').value.trim(),
       policies: {
         vendorMaxDiscountPercent: Math.max(0, Math.min(100, Number(document.getElementById('vendorMaxDiscount').value) || 0)),
+        requireOpenCashSession: document.getElementById('requireCashSession').checked,
       },
       endereco: {
         logradouro: document.getElementById('logradouro').value.trim(),
