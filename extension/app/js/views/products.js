@@ -14,7 +14,7 @@ import { openModal, confirmDialog } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 
 const MOVEMENT_LABELS = {
-  entrada: 'Entrada', saida: 'Saída', venda: 'Venda', ajuste: 'Ajuste',
+  entrada: 'Entrada', saida: 'Saída', venda: 'Venda', ajuste: 'Ajuste', estorno: 'Estorno',
 };
 
 const UNITS = ['un', 'kg', 'g', 'L', 'ml', 'cx', 'saco', 'm', 'pct'];

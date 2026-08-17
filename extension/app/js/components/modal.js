@@ -1,6 +1,6 @@
 // Modal genérico e diálogo de confirmação reutilizados pelas views (editar
 // produto, cadastrar usuário, confirmar exclusão etc.).
-export function openModal({ title, bodyHtml, onMount, onSubmit, submitLabel = 'Salvar', cancelLabel = 'Cancelar', wide = false, singleButton = false }) {
+export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submitLabel = 'Salvar', cancelLabel = 'Cancelar', wide = false, singleButton = false }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.innerHTML = `
@@ -17,11 +17,17 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, submitLabel = 'S
 
   const modalEl = backdrop.querySelector('.modal');
   const close = () => backdrop.remove();
+  // Fecha por cancelamento (botão "Cancelar" ou clique fora do modal) —
+  // diferente de close(), que também é chamado após um submit bem-sucedido.
+  // Usado por quem precisa saber que o usuário desistiu (ex: uma Promise
+  // que só resolve dentro de onSubmit, como o modal de aprovação de
+  // desconto em views/sale.js).
+  const cancel = () => { close(); if (onCancel) onCancel(); };
 
   backdrop.addEventListener('mousedown', (e) => {
-    if (e.target === backdrop) close();
+    if (e.target === backdrop) cancel();
   });
-  backdrop.querySelector('[data-action="cancel"]')?.addEventListener('click', close);
+  backdrop.querySelector('[data-action="cancel"]')?.addEventListener('click', cancel);
 
   const submitBtn = backdrop.querySelector('[data-action="submit"]');
   submitBtn.addEventListener('click', async () => {

@@ -58,6 +58,13 @@ export async function renderCompanySettings(container, ctx) {
 
         <div class="field"><label for="horario">Horário de funcionamento</label><input id="horario" value="${escAttr(company.horarioFuncionamento)}"></div>
 
+        <p class="section-title">Políticas de venda</p>
+        <div class="field" style="max-width:320px;">
+          <label for="vendorMaxDiscount">Desconto máximo do vendedor sem aprovação (%)</label>
+          <input id="vendorMaxDiscount" type="number" min="0" max="100" step="0.5" value="${company.policies?.vendorMaxDiscountPercent ?? 10}">
+          <span class="hint">Acima disso, a venda só finaliza com a senha de um administrador.</span>
+        </div>
+
         <div class="modal-actions" style="justify-content:flex-end;">
           <button type="submit" class="btn">Salvar alterações</button>
         </div>
@@ -101,6 +108,9 @@ export async function renderCompanySettings(container, ctx) {
       email: document.getElementById('email').value.trim(),
       ramos,
       horarioFuncionamento: document.getElementById('horario').value.trim(),
+      policies: {
+        vendorMaxDiscountPercent: Math.max(0, Math.min(100, Number(document.getElementById('vendorMaxDiscount').value) || 0)),
+      },
       endereco: {
         logradouro: document.getElementById('logradouro').value.trim(),
         numero: document.getElementById('numero').value.trim(),

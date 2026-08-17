@@ -17,3 +17,23 @@ export async function setSessionUserId(userId) {
 export async function clearSession() {
   await chrome.storage.session.remove(KEY);
 }
+
+// ---------- Crédito de troca pendente ----------
+// Gerado ao estornar uma venda marcando "gerar crédito de troca". Fica
+// disponível pra ser usado como forma de pagamento na próxima venda desse
+// mesmo turno (efêmero como o resto da sessão — não sobrevive a reiniciar o
+// navegador, então não vira uma dívida esquecida no sistema).
+const CREDIT_KEY = 'session.pendingCredit';
+
+export async function getPendingCredit() {
+  const data = await chrome.storage.session.get(CREDIT_KEY);
+  return data[CREDIT_KEY] || null; // { amount, sourceSaleId, sourceRefundId, reason }
+}
+
+export async function setPendingCredit(credit) {
+  await chrome.storage.session.set({ [CREDIT_KEY]: credit });
+}
+
+export async function clearPendingCredit() {
+  await chrome.storage.session.remove(CREDIT_KEY);
+}
