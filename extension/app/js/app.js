@@ -20,6 +20,7 @@ import { renderCaixa } from './views/caixa.js';
 import { renderUsers } from './views/users.js';
 import { renderLogs } from './views/logs.js';
 import { renderCompanySettings } from './views/company.js';
+import { renderAjuda } from './views/ajuda.js';
 
 const root = document.getElementById('root');
 
@@ -32,6 +33,7 @@ const ROUTES = {
   usuarios: { label: 'Usuários', icon: '👥', roles: ['admin'], render: renderUsers },
   logs: { label: 'Log do sistema', icon: '🗒️', roles: ['admin'], render: renderLogs },
   empresa: { label: 'Dados da loja', icon: '🏬', roles: ['admin'], render: renderCompanySettings },
+  ajuda: { label: 'Ajuda', icon: '❓', roles: ['admin', 'vendedor'], render: renderAjuda },
 };
 
 async function boot() {

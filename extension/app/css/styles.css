@@ -436,3 +436,74 @@ tbody tr:hover { background: var(--surface-alt); }
 .text-muted { color: var(--text-muted); }
 .mt-0 { margin-top: 0; }
 .section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+
+/* ---------- Ajuda ---------- */
+.help-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.help-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: sticky;
+  top: 0;
+}
+.help-topic-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.help-topic-btn:hover { background: var(--surface-alt); }
+.help-topic-btn.active { background: var(--primary-light); color: var(--primary-dark); }
+.help-topic-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+.help-content h2 { margin: 0 0 4px; font-size: 19px; }
+.help-content .help-subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+.help-content h3 { font-size: 15px; margin: 22px 0 8px; color: var(--primary-dark); }
+.help-content h3:first-of-type { margin-top: 0; }
+.help-content p { line-height: 1.65; font-size: 13.8px; margin: 0 0 12px; }
+.help-content ol, .help-content ul { padding-left: 20px; line-height: 1.75; font-size: 13.8px; margin: 0 0 14px; }
+.help-content li { margin-bottom: 4px; }
+.help-content .tip {
+  background: var(--primary-light);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin: 4px 0 16px;
+}
+.help-content .tip strong { color: var(--primary-dark); }
+.help-content .warn-box {
+  background: #fbeecd;
+  border-left: 3px solid var(--warning);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin: 4px 0 16px;
+}
+.help-content kbd {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+@media (max-width: 760px) {
+  .help-layout { grid-template-columns: 1fr; }
+  .help-topics { flex-direction: row; overflow-x: auto; position: static; }
+}
