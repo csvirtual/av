@@ -1,9 +1,9 @@
 # Gestão de Loja — Estoque & Vendas (extensão do Chrome)
 
-Extensão para Google Chrome que controla **estoque, vendas e usuários** de uma
-loja de material de construção + mercearia. Roda **100% local**: todos os
-dados ficam salvos no IndexedDB do próprio navegador, nada é enviado para
-nenhum servidor.
+Extensão para Google Chrome que controla **estoque, vendas, caixa, clientes,
+fornecedores e financeiro** de uma loja de material de construção + mercearia.
+Roda **100% local**: todos os dados ficam salvos no IndexedDB do próprio
+navegador, nada é enviado para nenhum servidor.
 
 ## Como instalar (modo desenvolvedor)
 
@@ -31,16 +31,55 @@ Na primeira vez que o sistema abrir, ele pede:
 
 Depois disso, o sistema sempre abre na tela de **login**.
 
+Um menu de **Ajuda** (disponível para os dois perfis) explica cada parte do
+sistema em linguagem simples, separado em tópicos.
+
+## Funcionalidades
+
+- **Estoque** — cadastro de produtos com código de barras (leitor USB ou
+  código interno gerado pelo sistema), ajuste manual de entrada/saída,
+  histórico completo de movimentação por produto, alerta de estoque baixo e
+  inventário/balanço em lote.
+- **Vendas (PDV)** — carrinho por código de barras ou busca por nome,
+  desconto por item e geral (com teto configurável por vendedor + aprovação
+  de administrador acima do limite), pagamento misto (mais de uma forma na
+  mesma venda, incluindo fiado e crédito de troca).
+- **Estorno e troca** — estorno total ou parcial de uma venda já fechada,
+  com devolução automática ao estoque e opção de gerar crédito de troca
+  (usável como forma de pagamento na próxima venda) em vez de dinheiro.
+- **Caixa** — um caixa único para a loja toda: abertura com troco inicial,
+  sangria/suprimento (sempre com motivo obrigatório) e fechamento com
+  conferência por forma de pagamento. Pode ser configurado como obrigatório
+  para registrar vendas.
+- **Clientes e fiado** — cadastro de clientes, venda fiada com limite de
+  crédito opcional, extrato completo de dívidas e pagamentos recebidos.
+- **Fornecedores e compras** — cadastro de fornecedores, pedidos de compra
+  com recebimento total ou parcial (atualiza estoque e preço de custo) e
+  sugestão automática de compra para produtos com estoque baixo.
+- **Financeiro** — contas a pagar e a receber, com vencimento automático e
+  baixa de pagamento.
+- **Relatórios** — faturamento, ticket médio, vendas por vendedor e por
+  categoria, margem de lucro estimada e curva ABC de produtos, por período.
+- **Fidelidade** — programa opcional de pontos por real gasto, resgatável
+  como crédito de troca.
+- **Log de auditoria** — toda ação relevante do sistema (login, cadastros,
+  edições, vendas, estornos, movimentos de caixa etc.) fica registrada com
+  usuário, perfil e data/hora — exclusivo do Administrador Geral.
+
 ## Perfis de acesso
 
 | Recurso | Administrador | Vendedor |
 |---|---|---|
 | Painel, estoque, histórico de vendas | ✅ | ✅ |
-| Registrar venda | ✅ | ✅ |
-| Histórico de movimentação de um produto | ✅ | ✅ |
-| Cadastrar/editar produto, ajustar estoque | ✅ | ❌ |
+| Registrar venda, aplicar desconto até o limite configurado | ✅ | ✅ |
+| Abrir/fechar caixa, sangria/suprimento | ✅ | ✅ |
+| Cadastrar cliente, vender fiado, receber pagamento de fiado | ✅ | ✅ |
+| Cadastrar/editar produto, ajustar estoque, inventário | ✅ | ❌ |
+| Estornar venda | ✅ | ❌ |
+| Fornecedores e pedidos de compra | ✅ | ❌ |
+| Financeiro (contas a pagar/receber) e relatórios gerenciais | ✅ | ❌ |
 | Cadastrar/gerenciar usuários | ✅ | ❌ |
-| Editar dados da loja | ✅ | ❌ |
+| Editar dados da loja e políticas de venda | ✅ | ❌ |
 | Log do sistema (ações de todos, por perfil) | ✅ | ❌ |
 
 Todo vendedor vê o estoque geral e **quem vendeu o quê e quando** (histórico
@@ -88,11 +127,16 @@ extension/
       app.js               Roteamento e shell do app pós-login
       db.js                Acesso baixo nível ao IndexedDB
       auth.js              Hash de senha (PBKDF2)
-      session.js           Sessão do usuário logado
+      session.js           Sessão do usuário logado e crédito de troca pendente
       data/                Repositórios: empresa, usuários, produtos, vendas,
-                            movimentações de estoque, log de auditoria
-      utils/               CNPJ, formatação, leitura de código de barras
+                            estoque, auditoria, caixa, clientes/fiado,
+                            fornecedores, compras, financeiro, fidelidade,
+                            relatórios
+      utils/               CNPJ, formatação, leitura de código de barras, cálculo
+                            de desconto/totais
       views/               Telas: setup, login, painel, estoque, venda,
-                            histórico de vendas, usuários, log, dados da loja
+                            histórico de vendas, caixa, clientes, compras,
+                            financeiro, relatórios, usuários, log, dados da
+                            loja, ajuda
       components/          Modal, toast
 ```
