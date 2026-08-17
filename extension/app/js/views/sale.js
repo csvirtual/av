@@ -20,6 +20,7 @@ import { formatMoney, escapeHtml } from '../utils/format.js';
 import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
 import { showToast } from '../components/toast.js';
 import { openModal, confirmDialog } from '../components/modal.js';
+import { printSaleReceipt } from '../components/receipt.js';
 
 const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix', 'Fiado'];
 const CREDIT_METHOD = 'Crédito de troca';
@@ -624,6 +625,7 @@ export async function renderSale(container, ctx) {
         entity: 'sale', entityId: sale.id,
       });
       showToast(`Venda finalizada: ${formatMoney(sale.total)}.`, 'success');
+      const customerNameForReceipt = selectedCustomer?.nome || null;
       cart = [];
       overallDiscountType = null;
       overallDiscountValue = 0;
@@ -634,6 +636,20 @@ export async function renderSale(container, ctx) {
       resultsBox.innerHTML = '';
       scanInput.value = '';
       scanInput.focus();
+
+      openModal({
+        title: 'Venda finalizada',
+        submitLabel: '🖨️ Imprimir recibo',
+        cancelLabel: 'Fechar',
+        bodyHtml: `
+          <p style="font-size:15px;">Venda de <strong>${formatMoney(sale.total)}</strong> registrada com sucesso.</p>
+          <p class="text-muted" style="font-size:12.5px;">Abre o diálogo de impressão do navegador — escolha a impressora (inclusive térmica de cupom) ou "Salvar como PDF".</p>
+        `,
+        onSubmit: () => {
+          printSaleReceipt(sale, company, customerNameForReceipt);
+          return false; // mantém o modal aberto — dá pra imprimir de novo se precisar
+        },
+      });
     } catch (err) {
       showToast(err.message, 'error');
     } finally {

@@ -10,11 +10,13 @@
 import { listSales, refundSaleItems, saleStatus } from '../data/salesRepo.js';
 import { listUsers } from '../data/usersRepo.js';
 import { listCustomers } from '../data/customersRepo.js';
+import { getCompany } from '../data/companyRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { addPendingCredit } from '../session.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 import { openModal } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { printSaleReceipt } from '../components/receipt.js';
 
 const STATUS_BADGE = {
   completa: '<span class="badge badge-green">Completa</span>',
@@ -33,7 +35,7 @@ function paymentMethodLabel(p) {
 export async function renderSalesHistory(container, ctx) {
   container.innerHTML = '<div class="card">Carregando…</div>';
 
-  let [sales, users, customers] = await Promise.all([listSales(), listUsers(), listCustomers()]);
+  let [sales, users, customers, company] = await Promise.all([listSales(), listUsers(), listCustomers(), getCompany()]);
   const customerName = (id) => customers.find((c) => c.id === id)?.nome || null;
 
   container.innerHTML = `
@@ -130,6 +132,9 @@ export async function renderSalesHistory(container, ctx) {
       singleButton: !canRefund,
       wide: true,
       bodyHtml: `
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button type="button" class="btn btn-secondary btn-sm" id="print-receipt-btn">🖨️ Imprimir recibo</button>
+        </div>
         <p class="text-muted" style="font-size:13px;">
           Vendedor: <strong>${escapeHtml(sale.userName)}</strong>
           ${sale.customerId ? ` · Cliente: <strong>${escapeHtml(customerName(sale.customerId) || 'cliente removido')}</strong>` : ''}
@@ -170,6 +175,11 @@ export async function renderSalesHistory(container, ctx) {
           `).join('')}
         ` : ''}
       `,
+      onMount: (modalEl) => {
+        modalEl.querySelector('#print-receipt-btn').addEventListener('click', () => {
+          printSaleReceipt(sale, company, sale.customerId ? customerName(sale.customerId) : null);
+        });
+      },
       onSubmit: (modalEl, close) => {
         if (!canRefund) return true;
         close();

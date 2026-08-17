@@ -747,3 +747,49 @@ tbody tr:hover { background: var(--surface-alt); }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .sidebar-brand .name { font-size: 14px; }
 }
+
+/* ==========================================================================
+   Recibo de venda (impressão) — ver components/receipt.js. Fica escondido
+   o tempo todo na tela normal; @media print vira ele visível e some com
+   todo o resto da página, sem precisar abrir aba nova nem popup. Layout
+   estreito (58mm) de propósito: é o tamanho mais comum de bobina de
+   impressora térmica de cupom no varejo — numa impressora comum (A4) ele
+   só imprime como uma faixa estreita no canto da folha, o que também é
+   perfeitamente aceitável pra um recibo.
+   ========================================================================== */
+#print-receipt-root { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  #print-receipt-root, #print-receipt-root * { visibility: visible; }
+  #print-receipt-root {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  @page { margin: 4mm; }
+}
+
+.receipt {
+  width: 58mm;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #000;
+}
+.r-header { text-align: center; }
+.r-store-name { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+.r-small { font-size: 9.5px; }
+.r-center { text-align: center; }
+.r-title { font-size: 12px; font-weight: 700; text-align: center; text-transform: uppercase; }
+.r-section-title { font-weight: 700; text-transform: uppercase; font-size: 9.5px; margin-bottom: 2px; }
+.r-sep { border-top: 1px dashed #000; margin: 5px 0; }
+.r-row { display: flex; justify-content: space-between; gap: 8px; }
+.r-row.r-total { font-weight: 700; font-size: 12px; margin-top: 3px; }
+.r-items { width: 100%; border-collapse: collapse; }
+.r-items td { padding: 1px 0; vertical-align: top; }
+.r-item-name { font-weight: 700; }
+.r-item-refunded { font-weight: 400; text-decoration: line-through; }
+.r-item-qty { white-space: nowrap; }
+.r-item-total { text-align: right; white-space: nowrap; }
