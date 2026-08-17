@@ -10,14 +10,43 @@
   --primary-light: #e4f0e9;
   --accent: #c98a2c;
   --danger: #b3261e;
+  --danger-dark: #8f1e18;
   --danger-light: #fbe9e7;
   --success: #1a7a45;
   --warning: #a6650f;
+  --warning-light: #fbeecd;
   --radius: 10px;
   --radius-sm: 6px;
   --shadow: 0 1px 3px rgba(20, 30, 27, 0.08), 0 1px 2px rgba(20, 30, 27, 0.06);
   --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
   font-size: 15px;
+}
+
+/* Modo escuro: segue a preferência do sistema operacional (o Chrome não
+ * expõe um jeito de "forçar" o tema de uma extensão além disso). Como todo
+ * componente da folha de estilo usa os tokens de --root em vez de cor fixa,
+ * bastou redefinir os tokens aqui — nada mais precisou mudar. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101613;
+    --surface: #1a221e;
+    --surface-alt: #212b25;
+    --border: #34413a;
+    --text: #e9efec;
+    --text-muted: #93a89e;
+    --primary: #2f9d6b;
+    --primary-dark: #0d2b1c;
+    --primary-light: rgba(47, 157, 107, 0.18);
+    --accent: #b27c2a;
+    --danger: #e5645a;
+    --danger-dark: #b23a30;
+    --danger-light: rgba(229, 100, 90, 0.18);
+    --success: #3fae6c;
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -81,7 +110,7 @@ a { color: var(--primary); }
 .btn-secondary:hover { background: var(--surface-alt); }
 
 .btn-danger { background: var(--danger); }
-.btn-danger:hover { background: #8f1e18; }
+.btn-danger:hover { background: var(--danger-dark); }
 
 .btn-ghost {
   background: transparent;
@@ -352,7 +381,7 @@ tbody tr:hover { background: var(--surface-alt); }
   letter-spacing: 0.3px;
 }
 .badge-green { background: var(--primary-light); color: var(--primary); }
-.badge-gold { background: #fbeecd; color: var(--warning); }
+.badge-gold { background: var(--warning-light); color: var(--warning); }
 .badge-red { background: var(--danger-light); color: var(--danger); }
 .badge-gray { background: var(--surface-alt); color: var(--text-muted); }
 
@@ -497,12 +526,12 @@ tbody tr:hover { background: var(--surface-alt); }
   cursor: pointer;
 }
 .help-topic-btn:hover { background: var(--surface-alt); }
-.help-topic-btn.active { background: var(--primary-light); color: var(--primary-dark); }
+.help-topic-btn.active { background: var(--primary-light); color: var(--primary); }
 .help-topic-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
 
 .help-content h2 { margin: 0 0 4px; font-size: 19px; }
 .help-content .help-subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
-.help-content h3 { font-size: 15px; margin: 22px 0 8px; color: var(--primary-dark); }
+.help-content h3 { font-size: 15px; margin: 22px 0 8px; color: var(--primary); }
 .help-content h3:first-of-type { margin-top: 0; }
 .help-content p { line-height: 1.65; font-size: 13.8px; margin: 0 0 12px; }
 .help-content ol, .help-content ul { padding-left: 20px; line-height: 1.75; font-size: 13.8px; margin: 0 0 14px; }
@@ -515,9 +544,9 @@ tbody tr:hover { background: var(--surface-alt); }
   font-size: 13px;
   margin: 4px 0 16px;
 }
-.help-content .tip strong { color: var(--primary-dark); }
+.help-content .tip strong { color: var(--primary); }
 .help-content .warn-box {
-  background: #fbeecd;
+  background: var(--warning-light);
   border-left: 3px solid var(--warning);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   padding: 10px 14px;
