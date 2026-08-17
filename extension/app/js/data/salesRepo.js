@@ -11,22 +11,31 @@
 import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
+import { recordDebt } from './customersRepo.js';
 import { applyDiscount, discountAmount } from '../utils/pricing.js';
 
 const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
+const FIADO_METHOD = 'Fiado';
 
 /** Registra uma venda completa: confere estoque de cada item, calcula
  * descontos (por item e geral), debita a quantidade vendida (via stockRepo,
  * que também grava a movimentação) e só então grava o registro da venda.
  * Se qualquer item não tiver estoque suficiente, ou a soma dos pagamentos
- * não bater com o total, nada é gravado. */
+ * não bater com o total, nada é gravado. Uma venda com pagamento em
+ * "Fiado" precisa de um cliente selecionado — vira uma dívida na conta
+ * dele (ver data/customersRepo.js), não dinheiro entrando agora. */
 export async function createSale({
   userId, userName, items,
   overallDiscountType = null, overallDiscountValue = 0,
-  payments, discountApprovedBy = null, cashSessionId = null,
+  payments, discountApprovedBy = null, cashSessionId = null, customerId = null,
 }) {
   if (!items || items.length === 0) throw new Error('A venda precisa ter pelo menos um item.');
   if (!payments || payments.length === 0) throw new Error('Informe ao menos uma forma de pagamento.');
+
+  const fiadoTotal = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  if (fiadoTotal > 0 && !customerId) {
+    throw new Error('Selecione um cliente para vender fiado.');
+  }
 
   // Confere estoque de todos os itens antes de debitar qualquer um —
   // evita vender parte do carrinho e travar no meio por falta de estoque.
@@ -88,10 +97,16 @@ export async function createSale({
     payments: payments.map((p) => ({ method: p.method, amount: Number(p.amount) || 0 })),
     discountApprovedBy,
     cashSessionId,
+    customerId,
     refunds: [],
     refundedTotal: 0,
   };
   await dbAdd('sales', sale);
+
+  if (fiadoTotal > 0) {
+    await recordDebt({ customerId, amount: fiadoTotal, saleId: sale.id, userId, userName });
+  }
+
   return sale;
 }
 

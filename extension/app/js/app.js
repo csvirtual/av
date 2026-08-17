@@ -17,6 +17,7 @@ import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
 import { renderCaixa } from './views/caixa.js';
+import { renderClientes } from './views/clientes.js';
 import { renderUsers } from './views/users.js';
 import { renderLogs } from './views/logs.js';
 import { renderCompanySettings } from './views/company.js';
@@ -30,6 +31,7 @@ const ROUTES = {
   venda: { label: 'Nova venda', icon: '🧾', roles: ['admin', 'vendedor'], render: renderSale },
   vendas: { label: 'Histórico de vendas', icon: '📊', roles: ['admin', 'vendedor'], render: renderSalesHistory },
   caixa: { label: 'Caixa', icon: '💰', roles: ['admin', 'vendedor'], render: renderCaixa },
+  clientes: { label: 'Clientes', icon: '🧑‍🤝‍🧑', roles: ['admin', 'vendedor'], render: renderClientes },
   usuarios: { label: 'Usuários', icon: '👥', roles: ['admin'], render: renderUsers },
   logs: { label: 'Log do sistema', icon: '🗒️', roles: ['admin'], render: renderLogs },
   empresa: { label: 'Dados da loja', icon: '🏬', roles: ['admin'], render: renderCompanySettings },

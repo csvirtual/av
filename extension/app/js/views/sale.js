@@ -13,15 +13,17 @@ import { logAction } from '../data/auditRepo.js';
 import { getCompany } from '../data/companyRepo.js';
 import { verifyLogin } from '../data/usersRepo.js';
 import { getOpenSession } from '../data/cashRepo.js';
+import { searchCustomers, createCustomer, getCustomerBalance } from '../data/customersRepo.js';
 import { getPendingCredit, setPendingCredit, clearPendingCredit } from '../session.js';
 import { bindBarcodeInput } from '../utils/barcode.js';
 import { formatMoney, escapeHtml } from '../utils/format.js';
 import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
 import { showToast } from '../components/toast.js';
-import { openModal } from '../components/modal.js';
+import { openModal, confirmDialog } from '../components/modal.js';
 
-const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix'];
+const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix', 'Fiado'];
 const CREDIT_METHOD = 'Crédito de troca';
+const FIADO_METHOD = 'Fiado';
 
 export async function renderSale(container, ctx) {
   let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
@@ -29,6 +31,7 @@ export async function renderSale(container, ctx) {
   let overallDiscountValue = 0;
   let payments = []; // [{ method, amount }]
   let pendingCredit = await getPendingCredit();
+  let selectedCustomer = null;
 
   const company = await getCompany();
   const vendorMaxDiscountPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
@@ -68,6 +71,11 @@ export async function renderSale(container, ctx) {
         </div>
         <div id="search-results"></div>
         <div id="credit-banner"></div>
+
+        <p class="section-title" style="margin-top:16px;">
+          Cliente <span class="text-muted" style="font-weight:400;">(opcional — obrigatório pra vender fiado)</span>
+        </p>
+        <div id="customer-box"></div>
       </div>
       <div class="card">
         <p class="section-title mt-0">Carrinho</p>
@@ -87,6 +95,7 @@ export async function renderSale(container, ctx) {
   const scanInput = document.getElementById('scan-input');
   const resultsBox = document.getElementById('search-results');
   const creditBanner = document.getElementById('credit-banner');
+  const customerBox = document.getElementById('customer-box');
   const cartBox = document.getElementById('cart-box');
   const totalsBox = document.getElementById('totals-box');
   const paymentsBox = document.getElementById('payments-box');
@@ -94,6 +103,69 @@ export async function renderSale(container, ctx) {
 
   function currentTotals() {
     return computeCartTotals(cart, overallDiscountType, overallDiscountValue);
+  }
+
+  async function renderCustomerBox() {
+    if (!selectedCustomer) {
+      customerBox.innerHTML = `
+        <input type="text" id="customer-search" placeholder="Buscar cliente por nome ou telefone…">
+        <div id="customer-results"></div>
+      `;
+      const searchInput = document.getElementById('customer-search');
+      const resultsDiv = document.getElementById('customer-results');
+      let debounce;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(debounce);
+        const term = searchInput.value.trim();
+        if (term.length < 2) { resultsDiv.innerHTML = ''; return; }
+        debounce = setTimeout(async () => {
+          const matches = await searchCustomers(term);
+          resultsDiv.innerHTML = `
+            <div class="table-wrap" style="margin-top:8px;">
+              <table><tbody>
+                ${matches.slice(0, 6).map((c) => `
+                  <tr>
+                    <td>${escapeHtml(c.nome)}</td>
+                    <td class="text-muted">${escapeHtml(c.telefone || '—')}</td>
+                    <td><button class="btn btn-sm" data-pick-customer="${c.id}">Selecionar</button></td>
+                  </tr>
+                `).join('')}
+                <tr>
+                  <td colspan="3">
+                    <button class="btn btn-ghost btn-sm" id="quick-new-customer">+ Cadastrar "${escapeHtml(term)}" como novo cliente</button>
+                  </td>
+                </tr>
+              </tbody></table>
+            </div>
+          `;
+          resultsDiv.querySelectorAll('[data-pick-customer]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              selectedCustomer = matches.find((c) => c.id === btn.dataset.pickCustomer);
+              await renderCustomerBox();
+            });
+          });
+          document.getElementById('quick-new-customer').addEventListener('click', async () => {
+            selectedCustomer = await createCustomer({ nome: term });
+            await renderCustomerBox();
+          });
+        }, 220);
+      });
+    } else {
+      const balance = await getCustomerBalance(selectedCustomer.id);
+      customerBox.innerHTML = `
+        <div class="cart-item" style="padding:8px 0;">
+          <div style="flex:1;">
+            <div class="name">${escapeHtml(selectedCustomer.nome)}</div>
+            <div class="meta">${escapeHtml(selectedCustomer.telefone || 'sem telefone')}${balance > 0.01 ? ` · deve ${formatMoney(balance)}` : ''}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="clear-customer-btn" type="button">Trocar</button>
+        </div>
+      `;
+      document.getElementById('clear-customer-btn').addEventListener('click', async () => {
+        selectedCustomer = null;
+        await renderCustomerBox();
+      });
+    }
   }
 
   function paymentsSum() {
@@ -456,6 +528,27 @@ export async function renderSale(container, ctx) {
       discountApprovedBy = admin.id;
     }
 
+    const fiadoAmount = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + p.amount, 0);
+    if (fiadoAmount > 0) {
+      if (!selectedCustomer) {
+        showToast('Selecione um cliente para vender fiado.', 'error');
+        return;
+      }
+      if (selectedCustomer.creditLimit > 0) {
+        const currentBalance = await getCustomerBalance(selectedCustomer.id);
+        const newBalance = currentBalance + fiadoAmount;
+        if (newBalance > selectedCustomer.creditLimit) {
+          const ok = await confirmDialog({
+            title: 'Limite de crédito ultrapassado',
+            message: `Com essa venda, "${escapeHtml(selectedCustomer.nome)}" vai ficar devendo ${formatMoney(newBalance)}, acima do limite de ${formatMoney(selectedCustomer.creditLimit)} cadastrado. Continuar mesmo assim?`,
+            confirmLabel: 'Vender fiado assim mesmo',
+            danger: true,
+          });
+          if (!ok) return;
+        }
+      }
+    }
+
     finalizeBtn.disabled = true;
     try {
       const sale = await createSale({
@@ -466,13 +559,15 @@ export async function renderSale(container, ctx) {
         payments,
         discountApprovedBy,
         cashSessionId: cashSession?.id || null,
+        customerId: selectedCustomer?.id || null,
       });
       await logAction({
         userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
         action: 'Venda registrada',
         details: `Venda de ${sale.items.length} item(ns) totalizando ${formatMoney(sale.total)}`
           + (sale.itemsDiscountTotal + sale.overallDiscountAmount > 0 ? ` (desconto de ${formatMoney(sale.itemsDiscountTotal + sale.overallDiscountAmount)})` : '')
-          + (discountApprovedBy ? ' — desconto autorizado por administrador' : '') + '.',
+          + (discountApprovedBy ? ' — desconto autorizado por administrador' : '')
+          + (fiadoAmount > 0 ? ` — ${formatMoney(fiadoAmount)} fiado para "${selectedCustomer.nome}"` : '') + '.',
         entity: 'sale', entityId: sale.id,
       });
       showToast(`Venda finalizada: ${formatMoney(sale.total)}.`, 'success');
@@ -480,7 +575,9 @@ export async function renderSale(container, ctx) {
       overallDiscountType = null;
       overallDiscountValue = 0;
       payments = [];
+      selectedCustomer = null;
       renderAll();
+      renderCustomerBox();
       resultsBox.innerHTML = '';
       scanInput.value = '';
       scanInput.focus();
@@ -492,5 +589,6 @@ export async function renderSale(container, ctx) {
   });
 
   renderCreditBanner();
+  renderCustomerBox();
   renderAll();
 }

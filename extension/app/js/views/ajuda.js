@@ -1,4 +1,4 @@
-// Ajuda — explica o sistema inteiro em linguagem simples, separado em 7
+// Ajuda — explica o sistema inteiro em linguagem simples, separado por
 // tópicos. Disponível pra admin e vendedor: cada um entende não só o que
 // pode fazer, mas por que algumas coisas ficam bloqueadas pro seu perfil.
 import { escapeHtml } from '../utils/format.js';
@@ -24,7 +24,7 @@ const TOPICS = [
       <div class="tip"><strong>Dica:</strong> a sessão não fica salva pra sempre — se você fechar o navegador, na próxima vez vai pedir login de novo. Isso é proposital, pra loja não ficar logada sem querer com o computador ligado o dia todo.</div>
 
       <h3>Vendedores</h3>
-      <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico 6, "Usuários e permissões", pra entender a diferença completa).</p>
+      <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
     `,
   },
   {
@@ -77,7 +77,36 @@ const TOPICS = [
       <p>Clique em <strong>+ Forma de pagamento</strong> quantas vezes precisar — dá pra dividir a mesma venda entre dinheiro, cartão de débito, cartão de crédito e Pix, por exemplo metade em dinheiro e metade no cartão. O botão de finalizar só libera quando a soma dos pagamentos bate exatamente com o total.</p>
 
       <h3>Crédito de troca</h3>
-      <p>Se o cliente tiver um crédito de troca disponível (veja o tópico 4), ele aparece como um aviso verde no topo da tela de venda, com um botão pra usar como parte do pagamento.</p>
+      <p>Se o cliente tiver um crédito de troca disponível (veja o tópico "Estorno e troca"), ele aparece como um aviso verde no topo da tela de venda, com um botão pra usar como parte do pagamento.</p>
+
+      <h3>Fiado</h3>
+      <p>Fiado também é uma forma de pagamento, igual dinheiro ou cartão — só que em vez de receber na hora, o valor vira uma dívida na conta do cliente. Pra usar, é preciso selecionar o cliente no campo <strong>Cliente</strong>, no canto superior esquerdo da tela (veja o tópico "Clientes e fiado" pra entender o resto).</p>
+    `,
+  },
+  {
+    id: 'clientes-fiado',
+    icon: '🧑‍🤝‍🧑',
+    title: 'Clientes e fiado',
+    html: `
+      <h2>Clientes e fiado</h2>
+      <p class="help-subtitle">Cadastrar clientes e controlar quem deve o quê.</p>
+
+      <h3>Cadastrar um cliente</h3>
+      <p>Vá em <strong>Clientes → + Novo cliente</strong>, ou cadastre na hora: durante uma venda, ao buscar um cliente que ainda não existe, aparece a opção "Cadastrar como novo cliente" direto na tela.</p>
+
+      <h3>Vendendo fiado</h3>
+      <p>Na tela <strong>Nova venda</strong>, selecione o cliente no campo próprio e, na hora do pagamento, escolha <strong>Fiado</strong> como forma de pagamento (pode ser só uma parte do valor, combinado com dinheiro ou cartão no resto). O valor entra automaticamente na conta do cliente como uma dívida — não precisa fazer mais nada.</p>
+
+      <h3>Limite de crédito (opcional)</h3>
+      <p>No cadastro do cliente, dá pra definir um limite de crédito. Se a nova venda fiada for deixar o cliente devendo mais que esse limite, o sistema avisa e pede confirmação antes de continuar — não bloqueia, só chama atenção.</p>
+
+      <h3>Recebendo o pagamento do fiado</h3>
+      <p>Vá em <strong>Clientes</strong>, clique em <strong>Extrato</strong> no cliente que pagou, e depois em <strong>Registrar pagamento</strong>. Informe o valor (pode ser parcial) e a forma de pagamento. O extrato do cliente mostra todo o histórico: o que foi fiado e o que já foi pago, com data e quem registrou cada lançamento.</p>
+
+      <div class="tip"><strong>Dica:</strong> se o pagamento do fiado for em dinheiro e o caixa estiver aberto, esse valor já entra automaticamente na conferência de fechamento do caixa — não precisa lançar de novo em nenhum outro lugar.</div>
+
+      <h3>Saldo devedor no Painel</h3>
+      <p>O Painel inicial mostra um card com o <strong>total em fiado</strong> de todos os clientes somados — um jeito rápido de acompanhar quanto a loja tem "a receber" no fiado.</p>
     `,
   },
   {
@@ -128,6 +157,8 @@ const TOPICS = [
 
       <h3>Caixa obrigatório (opcional, configurável)</h3>
       <p>O administrador pode ligar, em <strong>Dados da loja → Políticas de venda</strong>, a opção "Exigir caixa aberto para registrar vendas". Ligada essa opção, ninguém consegue finalizar uma venda sem abrir o caixa primeiro.</p>
+
+      <div class="tip"><strong>Fiado não conta como dinheiro no caixa</strong> — uma venda fiada não entra na conferência, porque é uma promessa de pagamento, não dinheiro na gaveta. Só quando o cliente vem pagar o fiado (veja o tópico "Clientes e fiado") é que o valor entra no caixa, na hora do pagamento.</div>
     `,
   },
   {
@@ -147,11 +178,13 @@ const TOPICS = [
         <li>Ver o estoque geral (mas não cadastrar, editar ou ajustar produto)</li>
         <li>Registrar vendas e ver o histórico de vendas de todo mundo</li>
         <li>Abrir/fechar caixa e fazer sangria/suprimento</li>
+        <li>Cadastrar e editar cliente, vender fiado e receber pagamento de fiado</li>
       </ul>
       <p>E <strong>não</strong> consegue:</p>
       <ul>
         <li>Cadastrar ou editar produto, nem ajustar estoque manualmente</li>
         <li>Estornar uma venda</li>
+        <li>Excluir cliente (só inativar)</li>
         <li>Cadastrar ou gerenciar outros usuários</li>
         <li>Ver o log de auditoria ou mudar os dados/políticas da loja</li>
       </ul>

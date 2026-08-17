@@ -4,8 +4,10 @@
 // quem está de turno abre e fecha antes de passar pro próximo.
 import { dbGetAll, dbGet, dbPut, dbAdd, dbGetAllByIndex, newId } from '../db.js';
 import { listSales } from './salesRepo.js';
+import { listPaymentsForCashSession } from './customersRepo.js';
 
 const CREDIT_METHOD = 'Crédito de troca';
+const FIADO_METHOD = 'Fiado';
 
 export async function getOpenSession() {
   const sessions = await dbGetAllByIndex('cashSessions', 'byStatus', 'aberto');
@@ -78,18 +80,21 @@ export async function recordCashMovement({ sessionId, type, amount, reason, user
  * tratado como devolução em dinheiro (reduz o esperado em espécie) — é o
  * caso mais comum numa loja pequena sem controle de qual forma original foi
  * usada no reembolso. Estorno que gerou crédito não mexe em caixa (a loja
- * ficou com o dinheiro, o cliente ficou com o crédito). */
+ * ficou com o dinheiro, o cliente ficou com o crédito). Venda com pagamento
+ * em "Fiado" também não entra aqui (é dívida, não dinheiro agora) — só
+ * conta quando o cliente vier pagar de verdade (ver listPaymentsForCashSession). */
 export async function computeExpectedAmounts(session) {
   const allSales = await listSales();
   const sessionSales = allSales.filter((s) => s.cashSessionId === session.id);
   const movements = await listSessionMovements(session.id);
+  const debtPayments = await listPaymentsForCashSession(session.id);
 
   const expected = { Dinheiro: session.openingAmount };
   const ensure = (method) => { if (!(method in expected)) expected[method] = 0; };
 
   for (const sale of sessionSales) {
     for (const payment of sale.payments) {
-      if (payment.method === CREDIT_METHOD) continue; // não é dinheiro novo entrando
+      if (payment.method === CREDIT_METHOD || payment.method === FIADO_METHOD) continue; // não é dinheiro novo entrando
       ensure(payment.method);
       expected[payment.method] += payment.amount;
     }
@@ -97,6 +102,11 @@ export async function computeExpectedAmounts(session) {
       if (refund.creditGenerated) continue; // virou crédito, não saiu dinheiro da gaveta
       expected.Dinheiro -= refund.totalRefunded;
     }
+  }
+
+  for (const payment of debtPayments) {
+    ensure(payment.paymentMethod);
+    expected[payment.paymentMethod] += payment.amount;
   }
 
   for (const m of movements) {

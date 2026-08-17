@@ -9,6 +9,7 @@
 // aqui já sai com motivo obrigatório e vai pro log de auditoria.
 import { listSales, refundSaleItems, saleStatus } from '../data/salesRepo.js';
 import { listUsers } from '../data/usersRepo.js';
+import { listCustomers } from '../data/customersRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { setPendingCredit } from '../session.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
@@ -24,7 +25,8 @@ const STATUS_BADGE = {
 export async function renderSalesHistory(container, ctx) {
   container.innerHTML = '<div class="card">Carregando…</div>';
 
-  let [sales, users] = await Promise.all([listSales(), listUsers()]);
+  let [sales, users, customers] = await Promise.all([listSales(), listUsers(), listCustomers()]);
+  const customerName = (id) => customers.find((c) => c.id === id)?.nome || null;
 
   container.innerHTML = `
     <div class="page-header">
@@ -85,12 +87,13 @@ export async function renderSalesHistory(container, ctx) {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data/Hora</th><th>Vendedor</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Data/Hora</th><th>Vendedor</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Status</th><th></th></tr></thead>
           <tbody>
             ${list.map((s) => `
               <tr>
                 <td>${formatDateTime(s.timestamp)}</td>
                 <td>${escapeHtml(s.userName)}</td>
+                <td>${s.customerId ? escapeHtml(customerName(s.customerId) || 'cliente removido') : '<span class="text-muted">—</span>'}</td>
                 <td>${s.items.length}</td>
                 <td>${s.payments.map((p) => escapeHtml(p.method)).join(', ') || '—'}</td>
                 <td>
@@ -120,7 +123,9 @@ export async function renderSalesHistory(container, ctx) {
       wide: true,
       bodyHtml: `
         <p class="text-muted" style="font-size:13px;">
-          Vendedor: <strong>${escapeHtml(sale.userName)}</strong> · ${STATUS_BADGE[saleStatus(sale)]}
+          Vendedor: <strong>${escapeHtml(sale.userName)}</strong>
+          ${sale.customerId ? ` · Cliente: <strong>${escapeHtml(customerName(sale.customerId) || 'cliente removido')}</strong>` : ''}
+          · ${STATUS_BADGE[saleStatus(sale)]}
         </p>
         <div class="table-wrap">
           <table>

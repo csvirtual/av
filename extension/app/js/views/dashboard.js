@@ -3,12 +3,14 @@
 import { listProducts } from '../data/productsRepo.js';
 import { listSales } from '../data/salesRepo.js';
 import { getOpenSession } from '../data/cashRepo.js';
+import { getAllBalances } from '../data/customersRepo.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 
 export async function renderDashboard(container, ctx) {
   container.innerHTML = '<div class="card">Carregando painel…</div>';
 
-  const [products, sales, cashSession] = await Promise.all([listProducts(), listSales(), getOpenSession()]);
+  const [products, sales, cashSession, balances] = await Promise.all([listProducts(), listSales(), getOpenSession(), getAllBalances()]);
+  const totalFiado = Object.values(balances).reduce((sum, v) => sum + v, 0);
 
   const activeProducts = products.filter((p) => p.active);
   const lowStock = activeProducts.filter((p) => p.quantity <= p.minStock);
@@ -55,6 +57,10 @@ export async function renderDashboard(container, ctx) {
         <div class="label">Caixa</div>
         <div class="value" style="font-size:18px;">${cashSession ? '<span class="badge badge-green">Aberto</span>' : '<span class="badge badge-gray">Fechado</span>'}</div>
       </div>
+      <div class="stat-card" id="fiado-stat-card" style="cursor:pointer;">
+        <div class="label">Total em fiado</div>
+        <div class="value ${totalFiado > 0 ? 'warn' : ''}">${formatMoney(totalFiado)}</div>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:20px;">
@@ -70,6 +76,7 @@ export async function renderDashboard(container, ctx) {
 
   container.querySelector('#go-venda').addEventListener('click', () => ctx.navigate('venda'));
   container.querySelector('#cash-stat-card').addEventListener('click', () => ctx.navigate('caixa'));
+  container.querySelector('#fiado-stat-card').addEventListener('click', () => ctx.navigate('clientes'));
 }
 
 function renderSalesTable(sales) {
