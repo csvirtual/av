@@ -225,20 +225,36 @@ export async function renderSale(container, ctx) {
         // (o que ainda vai restar) que importa pro vendedor decidir se dá
         // pra vender mais um pouco pro próximo cliente.
         const remaining = item.qtyAvailable - item.qty;
-        const remainingColor = remaining <= 0 ? 'color:var(--danger);font-weight:600;' : remaining <= 2 ? 'color:var(--warning);font-weight:600;' : '';
+        const stockClass = remaining <= 0 ? 'danger' : remaining <= 2 ? 'warn' : '';
         return `
-        <div class="cart-item">
-          <div style="flex:1;min-width:0;">
+        <div class="cart-line">
+          <div class="cart-line-info">
             <div class="name">${escapeHtml(item.name)}</div>
-            <div class="meta">${formatMoney(item.unitPrice)} / ${escapeHtml(item.unit)} · código ${escapeHtml(item.barcode)} · <span style="${remainingColor}">estoque restante: ${remaining} ${escapeHtml(item.unit)}</span></div>
+            <div class="cart-line-details">
+              <span>${formatMoney(item.unitPrice)} / ${escapeHtml(item.unit)}</span>
+              <span class="sep">·</span>
+              <span>Cód. <span class="code-value">${escapeHtml(item.barcode)}</span></span>
+            </div>
+            <div class="cart-line-stock ${stockClass}">
+              <span class="dot"></span>Estoque restante: ${remaining} ${escapeHtml(item.unit)}
+            </div>
           </div>
-          <input type="number" class="qty-input" min="1" max="${item.qtyAvailable}" value="${item.qty}" data-idx="${idx}">
-          <button class="btn btn-ghost btn-sm" data-discount="${idx}" title="Desconto no item">${hasDiscount ? '% editar' : '% desconto'}</button>
-          <div style="width:96px;text-align:right;">
-            ${hasDiscount ? `<div class="text-muted" style="font-size:11.5px;text-decoration:line-through;">${formatMoney(gross)}</div>` : ''}
-            <div style="font-weight:600;">${formatMoney(net)}</div>
+          <div class="cart-line-controls">
+            <div class="cart-line-controls-left">
+              <div class="cart-line-qty">
+                <label for="cart-qty-${idx}">Qtd.</label>
+                <input id="cart-qty-${idx}" type="number" class="qty-input" min="1" max="${item.qtyAvailable}" value="${item.qty}" data-idx="${idx}">
+              </div>
+              <button class="btn btn-ghost btn-sm" data-discount="${idx}" title="Desconto no item">${hasDiscount ? '% editar' : '% desconto'}</button>
+            </div>
+            <div class="cart-line-controls-right">
+              <div class="cart-line-price">
+                ${hasDiscount ? `<div class="gross">${formatMoney(gross)}</div>` : ''}
+                <div class="net">${formatMoney(net)}</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" data-remove="${idx}" title="Remover">✕</button>
+            </div>
           </div>
-          <button class="btn btn-ghost btn-sm" data-remove="${idx}" title="Remover">✕</button>
         </div>
       `;
       }).join('');

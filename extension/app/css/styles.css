@@ -505,6 +505,59 @@ tbody tr:hover { background: var(--surface-alt); }
 .cart-item .name { flex: 1; font-weight: 600; font-size: 13.5px; }
 .cart-item .meta { font-size: 12px; color: var(--text-muted); }
 .cart-item .qty-input { width: 60px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); text-align: center; }
+
+/* Linha de produto no carrinho da PDV — estrutura própria (não usa
+ * .cart-item) porque tem uma hierarquia de texto mais rica que as outras
+ * linhas que reaproveitam essa classe (cliente selecionado, forma de
+ * pagamento). Duas fileiras por item: a de cima (nome, preço/código,
+ * estoque restante) sempre com a largura inteira do cartão pra respirar
+ * sem quebrar palavra no meio; a de baixo, só com os controles
+ * (quantidade, desconto, preço, remover), que não competem por espaço
+ * com o texto. É o mesmo padrão de nota fiscal/PDV profissional — texto
+ * em cima, ação embaixo — em vez de espremer tudo numa única linha. */
+.cart-line {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.cart-line:first-child { padding-top: 6px; }
+.cart-line:last-child { border-bottom: none; padding-bottom: 6px; }
+
+.cart-line-info { display: flex; flex-direction: column; gap: 6px; }
+.cart-line-info .name { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+
+.cart-line-details { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.cart-line-details .sep { opacity: 0.45; }
+.cart-line-details .code-value { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.2px; }
+
+.cart-line-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text-muted);
+}
+.cart-line-stock .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.cart-line-stock.warn { color: var(--warning); }
+.cart-line-stock.danger { color: var(--danger); }
+
+.cart-line-controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.cart-line-controls-left { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.cart-line-controls-left .btn { white-space: nowrap; }
+.cart-line-controls-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.cart-line-qty { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.cart-line-qty label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.cart-line-qty .qty-input { width: 60px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); text-align: center; }
+
+.cart-line-price { text-align: right; }
+.cart-line-price .gross { font-size: 11.5px; color: var(--text-muted); text-decoration: line-through; margin-bottom: 3px; }
+.cart-line-price .net { font-weight: 700; font-size: 15px; }
 .cart-total {
   display: flex;
   justify-content: space-between;
