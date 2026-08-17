@@ -457,7 +457,7 @@ tbody tr:hover { background: var(--surface-alt); }
 /* ---------- Toast ---------- */
 .toast-root {
   position: fixed;
-  top: 18px;
+  bottom: 18px;
   right: 18px;
   z-index: 200;
   display: flex;
@@ -477,7 +477,7 @@ tbody tr:hover { background: var(--surface-alt); }
 .toast.error { background: var(--danger); }
 .toast.success { background: var(--success); }
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
