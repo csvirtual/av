@@ -421,7 +421,7 @@ function renderTable(products, isAdmin) {
       <table>
         <thead>
           <tr>
-            <th>Produto</th><th>Categoria</th><th>Código</th><th>Preço</th><th>Estoque</th><th>Status</th><th></th>
+            <th style="min-width:200px;">Produto</th><th>Categoria</th><th>Código</th><th>Preço</th><th>Estoque</th><th>Status</th><th></th>
           </tr>
         </thead>
         <tbody>
