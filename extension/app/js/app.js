@@ -9,6 +9,7 @@ import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
 import { confirmDialog } from './components/modal.js';
 import { escapeHtml } from './utils/format.js';
+import { getThemePreference, applyTheme, setThemePreference } from './theme.js';
 
 import { renderSetup } from './views/setup.js';
 import { renderLogin } from './views/login.js';
@@ -161,4 +162,40 @@ function renderShell(user, company) {
   else renderCurrentRoute();
 }
 
-boot();
+/** Botão fixo de aparência (☀️/🌙/🖥️), visível em toda tela — setup, login
+ * e sistema logado — porque fica fora de #root, então nenhuma troca de
+ * tela (que só substitui o innerHTML do #root) o remove. Clicar alterna
+ * entre automático → claro → escuro → automático, gravando a escolha
+ * pra valer também nas próximas vezes que o sistema abrir. */
+function initThemeToggle() {
+  const ICONS = { system: '🖥️', light: '☀️', dark: '🌙' };
+  const LABELS = { system: 'Automático (segue o sistema)', light: 'Claro', dark: 'Escuro' };
+  const ORDER = ['system', 'light', 'dark'];
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'theme-toggle-btn';
+  document.body.appendChild(btn);
+
+  async function refresh() {
+    const pref = await getThemePreference();
+    btn.textContent = ICONS[pref];
+    btn.title = `Aparência: ${LABELS[pref]} — clique para mudar`;
+    btn.setAttribute('aria-label', btn.title);
+  }
+
+  btn.addEventListener('click', async () => {
+    const pref = await getThemePreference();
+    const next = ORDER[(ORDER.indexOf(pref) + 1) % ORDER.length];
+    await setThemePreference(next);
+    await refresh();
+  });
+
+  refresh();
+}
+
+(async () => {
+  applyTheme(await getThemePreference());
+  initThemeToggle();
+  boot();
+})();
