@@ -193,6 +193,37 @@ a { color: var(--primary); }
   flex-direction: column;
 }
 
+/* Botão de menu (☰) e véu por trás do menu — só aparecem em telas estreitas,
+ * quando o menu lateral vira uma gaveta que desliza por cima do conteúdo em
+ * vez de dividir a largura da tela com ele (ver breakpoint 900px). */
+.menu-toggle-btn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 160;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 18px;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 20, 0.45);
+  z-index: 140;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
 .sidebar-brand {
   padding: 6px 10px 20px;
   border-bottom: 1px solid rgba(255,255,255,0.12);
@@ -497,4 +528,76 @@ tbody tr:hover { background: var(--surface-alt); }
 @media (max-width: 760px) {
   .help-layout { grid-template-columns: 1fr; }
   .help-topics { flex-direction: row; overflow-x: auto; position: static; }
+}
+
+/* ==========================================================================
+   Responsividade — a extensão abre numa aba comum, então a janela do
+   navegador pode ficar tão estreita quanto o usuário quiser (lado a lado
+   com outra janela, notebook pequeno, zoom alto etc.). As regras abaixo
+   cobrem do desktop largo até uma tela de celular, sempre priorizando
+   nunca deixar a página inteira rolar na horizontal — quem rola é só o
+   componente que precisa (tabela, menu de tópicos da ajuda).
+   ========================================================================== */
+
+/* ---------- ~1024px: PDV empilha carrinho/pagamento embaixo da busca ---------- */
+@media (max-width: 1024px) {
+  .pdv-layout { grid-template-columns: 1fr; }
+}
+
+/* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */
+@media (max-width: 900px) {
+  .shell { display: block; }
+  .menu-toggle-btn { display: flex; }
+  /* Fica no fluxo (display:block) o tempo todo dentro do breakpoint — só
+   * assim a opacidade consegue transicionar; display não anima. */
+  .sidebar-overlay { display: block; }
+  .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 250px;
+    max-width: 82vw;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    z-index: 150;
+    box-shadow: var(--shadow-md);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .main { padding: 76px 18px 48px; }
+  .page-header { margin-bottom: 18px; }
+}
+
+/* ---------- ~640px: formulários, modais e telas de autenticação compactos ---------- */
+@media (max-width: 640px) {
+  html, body { font-size: 14px; }
+  .main { padding: 72px 12px 40px; }
+
+  .form-row { flex-direction: column; gap: 0; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar input, .toolbar select, .toolbar label { width: 100%; min-width: 0; }
+  .toolbar label { display: flex; justify-content: space-between; gap: 8px; }
+
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1; }
+
+  .modal-backdrop { padding: 10px; align-items: flex-end; }
+  .modal { max-width: 100%; max-height: 92vh; padding: 18px 16px; }
+  .modal.wide { max-width: 100%; }
+
+  .auth-screen { padding: 16px; }
+  .auth-card, .auth-card.wide { padding: 26px 20px; max-width: 100%; }
+
+  .cart-item { flex-wrap: wrap; }
+  .cart-item .name { flex: 1 1 100%; }
+
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+/* ---------- ~420px: telas de celular ---------- */
+@media (max-width: 420px) {
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .sidebar-brand .name { font-size: 14px; }
 }

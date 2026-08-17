@@ -74,7 +74,9 @@ function currentRouteKey() {
 function renderShell(user, company) {
   root.innerHTML = `
     <div class="shell">
-      <nav class="sidebar">
+      <button class="menu-toggle-btn" id="menu-toggle-btn" type="button" aria-label="Abrir menu">☰</button>
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+      <nav class="sidebar" id="sidebar">
         <div class="sidebar-brand">
           <div class="name">${escapeHtml(company?.nomeFantasia || 'Gestão de Loja')}</div>
           <div class="sub">${escapeHtml(company?.cnpj || '')}</div>
@@ -90,6 +92,20 @@ function renderShell(user, company) {
     </div>
   `;
 
+  // Menu lateral em tela estreita vira uma gaveta (ver breakpoint 900px em
+  // styles.css) — o botão ☰ e o véu por trás só ficam visíveis nesse modo,
+  // mas os elementos e os listeners existem sempre, sem custo em telas largas.
+  const sidebarEl = document.getElementById('sidebar');
+  const overlayEl = document.getElementById('sidebar-overlay');
+  const closeSidebar = () => { sidebarEl.classList.remove('open'); overlayEl.classList.remove('open'); };
+  const toggleSidebar = () => {
+    const opening = !sidebarEl.classList.contains('open');
+    sidebarEl.classList.toggle('open', opening);
+    overlayEl.classList.toggle('open', opening);
+  };
+  document.getElementById('menu-toggle-btn').addEventListener('click', toggleSidebar);
+  overlayEl.addEventListener('click', closeSidebar);
+
   const navGroup = document.getElementById('nav-group');
   navGroup.innerHTML = Object.entries(ROUTES)
     .filter(([, route]) => route.roles.includes(user.role))
@@ -100,7 +116,7 @@ function renderShell(user, company) {
     `).join('');
 
   navGroup.querySelectorAll('.nav-link').forEach((btn) => {
-    btn.addEventListener('click', () => { location.hash = `#/${btn.dataset.route}`; });
+    btn.addEventListener('click', () => { location.hash = `#/${btn.dataset.route}`; closeSidebar(); });
   });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
