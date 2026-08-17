@@ -96,7 +96,11 @@ export async function createSale({
     overallDiscountValue: Number(overallDiscountValue) || 0,
     overallDiscountAmount,
     total,
-    payments: payments.map((p) => ({ method: p.method, amount: Number(p.amount) || 0 })),
+    // installments (parcelas) só faz sentido pra cartão de crédito, mas fica
+    // gravado em todo pagamento — sempre 1 quando não se aplica — pra manter
+    // o formato do registro previsível em vez de um campo que às vezes existe
+    // e às vezes não.
+    payments: payments.map((p) => ({ method: p.method, amount: Number(p.amount) || 0, installments: Math.max(1, Math.floor(Number(p.installments)) || 1) })),
     discountApprovedBy,
     cashSessionId,
     customerId,

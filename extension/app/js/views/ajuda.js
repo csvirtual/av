@@ -78,6 +78,7 @@ const TOPICS = [
 
       <h3>Pagamento</h3>
       <p>Clique em <strong>+ Forma de pagamento</strong> quantas vezes precisar — dá pra dividir a mesma venda entre dinheiro, cartão de débito, cartão de crédito e Pix, por exemplo metade em dinheiro e metade no cartão. O botão de finalizar só libera quando a soma dos pagamentos bate exatamente com o total.</p>
+      <p>Escolheu <strong>Cartão de crédito</strong>? Aparece um seletor de <strong>parcelas</strong> (1x até 12x) do lado — é só pra registro, fica marcado no histórico da venda; o sistema não cobra nem calcula juros, isso é combinado direto na maquininha.</p>
 
       <h3>Crédito de troca</h3>
       <p>Se o cliente tiver um crédito de troca disponível (veja o tópico "Estorno e troca"), ele aparece como um aviso verde no topo da tela de venda, com um botão pra usar como parte do pagamento.</p>

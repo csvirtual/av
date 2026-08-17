@@ -24,6 +24,8 @@ import { openModal, confirmDialog } from '../components/modal.js';
 const PAYMENT_METHODS = ['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix', 'Fiado'];
 const CREDIT_METHOD = 'Crédito de troca';
 const FIADO_METHOD = 'Fiado';
+const CREDIT_CARD_METHOD = 'Cartão de crédito';
+const MAX_INSTALLMENTS = 12; // padrão comum de "parcelamento sem juros" no varejo brasileiro
 
 export async function renderSale(container, ctx) {
   let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
@@ -359,12 +361,18 @@ export async function renderSale(container, ctx) {
         // é crédito (não faz sentido oferecer "virar" outro pagamento em
         // crédito) — pra trocar de forma, remove a linha e usa o banner.
         const options = p.method === CREDIT_METHOD ? [CREDIT_METHOD, ...PAYMENT_METHODS] : PAYMENT_METHODS;
+        const isCreditCard = p.method === CREDIT_CARD_METHOD;
         return `
-        <div class="cart-item">
-          <select data-pay-method="${idx}" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;" ${p.method === CREDIT_METHOD ? 'disabled' : ''}>
+        <div class="payment-row">
+          <select data-pay-method="${idx}" class="payment-method-select" ${p.method === CREDIT_METHOD ? 'disabled' : ''}>
             ${options.map((m) => `<option value="${escapeHtml(m)}" ${p.method === m ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('')}
           </select>
-          <input type="number" class="qty-input" style="width:100px;" min="0" step="0.01" value="${p.amount.toFixed(2)}" data-pay-idx="${idx}">
+          ${isCreditCard ? `
+            <select data-pay-installments="${idx}" class="payment-installments-select" title="Número de parcelas">
+              ${Array.from({ length: MAX_INSTALLMENTS }, (_, i) => i + 1).map((n) => `<option value="${n}" ${(p.installments || 1) === n ? 'selected' : ''}>${n}x</option>`).join('')}
+            </select>
+          ` : ''}
+          <input type="number" class="payment-amount-input" min="0" step="0.01" value="${p.amount.toFixed(2)}" data-pay-idx="${idx}">
           <button class="btn btn-ghost btn-sm" data-pay-remove="${idx}">✕</button>
         </div>
       `;
@@ -372,7 +380,15 @@ export async function renderSale(container, ctx) {
 
     paymentsBox.querySelectorAll('[data-pay-method]').forEach((select) => {
       select.addEventListener('change', () => {
-        payments[Number(select.dataset.payMethod)].method = select.value;
+        const idx = Number(select.dataset.payMethod);
+        payments[idx].method = select.value;
+        if (select.value === CREDIT_CARD_METHOD && !payments[idx].installments) payments[idx].installments = 1;
+        renderPayments();
+      });
+    });
+    paymentsBox.querySelectorAll('[data-pay-installments]').forEach((select) => {
+      select.addEventListener('change', () => {
+        payments[Number(select.dataset.payInstallments)].installments = Number(select.value);
       });
     });
     paymentsBox.querySelectorAll('[data-pay-idx]').forEach((input) => {

@@ -22,6 +22,14 @@ const STATUS_BADGE = {
   estornada: '<span class="badge badge-red">Estornada</span>',
 };
 
+/** Rótulo de uma forma de pagamento pra exibição — só mostra o número de
+ * parcelas quando fizer diferença (cartão de crédito parcelado em mais de
+ * 1x); à vista ou qualquer outra forma fica só o nome mesmo. */
+function paymentMethodLabel(p) {
+  const suffix = p.method === 'Cartão de crédito' && p.installments > 1 ? ` (${p.installments}x)` : '';
+  return `${escapeHtml(p.method)}${suffix}`;
+}
+
 export async function renderSalesHistory(container, ctx) {
   container.innerHTML = '<div class="card">Carregando…</div>';
 
@@ -95,7 +103,7 @@ export async function renderSalesHistory(container, ctx) {
                 <td>${escapeHtml(s.userName)}</td>
                 <td>${s.customerId ? escapeHtml(customerName(s.customerId) || 'cliente removido') : '<span class="text-muted">—</span>'}</td>
                 <td>${s.items.length}</td>
-                <td>${s.payments.map((p) => escapeHtml(p.method)).join(', ') || '—'}</td>
+                <td>${s.payments.map((p) => paymentMethodLabel(p)).join(', ') || '—'}</td>
                 <td>
                   ${s.refundedTotal > 0 ? `<div class="text-muted" style="font-size:11.5px;text-decoration:line-through;">${formatMoney(s.total)}</div>` : ''}
                   ${formatMoney(netTotal(s))}
@@ -150,7 +158,7 @@ export async function renderSalesHistory(container, ctx) {
         </div>
         <div class="cart-total"><span>Total</span><span class="value">${formatMoney(sale.total)}</span></div>
         <p class="section-title" style="margin-top:14px;">Pagamento</p>
-        ${sale.payments.map((p) => `<div style="display:flex;justify-content:space-between;font-size:13px;"><span>${escapeHtml(p.method)}</span><span>${formatMoney(p.amount)}</span></div>`).join('')}
+        ${sale.payments.map((p) => `<div style="display:flex;justify-content:space-between;font-size:13px;"><span>${paymentMethodLabel(p)}</span><span>${formatMoney(p.amount)}</span></div>`).join('')}
         ${sale.refunds.length > 0 ? `
           <p class="section-title" style="margin-top:14px;">Estornos</p>
           ${sale.refunds.map((r) => `

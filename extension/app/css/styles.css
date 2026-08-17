@@ -558,6 +558,16 @@ tbody tr:hover { background: var(--surface-alt); }
 .cart-line-price { text-align: right; }
 .cart-line-price .gross { font-size: 11.5px; color: var(--text-muted); text-decoration: line-through; margin-bottom: 3px; }
 .cart-line-price .net { font-weight: 700; font-size: 15px; }
+
+/* Linha de forma de pagamento — mesmo espírito do .cart-line (evita
+ * espremer campos numa linha corrida), mas mais simples porque tem só
+ * 2-3 controles ao invés de texto + controles. */
+.payment-row { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.payment-row:first-child { padding-top: 4px; }
+.payment-row:last-child { border-bottom: none; padding-bottom: 4px; }
+.payment-method-select { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.payment-installments-select { width: 60px; flex-shrink: 0; padding: 8px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: center; }
+.payment-amount-input { width: 110px; flex-shrink: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); text-align: right; }
 .cart-total {
   display: flex;
   justify-content: space-between;
