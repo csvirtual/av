@@ -185,12 +185,38 @@ const TOPICS = [
         <li>Cadastrar ou editar produto, nem ajustar estoque manualmente</li>
         <li>Estornar uma venda</li>
         <li>Excluir cliente (só inativar)</li>
+        <li>Cadastrar fornecedor ou fazer pedido de compra</li>
         <li>Cadastrar ou gerenciar outros usuários</li>
         <li>Ver o log de auditoria ou mudar os dados/políticas da loja</li>
       </ul>
 
       <h3>Gerenciando vendedores</h3>
       <p>Na tela <strong>Usuários</strong>, o administrador pode desativar um vendedor (ele para de conseguir logar, mas as vendas dele continuam no histórico) e redefinir a senha de qualquer um, sem precisar saber a senha antiga.</p>
+    `,
+  },
+  {
+    id: 'compras',
+    icon: '🛒',
+    title: 'Fornecedores e compras',
+    html: `
+      <h2>Fornecedores e compras</h2>
+      <p class="help-subtitle">Como repor o estoque de forma organizada (só administrador).</p>
+
+      <h3>Cadastrar fornecedor</h3>
+      <p>Vá em <strong>Compras → Fornecedores → + Novo fornecedor</strong>. Vale a pena vincular cada produto ao fornecedor de costume dele — isso é feito no próprio cadastro do produto, em <strong>Estoque</strong>, no campo "Fornecedor padrão". É esse vínculo que faz a sugestão automática de compra funcionar.</p>
+
+      <h3>Criar um pedido de compra</h3>
+      <p>Em <strong>Compras → Pedidos de compra → + Novo pedido</strong>, escolha o fornecedor e adicione os produtos (buscando pelo nome), com quantidade e custo unitário combinado. O pedido fica com status <strong>Aberto</strong> até alguém receber a mercadoria.</p>
+
+      <h3>Sugestão automática</h3>
+      <p>O botão <strong>Sugestão automática</strong> olha todos os produtos com estoque baixo que já têm um fornecedor padrão cadastrado, agrupa por fornecedor e sugere uma quantidade de reposição — é só um ponto de partida, dá pra ajustar tudo antes de confirmar o pedido.</p>
+
+      <h3>Recebendo a mercadoria</h3>
+      <p>Quando a entrega chegar, abra o pedido e clique em <strong>Receber mercadoria</strong>. Pode ser tudo de uma vez ou aos poucos (entregas parciais) — o sistema só dá entrada no estoque na quantidade que você confirmar receber, e atualiza o preço de custo do produto com o valor informado na nota.</p>
+      <p>O pedido muda de status sozinho: <span class="badge badge-gray">Aberto</span> → <span class="badge badge-gold">Recebido parcialmente</span> → <span class="badge badge-green">Recebido</span>. Um pedido que ainda não recebeu nada pode ser cancelado.</p>
+
+      <h3>Inventário / balanço</h3>
+      <p>Em <strong>Estoque → Fazer inventário</strong>, dá pra contar fisicamente todos os produtos de uma vez e digitar o valor encontrado — o sistema ajusta sozinho só os produtos com diferença, registrando tudo no histórico de cada um.</p>
     `,
   },
   {

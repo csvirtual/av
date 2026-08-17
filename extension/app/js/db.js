@@ -3,7 +3,7 @@
 // Nenhuma regra de negócio deve viver aqui — só mecanismo de acesso ao banco,
 // reutilizado pelos repositórios em js/data/*.js.
 const DB_NAME = 'loja-gestao-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -71,6 +71,20 @@ function openDatabase() {
         const store = db.createObjectStore('customerDebts', { keyPath: 'id' });
         store.createIndex('byCustomerId', 'customerId', { unique: false });
         store.createIndex('byTimestamp', 'timestamp', { unique: false });
+      }
+
+      // v4: fornecedores e pedidos de compra — ver data/suppliersRepo.js e
+      // data/purchasesRepo.js
+      if (!db.objectStoreNames.contains('suppliers')) {
+        const store = db.createObjectStore('suppliers', { keyPath: 'id' });
+        store.createIndex('byNameLower', 'nameLower', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('purchaseOrders')) {
+        const store = db.createObjectStore('purchaseOrders', { keyPath: 'id' });
+        store.createIndex('bySupplierId', 'supplierId', { unique: false });
+        store.createIndex('byStatus', 'status', { unique: false });
+        store.createIndex('byCreatedAt', 'createdAt', { unique: false });
       }
     };
 

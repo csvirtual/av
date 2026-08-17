@@ -47,6 +47,9 @@ export async function createProduct(data) {
     // não contar o estoque inicial em dobro.
     quantity: 0,
     minStock: Number(data.minStock) || 0,
+    // Fornecedor padrão (opcional) — usado pra agrupar a sugestão de compra
+    // automática por fornecedor (ver data/purchasesRepo.js).
+    supplierId: data.supplierId || null,
     active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -73,6 +76,7 @@ export async function updateProduct(id, data) {
   if (data.price !== undefined) product.price = Number(data.price) || 0;
   if (data.costPrice !== undefined) product.costPrice = Number(data.costPrice) || 0;
   if (data.minStock !== undefined) product.minStock = Number(data.minStock) || 0;
+  if (data.supplierId !== undefined) product.supplierId = data.supplierId || null;
   product.updatedAt = Date.now();
   await dbPut('products', product);
   return product;

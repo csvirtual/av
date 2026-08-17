@@ -7,6 +7,7 @@ import {
   setProductActive, deleteProduct,
 } from '../data/productsRepo.js';
 import { recordMovement, listMovementsByProduct } from '../data/stockRepo.js';
+import { listSuppliers } from '../data/suppliersRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { generateInternalBarcode } from '../utils/barcode.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
@@ -30,6 +31,7 @@ export async function renderProducts(container, ctx) {
         <div class="desc">Material de construção e mercearia — visão geral do que a loja tem disponível.</div>
       </div>
       <div class="page-actions">
+        ${isAdmin ? '<button class="btn btn-secondary" id="inventory-btn">Fazer inventário</button>' : ''}
         ${isAdmin ? '<button class="btn" id="new-product-btn">+ Novo produto</button>' : ''}
       </div>
     </div>
@@ -64,6 +66,7 @@ export async function renderProducts(container, ctx) {
 
   if (isAdmin) {
     document.getElementById('new-product-btn').addEventListener('click', () => openProductModal(null));
+    document.getElementById('inventory-btn').addEventListener('click', () => openInventoryModal());
   }
 
   function wireRowActions(products) {
@@ -153,8 +156,9 @@ export async function renderProducts(container, ctx) {
     refresh();
   }
 
-  function openProductModal(product) {
+  async function openProductModal(product) {
     const isEdit = !!product;
+    const suppliers = await listSuppliers();
     openModal({
       title: isEdit ? 'Editar produto' : 'Novo produto',
       submitLabel: isEdit ? 'Salvar alterações' : 'Cadastrar produto',
@@ -206,6 +210,14 @@ export async function renderProducts(container, ctx) {
             <input id="f-min" type="number" step="1" min="0" value="${isEdit ? product.minStock : 0}">
           </div>
         </div>
+        <div class="field">
+          <label>Fornecedor padrão</label>
+          <select id="f-supplier">
+            <option value="">Nenhum</option>
+            ${suppliers.map((s) => `<option value="${s.id}" ${isEdit && product.supplierId === s.id ? 'selected' : ''}>${escapeHtml(s.nome)}</option>`).join('')}
+          </select>
+          <span class="hint">Usado pra agrupar a sugestão automática de compra em Compras → Sugestão.</span>
+        </div>
       `,
       onMount: (modalEl) => {
         modalEl.querySelector('#gen-barcode-btn').addEventListener('click', () => {
@@ -231,6 +243,7 @@ export async function renderProducts(container, ctx) {
           price,
           costPrice: modalEl.querySelector('#f-cost').value,
           minStock: modalEl.querySelector('#f-min').value,
+          supplierId: modalEl.querySelector('#f-supplier').value || null,
         };
         try {
           if (isEdit) {
@@ -314,6 +327,80 @@ export async function renderProducts(container, ctx) {
             entity: 'product', entityId: product.id,
           });
           showToast('Estoque ajustado.', 'success');
+          refresh();
+          return true;
+        } catch (err) {
+          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          return false;
+        }
+      },
+    });
+  }
+
+  /** Inventário/balanço: contagem física de todo o catálogo de uma vez.
+   * Pra cada produto onde a contagem digitada difere da quantidade atual do
+   * sistema, gera um ajuste (tipo 'ajuste') com a diferença — mesmo
+   * mecanismo do ajuste individual, só que em lote. Produto sem diferença
+   * não gera movimento nenhum (evita poluir o histórico à toa). */
+  async function openInventoryModal() {
+    const products = (await listProducts()).filter((p) => p.active);
+    openModal({
+      title: 'Inventário / balanço de estoque',
+      submitLabel: 'Aplicar ajustes',
+      wide: true,
+      bodyHtml: `
+        <div id="modal-error"></div>
+        <p class="text-muted" style="font-size:13px;">
+          Conte fisicamente cada produto e digite o valor encontrado. Só os produtos com contagem
+          diferente do sistema geram um ajuste — o resto fica como está.
+        </p>
+        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Produto</th><th>No sistema</th><th>Contagem física</th></tr></thead>
+            <tbody>
+              ${products.map((p) => `
+                <tr>
+                  <td>${escapeHtml(p.name)}</td>
+                  <td>${p.quantity} ${escapeHtml(p.unit)}</td>
+                  <td><input type="number" min="0" step="1" value="${p.quantity}" data-count="${p.id}" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Observação</label>
+          <input id="f-note" placeholder="Ex: balanço mensal de agosto">
+        </div>
+      `,
+      onSubmit: async (modalEl) => {
+        const errBox = modalEl.querySelector('#modal-error');
+        const note = modalEl.querySelector('#f-note').value.trim() || 'Inventário/balanço';
+        const diffs = products
+          .map((p) => ({ product: p, counted: Number(modalEl.querySelector(`[data-count="${p.id}"]`).value) }))
+          .filter(({ product, counted }) => Number.isFinite(counted) && counted !== product.quantity);
+
+        if (diffs.length === 0) {
+          showToast('Nenhuma diferença encontrada — estoque já bate com o sistema.', 'success');
+          return true;
+        }
+
+        try {
+          for (const { product, counted } of diffs) {
+            const delta = counted - product.quantity;
+            await recordMovement({
+              productId: product.id, type: 'ajuste', qty: delta,
+              userId: ctx.user.id, userName: ctx.user.nome,
+              note: `${note} (${delta > 0 ? '+' : ''}${delta})`,
+            });
+          }
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: 'Inventário/balanço de estoque',
+            details: `${diffs.length} produto(s) ajustado(s) por contagem física. ${note}.`,
+            entity: 'inventory', entityId: '',
+          });
+          showToast(`Inventário aplicado: ${diffs.length} produto(s) ajustado(s).`, 'success');
           refresh();
           return true;
         } catch (err) {
