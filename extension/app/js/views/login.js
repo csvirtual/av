@@ -4,12 +4,13 @@
 import { verifyLogin } from '../data/usersRepo.js';
 import { setSessionUserId } from '../session.js';
 import { logAction } from '../data/auditRepo.js';
+import { escapeHtml } from '../utils/format.js';
 
 export function renderLogin(root, { onLogin, company }) {
   root.innerHTML = `
     <div class="auth-screen">
       <div class="auth-card">
-        <div class="auth-brand"><span class="dot"></span><span>${company?.nomeFantasia || 'Gestão de Loja'}</span></div>
+        <div class="auth-brand"><span class="dot"></span><span>${escapeHtml(company?.nomeFantasia) || 'Gestão de Loja'}</span></div>
         <h1>Entrar</h1>
         <p class="subtitle">Informe seu usuário e senha para acessar o sistema.</p>
         <form id="login-form" novalidate>
