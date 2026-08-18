@@ -19,8 +19,10 @@ JavaScript puro (ES modules), HTML e CSS.
 
 ## Primeiro uso
 
-Na primeira vez que o sistema abrir, ele pergunta: **cadastrar do zero** ou
-**restaurar de um backup**?
+Na primeira vez que o sistema abrir, a tela de boas-vindas já deixa escolher
+a **aparência** (claro/escuro/automático — pode trocar quando quiser depois,
+em Personalização) e pergunta: **cadastrar do zero** ou **restaurar de um
+backup**?
 
 Cadastrando do zero, pede:
 
@@ -91,8 +93,9 @@ sistema em linguagem simples, separado em tópicos.
   usuário, perfil e data/hora — exclusivo do Administrador Geral.
 - **Personalização** — aparência claro/escuro, independente do sistema
   operacional (menu **Personalização**, disponível pros dois perfis). A
-  escolha inicial já é feita na configuração inicial, num passo próprio
-  antes do cadastro da empresa — pode ser trocada a qualquer momento depois.
+  escolha inicial já é feita na própria tela de boas-vindas da configuração
+  inicial, antes até de decidir entre cadastrar do zero ou restaurar backup
+  — pode ser trocada a qualquer momento depois.
 - **Backup** — exportação e restauração de todos os dados do sistema num
   arquivo único protegido por senha (AES-256-GCM, chave derivada via
   PBKDF2), pra guardar em outro lugar e restaurar depois — inclusive numa

@@ -8,7 +8,7 @@
 // estorno, só ganha uma entrada em `refunds` e os itens afetados marcam
 // quanto já foi devolvido (`qtyRefunded`), preservando o valor original pra
 // auditoria.
-import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
+import { dbGetAll, dbGet, dbUpdate, dbTransaction, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
@@ -21,12 +21,24 @@ const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
 const FIADO_METHOD = 'Fiado';
 
 /** Registra uma venda completa: confere estoque de cada item, calcula
- * descontos (por item e geral), debita a quantidade vendida (via stockRepo,
- * que também grava a movimentação) e só então grava o registro da venda.
- * Se qualquer item não tiver estoque suficiente, ou a soma dos pagamentos
- * não bater com o total, nada é gravado. Uma venda com pagamento em
- * "Fiado" precisa de um cliente selecionado — vira uma dívida na conta
- * dele (ver data/customersRepo.js), não dinheiro entrando agora.
+ * descontos (por item e geral), debita a quantidade vendida e grava o
+ * registro da venda — tudo dentro de UMA ÚNICA transação do IndexedDB (ver
+ * o bloco com dbTransaction mais abaixo). Se qualquer item não tiver
+ * estoque suficiente, ou a soma dos pagamentos não bater com o total, nada
+ * é gravado. Uma venda com pagamento em "Fiado" precisa de um cliente
+ * selecionado — vira uma dívida na conta dele (ver data/customersRepo.js),
+ * não dinheiro entrando agora.
+ *
+ * Por que uma transação única (achado de auditoria): antes, cada item do
+ * carrinho debitava o estoque numa transação própria (uma chamada a
+ * stockRepo.recordMovement por item, em sequência), e só depois de todas
+ * elas é que a venda em si era gravada, numa transação separada. Se o
+ * Chrome fechasse, travasse ou o computador reiniciasse no meio desse
+ * processo — bem mais provável numa venda com vários itens do que parece
+ * — o estoque de alguns itens já tinha sido debitado, mas a venda que
+ * explicaria essa baixa nunca chegava a existir: estoque errado, sem
+ * nenhum registro contábil por trás. Agora a baixa de cada item E o
+ * registro da venda só existem juntos, ou nenhum dos dois existe.
  *
  * A autorização de desconto acima do limite (`discountApproval`) é
  * verificada AQUI, não só na tela: a versão antiga confiava num
@@ -75,8 +87,13 @@ export async function createSale({
     throw new Error('Selecione um cliente para vender fiado.');
   }
 
-  // Confere estoque de todos os itens antes de debitar qualquer um —
-  // evita vender parte do carrinho e travar no meio por falta de estoque.
+  // Confere estoque de todos os itens antes de debitar qualquer um — evita
+  // vender parte do carrinho e travar no meio por falta de estoque. Essa
+  // leitura aqui é só um filtro rápido, pra devolver um erro amigável cedo
+  // (produto errado, estoque zerado) sem nem tentar abrir a transação —
+  // não é a checagem que vale de verdade: a decisão final usa uma leitura
+  // FRESCA de cada produto, dentro da própria transação atômica lá embaixo
+  // (essa aqui pode estar desatualizada por alguns milissegundos).
   const products = [];
   for (const item of items) {
     const product = await getProduct(item.productId);
@@ -133,13 +150,6 @@ export async function createSale({
     }
   }
 
-  for (const item of items) {
-    await recordMovement({
-      productId: item.productId, type: 'venda', qty: -item.qty,
-      userId, userName, note: 'Baixa por venda',
-    });
-  }
-
   const sale = {
     id: newId(),
     timestamp: Date.now(),
@@ -162,7 +172,63 @@ export async function createSale({
     refunds: [],
     refundedTotal: 0,
   };
-  await dbAdd('sales', sale);
+
+  // Baixa de estoque de cada item + gravação da venda, tudo numa ÚNICA
+  // transação (cobrindo os 3 stores envolvidos) — ver comentário no topo
+  // da função. `stockError` guarda a mensagem amigável de um item sem
+  // estoque suficiente: a transação é abortada nesse caso (desfaz
+  // qualquer baixa já enfileirada dos itens anteriores do mesmo carrinho),
+  // e o erro de verdade é relançado depois, fora da transação — abortar
+  // faz dbTransaction rejeitar só com "Transação cancelada.", sem contexto
+  // nenhum, por isso a mensagem específica é guardada à parte.
+  //
+  // A checagem por item precisa ser sequencial (uma só depois que a
+  // anterior terminou), não em paralelo: se o mesmo produto aparecer duas
+  // vezes no carrinho (não deveria acontecer pela UI, que sempre soma na
+  // mesma linha, mas esta função não confia cegamente em quem chama), a
+  // segunda leitura precisa enxergar o efeito da baixa da primeira, senão
+  // as duas debitariam a partir da mesma quantidade "antes" e o produto
+  // ficaria com menos estoque do que deveria.
+  let stockError = null;
+  try {
+    await dbTransaction(['products', 'stockMovements', 'sales'], 'readwrite', (transaction) => {
+      const productsStore = transaction.objectStore('products');
+      const movementsStore = transaction.objectStore('stockMovements');
+      const salesStore = transaction.objectStore('sales');
+
+      function processItem(idx) {
+        if (idx >= saleItems.length) {
+          salesStore.add(sale);
+          return;
+        }
+        const item = saleItems[idx];
+        const getReq = productsStore.get(item.productId);
+        getReq.onsuccess = () => {
+          const product = getReq.result;
+          if (!product) {
+            stockError = 'Produto não encontrado no carrinho.';
+            transaction.abort();
+            return;
+          }
+          const newQuantity = product.quantity - item.qty;
+          if (newQuantity < 0) {
+            stockError = `Estoque insuficiente de "${product.name}" (disponível: ${product.quantity}).`;
+            transaction.abort();
+            return;
+          }
+          productsStore.put({ ...product, quantity: newQuantity, updatedAt: Date.now() });
+          movementsStore.add({
+            id: newId(), productId: item.productId, type: 'venda', qty: -item.qty,
+            userId, userName, note: 'Baixa por venda', timestamp: Date.now(),
+          });
+          processItem(idx + 1);
+        };
+      }
+      processItem(0);
+    });
+  } catch (err) {
+    throw new Error(stockError || err.message);
+  }
 
   if (fiadoTotal > 0) {
     await recordDebt({ customerId, amount: fiadoTotal, saleId: sale.id, userId, userName });

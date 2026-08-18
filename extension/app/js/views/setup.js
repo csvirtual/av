@@ -1,12 +1,13 @@
 // Assistente de configuração inicial: roda uma única vez, na primeira
-// abertura do sistema. Antes de tudo, pergunta se é um cadastro novo ou se
-// existe um backup pra restaurar — quem escolhe cadastro novo segue pro
-// fluxo de sempre (passo 1 escolhe a aparência, passo 2 cadastra a empresa,
-// passo 3 cadastra obrigatoriamente o Administrador Geral); quem tem backup
+// abertura do sistema. A própria tela de boas-vindas já deixa escolher a
+// aparência (embutida ali, não é mais um passo separado) e pergunta se é um
+// cadastro novo ou se existe um backup pra restaurar — quem escolhe
+// cadastro novo segue pro fluxo de sempre (passo 1 cadastra a empresa,
+// passo 2 cadastra obrigatoriamente o Administrador Geral); quem tem backup
 // pula direto pra tela de login com todos os dados já restaurados (a
-// aparência, nesse caso, fica com o padrão até ser trocada depois em
-// Personalização — não faz parte do backup). Só depois de um dos dois
-// caminhos o app libera a tela de login.
+// aparência escolhida na tela de boas-vindas já vale nesse caminho também,
+// já que é aplicada na hora — não faz parte do arquivo de backup em si).
+// Só depois de um dos dois caminhos o app libera a tela de login.
 import { saveCompany } from '../data/companyRepo.js';
 import { createUser, findByUsername } from '../data/usersRepo.js';
 import { logAction } from '../data/auditRepo.js';
@@ -31,11 +32,13 @@ export function renderSetup(root, { onComplete }) {
   const state = { step: 0, company: null };
   renderStep0();
 
-  // totalSteps=3 porque o fluxo de "cadastro do zero" agora é: 1) aparência,
-  // 2) dados da loja, 3) Administrador Geral. O passo 0 (esta escolha) e a
-  // restauração de backup não passam por aqui — não têm stepNum, por isso
-  // não mostram a barra de progresso (ver renderStep0/renderRestore).
-  function shell(inner, { title, subtitle, stepNum = null, totalSteps = 3 }) {
+  // totalSteps=2 porque o fluxo de "cadastro do zero" agora é: 1) dados da
+  // loja, 2) Administrador Geral (a aparência já foi escolhida na própria
+  // tela de boas-vindas, antes desses passos numerados). O passo 0 (esta
+  // escolha) e a restauração de backup não passam por aqui — não têm
+  // stepNum, por isso não mostram a barra de progresso (ver
+  // renderStep0/renderRestore).
+  function shell(inner, { title, subtitle, stepNum = null, totalSteps = 2 }) {
     root.innerHTML = `
       <div class="auth-screen">
         <div class="auth-card wide">
@@ -54,9 +57,20 @@ export function renderSetup(root, { onComplete }) {
     `;
   }
 
-  // ---------- Passo 0: cadastro novo ou restaurar de um backup ----------
-  function renderStep0() {
+  // ---------- Passo 0: boas-vindas — escolhe a aparência (embutida aqui,
+  // não é mais uma tela separada) e depois se é cadastro novo ou restaurar
+  // de um backup. A aparência já é aplicada na hora (ver theme.js) e vale
+  // pros dois caminhos daqui pra frente, já que é preferência do
+  // computador, não do cadastro/backup — pode ser trocada quando quiser
+  // depois, em Personalização. ----------
+  async function renderStep0() {
+    let currentTheme = await getThemePreference();
+
     shell(`
+      <p class="section-title">Aparência</p>
+      <div class="theme-options theme-options-compact" id="theme-options"></div>
+
+      <p class="section-title" style="margin-top:22px;">Como deseja continuar?</p>
       <div class="setup-choice-grid">
         <button type="button" class="setup-choice-card" id="choice-new">
           <span class="icon">🏬</span>
@@ -71,37 +85,14 @@ export function renderSetup(root, { onComplete }) {
       </div>
     `, {
       title: 'Bem-vindo',
-      subtitle: 'Antes de começar: você já tem um backup deste sistema, ou é a primeira vez que ele é instalado?',
-    });
-
-    document.getElementById('choice-new').addEventListener('click', renderThemeStep);
-    document.getElementById('choice-restore').addEventListener('click', renderRestore);
-  }
-
-  // ---------- Passo 1: aparência (claro/escuro/automático) — só no
-  // caminho de cadastro do zero; quem restaura um backup não passa por
-  // aqui, já que a preferência de tema é do computador, não do backup, e
-  // pode ser ajustada a qualquer momento depois em Personalização. ----------
-  async function renderThemeStep() {
-    let current = await getThemePreference();
-
-    shell(`
-      <div class="theme-options" id="theme-options"></div>
-      <div class="modal-actions" style="justify-content:space-between;padding-top:18px;">
-        <button type="button" class="btn btn-secondary" id="back-btn">← Voltar</button>
-        <button type="button" class="btn" id="theme-continue-btn">Continuar →</button>
-      </div>
-    `, {
-      title: 'Aparência',
-      subtitle: 'Escolha como o sistema vai aparecer neste computador. Pode trocar quando quiser depois, em Personalização.',
-      stepNum: 1,
+      subtitle: 'Antes de começar: escolha como o sistema vai aparecer neste computador e diga se você já tem um backup ou se é a primeira vez que ele é instalado.',
     });
 
     const optionsBox = document.getElementById('theme-options');
 
-    function renderOptions() {
+    function renderThemeOptions() {
       optionsBox.innerHTML = THEME_OPTIONS.map((opt) => `
-        <div class="theme-option ${current === opt.value ? 'active' : ''}" data-theme-option="${opt.value}" role="button" tabindex="0">
+        <div class="theme-option ${currentTheme === opt.value ? 'active' : ''}" data-theme-option="${opt.value}" role="button" tabindex="0">
           <span class="icon">${opt.icon}</span>
           <span class="label">${opt.label}</span>
           <span class="desc">${opt.desc}</span>
@@ -109,23 +100,23 @@ export function renderSetup(root, { onComplete }) {
         </div>
       `).join('');
       optionsBox.querySelectorAll('[data-theme-option]').forEach((el) => {
-        el.addEventListener('click', () => selectOption(el.dataset.themeOption));
+        el.addEventListener('click', () => selectTheme(el.dataset.themeOption));
         el.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOption(el.dataset.themeOption); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTheme(el.dataset.themeOption); }
         });
       });
     }
 
-    async function selectOption(value) {
-      if (value === current) return;
-      current = value;
+    async function selectTheme(value) {
+      if (value === currentTheme) return;
+      currentTheme = value;
       await setThemePreference(value); // já aplica visualmente na hora, ver theme.js
-      renderOptions();
+      renderThemeOptions();
     }
 
-    renderOptions();
-    document.getElementById('back-btn').addEventListener('click', renderStep0);
-    document.getElementById('theme-continue-btn').addEventListener('click', () => { state.step = 1; renderStep1(); });
+    renderThemeOptions();
+    document.getElementById('choice-new').addEventListener('click', () => { state.step = 1; renderStep1(); });
+    document.getElementById('choice-restore').addEventListener('click', renderRestore);
   }
 
   // ---------- Restaurar de um backup (sem limite de tentativas — a senha
@@ -268,12 +259,12 @@ export function renderSetup(root, { onComplete }) {
     `, {
       title: 'Dados da loja',
       subtitle: 'Agora vamos cadastrar os dados da empresa. Esse cadastro é feito uma única vez.',
-      stepNum: 2,
+      stepNum: 1,
     });
 
     // Sem botão "← Voltar" aqui de propósito: os campos deste formulário
-    // não ficam salvos em nenhum rascunho — voltar pra tela de aparência e
-    // clicar em "Continuar" de novo re-renderizaria tudo em branco,
+    // não ficam salvos em nenhum rascunho — voltar pra tela de boas-vindas e
+    // clicar em "Cadastrar do zero" de novo re-renderizaria tudo em branco,
     // apagando o que já tinha sido digitado. Se quiser mudar a aparência,
     // dá pra fazer depois, em Personalização, sem perder o cadastro.
     const form = document.getElementById('company-form');
@@ -365,7 +356,7 @@ export function renderSetup(root, { onComplete }) {
     `, {
       title: 'Administrador Geral',
       subtitle: 'Agora cadastre o Administrador Geral — o primeiro usuário do sistema, com acesso total. Os próximos usuários cadastrados serão vendedores.',
-      stepNum: 3,
+      stepNum: 2,
     });
 
     document.getElementById('back-btn').addEventListener('click', () => {

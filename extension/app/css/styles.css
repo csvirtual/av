@@ -731,6 +731,17 @@ input.customer-search-input:focus {
 .theme-option .check { visibility: hidden; font-size: 12px; }
 .theme-option.active .check { visibility: visible; }
 
+/* Variante compacta — usada na tela de boas-vindas do Setup (setup.js),
+   onde a escolha de aparência fica embutida acima dos cartões de
+   cadastrar do zero / restaurar backup, então precisa ocupar menos altura
+   que a versão de tela cheia da tela de Personalização. */
+.theme-options-compact .theme-option { padding: 12px 10px; flex-direction: row; justify-content: flex-start; gap: 10px; min-width: 0; }
+.theme-options-compact .theme-option .icon { font-size: 20px; }
+.theme-options-compact .theme-option .label { font-size: 13px; }
+.theme-options-compact .theme-option .desc { display: none; }
+.theme-options-compact .theme-option .check { display: none; }
+@media (max-width: 620px) { .theme-options-compact { flex-direction: column; } .theme-options-compact .theme-option { min-width: 0; } }
+
 /* ==========================================================================
    Responsividade — a extensão abre numa aba comum, então a janela do
    navegador pode ficar tão estreita quanto o usuário quiser (lado a lado

@@ -13,7 +13,7 @@ const TOPICS = [
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
       <h3>Cadastro da loja</h3>
-      <p>Na primeiríssima vez que o sistema abre, antes até do cadastro da empresa, ele pergunta a <strong>aparência</strong> (claro, escuro ou automático) e depois pede os dados da empresa (CNPJ, endereço, telefone etc.). Isso só acontece <strong>uma única vez</strong> — depois disso, o sistema nunca mais pede de novo.</p>
+      <p>Na primeiríssima vez que o sistema abre, a própria tela de boas-vindas já deixa escolher a <strong>aparência</strong> (claro, escuro ou automático) antes de perguntar se é cadastro novo ou restauração de backup; escolhendo cadastro novo, o passo seguinte pede os dados da empresa (CNPJ, endereço, telefone etc.). Isso só acontece <strong>uma única vez</strong> — depois disso, o sistema nunca mais pede de novo.</p>
 
       <h3>O Administrador Geral</h3>
       <p>Logo depois de cadastrar a loja, o sistema pede pra cadastrar o primeiro usuário — e esse primeiro usuário é <strong>sempre</strong> o Administrador Geral. Ele é quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
