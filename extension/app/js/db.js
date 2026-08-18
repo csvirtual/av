@@ -110,8 +110,30 @@ function openDatabase() {
       }
     };
 
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Sem isso, uma aba com conexão aberta bloqueia PRA SEMPRE qualquer
+      // outra tentativa de abrir o banco numa versão mais nova (ex: outra
+      // aba já rodando o código atualizado depois de a extensão se
+      // atualizar sozinha, ou até um dev testando localmente com "Load
+      // unpacked" + recarregar a extensão) — o pedido de upgrade da outra
+      // aba fica parado esperando essa conexão fechar, e essa conexão
+      // nunca fecha sozinha por padrão. Ao ouvir 'versionchange', fecha a
+      // conexão desta aba de propósito; a próxima operação do banco NESTA
+      // aba reabre uma conexão nova sozinha (dbPromise volta a null), sem
+      // precisar de reload manual.
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
+    // Efeito colateral do mesmo cenário acima, do lado de quem está tentando
+    // abrir a versão nova: enquanto a outra aba não fecha a conexão antiga,
+    // este req fica com status 'blocked' (nem onsuccess nem onerror disparam
+    // ainda). Não precisa fazer nada aqui além de não travar silenciosamente
+    // pra sempre sem pista nenhuma — o onversionchange acima já resolve a
+    // causa; isso só evita um estado "preso" sem log nenhum se, por algum
+    // motivo, a outra aba não reagir a tempo.
+    req.onblocked = () => console.warn('[db] Abertura do banco bloqueada por outra aba com conexão aberta — aguardando ela fechar.');
   });
   return dbPromise;
 }

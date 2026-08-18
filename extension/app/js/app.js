@@ -7,7 +7,7 @@ import { hasAnyUser, getUser } from './data/usersRepo.js';
 import { getSessionUserId, clearSession, onSessionUserIdChanged } from './session.js';
 import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
-import { confirmDialog } from './components/modal.js';
+import { confirmDialog, closeAllModals } from './components/modal.js';
 import { escapeHtml } from './utils/format.js';
 import { getThemePreference, applyTheme } from './theme.js';
 
@@ -52,6 +52,15 @@ const ROUTES = {
 };
 
 async function boot() {
+  // Mesmo motivo do closeAllModals() em renderCurrentRoute (ver comentário
+  // lá): um modal aberto fica anexado direto no <body>, fora de #root, e
+  // sobreviveria mesmo a isso reescrever root.innerHTML por completo.
+  // boot() é chamado não só no carregamento inicial, mas também no logout,
+  // ao completar o setup/login, e — o caso mais fácil de reproduzir de
+  // verdade — quando outra aba desloga (ver onSessionUserIdChanged mais
+  // abaixo): se esta aba tiver um modal aberto no momento, ele ficaria
+  // flutuando por cima da tela de login sem essa chamada.
+  closeAllModals();
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
 
   const [companyRegistered, anyUser] = await Promise.all([isCompanyRegistered(), hasAnyUser()]);
@@ -165,6 +174,15 @@ function renderShell(user, company) {
   // acaso. Custa uma leitura no IndexedDB por clique de navegação — 1
   // registro, sem sensação de lentidão perceptível.
   async function renderCurrentRoute() {
+    // Fecha qualquer modal aberto ANTES de qualquer outra coisa — inclusive
+    // antes do await abaixo. Sem isso, um modal aberto sobrevivia à troca
+    // de rota (ele fica anexado direto no <body>, fora do #main-content
+    // que este roteador limpa) e ficava flutuando por cima da tela nova.
+    // Isso é alcançável de verdade: a extensão abre numa aba cheia, então
+    // o usuário tem o histórico do navegador disponível normalmente — dá
+    // pra reproduzir com o botão "Voltar" enquanto um modal está aberto.
+    closeAllModals();
+
     const freshUser = await getUser(user.id);
     if (!freshUser || !freshUser.active) {
       showToast('Sua sessão não é mais válida — faça login novamente.', 'error');

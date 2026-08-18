@@ -1,5 +1,24 @@
 // Modal genérico e diálogo de confirmação reutilizados pelas views (editar
 // produto, cadastrar usuário, confirmar exclusão etc.).
+
+// Modais abertos no momento (openModal ou confirmDialog) — cada entrada é
+// a função que fecha aquele modal específico. Existe só pra permitir
+// fechar tudo de uma vez ao trocar de rota (ver closeAllModals, chamado
+// pelo roteador em app.js a cada navegação, inclusive via botão
+// "Voltar"/"Avançar" do navegador). Sem isso, um modal aberto sobrevivia à
+// troca de rota — ele é anexado direto no <body>, fora do container que o
+// roteador limpa — e ficava flutuando por cima da tela nova, com o
+// formulário e os botões ainda "vivos", ainda referenciando dados de uma
+// tela que não existe mais (achado de auditoria, reproduzido com o botão
+// "Voltar" do navegador enquanto um modal estava aberto).
+const openModals = new Set();
+
+export function closeAllModals() {
+  // Cópia porque cada função, ao rodar, se remove do Set original — mexer
+  // no Set original durante o for...of pularia entradas.
+  for (const forceClose of [...openModals]) forceClose();
+}
+
 export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submitLabel = 'Salvar', cancelLabel = 'Cancelar', wide = false, singleButton = false }) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -16,7 +35,7 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submit
   document.body.appendChild(backdrop);
 
   const modalEl = backdrop.querySelector('.modal');
-  const close = () => backdrop.remove();
+  const close = () => { backdrop.remove(); openModals.delete(forceClose); };
   // `submitting` é a defesa contra clique duplo/rápido no botão de
   // confirmar — achado de auditoria: como onSubmit é assíncrono (quase
   // sempre grava algo no IndexedDB), sem essa trava um segundo clique
@@ -42,6 +61,22 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submit
     close();
     if (onCancel) onCancel();
   };
+
+  // Usado só por closeAllModals (troca de rota). Sempre tira o modal da
+  // tela, mesmo em cima de um submit em andamento — não faria sentido
+  // deixar um modal de uma tela que não existe mais flutuando por cima da
+  // nova. Só chama onCancel se não houver submit em andamento: se houver,
+  // o próprio onSubmit ainda vai terminar em segundo plano (a gravação já
+  // foi disparada, não tem como nem por que interrompê-la) e vai chamar
+  // close() sozinho depois — chamar onCancel aqui também resolveria uma
+  // eventual Promise embrulhada (ver views/sale.js) como "cancelado" bem
+  // na hora que a operação está sendo confirmada, o que seria errado.
+  const forceClose = () => {
+    const wasSubmitting = submitting;
+    close();
+    if (!wasSubmitting && onCancel) onCancel();
+  };
+  openModals.add(forceClose);
 
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) cancel();
@@ -88,7 +123,13 @@ export function confirmDialog({ title = 'Confirmar', message, confirmLabel = 'Co
       </div>
     `;
     document.body.appendChild(backdrop);
-    const close = (result) => { backdrop.remove(); resolve(result); };
+    const close = (result) => { backdrop.remove(); openModals.delete(forceClose); resolve(result); };
+    // Ao trocar de rota, uma confirmação pendente vira "não confirmado"
+    // (false) — a mesma resposta que um clique fora do modal já dava. Nunca
+    // deixa a Promise pendurada pra sempre esperando um clique que não vai
+    // mais acontecer.
+    const forceClose = () => close(false);
+    openModals.add(forceClose);
     backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop) close(false); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
     backdrop.querySelector('[data-action="ok"]').addEventListener('click', () => close(true));

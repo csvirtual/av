@@ -62,9 +62,25 @@ export function renderSetup(root, { onComplete }) {
   // de um backup. A aparência já é aplicada na hora (ver theme.js) e vale
   // pros dois caminhos daqui pra frente, já que é preferência do
   // computador, não do cadastro/backup — pode ser trocada quando quiser
-  // depois, em Personalização. ----------
-  async function renderStep0() {
-    let currentTheme = await getThemePreference();
+  // depois, em Personalização.
+  //
+  // Não é async: renderiza a tela na hora, com 'system' como palpite
+  // inicial (é o padrão de fábrica mesmo — ver theme.js), e só depois
+  // confirma a preferência salva de verdade (chrome.storage.local) em
+  // segundo plano, corrigindo o cartão marcado se for diferente. Isso é
+  // só sobre QUAL cartão aparece destacado — a aparência em si (cores da
+  // própria tela) já foi aplicada antes de tudo, no boot (ver app.js), não
+  // depende deste passo. Evita atrasar o primeiro frame da tela de
+  // boas-vindas esperando uma leitura de storage. ----------
+  function renderStep0() {
+    let currentTheme = 'system';
+    // Se o usuário já clicou num cartão antes dessa leitura em segundo
+    // plano terminar (janela bem curta, mas não impossível), essa leitura
+    // não pode "voltar atrás" e desfazer a escolha manual dele.
+    let userPicked = false;
+    getThemePreference().then((saved) => {
+      if (!userPicked && saved !== currentTheme) { currentTheme = saved; renderThemeOptions(); }
+    });
 
     shell(`
       <p class="section-title">Aparência</p>
@@ -109,6 +125,7 @@ export function renderSetup(root, { onComplete }) {
 
     async function selectTheme(value) {
       if (value === currentTheme) return;
+      userPicked = true;
       currentTheme = value;
       await setThemePreference(value); // já aplica visualmente na hora, ver theme.js
       renderThemeOptions();
