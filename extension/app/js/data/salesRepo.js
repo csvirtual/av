@@ -14,6 +14,7 @@ import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
 import { recordEarn, recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
 import { getCompany } from './companyRepo.js';
+import { verifyLogin } from './usersRepo.js';
 import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
 
 const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
@@ -25,14 +26,49 @@ const FIADO_METHOD = 'Fiado';
  * Se qualquer item não tiver estoque suficiente, ou a soma dos pagamentos
  * não bater com o total, nada é gravado. Uma venda com pagamento em
  * "Fiado" precisa de um cliente selecionado — vira uma dívida na conta
- * dele (ver data/customersRepo.js), não dinheiro entrando agora. */
+ * dele (ver data/customersRepo.js), não dinheiro entrando agora.
+ *
+ * A autorização de desconto acima do limite (`discountApproval`) é
+ * verificada AQUI, não só na tela: a versão antiga confiava num
+ * `discountApprovedBy` já resolvido pela UI (o id de um admin), o que
+ * qualquer chamada direta a esta função — sem nunca ter passado pelo
+ * modal de senha — conseguia forjar sozinha (bastava saber o id de
+ * qualquer admin, que não é segredo nenhum). Agora quem decide se o
+ * desconto passou do limite, e se a senha do admin bate, é esta função —
+ * a tela só continua coletando usuário/senha numa telinha, pra dar
+ * feedback rápido, mas a decisão de verdade é sempre revalidada aqui. */
 export async function createSale({
-  userId, userName, items,
+  userId, userName, userRole = 'vendedor', items,
   overallDiscountType = null, overallDiscountValue = 0,
-  payments, discountApprovedBy = null, cashSessionId = null, customerId = null,
+  payments, discountApproval = null, cashSessionId = null, customerId = null,
 }) {
   if (!items || items.length === 0) throw new Error('A venda precisa ter pelo menos um item.');
   if (!payments || payments.length === 0) throw new Error('Informe ao menos uma forma de pagamento.');
+
+  // Nunca confia cegamente em número vindo de fora (carrinho, ou uma
+  // chamada direta a esta função por fora da tela): quantidade tem que ser
+  // um número positivo de verdade, e valor de pagamento não pode ser
+  // negativo. Sem isso, um item com qty negativa passava batido pelo
+  // "estoque insuficiente" (que só falha se o disponível for MENOR que a
+  // quantidade — nunca é o caso com qty negativa), gerava estoque do nada
+  // (recordMovement grava -qty, então -(-5) = +5 de entrada "por venda") e
+  // ainda diminuía o total a pagar (preço × qty negativa = valor negativo
+  // somado no subtotal). Da mesma forma, um pagamento com valor negativo
+  // podia compensar outro maior e ainda "bater" com o total da venda,
+  // enquanto vira uma dívida de fiado negativa (crédito fabricado) se a
+  // forma for "Fiado".
+  items = items.map((item) => ({ ...item, qty: Number(item.qty) }));
+  for (const item of items) {
+    if (!Number.isFinite(item.qty) || item.qty <= 0) {
+      throw new Error('Quantidade inválida em um dos itens do carrinho.');
+    }
+  }
+  for (const p of payments) {
+    const amt = Number(p.amount);
+    if (!Number.isFinite(amt) || amt < 0) {
+      throw new Error('Valor de pagamento inválido.');
+    }
+  }
 
   const fiadoTotal = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   if (fiadoTotal > 0 && !customerId) {
@@ -69,13 +105,32 @@ export async function createSale({
   // Mesma fórmula de subtotal/desconto/total do PDV (utils/pricing.js) —
   // reaproveitada aqui em vez de reimplementada, pra nunca divergir do que
   // já foi mostrado na tela pro vendedor antes de finalizar.
-  const { subtotal, itemsDiscountTotal, overallDiscountAmount, total } = computeCartTotals(
+  const { subtotal, itemsDiscountTotal, overallDiscountAmount, total, totalDiscountPercent } = computeCartTotals(
     saleItems, overallDiscountType, overallDiscountValue,
   );
 
   const paymentsTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   if (Math.abs(paymentsTotal - total) > PAYMENT_TOLERANCE) {
     throw new Error(`Os pagamentos (${paymentsTotal.toFixed(2)}) não somam o total da venda (${total.toFixed(2)}).`);
+  }
+
+  // Desconto acima do limite do vendedor exige autorização de um
+  // administrador — verificada de verdade aqui (usuário + senha
+  // conferidos contra o hash gravado), não só confiada de quem chamou.
+  let discountApprovedBy = null;
+  if (userRole !== 'admin') {
+    const company = await getCompany();
+    const maxPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
+    if (totalDiscountPercent > maxPercent + 0.001) {
+      if (!discountApproval || !discountApproval.username || !discountApproval.password) {
+        throw new Error(`Esse desconto passa do limite de ${maxPercent}% — peça a autorização de um administrador.`);
+      }
+      const admin = await verifyLogin(discountApproval.username, discountApproval.password);
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Usuário ou senha de administrador inválidos para autorizar o desconto.');
+      }
+      discountApprovedBy = admin.id;
+    }
   }
 
   for (const item of items) {

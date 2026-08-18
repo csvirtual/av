@@ -39,14 +39,17 @@ export async function createProduct(data) {
     nameLower: (data.name || '').trim().toLowerCase(),
     category: data.category || 'material', // 'material' | 'mercearia'
     unit: data.unit || 'un',
-    price: Number(data.price) || 0,
-    costPrice: Number(data.costPrice) || 0,
+    // Math.max(0, ...) em preço/estoque mínimo: um valor negativo aqui não
+    // é só "esquisito" — preço negativo reduz o total de qualquer venda
+    // que incluir o produto (linha do carrinho vira valor negativo).
+    price: Math.max(0, Number(data.price) || 0),
+    costPrice: Math.max(0, Number(data.costPrice) || 0),
     // Sempre começa em 0: se houver estoque inicial, quem chama (views/products.js)
     // aplica via stockRepo.recordMovement logo em seguida — é o único caminho que
     // ajusta quantidade, pra manter um único registro de origem (stockMovements) e
     // não contar o estoque inicial em dobro.
     quantity: 0,
-    minStock: Number(data.minStock) || 0,
+    minStock: Math.max(0, Number(data.minStock) || 0),
     // Fornecedor padrão (opcional) — usado pra agrupar a sugestão de compra
     // automática por fornecedor (ver data/purchasesRepo.js).
     supplierId: data.supplierId || null,
@@ -73,9 +76,9 @@ export async function updateProduct(id, data) {
   }
   if (data.category !== undefined) product.category = data.category;
   if (data.unit !== undefined) product.unit = data.unit;
-  if (data.price !== undefined) product.price = Number(data.price) || 0;
-  if (data.costPrice !== undefined) product.costPrice = Number(data.costPrice) || 0;
-  if (data.minStock !== undefined) product.minStock = Number(data.minStock) || 0;
+  if (data.price !== undefined) product.price = Math.max(0, Number(data.price) || 0);
+  if (data.costPrice !== undefined) product.costPrice = Math.max(0, Number(data.costPrice) || 0);
+  if (data.minStock !== undefined) product.minStock = Math.max(0, Number(data.minStock) || 0);
   if (data.supplierId !== undefined) product.supplierId = data.supplierId || null;
   product.updatedAt = Date.now();
   await dbPut('products', product);

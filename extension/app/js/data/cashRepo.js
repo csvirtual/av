@@ -31,7 +31,7 @@ export async function openSession({ userId, userName, openingAmount }) {
     status: 'aberto',
     openedBy: { userId, userName },
     openedAt: Date.now(),
-    openingAmount: Number(openingAmount) || 0,
+    openingAmount: Math.max(0, Number(openingAmount) || 0),
     closedBy: null,
     closedAt: null,
     countedAmounts: null,
@@ -124,7 +124,7 @@ export async function closeSession({ sessionId, userId, userName, countedAmounts
   const expectedAmounts = await computeExpectedAmounts(session);
   const counted = {};
   for (const [method, value] of Object.entries(countedAmounts || {})) {
-    counted[method] = Number(value) || 0;
+    counted[method] = Math.max(0, Number(value) || 0);
   }
   const difference = (counted.Dinheiro ?? 0) - (expectedAmounts.Dinheiro ?? 0);
 

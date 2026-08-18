@@ -29,7 +29,7 @@ export async function createPurchaseOrder({ supplierId, items, notes = '', userI
       unit: item.unit || 'un',
       qtyOrdered: Number(item.qty) || 0,
       qtyReceived: 0,
-      unitCost: Number(item.unitCost) || 0,
+      unitCost: Math.max(0, Number(item.unitCost) || 0),
     }))
     .filter((i) => i.qtyOrdered > 0);
   if (orderItems.length === 0) throw new Error('O pedido precisa ter ao menos um item com quantidade.');

@@ -558,12 +558,17 @@ export async function renderSale(container, ctx) {
           const errBox = modalEl.querySelector('#modal-error');
           const username = modalEl.querySelector('#f-admin-user').value.trim();
           const password = modalEl.querySelector('#f-admin-pass').value;
+          // Confere aqui só pra dar um retorno rápido na hora (evita
+          // mandar pro createSale e só descobrir que errou depois de
+          // fechar o modal) — quem decide de verdade se autoriza é o
+          // createSale, que confere usuário/senha de novo por conta
+          // própria antes de gravar a venda.
           const admin = await verifyLogin(username, password);
           if (!admin || admin.role !== 'admin') {
             errBox.innerHTML = '<div class="form-error">Usuário/senha inválidos ou não é um administrador.</div>';
             return false;
           }
-          resolve(admin);
+          resolve({ username, password });
           return true;
         },
         onCancel: () => resolve(null),
@@ -574,12 +579,11 @@ export async function renderSale(container, ctx) {
   finalizeBtn.addEventListener('click', async () => {
     if (cart.length === 0) return;
     const totals = currentTotals();
-    let discountApprovedBy = null;
+    let discountApproval = null;
 
     if (ctx.user.role !== 'admin' && totals.totalDiscountPercent > vendorMaxDiscountPercent + 0.001) {
-      const admin = await openAdminApprovalModal();
-      if (!admin) return; // cancelado
-      discountApprovedBy = admin.id;
+      discountApproval = await openAdminApprovalModal();
+      if (!discountApproval) return; // cancelado
     }
 
     const fiadoAmount = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + p.amount, 0);
@@ -608,10 +612,11 @@ export async function renderSale(container, ctx) {
       const sale = await createSale({
         userId: ctx.user.id,
         userName: ctx.user.nome,
+        userRole: ctx.user.role,
         items: cart.map((i) => ({ productId: i.productId, qty: i.qty, discountType: i.discountType, discountValue: i.discountValue })),
         overallDiscountType, overallDiscountValue,
         payments,
-        discountApprovedBy,
+        discountApproval,
         cashSessionId: cashSession?.id || null,
         customerId: selectedCustomer?.id || null,
       });
@@ -620,7 +625,7 @@ export async function renderSale(container, ctx) {
         action: 'Venda registrada',
         details: `Venda de ${sale.items.length} item(ns) totalizando ${formatMoney(sale.total)}`
           + (sale.itemsDiscountTotal + sale.overallDiscountAmount > 0 ? ` (desconto de ${formatMoney(sale.itemsDiscountTotal + sale.overallDiscountAmount)})` : '')
-          + (discountApprovedBy ? ' — desconto autorizado por administrador' : '')
+          + (sale.discountApprovedBy ? ' — desconto autorizado por administrador' : '')
           + (fiadoAmount > 0 ? ` — ${formatMoney(fiadoAmount)} fiado para "${selectedCustomer.nome}"` : '') + '.',
         entity: 'sale', entityId: sale.id,
       });
