@@ -19,7 +19,10 @@ JavaScript puro (ES modules), HTML e CSS.
 
 ## Primeiro uso
 
-Na primeira vez que o sistema abrir, ele pede:
+Na primeira vez que o sistema abrir, ele pergunta: **cadastrar do zero** ou
+**restaurar de um backup**?
+
+Cadastrando do zero, pede:
 
 1. **Dados da loja** — CNPJ (com validação de dígitos verificadores),
    razão social, nome fantasia, endereço completo, telefone, e-mail,
@@ -28,6 +31,9 @@ Na primeira vez que o sistema abrir, ele pede:
    Esse cadastro é obrigatório e só acontece uma vez. Todos os usuários
    cadastrados depois disso (pela tela **Usuários**, só acessível ao admin)
    nascem como **vendedores**.
+
+Escolhendo restaurar, basta selecionar o arquivo de backup e digitar a
+senha — o cadastro inteiro é pulado, os dados vêm todos do arquivo.
 
 Depois disso, o sistema sempre abre na tela de **login**.
 
@@ -79,7 +85,10 @@ sistema em linguagem simples, separado em tópicos.
 - **Backup** — exportação e restauração de todos os dados do sistema num
   arquivo único protegido por senha (AES-256-GCM, chave derivada via
   PBKDF2), pra guardar em outro lugar e restaurar depois — inclusive numa
-  instalação nova, em outro computador. Exclusivo do Administrador Geral.
+  instalação nova, em outro computador. Exportar é exclusivo do
+  Administrador Geral; restaurar também pode ser feito direto na primeira
+  tela do sistema (antes até de cadastrar a empresa), sem limite de
+  tentativas de senha e sem nunca bloquear a opção de cadastrar do zero.
   É manual por decisão de projeto: automatizar isso em segundo plano exigiria
   pedir permissões novas ao Chrome (`downloads`/`alarms`), o que vai contra
   o princípio de pedir o mínimo possível — quem decide quando fazer backup

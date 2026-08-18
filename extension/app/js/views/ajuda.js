@@ -288,8 +288,12 @@ const TOPICS = [
 
       <h3>Restaurar backup</h3>
       <p>Selecione o arquivo de backup, digite a senha e clique em <strong>Ler backup</strong>. O sistema mostra uma prévia comparando os dados atuais com os do arquivo antes de mexer em qualquer coisa. Só depois de confirmar (duas vezes, de propósito) é que a restauração realmente acontece.</p>
-      <div class="warn-box"><strong>Atenção:</strong> restaurar um backup <strong>apaga todos os dados atuais</strong> e substitui pelos dados do arquivo — não tem como desfazer. Use isso numa instalação nova (depois de fazer o cadastro inicial da loja) ou só se tiver certeza de que quer voltar pro estado do backup.</div>
+      <div class="warn-box"><strong>Atenção:</strong> restaurar um backup <strong>apaga todos os dados atuais</strong> e substitui pelos dados do arquivo — não tem como desfazer.</div>
       <p>Depois de restaurar, o sistema desloga automaticamente — faça login de novo com um usuário que exista no backup restaurado.</p>
+
+      <h3>Restaurar numa instalação nova</h3>
+      <p>Numa extensão recém-instalada (sem loja cadastrada ainda), a primeira tela já pergunta: <strong>"Cadastrar do zero"</strong> ou <strong>"Já tenho um backup"</strong>. Escolhendo a segunda opção, você seleciona o arquivo e digita a senha ali mesmo — o sistema pula o cadastro inteiro (empresa e administrador não precisam ser digitados de novo, já vêm do backup) e vai direto pro login.</p>
+      <p>Errar a senha nessa tela não bloqueia nada: mostra o erro e deixa tentar de novo quantas vezes precisar, e a opção "Cadastrar do zero" continua sempre disponível, clicando em "← Voltar".</p>
 
       <h3>Backup é manual, de propósito</h3>
       <p>O sistema não faz backup sozinho, automaticamente, em segundo plano. Isso é intencional: rodar backup automático sem ninguém abrir o sistema exigiria pedir permissões novas ao Chrome (pra salvar arquivo e "acordar" a extensão em horário fixo) — e esse sistema é feito pra pedir o mínimo possível. Faça backup manualmente com a frequência que fizer sentido pra sua loja (ex: toda semana).</p>

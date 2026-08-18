@@ -1,36 +1,126 @@
 // Assistente de configuração inicial: roda uma única vez, na primeira
-// abertura do sistema. Passo 1 cadastra a empresa; passo 2 cadastra
-// obrigatoriamente o Administrador Geral (primeiro usuário do sistema).
-// Só depois dos dois passos o app libera a tela de login.
+// abertura do sistema. Antes de tudo, pergunta se é um cadastro novo ou se
+// existe um backup pra restaurar — quem escolhe cadastro novo segue pro
+// fluxo de sempre (passo 1 cadastra a empresa, passo 2 cadastra
+// obrigatoriamente o Administrador Geral); quem tem backup pula direto pra
+// tela de login com todos os dados já restaurados. Só depois de um dos dois
+// caminhos o app libera a tela de login.
 import { saveCompany } from '../data/companyRepo.js';
 import { createUser, findByUsername } from '../data/usersRepo.js';
 import { logAction } from '../data/auditRepo.js';
+import { readBackupFile, applyBackup } from '../data/backupRepo.js';
 import { isValidCnpj, formatCnpj, onlyDigits } from '../utils/cnpj.js';
 import { showToast } from '../components/toast.js';
 
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 export function renderSetup(root, { onComplete }) {
-  const state = { step: 1, company: null };
-  renderStep1();
+  const state = { step: 0, company: null };
+  renderStep0();
 
-  function shell(inner, stepNum) {
+  function shell(inner, { title, subtitle, stepNum = null }) {
     root.innerHTML = `
       <div class="auth-screen">
         <div class="auth-card wide">
           <div class="auth-brand"><span class="dot"></span><span>Configuração inicial</span></div>
-          <h1>${stepNum === 1 ? 'Dados da loja' : 'Administrador Geral'}</h1>
-          <p class="subtitle">${stepNum === 1
-            ? 'Vamos começar cadastrando os dados da empresa. Esse cadastro é feito uma única vez.'
-            : 'Agora cadastre o Administrador Geral — o primeiro usuário do sistema, com acesso total. Os próximos usuários cadastrados serão vendedores.'}</p>
+          <h1>${title}</h1>
+          <p class="subtitle">${subtitle}</p>
+          ${stepNum ? `
           <div class="steps">
             <div class="step ${stepNum >= 1 ? (stepNum > 1 ? 'done' : 'active') : ''}"></div>
             <div class="step ${stepNum >= 2 ? 'active' : ''}"></div>
-          </div>
+          </div>` : ''}
           ${inner}
         </div>
       </div>
     `;
+  }
+
+  // ---------- Passo 0: cadastro novo ou restaurar de um backup ----------
+  function renderStep0() {
+    shell(`
+      <div class="setup-choice-grid">
+        <button type="button" class="setup-choice-card" id="choice-new">
+          <span class="icon">🏬</span>
+          <div class="title">Cadastrar do zero</div>
+          <div class="desc">Primeira loja usando o sistema. Vamos cadastrar os dados da empresa e o Administrador Geral.</div>
+        </button>
+        <button type="button" class="setup-choice-card" id="choice-restore">
+          <span class="icon">💾</span>
+          <div class="title">Já tenho um backup</div>
+          <div class="desc">Restaurar todos os dados de um arquivo de backup gerado anteriormente (nesse ou em outro computador).</div>
+        </button>
+      </div>
+    `, {
+      title: 'Bem-vindo',
+      subtitle: 'Antes de começar: você já tem um backup deste sistema, ou é a primeira vez que ele é instalado?',
+    });
+
+    document.getElementById('choice-new').addEventListener('click', () => { state.step = 1; renderStep1(); });
+    document.getElementById('choice-restore').addEventListener('click', renderRestore);
+  }
+
+  // ---------- Restaurar de um backup (sem limite de tentativas — a senha
+  // errada só mostra erro e deixa tentar de novo; "cadastrar do zero"
+  // nunca fica bloqueado, é só voltar) ----------
+  function renderRestore() {
+    shell(`
+      <form id="restore-form" novalidate>
+        <div id="form-error"></div>
+        <div class="field">
+          <label for="restore-file">Arquivo de backup *</label>
+          <input id="restore-file" type="file" accept=".json,application/json" required>
+        </div>
+        <div class="field">
+          <label for="restore-pass">Senha do backup *</label>
+          <input id="restore-pass" type="password" required>
+        </div>
+        <div class="modal-actions" style="justify-content:space-between;padding-top:8px;">
+          <button type="button" class="btn btn-secondary" id="back-btn">← Voltar</button>
+          <button type="submit" class="btn" id="restore-submit-btn">Restaurar</button>
+        </div>
+      </form>
+    `, {
+      title: 'Restaurar de um backup',
+      subtitle: 'Selecione o arquivo de backup e digite a senha usada na exportação.',
+    });
+
+    document.getElementById('back-btn').addEventListener('click', renderStep0);
+
+    document.getElementById('restore-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errBox = document.getElementById('form-error');
+      errBox.innerHTML = '';
+
+      const fileInput = document.getElementById('restore-file');
+      const pass = document.getElementById('restore-pass').value;
+      const file = fileInput.files[0];
+      if (!file) {
+        errBox.innerHTML = '<div class="form-error">Selecione o arquivo de backup.</div>';
+        return;
+      }
+
+      const btn = document.getElementById('restore-submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Restaurando...';
+      try {
+        const text = await file.text();
+        const { payload } = await readBackupFile(text, pass);
+        await applyBackup(payload);
+        await logAction({
+          userId: null, userName: 'Restauração inicial (Setup)', role: 'admin',
+          action: 'Backup restaurado no Setup',
+          details: 'Backup restaurado durante a configuração inicial da extensão (instalação nova).',
+          entity: 'backup', entityId: 'restore-setup',
+        });
+        showToast('Backup restaurado com sucesso! Faça login com um usuário do backup.', 'success');
+        onComplete();
+      } catch (err) {
+        errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'Restaurar';
+      }
+    });
   }
 
   function renderStep1() {
@@ -107,7 +197,11 @@ export function renderSetup(root, { onComplete }) {
           <button type="submit" class="btn">Continuar →</button>
         </div>
       </form>
-    `, 1);
+    `, {
+      title: 'Dados da loja',
+      subtitle: 'Vamos começar cadastrando os dados da empresa. Esse cadastro é feito uma única vez.',
+      stepNum: 1,
+    });
 
     const form = document.getElementById('company-form');
     const cnpjInput = document.getElementById('cnpj');
@@ -195,7 +289,11 @@ export function renderSetup(root, { onComplete }) {
           <button type="submit" class="btn">Concluir cadastro</button>
         </div>
       </form>
-    `, 2);
+    `, {
+      title: 'Administrador Geral',
+      subtitle: 'Agora cadastre o Administrador Geral — o primeiro usuário do sistema, com acesso total. Os próximos usuários cadastrados serão vendedores.',
+      stepNum: 2,
+    });
 
     document.getElementById('back-btn').addEventListener('click', () => {
       state.step = 1;
