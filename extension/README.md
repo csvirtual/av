@@ -102,8 +102,8 @@ sistema em linguagem simples, separado em tópicos.
 | Registrar venda, aplicar desconto até o limite configurado | ✅ | ✅ |
 | Abrir/fechar caixa, sangria/suprimento | ✅ | ✅ |
 | Cadastrar cliente, vender fiado, receber pagamento de fiado | ✅ | ✅ |
+| Estornar venda (total ou por item) | ✅ | ✅ |
 | Cadastrar/editar produto, ajustar estoque, inventário | ✅ | ❌ |
-| Estornar venda | ✅ | ❌ |
 | Fornecedores e pedidos de compra | ✅ | ❌ |
 | Financeiro (contas a pagar/receber) e relatórios gerenciais | ✅ | ❌ |
 | Cadastrar/gerenciar usuários | ✅ | ❌ |

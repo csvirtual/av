@@ -3,10 +3,10 @@
 // Vendedores veem as vendas de todos os colegas aqui (é só o LOG interno de
 // ações que fica restrito ao admin — ver views/logs.js).
 //
-// Estorno (total ou por item) fica restrito ao administrador: é uma ação
-// que mexe em dinheiro e estoque já fechados, então evita que um vendedor
-// desfaça sozinho uma venda pra encobrir erro ou furto — todo estorno feito
-// aqui já sai com motivo obrigatório e vai pro log de auditoria.
+// Estorno (total ou por item) está disponível pros dois perfis — admin e
+// vendedor. Continua exigindo motivo obrigatório e sempre vai pro log de
+// auditoria com quem fez, então mesmo sem aprovação prévia de um admin, dá
+// pra rastrear todo estorno depois.
 import { listSales, refundSaleItems, saleStatus } from '../data/salesRepo.js';
 import { listUsers } from '../data/usersRepo.js';
 import { listCustomers } from '../data/customersRepo.js';
@@ -124,7 +124,7 @@ export async function renderSalesHistory(container, ctx) {
   }
 
   function showSaleDetail(sale) {
-    const canRefund = ctx.user.role === 'admin' && saleStatus(sale) !== 'estornada';
+    const canRefund = saleStatus(sale) !== 'estornada';
     openModal({
       title: `Venda de ${formatDateTime(sale.timestamp)}`,
       submitLabel: canRefund ? 'Estornar itens' : 'Fechar',

@@ -127,7 +127,7 @@ const TOPICS = [
     title: 'Estorno e troca',
     html: `
       <h2>Estorno e troca</h2>
-      <p class="help-subtitle">O que fazer quando o cliente devolve um produto (só administrador).</p>
+      <p class="help-subtitle">O que fazer quando o cliente devolve um produto — disponível pros dois perfis.</p>
 
       <h3>Como estornar</h3>
       <p>Vá em <strong>Histórico de vendas</strong>, clique em "Ver itens" na venda em questão, e depois em <strong>Estornar itens</strong>. Escolha a quantidade de cada item que está sendo devolvida e escreva o motivo (obrigatório) — pode ser um item só ou a venda inteira.</p>
@@ -189,13 +189,13 @@ const TOPICS = [
       <ul>
         <li>Ver o estoque geral (mas não cadastrar, editar ou ajustar produto)</li>
         <li>Registrar vendas e ver o histórico de vendas de todo mundo</li>
+        <li>Estornar uma venda (total ou por item)</li>
         <li>Abrir/fechar caixa e fazer sangria/suprimento</li>
         <li>Cadastrar e editar cliente, vender fiado e receber pagamento de fiado</li>
       </ul>
       <p>E <strong>não</strong> consegue:</p>
       <ul>
         <li>Cadastrar ou editar produto, nem ajustar estoque manualmente</li>
-        <li>Estornar uma venda</li>
         <li>Excluir cliente (só inativar)</li>
         <li>Cadastrar fornecedor ou fazer pedido de compra</li>
         <li>Ver contas a pagar/receber ou relatórios gerenciais</li>
