@@ -514,6 +514,25 @@ tbody tr:hover { background: var(--surface-alt); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Busca de cliente (Nova venda, Carreto) — um input solto, fora de um
+ * .field (não tem label do lado), que sem isso herdaria só a regra crua de
+ * "input, select, textarea" (só fonte/tamanho, sem borda nem padding
+ * decente) e ficava discrepante do resto da tela. */
+.customer-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.customer-search-input:focus {
+  border-color: var(--primary);
+}
+
 /* ---------- PDV (Nova Venda) ---------- */
 .pdv-layout {
   display: grid;

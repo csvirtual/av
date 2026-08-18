@@ -9,6 +9,7 @@
 // troca gerado por um estorno anterior (ver session.js).
 import { getByBarcode, searchProducts } from '../data/productsRepo.js';
 import { createSale } from '../data/salesRepo.js';
+import { createDelivery } from '../data/deliveriesRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { getCompany } from '../data/companyRepo.js';
 import { verifyLogin } from '../data/usersRepo.js';
@@ -101,6 +102,7 @@ export async function renderSale(container, ctx) {
         <button class="btn btn-secondary btn-sm" id="add-payment-btn" type="button" style="margin-top:6px;">+ Forma de pagamento</button>
 
         <button class="btn" id="finalize-btn" style="width:100%;padding:12px;margin-top:16px;" disabled>Finalizar venda</button>
+        <button class="btn btn-secondary" id="finalize-carreto-btn" style="width:100%;padding:12px;margin-top:8px;" disabled title="Registra a venda e já cadastra um carreto com os itens que você marcar">Finalizar venda + carreto</button>
       </div>
     </div>
   `;
@@ -113,6 +115,7 @@ export async function renderSale(container, ctx) {
   const totalsBox = document.getElementById('totals-box');
   const paymentsBox = document.getElementById('payments-box');
   const finalizeBtn = document.getElementById('finalize-btn');
+  const finalizeCarretoBtn = document.getElementById('finalize-carreto-btn');
 
   function currentTotals() {
     return computeCartTotals(cart, overallDiscountType, overallDiscountValue);
@@ -121,7 +124,7 @@ export async function renderSale(container, ctx) {
   async function renderCustomerBox() {
     if (!selectedCustomer) {
       customerBox.innerHTML = `
-        <input type="text" id="customer-search" placeholder="Buscar cliente por nome ou telefone…">
+        <input type="text" id="customer-search" class="customer-search-input" placeholder="Buscar cliente por nome ou telefone…">
         <div id="customer-results"></div>
       `;
       const searchInput = document.getElementById('customer-search');
@@ -433,7 +436,9 @@ export async function renderSale(container, ctx) {
         : `<span style="color:var(--success);">Pagamento completo ✓</span>`;
     paymentsBox.insertAdjacentHTML('beforeend', `<div style="font-size:13px;font-weight:600;margin-top:8px;text-align:right;">${label}</div>`);
 
-    finalizeBtn.disabled = cart.length === 0 || Math.abs(remaining) > PAYMENT_TOLERANCE_UI;
+    const disableFinalize = cart.length === 0 || Math.abs(remaining) > PAYMENT_TOLERANCE_UI;
+    finalizeBtn.disabled = disableFinalize;
+    finalizeCarretoBtn.disabled = disableFinalize;
   }
 
   function renderAll() {
@@ -576,21 +581,24 @@ export async function renderSale(container, ctx) {
     });
   }
 
-  finalizeBtn.addEventListener('click', async () => {
-    if (cart.length === 0) return;
+  // Checagens que valem pros dois botões de finalizar (com ou sem carreto):
+  // aprovação de desconto acima do limite do vendedor, e confirmação de
+  // limite de crédito se houver fiado. Devolve null se o vendedor cancelou
+  // em algum ponto (nesse caso quem chamou só encerra sem fazer nada).
+  async function runPreFinalizeChecks() {
     const totals = currentTotals();
     let discountApproval = null;
 
     if (ctx.user.role !== 'admin' && totals.totalDiscountPercent > vendorMaxDiscountPercent + 0.001) {
       discountApproval = await openAdminApprovalModal();
-      if (!discountApproval) return; // cancelado
+      if (!discountApproval) return null; // cancelado
     }
 
     const fiadoAmount = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + p.amount, 0);
     if (fiadoAmount > 0) {
       if (!selectedCustomer) {
         showToast('Selecione um cliente para vender fiado.', 'error');
-        return;
+        return null;
       }
       if (selectedCustomer.creditLimit > 0) {
         const currentBalance = await getCustomerBalance(selectedCustomer.id);
@@ -602,12 +610,84 @@ export async function renderSale(container, ctx) {
             confirmLabel: 'Vender fiado assim mesmo',
             danger: true,
           });
-          if (!ok) return;
+          if (!ok) return null;
         }
       }
     }
+    return { discountApproval, fiadoAmount };
+  }
 
+  // Modal de escolha dos itens que vão no carreto, aberto só pelo botão
+  // "Finalizar venda + carreto". Mostra os itens do carrinho no momento em
+  // que o botão foi clicado (o carrinho fica travado atrás do modal — não
+  // há como mudar enquanto ele está aberto), todos marcados por padrão: a
+  // suposição é que o normal é levar tudo que foi comprado, e o vendedor só
+  // desmarca as exceções (ex: um item que o cliente já levou na mão).
+  // Devolve null se o vendedor cancelar (nesse caso a venda não é
+  // registrada — nem venda nem carreto, do jeito que se nunca tivesse
+  // clicado em nada).
+  function openCarretoPickerModal() {
+    const snapshot = cart.map((item, idx) => ({
+      idx, productId: item.productId, name: item.name, unit: item.unit, qty: item.qty,
+    }));
+    return new Promise((resolve) => {
+      openModal({
+        title: 'Itens para o carreto',
+        submitLabel: 'Cadastrar venda + carreto',
+        wide: true,
+        bodyHtml: `
+          <p style="font-size:13.5px;color:var(--text-muted);">
+            Marque os itens desta venda que vão nesta entrega para <strong>${escapeHtml(selectedCustomer.nome)}</strong>.
+            Os que ficarem desmarcados foram vendidos, mas não entram no carreto.
+          </p>
+          <div id="modal-error"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th></th><th>Item</th><th>Qtd.</th></tr></thead>
+              <tbody>
+                ${snapshot.map((i) => `
+                  <tr>
+                    <td><input type="checkbox" data-carreto-check="${i.idx}" checked></td>
+                    <td>${escapeHtml(i.name)}</td>
+                    <td>${i.qty} ${escapeHtml(i.unit)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <div class="field"><label>Endereço de entrega</label><input id="f-carreto-address" value="${escapeHtml(selectedCustomer.endereco || '')}"></div>
+            <div class="field"><label>Responsável pela entrega</label><input id="f-carreto-responsible" placeholder="Ex: nome do motorista"></div>
+          </div>
+          <div class="field"><label>Observações</label><input id="f-carreto-notes" placeholder="Opcional"></div>
+        `,
+        onSubmit: (modalEl) => {
+          const errBox = modalEl.querySelector('#modal-error');
+          const checked = snapshot.filter((i) => modalEl.querySelector(`[data-carreto-check="${i.idx}"]`).checked);
+          if (checked.length === 0) {
+            errBox.innerHTML = '<div class="form-error">Marque ao menos um item para o carreto — ou use "Finalizar venda" sem carreto.</div>';
+            return false;
+          }
+          resolve({
+            items: checked.map((i) => ({ source: 'estoque', productId: i.productId, name: i.name, unit: i.unit, qty: i.qty })),
+            address: modalEl.querySelector('#f-carreto-address').value,
+            responsible: modalEl.querySelector('#f-carreto-responsible').value,
+            notes: modalEl.querySelector('#f-carreto-notes').value,
+          });
+          return true;
+        },
+        onCancel: () => resolve(null),
+      });
+    });
+  }
+
+  // Registra a venda de verdade e, se deliveryPlan não for nulo, cadastra o
+  // carreto logo em seguida com os itens escolhidos no modal — usado pelos
+  // dois botões de finalizar (a diferença entre eles é só se deliveryPlan
+  // existe ou não).
+  async function commitSale(discountApproval, fiadoAmount, deliveryPlan) {
     finalizeBtn.disabled = true;
+    finalizeCarretoBtn.disabled = true;
     try {
       const sale = await createSale({
         userId: ctx.user.id,
@@ -629,7 +709,30 @@ export async function renderSale(container, ctx) {
           + (fiadoAmount > 0 ? ` — ${formatMoney(fiadoAmount)} fiado para "${selectedCustomer.nome}"` : '') + '.',
         entity: 'sale', entityId: sale.id,
       });
-      showToast(`Venda finalizada: ${formatMoney(sale.total)}.`, 'success');
+
+      let delivery = null;
+      if (deliveryPlan) {
+        delivery = await createDelivery({
+          customerId: selectedCustomer.id,
+          items: deliveryPlan.items,
+          address: deliveryPlan.address,
+          responsible: deliveryPlan.responsible,
+          notes: deliveryPlan.notes,
+          saleId: sale.id,
+          userId: ctx.user.id, userName: ctx.user.nome,
+        });
+        await logAction({
+          userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+          action: 'Carreto cadastrado',
+          details: `Carreto para "${delivery.customerName}" com ${delivery.items.length} item(ns), gerado junto com a venda.`,
+          entity: 'delivery', entityId: delivery.id,
+        });
+      }
+
+      showToast(
+        delivery ? `Venda finalizada: ${formatMoney(sale.total)}. Carreto cadastrado.` : `Venda finalizada: ${formatMoney(sale.total)}.`,
+        'success',
+      );
       const customerNameForReceipt = selectedCustomer?.nome || null;
       cart = [];
       overallDiscountType = null;
@@ -648,6 +751,7 @@ export async function renderSale(container, ctx) {
         cancelLabel: 'Fechar',
         bodyHtml: `
           <p style="font-size:15px;">Venda de <strong>${formatMoney(sale.total)}</strong> registrada com sucesso.</p>
+          ${delivery ? `<p style="font-size:13.5px;color:var(--success);">🛻 Carreto cadastrado com ${delivery.items.length} item(ns) — veja em "Carreto".</p>` : ''}
           <p class="text-muted" style="font-size:12.5px;">Abre o diálogo de impressão do navegador — escolha a impressora (inclusive térmica de cupom) ou "Salvar como PDF".</p>
         `,
         onSubmit: () => {
@@ -659,7 +763,28 @@ export async function renderSale(container, ctx) {
       showToast(err.message, 'error');
     } finally {
       finalizeBtn.disabled = cart.length === 0;
+      finalizeCarretoBtn.disabled = cart.length === 0;
     }
+  }
+
+  finalizeBtn.addEventListener('click', async () => {
+    if (cart.length === 0) return;
+    const pre = await runPreFinalizeChecks();
+    if (!pre) return;
+    await commitSale(pre.discountApproval, pre.fiadoAmount, null);
+  });
+
+  finalizeCarretoBtn.addEventListener('click', async () => {
+    if (cart.length === 0) return;
+    if (!selectedCustomer) {
+      showToast('Selecione um cliente para gerar o carreto.', 'error');
+      return;
+    }
+    const pre = await runPreFinalizeChecks();
+    if (!pre) return;
+    const deliveryPlan = await openCarretoPickerModal();
+    if (!deliveryPlan) return; // cancelado — nem venda nem carreto são registrados
+    await commitSale(pre.discountApproval, pre.fiadoAmount, deliveryPlan);
   });
 
   renderCreditBanner();

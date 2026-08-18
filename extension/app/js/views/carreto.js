@@ -90,6 +90,7 @@ export async function renderCarreto(container, ctx) {
       bodyHtml: `
         <p class="text-muted" style="font-size:13px;">
           ${formatDateTime(delivery.createdAt)} · ${STATUS_BADGE[delivery.status]} · pedido por ${escapeHtml(delivery.createdBy.userName)}
+          ${delivery.saleId ? ' · gerado junto com uma venda' : ''}
         </p>
         <p style="font-size:13px;"><strong>Endereço:</strong> ${escapeHtml(delivery.address || 'não informado')}</p>
         ${delivery.responsible ? `<p style="font-size:13px;"><strong>Responsável pela entrega:</strong> ${escapeHtml(delivery.responsible)}</p>` : ''}
@@ -262,7 +263,7 @@ export async function renderCarreto(container, ctx) {
         function renderCustomerBox() {
           if (!selectedCustomer) {
             customerBox.innerHTML = `
-              <input type="text" id="customer-search" placeholder="Buscar cliente por nome ou telefone…">
+              <input type="text" id="customer-search" class="customer-search-input" placeholder="Buscar cliente por nome ou telefone…">
               <div id="customer-results"></div>
             `;
             const searchInput = customerBox.querySelector('#customer-search');

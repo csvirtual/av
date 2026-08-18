@@ -73,7 +73,10 @@ sistema em linguagem simples, separado em tópicos.
   do estoque ou avulsos (descrição livre, ex: "carga de areia"), endereço,
   responsável e status (pendente/entregue/cancelado). É só um checklist de
   logística — não mexe em estoque nem em dinheiro; a baixa de estoque
-  continua acontecendo normalmente na tela de Venda.
+  continua acontecendo normalmente na tela de Venda. Além da tela própria,
+  dá pra gerar direto da Nova venda com o botão **Finalizar venda +
+  carreto**, que registra a venda e cadastra o carreto na sequência só com
+  os itens marcados numa lista (todos marcados por padrão).
 - **Fornecedores e compras** — cadastro de fornecedores, pedidos de compra
   com recebimento total ou parcial (atualiza estoque e preço de custo) e
   sugestão automática de compra para produtos com estoque baixo.
@@ -87,7 +90,9 @@ sistema em linguagem simples, separado em tópicos.
   edições, vendas, estornos, movimentos de caixa etc.) fica registrada com
   usuário, perfil e data/hora — exclusivo do Administrador Geral.
 - **Personalização** — aparência claro/escuro, independente do sistema
-  operacional (menu **Personalização**, disponível pros dois perfis).
+  operacional (menu **Personalização**, disponível pros dois perfis). A
+  escolha inicial já é feita na configuração inicial, num passo próprio
+  antes do cadastro da empresa — pode ser trocada a qualquer momento depois.
 - **Backup** — exportação e restauração de todos os dados do sistema num
   arquivo único protegido por senha (AES-256-GCM, chave derivada via
   PBKDF2), pra guardar em outro lugar e restaurar depois — inclusive numa

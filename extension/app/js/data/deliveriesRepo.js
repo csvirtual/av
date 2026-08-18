@@ -22,7 +22,7 @@ export async function getDelivery(id) {
  * só produto cadastrado). O endereço, se não for informado, herda o
  * cadastro do cliente — mas fica sempre editável aqui, porque a entrega
  * pode ser num endereço diferente do cadastro (obra, por exemplo). */
-export async function createDelivery({ customerId, items, address = '', responsible = '', notes = '', userId, userName }) {
+export async function createDelivery({ customerId, items, address = '', responsible = '', notes = '', saleId = null, userId, userName }) {
   if (!customerId) throw new Error('Selecione um cliente para o carreto.');
   const customer = await getCustomer(customerId);
   if (!customer) throw new Error('Cliente não encontrado.');
@@ -47,6 +47,11 @@ export async function createDelivery({ customerId, items, address = '', responsi
     responsible: (responsible || '').trim(),
     notes: (notes || '').trim(),
     status: 'pendente', // 'pendente' | 'entregue' | 'cancelado'
+    // Preenchido só quando o carreto nasce direto da tela de Venda (botão
+    // "Finalizar venda + carreto") — permite rastrear de qual venda ele
+    // veio. Fica null num carreto cadastrado direto na tela Carreto, sem
+    // venda associada.
+    saleId,
     createdBy: { userId, userName },
     createdAt: Date.now(),
     deliveredBy: null,

@@ -13,7 +13,7 @@ const TOPICS = [
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
       <h3>Cadastro da loja</h3>
-      <p>Na primeiríssima vez que o sistema abre, ele pede os dados da empresa (CNPJ, endereço, telefone etc.). Isso só acontece <strong>uma única vez</strong> — depois disso, o sistema nunca mais pede de novo.</p>
+      <p>Na primeiríssima vez que o sistema abre, antes até do cadastro da empresa, ele pergunta a <strong>aparência</strong> (claro, escuro ou automático) e depois pede os dados da empresa (CNPJ, endereço, telefone etc.). Isso só acontece <strong>uma única vez</strong> — depois disso, o sistema nunca mais pede de novo.</p>
 
       <h3>O Administrador Geral</h3>
       <p>Logo depois de cadastrar a loja, o sistema pede pra cadastrar o primeiro usuário — e esse primeiro usuário é <strong>sempre</strong> o Administrador Geral. Ele é quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
@@ -27,7 +27,7 @@ const TOPICS = [
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
 
       <h3>Aparência (claro ou escuro)</h3>
-      <p>Em <strong>Personalização</strong>, no menu lateral, dá pra escolher se o sistema aparece com fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
+      <p>Além da tela de configuração inicial, dá pra trocar quando quiser em <strong>Personalização</strong>, no menu lateral — escolha entre fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
     `,
   },
   {
@@ -93,6 +93,10 @@ const TOPICS = [
 
       <h3>Fiado</h3>
       <p>Fiado também é uma forma de pagamento, igual dinheiro ou cartão — só que em vez de receber na hora, o valor vira uma dívida na conta do cliente. Pra usar, é preciso selecionar o cliente no campo <strong>Cliente</strong>, no canto superior esquerdo da tela (veja o tópico "Clientes e fiado" pra entender o resto).</p>
+
+      <h3>Finalizar venda + carreto</h3>
+      <p>Quando a venda vai ser entregue (comum em loja de material de construção), use o botão <strong>Finalizar venda + carreto</strong>, logo abaixo do "Finalizar venda" normal — só fica disponível com um cliente selecionado. Ele abre uma lista com todos os itens do carrinho, cada um com uma caixinha de marcação (todos vêm marcados por padrão): desmarque só o que <em>não</em> vai nesta entrega — por exemplo, um item que o próprio cliente já levou na hora. Ao confirmar, a venda é registrada normalmente e, na sequência, um carreto já nasce pronto só com os itens marcados, com o endereço do cliente pré-preenchido (editável) e campo pra responsável pela entrega e observações.</p>
+      <p class="text-muted" style="font-size:12.5px;">Cancelar esse modal não registra nada — nem a venda, nem o carreto. Veja o tópico "Carreto (entregas)" pra entender o resto da tela.</p>
     `,
   },
   {
@@ -149,7 +153,10 @@ const TOPICS = [
       <p>Só um carreto <strong>pendente</strong> pode virar entregue ou ser cancelado — depois de marcado, o status fica travado (se precisar corrigir algo, cadastre um carreto novo).</p>
 
       <h3>Relação com a Venda</h3>
-      <p>O carreto é independente da venda — dá pra cadastrar antes, depois ou até sem nenhuma venda vinculada (por exemplo, entrega de uma troca ou de um material já pago por fora). Por isso ele não desconta do estoque sozinho: se os itens do carreto também precisam sair do estoque, registre a venda normalmente na tela própria.</p>
+      <p>O carreto é independente da venda — dá pra cadastrar antes, depois ou até sem nenhuma venda vinculada (por exemplo, entrega de uma troca ou de um material já pago por fora). Por isso ele não desconta do estoque sozinho: se os itens do carreto também precisam sair do estoque, registre a venda normalmente na tela própria — ou use o atalho abaixo, que faz as duas coisas de uma vez.</p>
+
+      <h3>Atalho: gerar direto da Nova venda</h3>
+      <p>Na tela <strong>Nova venda</strong>, o botão <strong>Finalizar venda + carreto</strong> (abaixo do "Finalizar venda" normal) registra a venda e já cadastra o carreto na sequência, com os itens que você marcar numa lista — poupa ter que abrir a tela Carreto separadamente logo depois de vender. Um carreto cadastrado assim mostra "gerado junto com uma venda" no detalhe. Veja o tópico "Vendas (PDV)" pra mais detalhes desse atalho.</p>
     `,
   },
   {
