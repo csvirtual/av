@@ -76,6 +76,14 @@ sistema em linguagem simples, separado em tópicos.
   usuário, perfil e data/hora — exclusivo do Administrador Geral.
 - **Personalização** — aparência claro/escuro, independente do sistema
   operacional (menu **Personalização**, disponível pros dois perfis).
+- **Backup** — exportação e restauração de todos os dados do sistema num
+  arquivo único protegido por senha (AES-256-GCM, chave derivada via
+  PBKDF2), pra guardar em outro lugar e restaurar depois — inclusive numa
+  instalação nova, em outro computador. Exclusivo do Administrador Geral.
+  É manual por decisão de projeto: automatizar isso em segundo plano exigiria
+  pedir permissões novas ao Chrome (`downloads`/`alarms`), o que vai contra
+  o princípio de pedir o mínimo possível — quem decide quando fazer backup
+  é o lojista.
 
 ## Perfis de acesso
 
@@ -128,6 +136,9 @@ leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
   fechar o navegador), então cada início de expediente pede login de novo.
 - Não há nenhuma permissão de rede, câmera ou acesso a outras abas — a única
   permissão usada é `storage`.
+- **Sem backup, os dados não sobrevivem à perda do computador/perfil do
+  Chrome.** Use a tela **Backup** (Administrador Geral) regularmente —
+  veja a seção "Funcionalidades" acima.
 
 ## Estrutura de pastas
 
@@ -143,16 +154,17 @@ extension/
       app.js               Roteamento e shell do app pós-login
       db.js                Acesso baixo nível ao IndexedDB
       auth.js              Hash de senha (PBKDF2)
+      backupCrypto.js      Criptografia (AES-GCM + PBKDF2) do arquivo de backup
       session.js           Sessão do usuário logado e crédito de troca pendente
       data/                Repositórios: empresa, usuários, produtos, vendas,
                             estoque, auditoria, caixa, clientes/fiado,
                             fornecedores, compras, financeiro, fidelidade,
-                            relatórios
+                            relatórios, backup
       utils/               CNPJ, formatação, leitura de código de barras, cálculo
                             de desconto/totais
       views/               Telas: setup, login, painel, estoque, venda,
                             histórico de vendas, caixa, clientes, compras,
                             financeiro, relatórios, usuários, log, dados da
-                            loja, personalização, ajuda
+                            loja, backup, personalização, ajuda
       components/          Modal, toast, recibo de venda (impressão)
 ```

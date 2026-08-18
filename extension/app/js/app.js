@@ -27,6 +27,7 @@ import { renderLogs } from './views/logs.js';
 import { renderCompanySettings } from './views/company.js';
 import { renderAjuda } from './views/ajuda.js';
 import { renderPersonalizacao } from './views/personalizacao.js';
+import { renderBackup } from './views/backup.js';
 
 const root = document.getElementById('root');
 
@@ -43,6 +44,7 @@ const ROUTES = {
   usuarios: { label: 'Usuários', icon: '👥', roles: ['admin'], render: renderUsers },
   logs: { label: 'Log do sistema', icon: '🗒️', roles: ['admin'], render: renderLogs },
   empresa: { label: 'Dados da loja', icon: '🏬', roles: ['admin'], render: renderCompanySettings },
+  backup: { label: 'Backup', icon: '💾', roles: ['admin'], render: renderBackup },
   personalizacao: { label: 'Personalização', icon: '🎨', roles: ['admin', 'vendedor'], render: renderPersonalizacao },
   ajuda: { label: 'Ajuda', icon: '❓', roles: ['admin', 'vendedor'], render: renderAjuda },
 };

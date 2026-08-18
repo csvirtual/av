@@ -164,6 +164,21 @@ export async function dbCount(storeName) {
   return reqToPromise(store.count());
 }
 
+export async function dbClear(storeName) {
+  const store = await tx(storeName, 'readwrite');
+  await reqToPromise(store.clear());
+}
+
 export function newId() {
   return crypto.randomUUID();
 }
+
+// Todos os object stores do banco, na ordem em que são criados acima — é a
+// lista usada pelo backup (data/backupRepo.js) pra saber exatamente o que
+// exportar/restaurar sem precisar repetir os nomes em outro lugar. Toda vez
+// que um novo store for criado num upgrade futuro, ele entra aqui também.
+export const STORE_NAMES = [
+  'company', 'users', 'products', 'sales', 'stockMovements', 'auditLog',
+  'cashSessions', 'cashMovements', 'customers', 'customerDebts',
+  'suppliers', 'purchaseOrders', 'financialEntries', 'loyaltyEntries',
+];

@@ -189,6 +189,22 @@ a { color: var(--primary); }
   margin-bottom: 14px;
 }
 
+/* ---------- Aviso em destaque (fora da Ajuda) — ex.: tela de Backup ---------- */
+.notice {
+  border-left: 3px solid var(--primary);
+  background: var(--primary-light);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.notice strong { color: var(--primary); }
+.notice.notice-warning { border-left-color: var(--warning); background: var(--warning-light); }
+.notice.notice-warning strong { color: var(--warning); }
+.notice.notice-danger { border-left-color: var(--danger); background: var(--danger-light); }
+.notice.notice-danger strong { color: var(--danger); }
+
 /* ---------- Telas cheias (setup / login) ---------- */
 .auth-screen {
   min-height: 100vh;

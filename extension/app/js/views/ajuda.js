@@ -272,6 +272,29 @@ const TOPICS = [
       <div class="tip"><strong>Por que só o admin vê o log?</strong> O histórico de vendas já mostra pra todo mundo o que foi vendido e por quem. O log de auditoria é mais detalhado (inclui logins, edições, tentativas etc.) — fica restrito ao administrador pra funcionar como uma auditoria de confiança de verdade.</div>
     `,
   },
+  {
+    id: 'backup',
+    icon: '💾',
+    title: 'Backup',
+    html: `
+      <h2>Backup e restauração</h2>
+      <p class="help-subtitle">Como proteger os dados da loja contra perda — exclusivo do Administrador Geral.</p>
+
+      <p>Todos os dados do sistema (estoque, vendas, clientes, financeiro, usuários...) ficam salvos só no computador onde a extensão está instalada. Se esse computador quebrar, for formatado, ou o Chrome for reinstalado, esses dados <strong>não têm como ser recuperados</strong> a não ser que exista um backup feito antes.</p>
+
+      <h3>Exportar backup</h3>
+      <p>Na tela <strong>Backup</strong>, defina uma senha e clique em <strong>Gerar backup</strong>. O sistema baixa um arquivo com todos os dados da loja, protegido por essa senha — sem ela, o arquivo é ilegível pra qualquer pessoa, inclusive pra você. Guarde esse arquivo em outro lugar (pendrive, e-mail pra você mesmo, nuvem pessoal) e anote a senha num lugar seguro.</p>
+      <div class="tip"><strong>Não existe "esqueci a senha" aqui.</strong> Como o sistema é 100% local (sem servidor nenhum por trás), ninguém — nem o desenvolvedor do sistema — consegue recuperar um backup se a senha for perdida. É o preço de ser realmente privado.</div>
+
+      <h3>Restaurar backup</h3>
+      <p>Selecione o arquivo de backup, digite a senha e clique em <strong>Ler backup</strong>. O sistema mostra uma prévia comparando os dados atuais com os do arquivo antes de mexer em qualquer coisa. Só depois de confirmar (duas vezes, de propósito) é que a restauração realmente acontece.</p>
+      <div class="warn-box"><strong>Atenção:</strong> restaurar um backup <strong>apaga todos os dados atuais</strong> e substitui pelos dados do arquivo — não tem como desfazer. Use isso numa instalação nova (depois de fazer o cadastro inicial da loja) ou só se tiver certeza de que quer voltar pro estado do backup.</div>
+      <p>Depois de restaurar, o sistema desloga automaticamente — faça login de novo com um usuário que exista no backup restaurado.</p>
+
+      <h3>Backup é manual, de propósito</h3>
+      <p>O sistema não faz backup sozinho, automaticamente, em segundo plano. Isso é intencional: rodar backup automático sem ninguém abrir o sistema exigiria pedir permissões novas ao Chrome (pra salvar arquivo e "acordar" a extensão em horário fixo) — e esse sistema é feito pra pedir o mínimo possível. Faça backup manualmente com a frequência que fizer sentido pra sua loja (ex: toda semana).</p>
+    `,
+  },
 ];
 
 export async function renderAjuda(container, ctx) {
