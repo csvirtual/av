@@ -1,7 +1,7 @@
 // Catálogo de produtos (estoque). Cada produto tem um código de barras —
 // de fábrica (escaneado) ou interno (gerado pelo sistema, ver
 // utils/barcode.js) — usado tanto na venda quanto na busca.
-import { dbGetAll, dbGet, dbPut, dbAdd, dbDelete, dbGetByIndex, newId } from '../db.js';
+import { dbGetAll, dbGet, dbPut, dbAdd, dbDelete, dbGetByIndex, dbUpdate, newId } from '../db.js';
 
 export async function listProducts() {
   const products = await dbGetAll('products');
@@ -98,14 +98,19 @@ export async function deleteProduct(id) {
 /** Ajusta a quantidade em estoque por uma diferença (positiva = entrada,
  * negativa = saída/venda). Não grava o movimento em si — isso é
  * responsabilidade de quem chama (stockRepo.recordMovement), pra manter o
- * registro do produto e o histórico de movimentações desacoplados. */
+ * registro do produto e o histórico de movimentações desacoplados.
+ *
+ * Usa dbUpdate (get+put na MESMA transação) em vez de getProduct+dbPut
+ * separados: com duas transações, duas chamadas concorrentes (duas abas,
+ * dois vendedores vendendo o mesmo produto ao mesmo tempo) podiam ler a
+ * mesma quantidade "antiga" antes de qualquer uma escrever, e a segunda
+ * escrita apagava o efeito da primeira — vendendo mais do que o estoque
+ * real tinha, sem erro nenhum. */
 export async function adjustQuantity(id, delta) {
-  const product = await getProduct(id);
-  if (!product) throw new Error('Produto não encontrado.');
-  const newQuantity = product.quantity + delta;
-  if (newQuantity < 0) throw new Error(`Estoque insuficiente de "${product.name}".`);
-  product.quantity = newQuantity;
-  product.updatedAt = Date.now();
-  await dbPut('products', product);
-  return product;
+  return dbUpdate('products', id, (product) => {
+    if (!product) throw new Error('Produto não encontrado.');
+    const newQuantity = product.quantity + delta;
+    if (newQuantity < 0) throw new Error(`Estoque insuficiente de "${product.name}".`);
+    return { ...product, quantity: newQuantity, updatedAt: Date.now() };
+  });
 }

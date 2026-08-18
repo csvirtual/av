@@ -164,9 +164,70 @@ export async function dbCount(storeName) {
   return reqToPromise(store.count());
 }
 
-export async function dbClear(storeName) {
-  const store = await tx(storeName, 'readwrite');
-  await reqToPromise(store.clear());
+/** Lê e regrava um registro dentro de UMA ÚNICA transação — diferente de
+ * "dbGet + dbPut" separados (cada um abre a própria transação), isto aqui
+ * garante atomicidade real: entre o get e o put não existe brecha pra outra
+ * chamada concorrente ler o mesmo valor "antigo" e sobrescrever o resultado
+ * (lost update). `updateFn(current)` recebe o registro atual (ou
+ * `undefined` se não existir) e deve devolver o registro já atualizado, ou
+ * lançar um erro pra abortar a transação inteira sem gravar nada. */
+export async function dbUpdate(storeName, id, updateFn) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readwrite');
+    const store = transaction.objectStore(storeName);
+    const getReq = store.get(id);
+    getReq.onerror = () => reject(getReq.error);
+    getReq.onsuccess = () => {
+      let updated;
+      try {
+        updated = updateFn(getReq.result);
+      } catch (err) {
+        reject(err);
+        try { transaction.abort(); } catch { /* já pode não ter requisição pendente */ }
+        return;
+      }
+      const putReq = store.put(updated);
+      putReq.onerror = () => reject(putReq.error);
+      putReq.onsuccess = () => resolve(updated);
+    };
+  });
+}
+
+/** Abre UMA transação cobrindo vários object stores de uma vez (o
+ * IndexedDB suporta isso nativamente) e executa `work(transaction)`
+ * dentro dela. Se `work` lançar um erro em qualquer ponto, a transação
+ * inteira é abortada e desfeita — nenhuma escrita anterior (nem nos
+ * outros stores) fica gravada. Usado pra restauração de backup
+ * (data/backupRepo.js), que precisa trocar o conteúdo de vários stores de
+ * uma vez sem correr o risco de deixar o banco pela metade se algo falhar
+ * no meio do caminho. `work` deve ser síncrona (só enfileirar
+ * store.get/put/clear/etc.) — nada de `await` no meio, ou a transação
+ * fecha sozinha antes de todo o trabalho ser enfileirado. */
+export async function dbTransaction(storeNames, mode, work) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeNames, mode);
+    let result;
+    let settled = false;
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err || new Error('Transação cancelada.'));
+    };
+    transaction.onerror = () => fail(transaction.error);
+    transaction.onabort = () => fail(transaction.error);
+    transaction.oncomplete = () => {
+      settled = true;
+      resolve(result);
+    };
+    try {
+      result = work(transaction);
+    } catch (err) {
+      fail(err);
+      try { transaction.abort(); } catch { /* já pode não ter requisição pendente */ }
+    }
+  });
 }
 
 export function newId() {

@@ -5,7 +5,7 @@
 // extensão, em outro computador. É manual por decisão consciente: nada de
 // permissão de downloads/alarms pra automatizar isso sozinho (ver README) —
 // quem decide quando fazer backup é o lojista.
-import { dbGetAll, dbPut, dbClear, dbCount, STORE_NAMES } from '../db.js';
+import { dbGetAll, dbCount, dbTransaction, STORE_NAMES } from '../db.js';
 import { encryptPayload, decryptPayload } from '../backupCrypto.js';
 
 const BACKUP_FORMAT_VERSION = 1;
@@ -83,14 +83,22 @@ export async function readBackupFile(fileText, password) {
 }
 
 /** Aplica os dados decriptados: apaga tudo que existe hoje e regrava com o
- * conteúdo do backup, store por store. Ação destrutiva e irreversível —
- * quem chama isso já confirmou com o usuário antes (ver views/backup.js). */
+ * conteúdo do backup. Ação destrutiva e irreversível — quem chama isso já
+ * confirmou com o usuário antes (ver views/backup.js e views/setup.js).
+ *
+ * Roda tudo (limpar + regravar os 14 stores) dentro de UMA ÚNICA transação
+ * do IndexedDB, não uma transação separada por store: se qualquer escrita
+ * falhar no meio do caminho (registro corrompido, cota de armazenamento
+ * estourada), a transação inteira é desfeita e o banco volta exatamente
+ * pro estado de antes da restauração — nunca fica com alguns stores já
+ * trocados e outros ainda com os dados antigos. */
 export async function applyBackup(payload) {
-  for (const name of STORE_NAMES) {
-    await dbClear(name);
-    const records = payload.stores[name] || [];
-    for (const record of records) {
-      await dbPut(name, record);
+  await dbTransaction(STORE_NAMES, 'readwrite', (transaction) => {
+    for (const name of STORE_NAMES) {
+      const store = transaction.objectStore(name);
+      store.clear();
+      const records = payload.stores[name] || [];
+      for (const record of records) store.put(record);
     }
-  }
+  });
 }

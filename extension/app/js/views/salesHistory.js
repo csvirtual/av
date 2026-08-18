@@ -249,7 +249,7 @@ export async function renderSalesHistory(container, ctx) {
           reload();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },

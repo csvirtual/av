@@ -183,7 +183,7 @@ export async function renderCompras(container, ctx) {
           renderFornecedoresTab();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },
@@ -347,7 +347,7 @@ export async function renderCompras(container, ctx) {
           renderPedidosTab();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },
@@ -527,7 +527,7 @@ export async function renderCompras(container, ctx) {
           renderPedidosTab();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },

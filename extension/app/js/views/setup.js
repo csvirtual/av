@@ -10,6 +10,7 @@ import { createUser, findByUsername } from '../data/usersRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { readBackupFile, applyBackup } from '../data/backupRepo.js';
 import { isValidCnpj, formatCnpj, onlyDigits } from '../utils/cnpj.js';
+import { escapeHtml } from '../utils/format.js';
 import { showToast } from '../components/toast.js';
 
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -116,7 +117,7 @@ export function renderSetup(root, { onComplete }) {
         showToast('Backup restaurado com sucesso! Faça login com um usuário do backup.', 'success');
         onComplete();
       } catch (err) {
-        errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
         btn.disabled = false;
         btn.textContent = 'Restaurar';
       }
@@ -342,7 +343,7 @@ export function renderSetup(root, { onComplete }) {
         showToast('Loja e administrador cadastrados com sucesso!', 'success');
         onComplete();
       } catch (err) {
-        errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
         submitBtn.disabled = false;
       }
     });

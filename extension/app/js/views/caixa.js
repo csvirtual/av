@@ -151,7 +151,7 @@ async function renderOpenSession(container, ctx, session, refresh) {
           refresh();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },
@@ -224,7 +224,7 @@ async function renderOpenSession(container, ctx, session, refresh) {
           refresh();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },

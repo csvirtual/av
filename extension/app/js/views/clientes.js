@@ -172,7 +172,7 @@ export async function renderClientes(container, ctx) {
           refresh();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },
@@ -299,7 +299,7 @@ export async function renderClientes(container, ctx) {
           refresh();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },
@@ -344,7 +344,7 @@ export async function renderClientes(container, ctx) {
           refresh();
           return true;
         } catch (err) {
-          errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
           return false;
         }
       },

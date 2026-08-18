@@ -14,7 +14,7 @@ import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
 import { recordEarn, recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
 import { getCompany } from './companyRepo.js';
-import { applyDiscount, discountAmount } from '../utils/pricing.js';
+import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
 
 const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
 const FIADO_METHOD = 'Fiado';
@@ -51,27 +51,27 @@ export async function createSale({
     products.push(product);
   }
 
-  let subtotal = 0;
-  let itemsDiscountTotal = 0;
-  const saleItems = [];
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
+  // O preço unitário vem sempre de product.price (o preço gravado no
+  // catálogo agora), nunca de algo que o carrinho/cliente tenha mandado —
+  // é essa origem, e só ela, que garante que ninguém consiga fechar uma
+  // venda com um preço diferente do cadastrado.
+  const saleItems = items.map((item, i) => {
     const product = products[i];
-    const gross = product.price * item.qty;
-    const net = applyDiscount(gross, item.discountType, item.discountValue);
-    subtotal += gross;
-    itemsDiscountTotal += gross - net;
-    saleItems.push({
+    return {
       productId: product.id, name: product.name, barcode: product.barcode, unit: product.unit,
       qty: item.qty, unitPrice: product.price,
       discountType: item.discountType || null, discountValue: Number(item.discountValue) || 0,
-      lineTotal: net, qtyRefunded: 0,
-    });
-  }
+      lineTotal: applyDiscount(product.price * item.qty, item.discountType, item.discountValue),
+      qtyRefunded: 0,
+    };
+  });
 
-  const afterItemsDiscount = subtotal - itemsDiscountTotal;
-  const overallDiscountAmount = discountAmount(afterItemsDiscount, overallDiscountType, overallDiscountValue);
-  const total = Math.max(0, afterItemsDiscount - overallDiscountAmount);
+  // Mesma fórmula de subtotal/desconto/total do PDV (utils/pricing.js) —
+  // reaproveitada aqui em vez de reimplementada, pra nunca divergir do que
+  // já foi mostrado na tela pro vendedor antes de finalizar.
+  const { subtotal, itemsDiscountTotal, overallDiscountAmount, total } = computeCartTotals(
+    saleItems, overallDiscountType, overallDiscountValue,
+  );
 
   const paymentsTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   if (Math.abs(paymentsTotal - total) > PAYMENT_TOLERANCE) {

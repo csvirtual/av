@@ -55,7 +55,7 @@ export function renderLogin(root, { onLogin, company }) {
       });
       onLogin(user);
     } catch (err) {
-      errBox.innerHTML = `<div class="form-error">${err.message}</div>`;
+      errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
       submitBtn.disabled = false;
     }
   });

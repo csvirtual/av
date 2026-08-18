@@ -14,15 +14,24 @@ export async function setSessionUserId(userId) {
   await chrome.storage.session.set({ [KEY]: userId });
 }
 
+// Desloga: some com o usuário logado E qualquer crédito de troca pendente
+// que não foi usado. O crédito é descrito como "válido nesse mesmo turno"
+// (ver comentário abaixo) — sem limpar os dois juntos, um crédito gerado
+// por um vendedor (do estorno da venda de UM cliente) continuaria
+// disponível pro PRÓXIMO vendedor que logasse nessa mesma aba/sessão do
+// Chrome, e ele poderia aplicá-lo na venda de um cliente completamente
+// diferente sem perceber a origem — o logout precisa ser o limite real do
+// turno, não só o userId.
 export async function clearSession() {
-  await chrome.storage.session.remove(KEY);
+  await chrome.storage.session.remove([KEY, CREDIT_KEY]);
 }
 
 // ---------- Crédito de troca pendente ----------
 // Gerado ao estornar uma venda marcando "gerar crédito de troca". Fica
 // disponível pra ser usado como forma de pagamento na próxima venda desse
 // mesmo turno (efêmero como o resto da sessão — não sobrevive a reiniciar o
-// navegador, então não vira uma dívida esquecida no sistema).
+// navegador nem a um logout, então não vira uma dívida esquecida no
+// sistema nem "vaza" pro próximo turno).
 const CREDIT_KEY = 'session.pendingCredit';
 
 export async function getPendingCredit() {

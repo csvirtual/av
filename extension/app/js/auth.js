@@ -37,9 +37,21 @@ export async function hashPassword(password) {
   return { salt, hash };
 }
 
+/** Compara duas strings de tamanho igual em tempo constante (não para no
+ * primeiro caractere diferente) — evita que uma comparação `===` simples
+ * vaze, por timing, quantos caracteres do início já bateram. Baixo risco
+ * real aqui (é tudo local, sem rede), mas é troca de graça: mesmo
+ * resultado, mesmo custo, sem esse canal lateral. */
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 /** Confere a senha digitada contra o salt/hash gravados do usuário. */
 export async function verifyPasswordHash(password, salt, hash) {
   if (!salt || !hash) return false;
   const attempt = await deriveHash(password, salt);
-  return attempt === hash;
+  return timingSafeEqual(attempt, hash);
 }
