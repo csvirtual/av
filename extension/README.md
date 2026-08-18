@@ -43,7 +43,16 @@ sistema em linguagem simples, separado em tópicos.
 - **Vendas (PDV)** — carrinho por código de barras ou busca por nome,
   desconto por item e geral (com teto configurável por vendedor + aprovação
   de administrador acima do limite), pagamento misto (mais de uma forma na
-  mesma venda, incluindo fiado e crédito de troca).
+  mesma venda, incluindo fiado e crédito de troca), com parcelamento (1x a
+  12x) pra pagamento em cartão de crédito — é só um registro no histórico,
+  o sistema não cobra nem calcula juros.
+- **Impressão de recibo** — ao finalizar a venda, um aviso oferece imprimir
+  o recibo na hora (ou reimprimir depois, pelo Histórico de vendas). Usa o
+  diálogo de impressão do próprio navegador, então funciona com qualquer
+  impressora já instalada (térmica de cupom 58/80mm, comum A4/Carta, ou
+  "Salvar como PDF") sem nenhuma configuração extra — o layout se adapta
+  automaticamente ao tamanho do papel escolhido. É um comprovante de venda,
+  não um documento fiscal (o sistema não emite NFe/NFC-e).
 - **Estorno e troca** — estorno total ou parcial de uma venda já fechada,
   com devolução automática ao estoque e opção de gerar crédito de troca
   (usável como forma de pagamento na próxima venda) em vez de dinheiro.
@@ -65,6 +74,8 @@ sistema em linguagem simples, separado em tópicos.
 - **Log de auditoria** — toda ação relevante do sistema (login, cadastros,
   edições, vendas, estornos, movimentos de caixa etc.) fica registrada com
   usuário, perfil e data/hora — exclusivo do Administrador Geral.
+- **Personalização** — aparência claro/escuro, independente do sistema
+  operacional (menu **Personalização**, disponível pros dois perfis).
 
 ## Perfis de acesso
 
@@ -88,12 +99,17 @@ edições, exclusões — com timestamp e usuário) é exclusivo do administrado
 
 ## Código de barras
 
-O sistema foi pensado para um **leitor de código de barras USB**: ele
-funciona como um teclado, "digitando" o código e apertando Enter sozinho —
-não precisa de nenhuma configuração. Basta:
+O sistema é compatível com **qualquer leitor de código de barras** (USB ou
+Bluetooth) configurado em modo teclado/HID — é assim que a grande maioria
+dos leitores de mercado e loja de material vem de fábrica: ele "digita" o
+código e aperta Enter sozinho, sem driver nem configuração nenhuma. Se o seu
+leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
+é o único requisito.
 
 - Na tela **Nova venda**, o campo de escaneamento já fica focado — é só
-  passar o produto no leitor.
+  passar o produto no leitor. Mesmo que o foco esteja em outro campo no
+  momento (aconteceu de clicar em outro lugar da tela), o sistema reconhece
+  o scan do mesmo jeito, como reforço.
 - Na tela **Estoque**, ao cadastrar um produto, também dá pra escanear o
   código de barras direto no campo correspondente.
 - Produtos sem código de fábrica (itens a granel, sem embalagem padrão)
@@ -137,6 +153,6 @@ extension/
       views/               Telas: setup, login, painel, estoque, venda,
                             histórico de vendas, caixa, clientes, compras,
                             financeiro, relatórios, usuários, log, dados da
-                            loja, ajuda
-      components/          Modal, toast
+                            loja, personalização, ajuda
+      components/          Modal, toast, recibo de venda (impressão)
 ```
