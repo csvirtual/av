@@ -514,11 +514,14 @@ tbody tr:hover { background: var(--surface-alt); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Busca de cliente (Nova venda, Carreto) — um input solto, fora de um
- * .field (não tem label do lado), que sem isso herdaria só a regra crua de
- * "input, select, textarea" (só fonte/tamanho, sem borda nem padding
- * decente) e ficava discrepante do resto da tela. */
-.customer-search-input {
+/* Busca de cliente (Nova venda, Carreto) — um input que em Nova venda fica
+ * solto, fora de um .field (não tem label do lado), e sem isso herdaria só
+ * a regra crua de "input, select, textarea" (só fonte/tamanho, sem borda
+ * nem padding decente). No Carreto ele fica dentro de um .field — por
+ * isso o seletor usa "input.customer-search-input" (empata em
+ * especificidade com ".field input" e ganha por vir depois no arquivo),
+ * garantindo a mesma aparência nos dois lugares em vez de só um deles. */
+input.customer-search-input {
   width: 100%;
   padding: 10px 12px;
   font-size: 14px;
@@ -529,7 +532,7 @@ tbody tr:hover { background: var(--surface-alt); }
   outline: none;
   transition: border-color 0.15s ease;
 }
-.customer-search-input:focus {
+input.customer-search-input:focus {
   border-color: var(--primary);
 }
 

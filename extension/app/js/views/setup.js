@@ -261,8 +261,7 @@ export function renderSetup(root, { onComplete }) {
           <input id="horario" placeholder="Ex: Seg a Sáb, 08h às 18h">
         </div>
 
-        <div class="modal-actions" style="justify-content:space-between;padding-top:8px;">
-          <button type="button" class="btn btn-secondary" id="back-btn">← Voltar</button>
+        <div class="modal-actions" style="justify-content:flex-end;padding-top:8px;">
           <button type="submit" class="btn">Continuar →</button>
         </div>
       </form>
@@ -272,8 +271,11 @@ export function renderSetup(root, { onComplete }) {
       stepNum: 2,
     });
 
-    document.getElementById('back-btn').addEventListener('click', renderThemeStep);
-
+    // Sem botão "← Voltar" aqui de propósito: os campos deste formulário
+    // não ficam salvos em nenhum rascunho — voltar pra tela de aparência e
+    // clicar em "Continuar" de novo re-renderizaria tudo em branco,
+    // apagando o que já tinha sido digitado. Se quiser mudar a aparência,
+    // dá pra fazer depois, em Personalização, sem perder o cadastro.
     const form = document.getElementById('company-form');
     const cnpjInput = document.getElementById('cnpj');
     cnpjInput.addEventListener('input', () => {

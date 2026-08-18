@@ -685,11 +685,22 @@ export async function renderSale(container, ctx) {
   // carreto logo em seguida com os itens escolhidos no modal — usado pelos
   // dois botões de finalizar (a diferença entre eles é só se deliveryPlan
   // existe ou não).
+  //
+  // IMPORTANTE: a criação da venda e a do carreto são tratadas em blocos
+  // separados de propósito. A venda já debita estoque e já é um fato
+  // consumado assim que createSale() retorna — se o cadastro do carreto
+  // falhar DEPOIS disso (ex: algum erro inesperado), a tela não pode dar a
+  // entender que "nada foi registrado", ou o vendedor pode tentar vender
+  // de novo e cobrar o cliente duas vezes. Por isso só a criação da venda
+  // em si aborta o fluxo inteiro; uma falha no carreto vira um aviso
+  // separado, sem desfazer nem esconder que a venda foi concluída.
   async function commitSale(discountApproval, fiadoAmount, deliveryPlan) {
     finalizeBtn.disabled = true;
     finalizeCarretoBtn.disabled = true;
+
+    let sale;
     try {
-      const sale = await createSale({
+      sale = await createSale({
         userId: ctx.user.id,
         userName: ctx.user.nome,
         userRole: ctx.user.role,
@@ -700,18 +711,26 @@ export async function renderSale(container, ctx) {
         cashSessionId: cashSession?.id || null,
         customerId: selectedCustomer?.id || null,
       });
-      await logAction({
-        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-        action: 'Venda registrada',
-        details: `Venda de ${sale.items.length} item(ns) totalizando ${formatMoney(sale.total)}`
-          + (sale.itemsDiscountTotal + sale.overallDiscountAmount > 0 ? ` (desconto de ${formatMoney(sale.itemsDiscountTotal + sale.overallDiscountAmount)})` : '')
-          + (sale.discountApprovedBy ? ' — desconto autorizado por administrador' : '')
-          + (fiadoAmount > 0 ? ` — ${formatMoney(fiadoAmount)} fiado para "${selectedCustomer.nome}"` : '') + '.',
-        entity: 'sale', entityId: sale.id,
-      });
+    } catch (err) {
+      showToast(err.message, 'error');
+      renderPayments(); // recalcula o disabled dos dois botões (carrinho/pagamento não mudaram)
+      return;
+    }
 
-      let delivery = null;
-      if (deliveryPlan) {
+    await logAction({
+      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+      action: 'Venda registrada',
+      details: `Venda de ${sale.items.length} item(ns) totalizando ${formatMoney(sale.total)}`
+        + (sale.itemsDiscountTotal + sale.overallDiscountAmount > 0 ? ` (desconto de ${formatMoney(sale.itemsDiscountTotal + sale.overallDiscountAmount)})` : '')
+        + (sale.discountApprovedBy ? ' — desconto autorizado por administrador' : '')
+        + (fiadoAmount > 0 ? ` — ${formatMoney(fiadoAmount)} fiado para "${selectedCustomer.nome}"` : '') + '.',
+      entity: 'sale', entityId: sale.id,
+    });
+
+    let delivery = null;
+    let deliveryErrorMessage = null;
+    if (deliveryPlan) {
+      try {
         delivery = await createDelivery({
           customerId: selectedCustomer.id,
           items: deliveryPlan.items,
@@ -727,50 +746,64 @@ export async function renderSale(container, ctx) {
           details: `Carreto para "${delivery.customerName}" com ${delivery.items.length} item(ns), gerado junto com a venda.`,
           entity: 'delivery', entityId: delivery.id,
         });
+      } catch (err) {
+        // A venda já está gravada — não desfaz nada, só avisa que o
+        // carreto em si não foi criado, pra cadastrar manualmente depois.
+        deliveryErrorMessage = err.message;
       }
+    }
 
+    if (deliveryErrorMessage) {
+      showToast(`Venda finalizada: ${formatMoney(sale.total)}. O carreto NÃO foi cadastrado (${deliveryErrorMessage}).`, 'error');
+    } else {
       showToast(
         delivery ? `Venda finalizada: ${formatMoney(sale.total)}. Carreto cadastrado.` : `Venda finalizada: ${formatMoney(sale.total)}.`,
         'success',
       );
-      const customerNameForReceipt = selectedCustomer?.nome || null;
-      cart = [];
-      overallDiscountType = null;
-      overallDiscountValue = 0;
-      payments = [];
-      selectedCustomer = null;
-      renderAll();
-      renderCustomerBox();
-      resultsBox.innerHTML = '';
-      scanInput.value = '';
-      scanInput.focus();
-
-      openModal({
-        title: 'Venda finalizada',
-        submitLabel: '🖨️ Imprimir recibo',
-        cancelLabel: 'Fechar',
-        bodyHtml: `
-          <p style="font-size:15px;">Venda de <strong>${formatMoney(sale.total)}</strong> registrada com sucesso.</p>
-          ${delivery ? `<p style="font-size:13.5px;color:var(--success);">🛻 Carreto cadastrado com ${delivery.items.length} item(ns) — veja em "Carreto".</p>` : ''}
-          <p class="text-muted" style="font-size:12.5px;">Abre o diálogo de impressão do navegador — escolha a impressora (inclusive térmica de cupom) ou "Salvar como PDF".</p>
-        `,
-        onSubmit: () => {
-          printSaleReceipt(sale, company, customerNameForReceipt);
-          return false; // mantém o modal aberto — dá pra imprimir de novo se precisar
-        },
-      });
-    } catch (err) {
-      showToast(err.message, 'error');
-    } finally {
-      finalizeBtn.disabled = cart.length === 0;
-      finalizeCarretoBtn.disabled = cart.length === 0;
     }
+
+    const customerNameForReceipt = selectedCustomer?.nome || null;
+    cart = [];
+    overallDiscountType = null;
+    overallDiscountValue = 0;
+    payments = [];
+    selectedCustomer = null;
+    renderAll();
+    renderCustomerBox();
+    resultsBox.innerHTML = '';
+    scanInput.value = '';
+    scanInput.focus();
+
+    openModal({
+      title: 'Venda finalizada',
+      submitLabel: '🖨️ Imprimir recibo',
+      cancelLabel: 'Fechar',
+      bodyHtml: `
+        <p style="font-size:15px;">Venda de <strong>${formatMoney(sale.total)}</strong> registrada com sucesso.</p>
+        ${delivery ? `<p style="font-size:13.5px;color:var(--success);">🛻 Carreto cadastrado com ${delivery.items.length} item(ns) — veja em "Carreto".</p>` : ''}
+        ${deliveryErrorMessage ? `<p style="font-size:13.5px;color:var(--danger);">⚠️ O carreto NÃO foi cadastrado (${escapeHtml(deliveryErrorMessage)}). A venda em si está registrada normalmente — cadastre o carreto manualmente na tela "Carreto", se precisar.</p>` : ''}
+        <p class="text-muted" style="font-size:12.5px;">Abre o diálogo de impressão do navegador — escolha a impressora (inclusive térmica de cupom) ou "Salvar como PDF".</p>
+      `,
+      onSubmit: () => {
+        printSaleReceipt(sale, company, customerNameForReceipt);
+        return false; // mantém o modal aberto — dá pra imprimir de novo se precisar
+      },
+    });
   }
 
+  // Os dois botões ficam desabilitados IMEDIATAMENTE ao clicar — antes de
+  // qualquer await (checagem de desconto/fiado, que pode envolver um
+  // modal) — pra um clique duplo não conseguir abrir dois modais
+  // empilhados nem disparar duas vendas seguidas a partir do mesmo
+  // carrinho. Todo caminho que aborta sem chegar em commitSale() precisa
+  // chamar renderPayments() pra devolver o estado correto dos botões
+  // (não um simples "true", que ignoraria o carrinho/pagamento reais).
   finalizeBtn.addEventListener('click', async () => {
     if (cart.length === 0) return;
+    finalizeBtn.disabled = true;
+    finalizeCarretoBtn.disabled = true;
     const pre = await runPreFinalizeChecks();
-    if (!pre) return;
+    if (!pre) { renderPayments(); return; }
     await commitSale(pre.discountApproval, pre.fiadoAmount, null);
   });
 
@@ -780,10 +813,12 @@ export async function renderSale(container, ctx) {
       showToast('Selecione um cliente para gerar o carreto.', 'error');
       return;
     }
+    finalizeBtn.disabled = true;
+    finalizeCarretoBtn.disabled = true;
     const pre = await runPreFinalizeChecks();
-    if (!pre) return;
+    if (!pre) { renderPayments(); return; }
     const deliveryPlan = await openCarretoPickerModal();
-    if (!deliveryPlan) return; // cancelado — nem venda nem carreto são registrados
+    if (!deliveryPlan) { renderPayments(); return; } // cancelado — nem venda nem carreto são registrados
     await commitSale(pre.discountApproval, pre.fiadoAmount, deliveryPlan);
   });
 
