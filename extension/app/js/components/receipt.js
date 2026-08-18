@@ -10,6 +10,16 @@
 // com todo o resto da página e mostra só ele na hora de imprimir de
 // verdade — não abre aba nova nem popup.
 //
+// O MESMO html serve pra impressora térmica estreita (bobina de cupom,
+// 58/80mm) e pra impressora comum (A4/Carta) — não é o mesmo layout: o
+// CSS detecta a largura real do papel escolhido no diálogo de impressão
+// (@media print and (min-width: ...) — o Chrome resolve isso contra o
+// tamanho de página selecionado) e troca pra uma segunda aparência bem
+// diferente, pensada pra folha inteira, com tabela de verdade e mais
+// espaço. Cada item já sai em células separadas (nome/qtd/unitário/total)
+// exatamente pra isso: o CSS só rearruma as mesmas células, não duplica
+// conteúdo nem recalcula nada.
+//
 // Importante: isto é um RECIBO/comprovante de venda, não um documento
 // fiscal (a extensão não emite NFe/NFC-e — decisão de escopo assumida
 // desde o início do projeto). O recibo deixa isso explícito pro
@@ -28,19 +38,26 @@ function formatAddress(company) {
   return parts.join(' — ');
 }
 
+/** Número de recibo amigável pra exibição — o id de verdade da venda é um
+ * UUID longo (chave interna, não pensado pra leitura humana); os 8
+ * primeiros caracteres já bastam pra diferenciar duas vendas visualmente
+ * num comprovante impresso, como um "número de pedido" curto. */
+function shortReceiptNumber(sale) {
+  return sale.id.slice(0, 8).toUpperCase();
+}
+
 function buildReceiptHtml(sale, company, customerName) {
   const address = formatAddress(company);
+
   const itemsHtml = sale.items.map((i) => {
     const refunded = i.qtyRefunded > 0 ? ` <span class="r-item-refunded">(${i.qtyRefunded} estornado${i.qtyRefunded > 1 ? 's' : ''})</span>` : '';
     return `
-      <tr>
-        <td colspan="3" class="r-item-name">${escapeHtml(i.name)}${refunded}</td>
-      </tr>
-      <tr>
-        <td class="r-item-qty">${i.qty} ${escapeHtml(i.unit)} × ${formatMoney(i.unitPrice)}</td>
-        <td></td>
-        <td class="r-item-total">${formatMoney(i.lineTotal)}</td>
-      </tr>`;
+      <div class="r-item-row">
+        <div class="r-cell r-cell-name">${escapeHtml(i.name)}${refunded}</div>
+        <div class="r-cell r-cell-qty">${i.qty} ${escapeHtml(i.unit)}</div>
+        <div class="r-cell r-cell-unit">${formatMoney(i.unitPrice)}</div>
+        <div class="r-cell r-cell-total">${formatMoney(i.lineTotal)}</div>
+      </div>`;
   }).join('');
 
   const paymentsHtml = sale.payments.map((p) => {
@@ -68,8 +85,11 @@ function buildReceiptHtml(sale, company, customerName) {
       </div>
 
       <div class="r-sep"></div>
-      <div class="r-title">Recibo de venda</div>
-      <div class="r-small r-center">(comprovante não fiscal)</div>
+      <div class="r-title-block">
+        <div class="r-title">Recibo de venda</div>
+        <div class="r-receipt-number">Nº ${shortReceiptNumber(sale)}</div>
+      </div>
+      <div class="r-small r-center r-nonfiscal">(comprovante não fiscal)</div>
       <div class="r-sep"></div>
 
       <div class="r-row"><span>Data</span><span>${formatDateTime(sale.timestamp)}</span></div>
@@ -77,15 +97,23 @@ function buildReceiptHtml(sale, company, customerName) {
       ${customerName ? `<div class="r-row"><span>Cliente</span><span>${escapeHtml(customerName)}</span></div>` : ''}
 
       <div class="r-sep"></div>
-      <table class="r-items">
-        <tbody>${itemsHtml}</tbody>
-      </table>
+      <div class="r-items">
+        <div class="r-items-head">
+          <div class="r-cell r-cell-name">Produto</div>
+          <div class="r-cell r-cell-qty">Qtd.</div>
+          <div class="r-cell r-cell-unit">Unitário</div>
+          <div class="r-cell r-cell-total">Total</div>
+        </div>
+        ${itemsHtml}
+      </div>
       <div class="r-sep"></div>
 
-      <div class="r-row"><span>Subtotal</span><span>${formatMoney(sale.subtotal)}</span></div>
-      ${sale.itemsDiscountTotal > 0 ? `<div class="r-row"><span>Desconto nos itens</span><span>−${formatMoney(sale.itemsDiscountTotal)}</span></div>` : ''}
-      ${sale.overallDiscountAmount > 0 ? `<div class="r-row"><span>Desconto geral</span><span>−${formatMoney(sale.overallDiscountAmount)}</span></div>` : ''}
-      <div class="r-row r-total"><span>TOTAL</span><span>${formatMoney(sale.total)}</span></div>
+      <div class="r-totals">
+        <div class="r-row"><span>Subtotal</span><span>${formatMoney(sale.subtotal)}</span></div>
+        ${sale.itemsDiscountTotal > 0 ? `<div class="r-row"><span>Desconto nos itens</span><span>−${formatMoney(sale.itemsDiscountTotal)}</span></div>` : ''}
+        ${sale.overallDiscountAmount > 0 ? `<div class="r-row"><span>Desconto geral</span><span>−${formatMoney(sale.overallDiscountAmount)}</span></div>` : ''}
+        <div class="r-row r-total"><span>TOTAL</span><span>${formatMoney(sale.total)}</span></div>
+      </div>
 
       <div class="r-sep"></div>
       <div class="r-section-title">Pagamento</div>

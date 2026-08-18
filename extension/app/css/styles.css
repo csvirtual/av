@@ -751,11 +751,16 @@ tbody tr:hover { background: var(--surface-alt); }
 /* ==========================================================================
    Recibo de venda (impressão) — ver components/receipt.js. Fica escondido
    o tempo todo na tela normal; @media print vira ele visível e some com
-   todo o resto da página, sem precisar abrir aba nova nem popup. Layout
-   estreito (58mm) de propósito: é o tamanho mais comum de bobina de
-   impressora térmica de cupom no varejo — numa impressora comum (A4) ele
-   só imprime como uma faixa estreita no canto da folha, o que também é
-   perfeitamente aceitável pra um recibo.
+   todo o resto da página, sem precisar abrir aba nova nem popup.
+
+   DUAS aparências a partir do MESMO html, escolhidas automaticamente pela
+   largura do papel que a pessoa selecionar no diálogo de impressão (o
+   Chrome resolve @media print and (min-width) contra o tamanho de página
+   escolhido — impressora térmica de 58/80mm cai no layout estreito tipo
+   cupom; A4/Carta numa impressora comum cai no layout largo tipo nota/
+   recibo de verdade). Cada item já sai em 4 células separadas (nome/qtd/
+   unitário/total) — só a disposição delas muda entre os dois layouts, o
+   conteúdo é sempre o mesmo.
    ========================================================================== */
 #print-receipt-root { display: none; }
 
@@ -771,25 +776,95 @@ tbody tr:hover { background: var(--surface-alt); }
   @page { margin: 4mm; }
 }
 
+/* ---------- Layout estreito (padrão — bobina térmica 58/80mm) ---------- */
 .receipt {
-  width: 58mm;
+  width: 100%;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 10.5px;
   line-height: 1.45;
   color: #000;
 }
 .r-header { text-align: center; }
-.r-store-name { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+.r-store-name { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.3px; }
 .r-small { font-size: 9.5px; }
 .r-center { text-align: center; }
-.r-title { font-size: 12px; font-weight: 700; text-align: center; text-transform: uppercase; }
+.r-title-block { text-align: center; }
+.r-title { font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.r-receipt-number { font-size: 9px; color: #333; margin-top: 1px; }
+.r-nonfiscal { margin-top: 1px; }
 .r-section-title { font-weight: 700; text-transform: uppercase; font-size: 9.5px; margin-bottom: 2px; }
 .r-sep { border-top: 1px dashed #000; margin: 5px 0; }
-.r-row { display: flex; justify-content: space-between; gap: 8px; }
-.r-row.r-total { font-weight: 700; font-size: 12px; margin-top: 3px; }
-.r-items { width: 100%; border-collapse: collapse; }
-.r-items td { padding: 1px 0; vertical-align: top; }
-.r-item-name { font-weight: 700; }
-.r-item-refunded { font-weight: 400; text-decoration: line-through; }
-.r-item-qty { white-space: nowrap; }
-.r-item-total { text-align: right; white-space: nowrap; }
+/* flex-wrap:wrap + margin-left:auto no valor: se o rótulo for comprido
+ * demais pra caber ao lado do valor (ex.: "Cartão de crédito (12x)" numa
+ * bobina de 58mm), o valor desce inteiro pra sua própria linha, alinhado
+ * à direita — nunca quebra no meio da frase nem sobrepõe o valor. */
+.r-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.r-row > span:first-child { white-space: nowrap; }
+.r-row > span:last-child { white-space: nowrap; margin-left: auto; }
+.r-row.r-total { font-weight: 700; font-size: 12px; margin-top: 3px; border-top: 1px solid #000; padding-top: 3px; }
+
+.r-items-head { display: none; }
+.r-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas: "name name name" "qty unit total";
+  column-gap: 8px;
+  padding: 2px 0;
+}
+.r-cell-name { grid-area: name; font-weight: 700; }
+.r-cell-qty { grid-area: qty; white-space: nowrap; }
+.r-cell-unit { grid-area: unit; text-align: right; white-space: nowrap; color: #333; }
+.r-cell-total { grid-area: total; text-align: right; white-space: nowrap; font-weight: 700; }
+.r-item-refunded { font-weight: 400; text-decoration: line-through; color: #555; }
+
+/* ---------- Layout largo (impressora comum — A4/Carta) ---------- */
+@media print and (min-width: 120mm) {
+  @page { margin: 14mm; }
+
+  .receipt {
+    width: 100%;
+    max-width: 190mm;
+    margin: 0 auto;
+    font-family: -apple-system, 'Segoe UI', system-ui, Roboto, Arial, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.6;
+    border: 1px solid #ccc;
+    padding: 12mm;
+  }
+  .r-header { text-align: left; }
+  .r-store-name { font-size: 19px; letter-spacing: 0.2px; }
+  .r-small { font-size: 11px; color: #444; }
+
+  .r-title-block { display: flex; justify-content: space-between; align-items: baseline; text-align: left; }
+  .r-title { font-size: 15px; }
+  .r-receipt-number { font-size: 12px; color: #555; margin-top: 0; }
+  .r-nonfiscal { text-align: left; margin-top: -2px; color: #777; }
+
+  .r-section-title { font-size: 11px; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .r-sep { border-top: 1px solid #ddd; margin: 12px 0; }
+  .r-row { padding: 3px 0; }
+  .r-row.r-total { font-size: 16px; margin-top: 6px; padding-top: 8px; }
+  .r-totals { max-width: 260px; margin-left: auto; }
+
+  .r-items-head {
+    display: grid;
+    grid-template-columns: 1fr 90px 110px 110px;
+    grid-template-areas: "name qty unit total";
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.4px;
+    color: #555;
+    border-bottom: 1.5px solid #000;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  .r-items-head .r-cell-qty, .r-items-head .r-cell-unit, .r-items-head .r-cell-total { text-align: right; }
+  .r-item-row {
+    grid-template-columns: 1fr 90px 110px 110px;
+    grid-template-areas: "name qty unit total";
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .r-cell-name { font-weight: 600; }
+}
