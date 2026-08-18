@@ -4,7 +4,7 @@
 // estoque nem em dinheiro — a baixa de estoque de verdade já acontece na
 // Venda; o carreto só ajuda a organizar o que precisa sair, pra quem, e se
 // já foi entregue ou não.
-import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
 import { getCustomer } from './customersRepo.js';
 
 export async function listDeliveries() {
@@ -61,22 +61,27 @@ export async function createDelivery({ customerId, items, address = '', responsi
   return delivery;
 }
 
+// markDelivered/cancelDelivery usam dbUpdate — a checagem "ainda está
+// pendente?" e a gravação da transição de status acontecem na mesma
+// transação, pra duas ações concorrentes sobre o mesmo carreto (marcar
+// entregue e cancelar, por exemplo) não conseguirem os dois passar na
+// checagem antes de qualquer um gravar.
 export async function markDelivered(id, { userId, userName }) {
-  const delivery = await getDelivery(id);
-  if (!delivery) throw new Error('Carreto não encontrado.');
-  if (delivery.status !== 'pendente') throw new Error('Este carreto não está mais pendente.');
-  delivery.status = 'entregue';
-  delivery.deliveredBy = { userId, userName };
-  delivery.deliveredAt = Date.now();
-  await dbPut('deliveries', delivery);
-  return delivery;
+  return dbUpdate('deliveries', id, (delivery) => {
+    if (!delivery) throw new Error('Carreto não encontrado.');
+    if (delivery.status !== 'pendente') throw new Error('Este carreto não está mais pendente.');
+    delivery.status = 'entregue';
+    delivery.deliveredBy = { userId, userName };
+    delivery.deliveredAt = Date.now();
+    return delivery;
+  });
 }
 
 export async function cancelDelivery(id) {
-  const delivery = await getDelivery(id);
-  if (!delivery) throw new Error('Carreto não encontrado.');
-  if (delivery.status !== 'pendente') throw new Error('Só é possível cancelar um carreto pendente.');
-  delivery.status = 'cancelado';
-  await dbPut('deliveries', delivery);
-  return delivery;
+  return dbUpdate('deliveries', id, (delivery) => {
+    if (!delivery) throw new Error('Carreto não encontrado.');
+    if (delivery.status !== 'pendente') throw new Error('Só é possível cancelar um carreto pendente.');
+    delivery.status = 'cancelado';
+    return delivery;
+  });
 }

@@ -825,4 +825,18 @@ export async function renderSale(container, ctx) {
   renderCreditBanner();
   renderCustomerBox();
   renderAll();
+
+  // Devolve a função de limpeza do reforço global de leitura de código de
+  // barras (listener em `document`, não preso a nenhum elemento desta
+  // tela) — o router (app.js) chama isso automaticamente ao SAIR desta
+  // tela. Antes, essa limpeza só acontecia ao REVISITAR Nova Venda (linha
+  // 40 acima), então o listener ficava ativo em segundo plano em
+  // qualquer outra tela até o usuário voltar aqui — inofensivo na
+  // prática (o listener já ignora campo focado e modal aberto), mas
+  // podia gerar um toast de erro confuso numa tela sem nada a ver se
+  // alguém escaneasse um código por acaso enquanto estava em outro lugar.
+  return () => {
+    stopGlobalScanner?.();
+    stopGlobalScanner = null;
+  };
 }

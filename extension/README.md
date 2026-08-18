@@ -161,6 +161,32 @@ leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
   Chrome.** Use a tela **Backup** (Administrador Geral) regularmente —
   veja a seção "Funcionalidades" acima.
 
+## Confiabilidade e integridade dos dados
+
+Pensado pra ser usado como caixa/PDV principal numa loja de verdade, com
+gente clicando rápido e mais de uma aba/tela aberta às vezes:
+
+- **Proteção contra clique duplo** — todo botão de confirmar (finalizar
+  venda, cadastrar, estornar, registrar pagamento etc.) desabilita assim
+  que é clicado e só volta a ficar disponível depois da operação terminar
+  — clicar de novo por impaciência ou nervosismo na correria do balcão não
+  duplica a ação.
+- **Sem "corrida" entre ações concorrentes** — estornar uma venda, receber
+  um pedido de compra, registrar pagamento de fiado, abrir o caixa e
+  editar cadastros (produto, cliente, fornecedor, usuário) sempre leem e
+  gravam o estado mais atual dentro de uma única operação no banco — duas
+  tentativas quase simultâneas sobre o mesmo registro (duplo clique restante
+  ou duas abas) nunca resultam em dado duplicado ou perdido; a segunda
+  tentativa é recusada com um aviso claro, não falha em silêncio.
+- **Sessão sincronizada entre abas** — como a extensão permite abrir mais
+  de uma aba, deslogar (ou ser desativado por um administrador) numa aba
+  reflete automaticamente nas outras, sem precisar recarregar a página.
+- **Uma venda com carreto associado nunca fica "pela metade"** — se o
+  carreto falhar por algum motivo depois da venda já ter sido registrada,
+  a venda continua valendo (o cliente já pagou e o estoque já baixou) e o
+  sistema avisa claramente que só o carreto precisa ser cadastrado de
+  novo, na tela própria.
+
 ## Estrutura de pastas
 
 ```

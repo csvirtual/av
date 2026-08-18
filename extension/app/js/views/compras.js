@@ -102,15 +102,19 @@ export async function renderCompras(container, ctx) {
           confirmLabel: next ? 'Reativar' : 'Inativar', danger: !next,
         });
         if (!ok) return;
-        await setSupplierActive(supplier.id, next);
-        await logAction({
-          userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-          action: next ? 'Reativação de fornecedor' : 'Inativação de fornecedor',
-          details: `Fornecedor "${supplier.nome}" ${next ? 'reativado' : 'inativado'}.`,
-          entity: 'supplier', entityId: supplier.id,
-        });
-        showToast(`Fornecedor ${next ? 'reativado' : 'inativado'}.`, 'success');
-        renderFornecedoresTab();
+        try {
+          await setSupplierActive(supplier.id, next);
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: next ? 'Reativação de fornecedor' : 'Inativação de fornecedor',
+            details: `Fornecedor "${supplier.nome}" ${next ? 'reativado' : 'inativado'}.`,
+            entity: 'supplier', entityId: supplier.id,
+          });
+          showToast(`Fornecedor ${next ? 'reativado' : 'inativado'}.`, 'success');
+          renderFornecedoresTab();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
       });
     });
     content.querySelectorAll('[data-delete]').forEach((btn) => {

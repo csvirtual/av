@@ -1,7 +1,7 @@
 // Usuários do sistema: o primeiro cadastrado é sempre o Administrador Geral
 // (role 'admin'); todos os demais nascem como 'vendedor'. Senhas nunca são
 // gravadas em texto puro — ver auth.js.
-import { dbGetAll, dbGet, dbPut, dbAdd, dbGetByIndex, dbCount, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbGetByIndex, dbCount, dbUpdate, newId } from '../db.js';
 import { hashPassword, verifyPasswordHash } from '../auth.js';
 
 export async function hasAnyUser() {
@@ -54,19 +54,23 @@ export async function verifyLogin(username, password) {
 }
 
 export async function setUserActive(id, active) {
-  const user = await getUser(id);
-  if (!user) return null;
-  user.active = active;
-  await dbPut('users', user);
-  return user;
+  return dbUpdate('users', id, (user) => {
+    if (!user) throw new Error('Usuário não encontrado.');
+    user.active = active;
+    return user;
+  });
 }
 
 export async function resetUserPassword(id, newPassword) {
-  const user = await getUser(id);
-  if (!user) return null;
+  // hashPassword é assíncrono — precisa rodar ANTES do dbUpdate, cujo
+  // updateFn é síncrono por definição (ver db.js). Não depende de ler o
+  // usuário primeiro, então calcular o hash antes não muda a atomicidade
+  // do get+put que segue.
   const { salt, hash } = await hashPassword(newPassword);
-  user.passwordSalt = salt;
-  user.passwordHash = hash;
-  await dbPut('users', user);
-  return user;
+  return dbUpdate('users', id, (user) => {
+    if (!user) throw new Error('Usuário não encontrado.');
+    user.passwordSalt = salt;
+    user.passwordHash = hash;
+    return user;
+  });
 }

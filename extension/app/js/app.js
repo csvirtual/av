@@ -4,7 +4,7 @@
 // mesma aba — sem framework, só JS de módulo nativo.
 import { isCompanyRegistered, getCompany } from './data/companyRepo.js';
 import { hasAnyUser, getUser } from './data/usersRepo.js';
-import { getSessionUserId, clearSession } from './session.js';
+import { getSessionUserId, clearSession, onSessionUserIdChanged } from './session.js';
 import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
 import { confirmDialog } from './components/modal.js';
@@ -148,7 +148,33 @@ function renderShell(user, company) {
     },
   };
 
-  function renderCurrentRoute() {
+  // Guarda a função de limpeza (opcional) que a tela atual devolveu — ver
+  // comentário logo abaixo. `null` quando a tela atual não precisa de
+  // nenhuma limpeza (a maioria não precisa: trocar innerHTML já solta os
+  // listeners presos a elementos removidos, o único caso que precisa de
+  // limpeza explícita é um listener preso em `document`/`window` que
+  // sobrevive à troca de innerHTML, como o reforço global de leitura de
+  // código de barras em Nova Venda).
+  let unmountCurrentRoute = null;
+
+  // Reconfere se este usuário continua ativo a cada navegação (não só uma
+  // vez, no boot inicial) — sem isso, um admin desativando um vendedor
+  // pela tela Usuários não tinha nenhum efeito sobre uma aba desse
+  // vendedor que já estivesse aberta: ela continuava plenamente
+  // funcional (vender, estornar etc.) até alguém recarregar a página por
+  // acaso. Custa uma leitura no IndexedDB por clique de navegação — 1
+  // registro, sem sensação de lentidão perceptível.
+  async function renderCurrentRoute() {
+    const freshUser = await getUser(user.id);
+    if (!freshUser || !freshUser.active) {
+      showToast('Sua sessão não é mais válida — faça login novamente.', 'error');
+      await clearSession();
+      boot();
+      return;
+    }
+
+    if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
+
     const key = currentRouteKey();
     const route = ROUTES[key];
     navGroup.querySelectorAll('.nav-link').forEach((btn) => {
@@ -160,13 +186,24 @@ function renderShell(user, company) {
     }
     const container = document.getElementById('main-content');
     container.innerHTML = '';
-    route.render(container, ctx);
+    // Uma view pode devolver (opcionalmente) uma função de limpeza, que é
+    // chamada automaticamente aqui na PRÓXIMA navegação, antes de montar a
+    // tela nova — quase nenhuma view precisa disso (só quem registra
+    // listener fora do próprio container, ver views/sale.js).
+    const cleanup = await route.render(container, ctx);
+    if (typeof cleanup === 'function') unmountCurrentRoute = cleanup;
   }
 
   window.onhashchange = renderCurrentRoute;
   if (!location.hash) location.hash = '#/dashboard';
   else renderCurrentRoute();
 }
+
+// Sessão é compartilhada entre todas as abas da extensão (não é por aba) —
+// login/logout numa aba precisa se refletir nas outras. Registrado uma
+// única vez aqui (não dentro de boot()/renderShell(), que rodam de novo a
+// cada login), senão cada novo login empilharia mais um listener.
+onSessionUserIdChanged(() => boot());
 
 // A aparência (claro/escuro/automático) é escolhida na tela Personalização
 // (ver views/personalizacao.js), acessível pelo menu depois de logar — só

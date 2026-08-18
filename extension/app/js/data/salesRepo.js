@@ -8,7 +8,7 @@
 // estorno, só ganha uma entrada em `refunds` e os itens afetados marcam
 // quanto já foi devolvido (`qtyRefunded`), preservando o valor original pra
 // auditoria.
-import { dbGetAll, dbGet, dbPut, dbAdd, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
@@ -195,82 +195,101 @@ export async function getSale(id) {
  * registro em `refunds` — a venda original nunca é alterada retroativamente,
  * só ganha esse histórico por cima. `generateCredit` sinaliza que o valor
  * pode virar crédito de troca numa venda futura (ver session.js); quem usa
- * o crédito depois é a tela de Nova Venda, não este módulo. */
+ * o crédito depois é a tela de Nova Venda, não este módulo.
+ *
+ * A validação (quanto ainda dá pra estornar de cada item) e o incremento de
+ * `qtyRefunded` acontecem dentro de um único dbUpdate — get+put na MESMA
+ * transação do IndexedDB. Antes, eram um dbGet seguido de um dbPut
+ * separados: dois estornos disparados quase juntos (duplo clique no botão
+ * de confirmar, ou duas abas na mesma venda) liam o mesmo estado "antes" e
+ * a segunda gravação apagava o efeito da primeira — o item podia ser
+ * estornado além da quantidade vendida, e um dos dois registros de estorno
+ * sumia de `sale.refunds` mesmo o estoque já tendo sido creditado por ele. */
 export async function refundSaleItems({ saleId, userId, userName, reason, items, generateCredit = false }) {
   if (!reason || !reason.trim()) throw new Error('Informe o motivo do estorno.');
   if (!items || items.length === 0) throw new Error('Selecione ao menos um item para estornar.');
 
-  const sale = await getSale(saleId);
-  if (!sale) throw new Error('Venda não encontrada.');
+  let refund;
+  let updatedSale;
+  await dbUpdate('sales', saleId, (sale) => {
+    if (!sale) throw new Error('Venda não encontrada.');
 
-  // `lineTotal` de cada item reflete só o desconto por item — o desconto
-  // geral do carrinho (aplicado sobre o total da venda, não guardado por
-  // item) fica de fora dele. Sem ratear essa diferença aqui, um estorno
-  // devolveria mais do que o cliente pagou de fato numa venda com desconto
-  // geral. `discountRatio` traz o valor de cada unidade pro preço líquido
-  // realmente cobrado (mesmo raciocínio usado em reportsRepo.js).
-  const lineTotalSum = sale.items.reduce((sum, i) => sum + i.lineTotal, 0);
-  const discountRatio = lineTotalSum > 0 ? sale.total / lineTotalSum : 1;
+    // `lineTotal` de cada item reflete só o desconto por item — o desconto
+    // geral do carrinho (aplicado sobre o total da venda, não guardado por
+    // item) fica de fora dele. Sem ratear essa diferença aqui, um estorno
+    // devolveria mais do que o cliente pagou de fato numa venda com
+    // desconto geral. `discountRatio` traz o valor de cada unidade pro
+    // preço líquido realmente cobrado (mesmo raciocínio de reportsRepo.js).
+    const lineTotalSum = sale.items.reduce((sum, i) => sum + i.lineTotal, 0);
+    const discountRatio = lineTotalSum > 0 ? sale.total / lineTotalSum : 1;
 
-  const refundItems = [];
-  let totalRefunded = 0;
+    const refundItems = [];
+    let totalRefunded = 0;
 
-  for (const req of items) {
-    const qty = Number(req.qty) || 0;
-    if (qty <= 0) continue;
-    const saleItem = sale.items.find((i) => i.productId === req.productId);
-    if (!saleItem) throw new Error('Item não encontrado nesta venda.');
-    const available = saleItem.qty - saleItem.qtyRefunded;
-    if (qty > available) {
-      throw new Error(`Só é possível estornar até ${available} de "${saleItem.name}" (já estornado: ${saleItem.qtyRefunded}).`);
+    for (const req of items) {
+      const qty = Number(req.qty) || 0;
+      if (qty <= 0) continue;
+      const saleItem = sale.items.find((i) => i.productId === req.productId);
+      if (!saleItem) throw new Error('Item não encontrado nesta venda.');
+      const available = saleItem.qty - saleItem.qtyRefunded;
+      if (qty > available) {
+        throw new Error(`Só é possível estornar até ${available} de "${saleItem.name}" (já estornado: ${saleItem.qtyRefunded}).`);
+      }
+      const unitNet = (saleItem.lineTotal / saleItem.qty) * discountRatio;
+      const amount = unitNet * qty;
+      refundItems.push({ productId: saleItem.productId, name: saleItem.name, qty, amount });
+      totalRefunded += amount;
+      saleItem.qtyRefunded += qty;
     }
-    const unitNet = (saleItem.lineTotal / saleItem.qty) * discountRatio;
-    const amount = unitNet * qty;
-    refundItems.push({ productId: saleItem.productId, name: saleItem.name, qty, amount });
-    totalRefunded += amount;
-    saleItem.qtyRefunded += qty;
-  }
 
-  if (refundItems.length === 0) throw new Error('Selecione ao menos um item para estornar.');
+    if (refundItems.length === 0) throw new Error('Selecione ao menos um item para estornar.');
 
-  for (const ri of refundItems) {
+    refund = {
+      id: newId(),
+      timestamp: Date.now(),
+      userId, userName,
+      reason: reason.trim(),
+      items: refundItems,
+      totalRefunded,
+      creditGenerated: !!generateCredit,
+    };
+    sale.refunds.push(refund);
+    sale.refundedTotal += totalRefunded;
+    updatedSale = sale;
+    return sale;
+  });
+
+  // A partir daqui o estorno já está gravado e validado de forma atômica —
+  // o que resta é efeito colateral (creditar estoque, reverter pontos). Se
+  // algo falhar nesta parte, o estorno em si permanece registrado (não fica
+  // "pela metade" de um jeito que permita estornar o mesmo item de novo);
+  // o erro sobe pra quem chamou avisar que o estoque pode não ter sido
+  // creditado, mas o registro contábil do estorno já é definitivo.
+  for (const ri of refund.items) {
     await recordMovement({
       productId: ri.productId, type: 'estorno', qty: ri.qty,
       userId, userName, note: `Estorno da venda — ${reason.trim()}`,
     });
   }
 
-  const refund = {
-    id: newId(),
-    timestamp: Date.now(),
-    userId, userName,
-    reason: reason.trim(),
-    items: refundItems,
-    totalRefunded,
-    creditGenerated: !!generateCredit,
-  };
-  sale.refunds.push(refund);
-  sale.refundedTotal += totalRefunded;
-  await dbPut('sales', sale);
-
   // Reverte proporcionalmente os pontos de fidelidade ganhos por esta
   // venda — sem isso, um cliente manteria pontos de compras que devolveu.
   // Fica negativo se ele já tiver resgatado esses pontos antes do estorno;
   // é o mesmo compromisso de qualquer programa de fidelidade real.
-  if (sale.customerId && sale.total > 0) {
-    const ledger = await listCustomerLoyaltyLedger(sale.customerId);
+  if (updatedSale.customerId && updatedSale.total > 0) {
+    const ledger = await listCustomerLoyaltyLedger(updatedSale.customerId);
     const pointsEarned = ledger
-      .filter((e) => e.saleId === sale.id && e.type === 'ganho')
+      .filter((e) => e.saleId === updatedSale.id && e.type === 'ganho')
       .reduce((sum, e) => sum + e.points, 0);
     if (pointsEarned > 0) {
-      const pointsToReverse = Math.floor(pointsEarned * (totalRefunded / sale.total));
+      const pointsToReverse = Math.floor(pointsEarned * (refund.totalRefunded / updatedSale.total));
       if (pointsToReverse > 0) {
-        await recordReversal({ customerId: sale.customerId, points: pointsToReverse, saleId: sale.id, userId, userName });
+        await recordReversal({ customerId: updatedSale.customerId, points: pointsToReverse, saleId: updatedSale.id, userId, userName });
       }
     }
   }
 
-  return { sale, refund };
+  return { sale: updatedSale, refund };
 }
 
 /** Status derivado da venda, pra exibição (badge na lista, etc.) — não é

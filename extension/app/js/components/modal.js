@@ -17,25 +17,55 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submit
 
   const modalEl = backdrop.querySelector('.modal');
   const close = () => backdrop.remove();
+  // `submitting` é a defesa contra clique duplo/rápido no botão de
+  // confirmar — achado de auditoria: como onSubmit é assíncrono (quase
+  // sempre grava algo no IndexedDB), sem essa trava um segundo clique
+  // antes do primeiro terminar disparava onSubmit() duas vezes em
+  // paralelo — as duas liam o mesmo estado "antes" de gravar, então a
+  // segunda podia apagar o efeito da primeira (last-write-wins) ou,
+  // pior, as duas serem aceitas e o dado ser gravado em dobro (ex:
+  // pagamento de fiado registrado duas vezes, estorno duplicado). Esse
+  // é o ÚNICO ponto de entrada de todo submit de modal do sistema, então
+  // a correção aqui vale pra every modal — não precisa repetir em cada
+  // tela que usa openModal.
+  let submitting = false;
+
   // Fecha por cancelamento (botão "Cancelar" ou clique fora do modal) —
   // diferente de close(), que também é chamado após um submit bem-sucedido.
   // Usado por quem precisa saber que o usuário desistiu (ex: uma Promise
   // que só resolve dentro de onSubmit, como o modal de aprovação de
-  // desconto em views/sale.js).
-  const cancel = () => { close(); if (onCancel) onCancel(); };
+  // desconto em views/sale.js). Ignorado enquanto um submit está em
+  // andamento — cancelar no meio de uma gravação em curso deixaria o
+  // onSubmit terminando "no escuro", sem modal pra mostrar erro nenhum.
+  const cancel = () => {
+    if (submitting) return;
+    close();
+    if (onCancel) onCancel();
+  };
 
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) cancel();
   });
-  backdrop.querySelector('[data-action="cancel"]')?.addEventListener('click', cancel);
+  const cancelBtn = backdrop.querySelector('[data-action="cancel"]');
+  cancelBtn?.addEventListener('click', cancel);
 
   const submitBtn = backdrop.querySelector('[data-action="submit"]');
   submitBtn.addEventListener('click', async () => {
-    if (onSubmit) {
+    if (submitting) return;
+    if (!onSubmit) { close(); return; }
+    submitting = true;
+    submitBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+    try {
       const shouldClose = await onSubmit(modalEl, close);
       if (shouldClose !== false) close();
-    } else {
-      close();
+    } finally {
+      // Se o modal já foi fechado (submit bem-sucedido), isso mexe num nó
+      // desanexado do DOM — inofensivo. Se ficou aberto (validação
+      // falhou), reabilita pro usuário corrigir e tentar de novo.
+      submitting = false;
+      submitBtn.disabled = false;
+      if (cancelBtn) cancelBtn.disabled = false;
     }
   });
 

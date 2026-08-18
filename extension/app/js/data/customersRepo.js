@@ -4,7 +4,7 @@
 // pra reconstruir o saldo a qualquer momento e nunca perde o histórico de
 // como ele chegou nesse valor — o mesmo princípio já usado no estoque
 // (stockMovements) e no caixa (cashMovements).
-import { dbGetAll, dbGet, dbPut, dbAdd, dbDelete, dbGetAllByIndex, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbDelete, dbGetAllByIndex, dbTransaction, dbUpdate, newId } from '../db.js';
 
 export async function listCustomers() {
   const customers = await dbGetAll('customers');
@@ -43,31 +43,31 @@ export async function createCustomer(data) {
 }
 
 export async function updateCustomer(id, data) {
-  const customer = await getCustomer(id);
-  if (!customer) throw new Error('Cliente não encontrado.');
-  if (data.nome !== undefined) {
-    const nome = data.nome.trim();
-    if (!nome) throw new Error('Nome do cliente é obrigatório.');
-    customer.nome = nome;
-    customer.nameLower = nome.toLowerCase();
-  }
-  if (data.telefone !== undefined) customer.telefone = data.telefone.trim();
-  if (data.documento !== undefined) customer.documento = data.documento.trim();
-  if (data.endereco !== undefined) customer.endereco = data.endereco.trim();
-  if (data.observacoes !== undefined) customer.observacoes = data.observacoes.trim();
-  if (data.creditLimit !== undefined) customer.creditLimit = Number(data.creditLimit) || 0;
-  customer.updatedAt = Date.now();
-  await dbPut('customers', customer);
-  return customer;
+  return dbUpdate('customers', id, (customer) => {
+    if (!customer) throw new Error('Cliente não encontrado.');
+    if (data.nome !== undefined) {
+      const nome = data.nome.trim();
+      if (!nome) throw new Error('Nome do cliente é obrigatório.');
+      customer.nome = nome;
+      customer.nameLower = nome.toLowerCase();
+    }
+    if (data.telefone !== undefined) customer.telefone = data.telefone.trim();
+    if (data.documento !== undefined) customer.documento = data.documento.trim();
+    if (data.endereco !== undefined) customer.endereco = data.endereco.trim();
+    if (data.observacoes !== undefined) customer.observacoes = data.observacoes.trim();
+    if (data.creditLimit !== undefined) customer.creditLimit = Number(data.creditLimit) || 0;
+    customer.updatedAt = Date.now();
+    return customer;
+  });
 }
 
 export async function setCustomerActive(id, active) {
-  const customer = await getCustomer(id);
-  if (!customer) return null;
-  customer.active = active;
-  customer.updatedAt = Date.now();
-  await dbPut('customers', customer);
-  return customer;
+  return dbUpdate('customers', id, (customer) => {
+    if (!customer) throw new Error('Cliente não encontrado.');
+    customer.active = active;
+    customer.updatedAt = Date.now();
+    return customer;
+  });
 }
 
 export async function deleteCustomer(id) {
@@ -128,14 +128,24 @@ export async function recordDebt({ customerId, amount, saleId, userId, userName 
 
 /** Registra o pagamento (total ou parcial) de uma dívida existente. Se feito
  * com o caixa aberto, o valor entra na conferência de fechamento — por isso
- * recebe cashSessionId separadamente (ver views/clientes.js). */
+ * recebe cashSessionId separadamente (ver views/clientes.js).
+ *
+ * A checagem do saldo e a gravação do pagamento acontecem dentro da MESMA
+ * transação do IndexedDB (dbTransaction), não como um dbGet (via
+ * getCustomerBalance) seguido de um dbAdd separados. Antes, dois cliques
+ * rápidos no botão de confirmar (ou duas abas registrando pagamento do
+ * mesmo cliente ao mesmo tempo) liam o mesmo saldo "antes" de qualquer um
+ * gravar — os dois passavam na validação "valor <= saldo" e os dois
+ * gravavam um lançamento de pagamento, quitando o dobro do que o cliente
+ * pagou de fato. Como o "saldo" aqui não é um campo único (é a soma de um
+ * extrato inteiro, ver comentário no topo do arquivo), a trava não pode
+ * usar dbUpdate (que é get+put de UM registro) — em vez disso, a leitura
+ * de todo o extrato e a decisão de gravar ou não ficam dentro do mesmo
+ * `work` síncrono do dbTransaction, serializadas pelo próprio IndexedDB. */
 export async function recordPayment({ customerId, amount, paymentMethod, cashSessionId = null, note = '', userId, userName }) {
   const value = Number(amount) || 0;
   if (value <= 0) throw new Error('Informe um valor de pagamento maior que zero.');
-  const balance = await getCustomerBalance(customerId);
-  if (value > balance + 0.01) {
-    throw new Error(`O cliente deve ${balance.toFixed(2)} — não é possível registrar um pagamento maior que a dívida.`);
-  }
+
   const entry = {
     id: newId(),
     customerId,
@@ -148,6 +158,25 @@ export async function recordPayment({ customerId, amount, paymentMethod, cashSes
     userId, userName,
     timestamp: Date.now(),
   };
-  await dbAdd('customerDebts', entry);
+
+  let validationError = null;
+  await dbTransaction('customerDebts', 'readwrite', (transaction) => {
+    const store = transaction.objectStore('customerDebts');
+    const getAllReq = store.index('byCustomerId').getAll(customerId);
+    getAllReq.onsuccess = () => {
+      const balance = getAllReq.result.reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
+      if (value > balance + 0.01) {
+        // Não aborta a transação (abortar perderia a mensagem de erro
+        // amigável — ver db.js) — só não grava nada. A transação
+        // completa normalmente, vazia, e o erro é lançado depois, fora
+        // dela, com o saldo real que foi lido.
+        validationError = `O cliente deve ${balance.toFixed(2)} — não é possível registrar um pagamento maior que a dívida.`;
+        return;
+      }
+      store.add(entry);
+    };
+  });
+
+  if (validationError) throw new Error(validationError);
   return entry;
 }

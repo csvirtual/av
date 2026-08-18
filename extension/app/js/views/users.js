@@ -67,15 +67,19 @@ export async function renderUsers(container, ctx) {
       danger: !next,
     });
     if (!ok) return;
-    await setUserActive(user.id, next);
-    await logAction({
-      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-      action: next ? 'Reativação de usuário' : 'Desativação de usuário',
-      details: `Usuário "${user.nome}" (${user.username}) ${next ? 'reativado' : 'desativado'}.`,
-      entity: 'user', entityId: user.id,
-    });
-    showToast(`Usuário ${next ? 'reativado' : 'desativado'}.`, 'success');
-    refresh();
+    try {
+      await setUserActive(user.id, next);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: next ? 'Reativação de usuário' : 'Desativação de usuário',
+        details: `Usuário "${user.nome}" (${user.username}) ${next ? 'reativado' : 'desativado'}.`,
+        entity: 'user', entityId: user.id,
+      });
+      showToast(`Usuário ${next ? 'reativado' : 'desativado'}.`, 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   }
 
   function openResetModal(user) {
@@ -93,15 +97,20 @@ export async function renderUsers(container, ctx) {
         const p2 = modalEl.querySelector('#f-pass2').value;
         if (p1.length < 6) { errBox.innerHTML = '<div class="form-error">A senha deve ter pelo menos 6 caracteres.</div>'; return false; }
         if (p1 !== p2) { errBox.innerHTML = '<div class="form-error">As senhas não coincidem.</div>'; return false; }
-        await resetUserPassword(user.id, p1);
-        await logAction({
-          userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-          action: 'Redefinição de senha',
-          details: `Senha de "${user.nome}" (${user.username}) redefinida pelo administrador.`,
-          entity: 'user', entityId: user.id,
-        });
-        showToast('Senha redefinida.', 'success');
-        return true;
+        try {
+          await resetUserPassword(user.id, p1);
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: 'Redefinição de senha',
+            details: `Senha de "${user.nome}" (${user.username}) redefinida pelo administrador.`,
+            entity: 'user', entityId: user.id,
+          });
+          showToast('Senha redefinida.', 'success');
+          return true;
+        } catch (err) {
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+          return false;
+        }
       },
     });
   }

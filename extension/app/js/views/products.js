@@ -126,15 +126,19 @@ export async function renderProducts(container, ctx) {
       danger: !next,
     });
     if (!ok) return;
-    await setProductActive(product.id, next);
-    await logAction({
-      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-      action: next ? 'Reativação de produto' : 'Inativação de produto',
-      details: `Produto "${product.name}" (código ${product.barcode}) ${next ? 'reativado' : 'inativado'}.`,
-      entity: 'product', entityId: product.id,
-    });
-    showToast(`Produto ${next ? 'reativado' : 'inativado'}.`, 'success');
-    refresh();
+    try {
+      await setProductActive(product.id, next);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: next ? 'Reativação de produto' : 'Inativação de produto',
+        details: `Produto "${product.name}" (código ${product.barcode}) ${next ? 'reativado' : 'inativado'}.`,
+        entity: 'product', entityId: product.id,
+      });
+      showToast(`Produto ${next ? 'reativado' : 'inativado'}.`, 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   }
 
   async function removeProduct(product) {

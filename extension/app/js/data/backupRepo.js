@@ -77,6 +77,17 @@ export async function readBackupFile(fileText, password) {
   if (!payload || typeof payload !== 'object' || !payload.stores) {
     throw new Error('Arquivo inválido — não parece ser um backup deste sistema.');
   }
+  // O campo é gravado desde sempre (buildBackupEnvelope), mas nunca tinha
+  // sido checado aqui — um backup de um formato mais novo (de uma versão
+  // futura do sistema, com stores/campos que esta versão não conhece)
+  // seria aplicado do mesmo jeito, sem aviso, e o dbTransaction atômico só
+  // pegaria o problema na hora de gravar (se pegasse), com um erro cru em
+  // vez de uma mensagem clara. Um backup de formato IGUAL ou MAIS ANTIGO
+  // continua sendo aceito normalmente — só recusa o que esta versão do
+  // sistema não tem como garantir que entende.
+  if (typeof payload.backupFormatVersion !== 'number' || payload.backupFormatVersion > BACKUP_FORMAT_VERSION) {
+    throw new Error('Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize a extensão antes de restaurar.');
+  }
 
   const counts = {};
   for (const name of STORE_NAMES) counts[name] = (payload.stores[name] || []).length;

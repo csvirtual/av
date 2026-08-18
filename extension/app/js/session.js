@@ -14,6 +14,25 @@ export async function setSessionUserId(userId) {
   await chrome.storage.session.set({ [KEY]: userId });
 }
 
+/** Chama `callback()` toda vez que o usuário logado mudar — em QUALQUER
+ * aba da extensão. chrome.storage.session é um único armazenamento
+ * compartilhado por todas as abas, não um por aba: se a loja usa duas abas
+ * (ou dois vendedores revezando o mesmo computador com abas antigas
+ * esquecidas abertas), logar/deslogar numa aba não avisava a outra — ela
+ * continuava com o usuário antigo "preso" na memória do JS até alguém
+ * navegar ou recarregar. Usado por app.js pra re-renderizar a aba inteira
+ * quando isso acontece, inclusive na própria aba que fez a mudança (chamar
+ * boot() de novo é seguro/idempotente, o pior efeito é um re-render extra
+ * que já ia acontecer de propósito mesmo). Devolve uma função pra remover
+ * o listener, se algum dia precisar. */
+export function onSessionUserIdChanged(callback) {
+  const listener = (changes, areaName) => {
+    if (areaName === 'session' && KEY in changes) callback();
+  };
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
+}
+
 // Desloga: some com o usuário logado E qualquer crédito de troca pendente
 // que não foi usado. O crédito é descrito como "válido nesse mesmo turno"
 // (ver comentário abaixo) — sem limpar os dois juntos, um crédito gerado

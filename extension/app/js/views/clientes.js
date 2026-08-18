@@ -84,15 +84,19 @@ export async function renderClientes(container, ctx) {
       danger: !next,
     });
     if (!ok) return;
-    await setCustomerActive(customer.id, next);
-    await logAction({
-      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-      action: next ? 'Reativação de cliente' : 'Inativação de cliente',
-      details: `Cliente "${customer.nome}" ${next ? 'reativado' : 'inativado'}.`,
-      entity: 'customer', entityId: customer.id,
-    });
-    showToast(`Cliente ${next ? 'reativado' : 'inativado'}.`, 'success');
-    refresh();
+    try {
+      await setCustomerActive(customer.id, next);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: next ? 'Reativação de cliente' : 'Inativação de cliente',
+        details: `Cliente "${customer.nome}" ${next ? 'reativado' : 'inativado'}.`,
+        entity: 'customer', entityId: customer.id,
+      });
+      showToast(`Cliente ${next ? 'reativado' : 'inativado'}.`, 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   }
 
   async function removeCustomer(customer) {

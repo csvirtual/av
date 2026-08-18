@@ -61,37 +61,46 @@ export async function createProduct(data) {
   return record;
 }
 
+// updateProduct/setProductActive usam dbUpdate (get+put na mesma
+// transação) em vez de getProduct+dbPut separados — edição administrativa
+// concorrente do MESMO produto é rara, mas sem isso duas edições quase
+// juntas (ex: um admin corrige o preço enquanto outra aba estava com o
+// formulário de edição aberto) apagam uma a outra silenciosamente
+// (last-write-wins) em vez de uma delas pelo menos falhar de forma visível
+// se checasse o código de barras contra um estado já desatualizado.
 export async function updateProduct(id, data) {
-  const product = await getProduct(id);
-  if (!product) throw new Error('Produto não encontrado.');
-  if (data.barcode && data.barcode !== product.barcode) {
+  if (data.barcode) {
     const other = await getByBarcode(data.barcode);
     if (other && other.id !== id) throw new Error('Já existe um produto com esse código de barras.');
-    product.barcode = data.barcode.trim();
-    product.barcodeIsInternal = !!data.barcodeIsInternal;
   }
-  if (data.name !== undefined) {
-    product.name = data.name.trim();
-    product.nameLower = data.name.trim().toLowerCase();
-  }
-  if (data.category !== undefined) product.category = data.category;
-  if (data.unit !== undefined) product.unit = data.unit;
-  if (data.price !== undefined) product.price = Math.max(0, Number(data.price) || 0);
-  if (data.costPrice !== undefined) product.costPrice = Math.max(0, Number(data.costPrice) || 0);
-  if (data.minStock !== undefined) product.minStock = Math.max(0, Number(data.minStock) || 0);
-  if (data.supplierId !== undefined) product.supplierId = data.supplierId || null;
-  product.updatedAt = Date.now();
-  await dbPut('products', product);
-  return product;
+  return dbUpdate('products', id, (product) => {
+    if (!product) throw new Error('Produto não encontrado.');
+    if (data.barcode && data.barcode !== product.barcode) {
+      product.barcode = data.barcode.trim();
+      product.barcodeIsInternal = !!data.barcodeIsInternal;
+    }
+    if (data.name !== undefined) {
+      product.name = data.name.trim();
+      product.nameLower = data.name.trim().toLowerCase();
+    }
+    if (data.category !== undefined) product.category = data.category;
+    if (data.unit !== undefined) product.unit = data.unit;
+    if (data.price !== undefined) product.price = Math.max(0, Number(data.price) || 0);
+    if (data.costPrice !== undefined) product.costPrice = Math.max(0, Number(data.costPrice) || 0);
+    if (data.minStock !== undefined) product.minStock = Math.max(0, Number(data.minStock) || 0);
+    if (data.supplierId !== undefined) product.supplierId = data.supplierId || null;
+    product.updatedAt = Date.now();
+    return product;
+  });
 }
 
 export async function setProductActive(id, active) {
-  const product = await getProduct(id);
-  if (!product) return null;
-  product.active = active;
-  product.updatedAt = Date.now();
-  await dbPut('products', product);
-  return product;
+  return dbUpdate('products', id, (product) => {
+    if (!product) throw new Error('Produto não encontrado.');
+    product.active = active;
+    product.updatedAt = Date.now();
+    return product;
+  });
 }
 
 export async function deleteProduct(id) {

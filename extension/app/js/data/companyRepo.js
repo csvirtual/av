@@ -1,6 +1,6 @@
 // Dados cadastrais da loja — um único registro fixo (id: 'main'), preenchido
 // no assistente de configuração inicial e editável depois só pelo admin.
-import { dbGet, dbPut } from '../db.js';
+import { dbGet, dbUpdate } from '../db.js';
 
 const COMPANY_ID = 'main';
 
@@ -13,8 +13,18 @@ export async function isCompanyRegistered() {
   return !!company;
 }
 
+/** dbUpdate (get+put na mesma transação) em vez de getCompany()+dbPut
+ * separados — o merge de `policies` abaixo depende do valor ATUAL de
+ * cada política pra preservar o que não foi informado (ver comentário mais
+ * abaixo); sem isso, duas edições de "Dados da loja" quase juntas (ou o
+ * cadastro inicial cruzando com uma edição, embora raro na prática — é
+ * uma tela só-admin) podiam ler o mesmo estado "antes" e uma delas
+ * sobrescrever a política que a outra tinha acabado de mudar. */
 export async function saveCompany(data) {
-  const existing = await getCompany();
+  return dbUpdate('company', COMPANY_ID, (existing) => buildCompanyRecord(data, existing));
+}
+
+function buildCompanyRecord(data, existing) {
   const record = {
     id: COMPANY_ID,
     cnpj: data.cnpj,
@@ -61,6 +71,5 @@ export async function saveCompany(data) {
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),
   };
-  await dbPut('company', record);
   return record;
 }

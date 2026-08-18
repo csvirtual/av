@@ -2,7 +2,7 @@
 // Modelo de caixa único (uma sessão aberta por vez pra loja toda, não por
 // vendedor) — combina com uma loja com uma frente de caixa física, onde
 // quem está de turno abre e fecha antes de passar pro próximo.
-import { dbGetAll, dbGet, dbPut, dbAdd, dbGetAllByIndex, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbGetAllByIndex, dbTransaction, dbUpdate, newId } from '../db.js';
 import { listSales } from './salesRepo.js';
 import { listPaymentsForCashSession } from './customersRepo.js';
 
@@ -23,9 +23,16 @@ export async function getSession(id) {
   return dbGet('cashSessions', id);
 }
 
+/** Abre um caixa novo — só se não existir nenhum já aberto (o sistema é de
+ * um caixa único pra loja toda). A checagem "já existe um aberto?" e a
+ * gravação da sessão nova acontecem dentro da MESMA transação
+ * (dbTransaction) — o índice `byStatus` não é único (não daria pra marcar
+ * só "aberto" como único e permitir vários "fechado"), então sem essa
+ * trava um clique duplo em "Abrir caixa" podia ler "nenhum aberto" duas
+ * vezes antes de qualquer uma gravar, criando dois caixas abertos ao mesmo
+ * tempo — quebrando a premissa que o resto do sistema assume (inclusive a
+ * conferência de fechamento, que soma vendas contra UMA sessão só). */
 export async function openSession({ userId, userName, openingAmount }) {
-  const existing = await getOpenSession();
-  if (existing) throw new Error('Já existe um caixa aberto. Feche-o antes de abrir um novo.');
   const session = {
     id: newId(),
     status: 'aberto',
@@ -39,7 +46,20 @@ export async function openSession({ userId, userName, openingAmount }) {
     difference: null,
     closingNotes: '',
   };
-  await dbAdd('cashSessions', session);
+
+  let validationError = null;
+  await dbTransaction('cashSessions', 'readwrite', (transaction) => {
+    const store = transaction.objectStore('cashSessions');
+    const getAllReq = store.index('byStatus').getAll('aberto');
+    getAllReq.onsuccess = () => {
+      if (getAllReq.result.length > 0) {
+        validationError = 'Já existe um caixa aberto. Feche-o antes de abrir um novo.';
+        return;
+      }
+      store.add(session);
+    };
+  });
+  if (validationError) throw new Error(validationError);
   return session;
 }
 
@@ -121,6 +141,13 @@ export async function closeSession({ sessionId, userId, userName, countedAmounts
   const session = await getSession(sessionId);
   if (!session || session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
 
+  // computeExpectedAmounts faz leituras em outros stores (vendas, extrato
+  // de fiado) — não dá pra rodar isso dentro de um dbUpdate (que exige uma
+  // função síncrona). Fica de fora; a proteção contra fechar o mesmo caixa
+  // duas vezes concorrentemente é a re-checagem de `status` logo abaixo,
+  // dentro do dbUpdate — feita com o valor mais recente do registro, não
+  // com o `session` já potencialmente desatualizado lido no começo desta
+  // função.
   const expectedAmounts = await computeExpectedAmounts(session);
   const counted = {};
   for (const [method, value] of Object.entries(countedAmounts || {})) {
@@ -128,16 +155,19 @@ export async function closeSession({ sessionId, userId, userName, countedAmounts
   }
   const difference = (counted.Dinheiro ?? 0) - (expectedAmounts.Dinheiro ?? 0);
 
-  const updated = {
-    ...session,
-    status: 'fechado',
-    closedBy: { userId, userName },
-    closedAt: Date.now(),
-    expectedAmounts,
-    countedAmounts: counted,
-    difference,
-    closingNotes: closingNotes.trim(),
-  };
-  await dbPut('cashSessions', updated);
-  return updated;
+  return dbUpdate('cashSessions', sessionId, (current) => {
+    if (!current || current.status !== 'aberto') {
+      throw new Error('Este caixa não está mais aberto.');
+    }
+    return {
+      ...current,
+      status: 'fechado',
+      closedBy: { userId, userName },
+      closedAt: Date.now(),
+      expectedAmounts,
+      countedAmounts: counted,
+      difference,
+      closingNotes: closingNotes.trim(),
+    };
+  });
 }
