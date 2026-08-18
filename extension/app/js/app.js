@@ -28,6 +28,7 @@ import { renderCompanySettings } from './views/company.js';
 import { renderAjuda } from './views/ajuda.js';
 import { renderPersonalizacao } from './views/personalizacao.js';
 import { renderBackup } from './views/backup.js';
+import { renderCarreto } from './views/carreto.js';
 
 const root = document.getElementById('root');
 
@@ -38,6 +39,7 @@ const ROUTES = {
   vendas: { label: 'Histórico de vendas', icon: '📊', roles: ['admin', 'vendedor'], render: renderSalesHistory },
   caixa: { label: 'Caixa', icon: '💰', roles: ['admin', 'vendedor'], render: renderCaixa },
   clientes: { label: 'Clientes', icon: '🧑‍🤝‍🧑', roles: ['admin', 'vendedor'], render: renderClientes },
+  carreto: { label: 'Carreto', icon: '🛻', roles: ['admin', 'vendedor'], render: renderCarreto },
   compras: { label: 'Compras', icon: '🛒', roles: ['admin'], render: renderCompras },
   financeiro: { label: 'Financeiro', icon: '💵', roles: ['admin'], render: renderFinanceiro },
   relatorios: { label: 'Relatórios', icon: '📈', roles: ['admin'], render: renderRelatorios },

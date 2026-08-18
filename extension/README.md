@@ -68,6 +68,12 @@ sistema em linguagem simples, separado em tópicos.
   para registrar vendas.
 - **Clientes e fiado** — cadastro de clientes, venda fiada com limite de
   crédito opcional, extrato completo de dívidas e pagamentos recebidos.
+- **Carreto (entregas)** — registro organizado do que vai em cada entrega
+  pro cliente (comum em loja de material de construção), com itens vindos
+  do estoque ou avulsos (descrição livre, ex: "carga de areia"), endereço,
+  responsável e status (pendente/entregue/cancelado). É só um checklist de
+  logística — não mexe em estoque nem em dinheiro; a baixa de estoque
+  continua acontecendo normalmente na tela de Venda.
 - **Fornecedores e compras** — cadastro de fornecedores, pedidos de compra
   com recebimento total ou parcial (atualiza estoque e preço de custo) e
   sugestão automática de compra para produtos com estoque baixo.
@@ -103,6 +109,7 @@ sistema em linguagem simples, separado em tópicos.
 | Abrir/fechar caixa, sangria/suprimento | ✅ | ✅ |
 | Cadastrar cliente, vender fiado, receber pagamento de fiado | ✅ | ✅ |
 | Estornar venda (total ou por item) | ✅ | ✅ |
+| Carreto: cadastrar, marcar entregue, cancelar | ✅ | ✅ |
 | Cadastrar/editar produto, ajustar estoque, inventário | ✅ | ❌ |
 | Fornecedores e pedidos de compra | ✅ | ❌ |
 | Financeiro (contas a pagar/receber) e relatórios gerenciais | ✅ | ❌ |
@@ -168,12 +175,12 @@ extension/
       data/                Repositórios: empresa, usuários, produtos, vendas,
                             estoque, auditoria, caixa, clientes/fiado,
                             fornecedores, compras, financeiro, fidelidade,
-                            relatórios, backup
+                            relatórios, backup, carretos (deliveriesRepo.js)
       utils/               CNPJ, formatação, leitura de código de barras, cálculo
                             de desconto/totais
       views/               Telas: setup, login, painel, estoque, venda,
-                            histórico de vendas, caixa, clientes, compras,
-                            financeiro, relatórios, usuários, log, dados da
-                            loja, backup, personalização, ajuda
+                            histórico de vendas, caixa, clientes, carreto,
+                            compras, financeiro, relatórios, usuários, log,
+                            dados da loja, backup, personalização, ajuda
       components/          Modal, toast, recibo de venda (impressão)
 ```

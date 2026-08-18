@@ -122,6 +122,37 @@ const TOPICS = [
     `,
   },
   {
+    id: 'carreto',
+    icon: '🛻',
+    title: 'Carreto (entregas)',
+    html: `
+      <h2>Carreto (entregas)</h2>
+      <p class="help-subtitle">Organizar o que precisa ser entregue pro cliente — disponível pros dois perfis.</p>
+
+      <h3>Pra que serve</h3>
+      <p>Em loja de material de construção é comum o "carreto" — o veículo que leva a mercadoria até a obra ou a casa do cliente. Essa tela é só um <strong>registro organizado</strong> do que vai em cada entrega, pra quem, e se já saiu ou não. Ela <strong>não mexe em estoque nem em dinheiro</strong> — a baixa de estoque de verdade acontece na tela <strong>Nova venda</strong>, como sempre. O carreto é só um checklist de logística por cima disso.</p>
+
+      <h3>Cadastrar um carreto novo</h3>
+      <p>Vá em <strong>Carreto → + Novo carreto</strong>. Escolha o cliente (busca o cadastro já existente ou cadastra um novo ali mesmo, igual na tela de venda) e adicione os itens de duas formas:</p>
+      <ul>
+        <li><strong>Item do estoque</strong> — busca um produto já cadastrado, pra manter o item rastreável.</li>
+        <li><strong>Item avulso</strong> — descrição livre com unidade própria, pra cobrir o que não é produto de prateleira (ex: "carga de areia", "entulho", "carga de tijolo a granel").</li>
+      </ul>
+      <p>O endereço de entrega vem preenchido automaticamente com o endereço cadastrado do cliente, mas pode ser trocado — a entrega às vezes é num endereço diferente (a obra, por exemplo). Dá pra anotar também quem é o responsável pelo carreto e observações gerais.</p>
+
+      <h3>Status do carreto</h3>
+      <ul>
+        <li><span class="badge badge-gray">Pendente</span> — ainda não saiu pra entrega.</li>
+        <li><span class="badge badge-green">Entregue</span> — marcado como entregue, com data/hora e quem confirmou.</li>
+        <li><span class="badge badge-red">Cancelado</span> — não vai mais ser entregue.</li>
+      </ul>
+      <p>Só um carreto <strong>pendente</strong> pode virar entregue ou ser cancelado — depois de marcado, o status fica travado (se precisar corrigir algo, cadastre um carreto novo).</p>
+
+      <h3>Relação com a Venda</h3>
+      <p>O carreto é independente da venda — dá pra cadastrar antes, depois ou até sem nenhuma venda vinculada (por exemplo, entrega de uma troca ou de um material já pago por fora). Por isso ele não desconta do estoque sozinho: se os itens do carreto também precisam sair do estoque, registre a venda normalmente na tela própria.</p>
+    `,
+  },
+  {
     id: 'estorno-troca',
     icon: '↩️',
     title: 'Estorno e troca',

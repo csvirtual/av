@@ -3,7 +3,7 @@
 // Nenhuma regra de negócio deve viver aqui — só mecanismo de acesso ao banco,
 // reutilizado pelos repositórios em js/data/*.js.
 const DB_NAME = 'loja-gestao-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise = null;
 
@@ -99,6 +99,14 @@ function openDatabase() {
         const store = db.createObjectStore('loyaltyEntries', { keyPath: 'id' });
         store.createIndex('byCustomerId', 'customerId', { unique: false });
         store.createIndex('byTimestamp', 'timestamp', { unique: false });
+      }
+
+      // v6: carreto (entrega de material) — ver data/deliveriesRepo.js
+      if (!db.objectStoreNames.contains('deliveries')) {
+        const store = db.createObjectStore('deliveries', { keyPath: 'id' });
+        store.createIndex('byCustomerId', 'customerId', { unique: false });
+        store.createIndex('byStatus', 'status', { unique: false });
+        store.createIndex('byCreatedAt', 'createdAt', { unique: false });
       }
     };
 
@@ -242,4 +250,5 @@ export const STORE_NAMES = [
   'company', 'users', 'products', 'sales', 'stockMovements', 'auditLog',
   'cashSessions', 'cashMovements', 'customers', 'customerDebts',
   'suppliers', 'purchaseOrders', 'financialEntries', 'loyaltyEntries',
+  'deliveries',
 ];

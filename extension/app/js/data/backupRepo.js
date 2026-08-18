@@ -25,6 +25,7 @@ export const STORE_LABELS = {
   purchaseOrders: 'Pedidos de compra',
   financialEntries: 'Contas financeiras',
   loyaltyEntries: 'Lançamentos de fidelidade',
+  deliveries: 'Carretos (entregas)',
 };
 
 /** Quantos registros existem hoje em cada store — usado pra mostrar "o que
