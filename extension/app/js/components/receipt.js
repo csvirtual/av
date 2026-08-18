@@ -51,11 +51,18 @@ function buildReceiptHtml(sale, company, customerName) {
 
   const itemsHtml = sale.items.map((i) => {
     const refunded = i.qtyRefunded > 0 ? ` <span class="r-item-refunded">(${i.qtyRefunded} estornado${i.qtyRefunded > 1 ? 's' : ''})</span>` : '';
+    // Com quantidade 1, unitário e total são sempre o mesmo número — no
+    // cupom estreito (sem cabeçalho de coluna pra deixar claro que são
+    // duas informações diferentes) isso lia como o valor repetido à toa;
+    // a classe abaixo deixa o CSS escondê-lo só nesse layout. Na tabela
+    // larga (A4) a coluna "Unitário" continua sempre visível — é
+    // convenção normal de nota/recibo mostrar as duas colunas.
+    const unitRedundant = i.qty === 1 ? ' r-cell-unit-redundant' : '';
     return `
       <div class="r-item-row">
         <div class="r-cell r-cell-name">${escapeHtml(i.name)}${refunded}</div>
         <div class="r-cell r-cell-qty">${i.qty} ${escapeHtml(i.unit)}</div>
-        <div class="r-cell r-cell-unit">${formatMoney(i.unitPrice)}</div>
+        <div class="r-cell r-cell-unit${unitRedundant}">${formatMoney(i.unitPrice)}</div>
         <div class="r-cell r-cell-total">${formatMoney(i.lineTotal)}</div>
       </div>`;
   }).join('');

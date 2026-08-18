@@ -814,6 +814,7 @@ tbody tr:hover { background: var(--surface-alt); }
 .r-cell-name { grid-area: name; font-weight: 700; }
 .r-cell-qty { grid-area: qty; white-space: nowrap; }
 .r-cell-unit { grid-area: unit; text-align: right; white-space: nowrap; color: #333; }
+.r-cell-unit.r-cell-unit-redundant { display: none; } /* qtd. 1: já é o mesmo valor do total, não repete */
 .r-cell-total { grid-area: total; text-align: right; white-space: nowrap; font-weight: 700; }
 .r-item-refunded { font-weight: 400; text-decoration: line-through; color: #555; }
 
@@ -867,4 +868,5 @@ tbody tr:hover { background: var(--surface-alt); }
     border-bottom: 1px solid #eee;
   }
   .r-cell-name { font-weight: 600; }
+  .r-cell-unit.r-cell-unit-redundant { display: block; } /* tabela de verdade: coluna "Unitário" sempre visível, é convenção normal de recibo/nota */
 }
