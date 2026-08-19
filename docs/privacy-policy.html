@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidade — Gestão de Loja</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #e9e8e2;
+    --surface: #fbfaf7;
+    --surface-line: rgba(27,36,32,0.13);
+    --ink: #1b2420;
+    --ink-soft: #52605a;
+    --ink-faint: #7c887f;
+    --accent: #a85a26;
+    --accent-ink: #fbfaf7;
+    --rule: rgba(27,36,32,0.16);
+    --tag-bg: #f2efe6;
+    --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --font-body: "Source Sans 3", "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131c17;
+      --surface: #1a251e;
+      --surface-line: rgba(237,239,233,0.10);
+      --ink: #ecefe9;
+      --ink-soft: #a9b6ac;
+      --ink-faint: #7c8a80;
+      --accent: #dd8a4a;
+      --accent-ink: #14201a;
+      --rule: rgba(237,239,233,0.14);
+      --tag-bg: #1f2b23;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131c17;
+    --surface: #1a251e;
+    --surface-line: rgba(237,239,233,0.10);
+    --ink: #ecefe9;
+    --ink-soft: #a9b6ac;
+    --ink-faint: #7c8a80;
+    --accent: #dd8a4a;
+    --accent-ink: #14201a;
+    --rule: rgba(237,239,233,0.14);
+    --tag-bg: #1f2b23;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .sheet {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+  .eyebrow {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(30px, 5vw, 42px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .meta {
+    color: var(--ink-faint);
+    font-size: 14px;
+    margin: 0 0 34px;
+    font-variant-numeric: tabular-nums;
+  }
+  .lede {
+    background: var(--surface);
+    border: 1px solid var(--surface-line);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 18px 20px;
+    font-size: 16.5px;
+    margin: 0 0 44px;
+  }
+  .lede strong { color: var(--accent); }
+
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    margin: 40px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  h2 .num {
+    display: inline-block;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-right: 10px;
+  }
+  p { margin: 0 0 14px; max-width: 62ch; }
+  ul { margin: 0 0 14px; padding-left: 22px; max-width: 60ch; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 600; }
+
+  .fill {
+    font-family: var(--font-mono);
+    background: var(--tag-bg);
+    border: 1px solid var(--surface-line);
+    border-radius: 3px;
+    padding: 1px 8px;
+    color: var(--accent);
+  }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+
+  @media (max-width: 520px) {
+    .sheet { padding: 40px 18px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <p class="eyebrow">Gestão de Loja — Estoque & Vendas</p>
+  <h1>Política de Privacidade</h1>
+  <p class="meta">Última atualização: 19 de agosto de 2026</p>
+
+  <div class="lede">
+    Em uma frase: <strong>este aplicativo não coleta, não transmite e não tem acesso a nenhum dado seu.</strong>
+    Tudo o que você cadastra fica salvo apenas no navegador onde a extensão está instalada.
+  </div>
+
+  <h2><span class="num">01</span>Como os dados são guardados</h2>
+  <p>
+    "Gestão de Loja — Estoque & Vendas" é uma extensão do Google Chrome que roda inteiramente no seu navegador. Os dados que você
+    cadastra — produtos, vendas, clientes, caixa, financeiro e demais telas — ficam salvos localmente,
+    usando duas tecnologias padrão do próprio navegador:
+  </p>
+  <ul>
+    <li><strong>IndexedDB</strong> — banco de dados local do navegador, onde fica o conteúdo da loja (estoque, vendas, clientes, etc.).</li>
+    <li><strong>chrome.storage</strong> — usado só para: a preferência de aparência (claro/escuro); a sessão do usuário logado no momento, apagada sozinha ao fechar o navegador; o horário da última ação na tela, usado apenas para encerrar a sessão automaticamente após 30 minutos sem uso; e um registro temporário indicando que a extensão está aberta, usado apenas para avisar caso você abra a extensão em mais de uma aba do navegador ao mesmo tempo.</li>
+  </ul>
+  <p>Não existe servidor. Não existe backend. Os dados nunca saem do computador onde a extensão foi instalada.</p>
+
+  <h2><span class="num">02</span>Permissões usadas</h2>
+  <p>
+    A extensão pede uma única permissão do Chrome: <strong>storage</strong>. É o que permite usar o
+    IndexedDB e o chrome.storage descritos acima. A extensão não pede (nem usa) acesso a rede,
+    câmera, localização, outras abas, histórico de navegação ou qualquer outro dado do Chrome.
+  </p>
+
+  <h2><span class="num">03</span>Compartilhamento com terceiros</h2>
+  <p>
+    Nenhum. Não há anúncios, não há analytics, não há telemetria, não há chamadas de rede de nenhum
+    tipo — a extensão não tem permissão de rede e o código não faz nenhuma requisição a servidor
+    externo. O que você cadastra é visto só por você, no seu navegador.
+  </p>
+
+  <h2><span class="num">04</span>Backup</h2>
+  <p>
+    Existe uma função opcional de exportar/restaurar backup, para levar os dados a outro computador ou
+    guardá-los em outro lugar. É uma ação manual, disparada só quando você clica em "Exportar": gera um
+    arquivo único, protegido por senha (criptografado com AES-256-GCM, chave derivada por PBKDF2), que
+    fica salvo onde você escolher — o próprio download do navegador, não a extensão, decide o destino
+    do arquivo. Sem essa ação manual, nenhum arquivo é gerado nem enviado a lugar nenhum.
+  </p>
+
+  <h2><span class="num">05</span>LGPD — Lei Geral de Proteção de Dados</h2>
+  <p>
+    Esta extensão em si não coleta nem transmite dado nenhum, então não atua como "operadora" de dados
+    de terceiros perante a LGPD. Se você, dono(a) ou gerente da loja, usar o sistema para cadastrar
+    dados pessoais de clientes ou funcionários (nome, telefone, endereço de entrega etc.), quem se torna
+    "controlador" desses dados — e responsável pelas obrigações da LGPD perante essas pessoas — é a sua
+    loja, não o software. O sistema ajuda de duas formas: um tópico dedicado em "Ajuda → Privacidade e
+    LGPD" dentro do próprio app, com um aviso de privacidade pronto pra você usar com seus clientes; e um
+    campo opcional, em "Dados da loja", para cadastrar o nome e contato do Encarregado de dados
+    (DPO) da sua loja, caso você tenha um.
+  </p>
+
+  <h2><span class="num">06</span>Como remover seus dados</h2>
+  <p>
+    Desinstalar a extensão do Chrome remove também os dados salvos no IndexedDB associado a ela. Dentro
+    do próprio sistema, cada tela de cadastro (produtos, clientes, usuários etc.) também permite
+    desativar ou remover registros individualmente.
+  </p>
+
+  <h2><span class="num">07</span>Alterações nesta política</h2>
+  <p>
+    Se esta política mudar, a data no topo da página é atualizada. Como o aplicativo não coleta contato
+    nenhum dos usuários, não há como notificar diretamente — a versão mais recente estará sempre nesta
+    mesma página.
+  </p>
+
+  <h2><span class="num">08</span>Contato</h2>
+  <p>
+    Dúvidas sobre esta política: <span class="fill">csvirtual.av@gmail.com</span>.
+  </p>
+
+  <footer>
+    Gestão de Loja — Estoque &amp; Vendas. Extensão 100% local, sem servidor.
+  </footer>
+</div>
+</body>
+</html>
