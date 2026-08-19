@@ -1,0 +1,18 @@
+{
+  "name": "cs-remote-desktop-signaling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor de sinalização WebRTC (pareamento por código + relay de SDP/ICE) para o cs-remote-desktop.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

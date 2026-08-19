@@ -1,0 +1,33 @@
+{
+  "name": "cs-remote-desktop-host",
+  "productName": "CS Remote Desktop Host",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Host agent do cs-remote-desktop: compartilha a tela e recebe controle remoto de mouse/teclado.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.csvirtual.remotedesktop.host",
+    "productName": "CS Remote Desktop Host",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg", "category": "public.app-category.utilities" },
+    "linux": { "target": ["AppImage"], "category": "Utility" }
+  }
+}

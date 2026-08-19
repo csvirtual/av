@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { width: 260px; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 16px; background: #14172b; color: #eef0ff; }
+    h1 { font-size: 15px; margin: 0 0 12px; }
+    .row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 10px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #666; }
+    .dot.on { background: #34d399; }
+    .code { font-size: 22px; font-weight: 700; letter-spacing: 3px; text-align: center; margin: 10px 0; }
+    button { width: 100%; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .start { background: #5b7cff; color: white; }
+    .stop { background: #ff5b6e; color: white; }
+    .hint { font-size: 11px; color: #9aa0c3; margin-top: 10px; line-height: 1.4; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>CS Remote Desktop</h1>
+  <div class="row"><span id="status-dot" class="dot"></span><span id="status-text">Verificando…</span></div>
+  <div id="code" class="code hidden">------</div>
+  <button id="start-btn" class="start hidden">Iniciar host</button>
+  <button id="stop-btn" class="stop hidden">Parar host</button>
+  <p id="not-installed" class="hint hidden">
+    O host nativo não está instalado. Rode o instalador da sua plataforma em
+    <code>chrome-extension/native-messaging-host/</code> e recarregue a extensão.
+  </p>
+  <script src="popup.js"></script>
+</body>
+</html>

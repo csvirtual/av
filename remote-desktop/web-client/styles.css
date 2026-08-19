@@ -1,0 +1,93 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1120;
+  --panel: #1a1d38;
+  --text: #eef0ff;
+  --muted: #9aa0c3;
+  --accent: #5b7cff;
+  --danger: #ff5b6e;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.screen.hidden { display: none; }
+
+.join-card {
+  width: min(380px, 90vw);
+  background: var(--panel);
+  padding: 32px;
+  border-radius: 16px;
+  text-align: center;
+}
+.join-card h1 { margin: 0 0 4px; font-size: 22px; }
+.subtitle { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+
+#code-input {
+  width: 100%;
+  font-size: 32px;
+  letter-spacing: 8px;
+  text-align: center;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #333a63;
+  background: #10142b;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.primary-btn, .danger-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary-btn { background: var(--accent); color: white; }
+.danger-btn { background: var(--danger); color: white; }
+
+.error { color: var(--danger); font-size: 13px; margin-top: 14px; }
+.error.hidden { display: none; }
+
+.advanced { margin-top: 20px; text-align: left; color: var(--muted); font-size: 12px; }
+.advanced label { display: block; margin: 10px 0 4px; }
+.advanced input {
+  width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #333a63;
+  background: #10142b; color: var(--text); font-size: 12px;
+}
+
+#call-screen { flex-direction: column; align-items: stretch; }
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: var(--panel);
+}
+.status { font-size: 13px; color: var(--muted); }
+.toolbar-actions { display: flex; gap: 10px; }
+.toolbar-actions button {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid #333a63;
+  background: transparent; color: var(--text); cursor: pointer; font-size: 13px;
+}
+.toolbar-actions .danger-btn { border: none; }
+
+.video-wrap {
+  flex: 1;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: none;
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>CS Remote Desktop — Host</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="panel">
+    <header>
+      <h1>CS Remote Desktop</h1>
+      <p class="subtitle">Compartilhe esta tela com alguém de confiança</p>
+    </header>
+
+    <section id="idle-view" class="view">
+      <button id="start-btn" class="primary-btn">Gerar código de acesso</button>
+      <p class="hint">A pessoa que vai te ajudar vai precisar deste código.</p>
+    </section>
+
+    <section id="code-view" class="view hidden">
+      <p class="label">Seu código de acesso</p>
+      <div id="code-display" class="code">------</div>
+      <p id="code-status" class="status">Aguardando conexão…</p>
+      <button id="cancel-btn" class="secondary-btn">Cancelar</button>
+    </section>
+
+    <section id="connected-view" class="view hidden">
+      <div class="status-row">
+        <span class="dot dot-live"></span>
+        <span>Sessão ativa — sua tela está sendo controlada remotamente</span>
+      </div>
+      <button id="stop-btn" class="danger-btn">Encerrar sessão</button>
+    </section>
+
+    <p id="error-box" class="error hidden"></p>
+  </main>
+  <script src="renderer.js"></script>
+</body>
+</html>

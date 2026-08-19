@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CS Remote Desktop — Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="join-screen" class="screen">
+    <form id="join-form" class="join-card">
+      <h1>CS Remote Desktop</h1>
+      <p class="subtitle">Digite o código de 6 dígitos que a pessoa te passou</p>
+      <input
+        id="code-input"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="6"
+        autocomplete="off"
+        placeholder="000000"
+        required
+      />
+      <button type="submit" id="join-btn" class="primary-btn">Conectar</button>
+      <p id="join-error" class="error hidden"></p>
+
+      <details class="advanced">
+        <summary>Avançado</summary>
+        <label for="signaling-input">Servidor de sinalização</label>
+        <input id="signaling-input" type="text" placeholder="wss://sua-instancia.exemplo.com" />
+      </details>
+    </form>
+  </div>
+
+  <div id="call-screen" class="screen hidden">
+    <div class="toolbar">
+      <span id="call-status" class="status">Conectando…</span>
+      <div class="toolbar-actions">
+        <button id="fullscreen-btn" title="Tela cheia">⛶</button>
+        <button id="disconnect-btn" class="danger-btn">Desconectar</button>
+      </div>
+    </div>
+    <div class="video-wrap">
+      <video id="remote-video" autoplay playsinline></video>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

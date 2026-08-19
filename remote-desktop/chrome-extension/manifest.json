@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "CS Remote Desktop",
+  "version": "1.0.0",
+  "description": "Inicie e controle o compartilhamento de tela do host, como o Chrome Remote Desktop.",
+  "permissions": ["nativeMessaging"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CS Remote Desktop"
+  }
+}
