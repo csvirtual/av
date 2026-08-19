@@ -3,13 +3,14 @@
 // sistema (estoque, venda, histórico, usuários, logs, empresa) dentro da
 // mesma aba — sem framework, só JS de módulo nativo.
 import { isCompanyRegistered, getCompany } from './data/companyRepo.js';
-import { hasAnyUser, getUser } from './data/usersRepo.js';
-import { getSessionUserId, clearSession, onSessionUserIdChanged } from './session.js';
+import { hasAnyUser, getUser, markAjudaSeen } from './data/usersRepo.js';
+import { getSessionUserId, clearSession, onSessionUserIdChanged, touchActivity, getIdleMs, IDLE_LIMIT_MS } from './session.js';
 import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
 import { confirmDialog, closeAllModals } from './components/modal.js';
 import { escapeHtml } from './utils/format.js';
 import { getThemePreference, applyTheme } from './theme.js';
+import { registerTabAndCheckDuplicate } from './tabPresence.js';
 
 import { renderSetup } from './views/setup.js';
 import { renderLogin } from './views/login.js';
@@ -52,8 +53,34 @@ const ROUTES = {
 };
 
 let unmountLogin = null;
+// Encerra o monitor de inatividade da tela anterior (ver dentro de
+// renderShell) — precisa existir fora dela porque renderShell pode ser
+// chamada mais de uma vez na mesma sessão (ctx.refreshShell, usado por
+// views/company.js ao salvar os dados da loja), e sem isso cada chamada
+// empilharia mais um conjunto de listeners de atividade + intervalo,
+// nunca desligados.
+let stopIdleWatch = null;
 
-async function boot() {
+// boot() pode ser chamado mais de uma vez quase ao mesmo tempo pro MESMO
+// evento de login/logout — o próprio login.js chama boot() direto ao
+// terminar, e chrome.storage.onChanged (ver onSessionUserIdChanged mais
+// abaixo) TAMBÉM dispara boot() reagindo à mesma escrita de sessão, na
+// MESMA aba que fez a escrita (não é só um aviso pras outras abas). Duas
+// execuções de boot() rodando em paralelo podiam ler o mesmo estado
+// "antes" (ex: se este usuário já viu a Ajuda) e tomar decisões
+// inconsistentes sobre qual tela mostrar no final — este wrapper serializa
+// as chamadas numa fila (nunca em paralelo), garantindo que uma chamada
+// redundante sempre vê o resultado já commitado da anterior antes de
+// decidir qualquer coisa. O efeito colateral de uma chamada redundante
+// continua sendo só um re-render extra (inofensivo), como já era antes —
+// só a CONCORRÊNCIA entre elas que precisa deixar de existir.
+let bootQueue = Promise.resolve();
+function boot() {
+  bootQueue = bootQueue.then(bootImpl, bootImpl);
+  return bootQueue;
+}
+
+async function bootImpl() {
   // Mesmo motivo do closeAllModals() em renderCurrentRoute (ver comentário
   // lá): um modal aberto fica anexado direto no <body>, fora de #root, e
   // sobreviveria mesmo a isso reescrever root.innerHTML por completo.
@@ -66,6 +93,8 @@ async function boot() {
   // A tela de login pode deixar um intervalo do contador de bloqueio
   // rodando (ver views/login.js) — encerra antes de trocar de tela.
   if (unmountLogin) { unmountLogin(); unmountLogin = null; }
+  // Idem pro monitor de inatividade do shell principal (ver renderShell).
+  if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
 
   const [companyRegistered, anyUser] = await Promise.all([isCompanyRegistered(), hasAnyUser()]);
@@ -80,8 +109,24 @@ async function boot() {
   if (currentUser && !currentUser.active) currentUser = null;
 
   if (!currentUser) {
-    unmountLogin = renderLogin(root, { company, onLogin: () => boot() });
+    // onLogin não chama boot() de propósito — login.js já chama
+    // setSessionUserId(), que sozinho dispara o listener de sessão (ver
+    // onSessionUserIdChanged mais abaixo) e re-renderiza esta aba. Chamar
+    // os dois juntos duplicava boot() pro mesmo login (mesmo motivo do
+    // logout manual, ver comentário lá).
+    unmountLogin = renderLogin(root, { company, onLogin: () => {} });
     return;
+  }
+
+  // Primeiríssimo login deste usuário (Administrador Geral recém-cadastrado
+  // ou vendedor novo) — abre direto na Ajuda em vez do Painel, pra ele já
+  // aprender a usar o sistema. Marca como visto ANTES de renderizar, então
+  // isso só acontece uma única vez na vida da conta, mesmo que o usuário
+  // saia da tela imediatamente sem interagir com o conteúdo.
+  if (!currentUser.hasSeenAjuda) {
+    await markAjudaSeen(currentUser.id);
+    currentUser = { ...currentUser, hasSeenAjuda: true };
+    location.hash = '#/ajuda';
   }
 
   renderShell(currentUser, company);
@@ -93,6 +138,12 @@ function currentRouteKey() {
 }
 
 function renderShell(user, company) {
+  // renderShell pode ser chamada mais de uma vez na mesma sessão
+  // (ctx.refreshShell, ver mais abaixo) — encerra o monitor de inatividade
+  // da chamada anterior antes de montar um novo, senão cada chamada
+  // empilha mais um conjunto de listeners de atividade + intervalo.
+  if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
+
   root.innerHTML = `
     <div class="shell">
       <button class="menu-toggle-btn" id="menu-toggle-btn" type="button" aria-label="Abrir menu">☰</button>
@@ -149,8 +200,68 @@ function renderShell(user, company) {
     });
     await clearSession();
     showToast('Sessão encerrada.', 'info');
-    boot();
+    // Sem boot() explícito aqui de propósito — clearSession() já dispara o
+    // listener de chrome.storage.onChanged registrado logo abaixo
+    // (onSessionUserIdChanged), que roda boot() sozinho, inclusive nesta
+    // mesma aba (ver comentário lá). Chamar os dois juntos fazia boot()
+    // rodar duas vezes quase ao mesmo tempo pro MESMO logout — mesmo com
+    // as chamadas serializadas (ver bootQueue), isso abria uma janela
+    // onde um evento de hashchange disparado pela primeira passagem podia
+    // ser tratado só depois que a segunda já tinha recriado a tela,
+    // achando um #main-content de uma versão já superada. Um gatilho só
+    // (o do storage cuida sozinho) elimina a corrida na raiz.
   });
+
+  // ---------- Expira a sessão sozinha depois de 30 min sem nenhuma
+  // interação (ver session.js — a atividade é compartilhada entre abas,
+  // então só desloga de verdade quando NENHUMA aba teve uso recente). O
+  // registro de atividade é limitado a no máximo 1 escrita a cada 15s
+  // (mousemove sozinho dispararia dezenas por segundo, sem necessidade
+  // nenhuma) — só a CHECAGEM roda a cada 30s, não a escrita. ----------
+  let lastActivityWrite = 0;
+  function markActivity() {
+    const now = Date.now();
+    if (now - lastActivityWrite < 15000) return;
+    lastActivityWrite = now;
+    touchActivity();
+  }
+  const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'];
+  ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, markActivity, { passive: true }));
+  touchActivity(); // a entrada nesta tela já conta como atividade inicial
+
+  // stopThisIdleWatch() se refere a SI MESMA por closure (idleCheckInterval,
+  // markActivity, ACTIVITY_EVENTS todos capturados diretamente) em vez de
+  // chamar a variável de módulo `stopIdleWatch` por nome — de propósito:
+  // essa variável é reatribuída a cada renderShell() (login, refreshShell),
+  // então se o intervalo de uma chamada ANTIGA ainda estivesse de pé na
+  // hora de disparar, chamar `stopIdleWatch()` (o nome) acabaria limpando
+  // o intervalo ATUAL (o mais novo), não o de quem disparou — ou pior,
+  // encontraria a variável já nula nesse meio-tempo. Cada intervalo só
+  // desliga a SI PRÓPRIO, sempre, não importa quantos outros já tenham
+  // vindo depois dele.
+  function stopThisIdleWatch() {
+    clearInterval(idleCheckInterval);
+    ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, markActivity));
+    // Só limpa a variável de módulo se ela ainda apontar pra ESTA função —
+    // um renderShell mais novo já pode ter posto a dele lá.
+    if (stopIdleWatch === stopThisIdleWatch) stopIdleWatch = null;
+  }
+  const idleCheckInterval = setInterval(async () => {
+    if (await getIdleMs() < IDLE_LIMIT_MS) return;
+    stopThisIdleWatch();
+    await logAction({
+      userId: user.id, userName: user.nome, role: user.role,
+      action: 'Sessão expirada por inatividade',
+      details: `Sessão de "${user.nome}" encerrada automaticamente após 30 minutos sem uso.`,
+      entity: 'auth', entityId: user.id,
+    });
+    await clearSession();
+    showToast('Sua sessão expirou por inatividade — faça login novamente.', 'error');
+    // Sem boot() explícito aqui — mesmo motivo do logout manual (ver
+    // comentário lá): clearSession() já dispara o listener de sessão
+    // sozinho, inclusive nesta aba.
+  }, 30000);
+  stopIdleWatch = stopThisIdleWatch;
 
   const ctx = {
     user,
@@ -192,11 +303,21 @@ function renderShell(user, company) {
     if (!freshUser || !freshUser.active) {
       showToast('Sua sessão não é mais válida — faça login novamente.', 'error');
       await clearSession();
-      boot();
+      // Sem boot() explícito aqui — mesmo motivo do logout manual (ver
+      // comentário lá).
       return;
     }
 
     if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
+
+    // Essa própria função fica presa em window.onhashchange, que sobrevive
+    // à troca de innerHTML — então uma mudança de hash feita ENQUANTO um
+    // boot() concorrente (ver comentário lá em cima) já reescreveu
+    // root.innerHTML por baixo pode acionar esta função depois que
+    // #main-content já não existe mais nesta versão da tela. Sem essa
+    // checagem, isso derrubava com "Cannot set properties of null".
+    const container = document.getElementById('main-content');
+    if (!container) return;
 
     const key = currentRouteKey();
     const route = ROUTES[key];
@@ -204,10 +325,10 @@ function renderShell(user, company) {
       btn.classList.toggle('active', btn.dataset.route === key);
     });
     if (!route.roles.includes(user.role)) {
-      document.getElementById('main-content').innerHTML = '<div class="card">Você não tem permissão para acessar esta tela.</div>';
+      container.innerHTML = '<div class="card">Você não tem permissão para acessar esta tela.</div>';
+      window.scrollTo(0, 0);
       return;
     }
-    const container = document.getElementById('main-content');
     container.innerHTML = '';
     // Uma view pode devolver (opcionalmente) uma função de limpeza, que é
     // chamada automaticamente aqui na PRÓXIMA navegação, antes de montar a
@@ -215,11 +336,26 @@ function renderShell(user, company) {
     // listener fora do próprio container, ver views/sale.js).
     const cleanup = await route.render(container, ctx);
     if (typeof cleanup === 'function') unmountCurrentRoute = cleanup;
+    // Sempre volta pro topo do card ao trocar de tela — sem isso, quem
+    // estava rolado lá embaixo numa lista longa (Estoque, Histórico) e
+    // clica noutro item do menu via a tela nova já aberta na mesma posição
+    // de rolagem de antes, às vezes cortando o título fora da vista.
+    window.scrollTo(0, 0);
   }
 
   window.onhashchange = renderCurrentRoute;
   if (!location.hash) location.hash = '#/dashboard';
-  else renderCurrentRoute();
+  // Sempre chama direto, na hora — nunca depende só do evento assíncrono
+  // de hashchange disparado pela linha acima pra decidir o que mostrar.
+  // Definir location.hash quando ele estava vazio dispara o evento de
+  // qualquer jeito (então isso pode rodar de novo mais tarde, redundante e
+  // inofensivo, como o resto do app já tolera) — mas depender só do evento
+  // deixava uma janela onde, com boot() concorrente (ver comentário lá em
+  // cima), o handler que acabava disparando podia já ser de uma versão
+  // superada desta tela. Chamando direto aqui, o #main-content que essa
+  // chamada usa é garantidamente o que acabou de ser criado alguns
+  // milissegundos atrás, sem depender de ordem entre tarefas assíncronas.
+  renderCurrentRoute();
 }
 
 // Sessão é compartilhada entre todas as abas da extensão (não é por aba) —
@@ -236,3 +372,13 @@ onSessionUserIdChanged(() => boot());
   applyTheme(await getThemePreference());
   boot();
 })();
+
+// Aviso de aba duplicada — roda em paralelo com o boot acima (não atrasa o
+// primeiro carregamento por causa disso). Aparece uma vez, ao abrir esta
+// aba, só se OUTRA aba do sistema já estiver aberta no navegador; não
+// bloqueia nada — os dois continuam funcionando normalmente, é só um
+// aviso pra quem esqueceu uma aba antiga aberta sem perceber. Some
+// sozinho em 5s, como qualquer toast (ver components/toast.js).
+registerTabAndCheckDuplicate().then((isDuplicate) => {
+  if (isDuplicate) showToast('O sistema já está aberto em outra aba deste navegador.', 'info');
+});

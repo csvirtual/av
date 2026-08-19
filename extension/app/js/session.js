@@ -85,3 +85,30 @@ export async function addPendingCredit({ amount, sourceSaleId = null, sourceRefu
   await setPendingCredit(credit);
   return credit;
 }
+
+// ---------- Expiração por inatividade ----------
+// Encerra a sessão sozinha depois de 30 minutos sem nenhuma interação —
+// proteção pra quem sai do balcão/computador e esquece o sistema logado.
+// Guardado em chrome.storage.session (mesmo motivo do resto deste arquivo:
+// efêmero, some ao fechar o navegador) e, por ser compartilhado entre
+// todas as abas, funciona certo com mais de uma aba aberta: mexer numa aba
+// já conta como atividade pras outras também — só expira de verdade quando
+// NENHUMA aba teve interação nos últimos 30 minutos, não quando uma aba
+// específica ficou parada. Quem dispara os eventos de mouse/teclado e roda
+// a checagem periódica é app.js — este módulo só guarda e lê o timestamp.
+const ACTIVITY_KEY = 'session.lastActivityAt';
+export const IDLE_LIMIT_MS = 30 * 60 * 1000;
+
+export async function touchActivity() {
+  await chrome.storage.session.set({ [ACTIVITY_KEY]: Date.now() });
+}
+
+/** Quanto tempo (ms) faz desde a última atividade registrada em QUALQUER
+ * aba. Sem nenhum registro ainda (login muito recente, antes da primeira
+ * chamada a touchActivity) devolve 0 — trata como "acabou de ficar ativo",
+ * nunca como já ocioso. */
+export async function getIdleMs() {
+  const data = await chrome.storage.session.get(ACTIVITY_KEY);
+  const last = data[ACTIVITY_KEY];
+  return last ? Date.now() - last : 0;
+}

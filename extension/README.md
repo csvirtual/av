@@ -40,7 +40,12 @@ senha — o cadastro inteiro é pulado, os dados vêm todos do arquivo.
 Depois disso, o sistema sempre abre na tela de **login**.
 
 Um menu de **Ajuda** (disponível para os dois perfis) explica cada parte do
-sistema em linguagem simples, separado em tópicos.
+sistema em linguagem simples, separado em tópicos. **No primeiríssimo login
+de cada usuário** (o Administrador Geral recém-cadastrado, ou qualquer
+vendedor cadastrado depois), o sistema já abre direto nessa tela de Ajuda em
+vez do Painel, pra ele aprender a usar o sistema antes de mais nada — só
+acontece uma vez na vida de cada conta; da segunda vez em diante, o login
+cai no Painel normalmente.
 
 ## Funcionalidades
 
@@ -162,6 +167,11 @@ leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
   liberar de novo.
 - A sessão do usuário logado usa `chrome.storage.session` (efêmero — some ao
   fechar o navegador), então cada início de expediente pede login de novo.
+- **Sessão expira sozinha depois de 30 minutos sem uso** — sem nenhum
+  clique, tecla ou movimento de mouse nesse tempo, o sistema desloga
+  automaticamente e volta pro login, avisando o motivo. Se houver mais de
+  uma aba aberta, mexer em qualquer uma delas conta como uso — só expira
+  de verdade quando NENHUMA aba tiver atividade recente.
 - Não há nenhuma permissão de rede, câmera ou acesso a outras abas — a única
   permissão usada é `storage`.
 - **Sem backup, os dados não sobrevivem à perda do computador/perfil do
@@ -188,6 +198,10 @@ gente clicando rápido e mais de uma aba/tela aberta às vezes:
 - **Sessão sincronizada entre abas** — como a extensão permite abrir mais
   de uma aba, deslogar (ou ser desativado por um administrador) numa aba
   reflete automaticamente nas outras, sem precisar recarregar a página.
+- **Aviso de aba duplicada** — abrir o sistema numa segunda aba enquanto já
+  tem uma aberta mostra um aviso rápido (some sozinho). Não bloqueia nada —
+  as duas abas continuam funcionando normalmente — é só um alerta pra quem
+  esqueceu uma aba antiga aberta sem perceber.
 - **Uma venda com carreto associado nunca fica "pela metade"** — se o
   carreto falhar por algum motivo depois da venda já ter sido registrada,
   a venda continua valendo (o cliente já pagou e o estoque já baixou) e o

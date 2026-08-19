@@ -40,6 +40,10 @@ export async function createUser({ nome, username, password, role }) {
     passwordSalt: salt,
     passwordHash: hash,
     active: true,
+    // Controla o redirecionamento automático pra tela de Ajuda no
+    // primeiríssimo login deste usuário (ver app.js) — nasce falso e vira
+    // verdadeiro uma única vez, na hora desse redirecionamento.
+    hasSeenAjuda: false,
     createdAt: Date.now(),
   };
   await dbAdd('users', record);
@@ -51,6 +55,16 @@ export async function verifyLogin(username, password) {
   if (!user || !user.active) return null;
   const ok = await verifyPasswordHash(password, user.passwordSalt, user.passwordHash);
   return ok ? user : null;
+}
+
+/** Marca que este usuário já foi redirecionado pra Ajuda no primeiro login
+ * (ver app.js) — daqui pra frente, login dele cai no Painel normalmente. */
+export async function markAjudaSeen(id) {
+  return dbUpdate('users', id, (user) => {
+    if (!user) throw new Error('Usuário não encontrado.');
+    user.hasSeenAjuda = true;
+    return user;
+  });
 }
 
 export async function setUserActive(id, active) {

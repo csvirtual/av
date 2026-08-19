@@ -24,8 +24,16 @@ const TOPICS = [
 
       <div class="tip"><strong>Dica:</strong> a sessão não fica salva pra sempre — se você fechar o navegador, na próxima vez vai pedir login de novo. Isso é proposital, pra loja não ficar logada sem querer com o computador ligado o dia todo.</div>
 
+      <div class="tip"><strong>Ficou parado 30 minutos?</strong> O sistema desloga sozinho depois de meia hora sem nenhum uso (mouse, teclado etc.), voltando pro login — é uma proteção pra quem sai do balcão e esquece o sistema logado. Se tiver mais de uma aba aberta, mexer em qualquer uma delas conta como uso; só desloga de verdade quando nenhuma aba tiver atividade recente.</div>
+
+      <h3>Primeiro login de cada usuário</h3>
+      <p>Na <strong>primeiríssima vez</strong> que qualquer usuário loga — o Administrador Geral logo depois do cadastro inicial, ou um vendedor recém-cadastrado — o sistema abre direto na tela de <strong>Ajuda</strong> (esta aqui!) em vez do Painel, pra já dar uma primeira olhada em como tudo funciona. Da segunda vez que essa mesma pessoa logar em diante, cai no Painel normalmente — é coisa de uma vez só na vida de cada conta.</p>
+
       <h3>Vendedores</h3>
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
+
+      <h3>Mais de uma aba aberta</h3>
+      <p>Dá pra abrir o sistema em mais de uma aba do navegador ao mesmo tempo — nada trava nem duplica dado. Se você abrir uma segunda aba enquanto já tem uma aberta, aparece um aviso rápido avisando (some sozinho em alguns segundos); é só um alerta, útil pra quem esqueceu uma aba antiga aberta em algum canto sem perceber.</p>
 
       <h3>Aparência (claro ou escuro)</h3>
       <p>Além da tela de configuração inicial, dá pra trocar quando quiser em <strong>Personalização</strong>, no menu lateral — escolha entre fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
@@ -373,6 +381,10 @@ export async function renderAjuda(container, ctx) {
     topicsNav.querySelectorAll('.help-topic-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.topic === id);
     });
+    // Volta pro topo ao trocar de tópico — sem isso, quem estava lendo o
+    // fim de um tópico longo e clica noutro (às vezes bem mais curto)
+    // ficava na mesma posição de rolagem de antes, longe do título novo.
+    window.scrollTo(0, 0);
   }
 
   topicsNav.querySelectorAll('.help-topic-btn').forEach((btn) => {
