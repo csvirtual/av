@@ -135,6 +135,53 @@ const TOPICS = [
     `,
   },
   {
+    id: 'lgpd',
+    icon: '🔒',
+    title: 'Privacidade e LGPD',
+    // Único tópico com conteúdo dinâmico — puxa o nome da loja e do
+    // encarregado direto do cadastro (ver views/company.js), pra não
+    // obrigar copiar/colar manualmente esses dados no aviso de privacidade
+    // pronto. Os outros tópicos são texto fixo; ver renderTopic() mais
+    // abaixo pra como isso é tratado nos dois casos.
+    html: (company) => {
+      const nomeLoja = company?.nomeFantasia || '[nome da loja]';
+      const encNome = company?.encarregadoLgpd?.nome;
+      const encContato = company?.encarregadoLgpd?.contato;
+      const linhaEncarregado = encNome
+        ? `Responsável pelos seus dados nesta loja: ${encNome}${encContato ? ` — ${encContato}` : ''}.`
+        : '[Se quiser, informe aqui quem é o responsável por dúvidas de privacidade — preencha em Dados da loja → Privacidade e LGPD.]';
+      return `
+      <h2>Privacidade e LGPD</h2>
+      <p class="help-subtitle">O sistema é 100% local, mas isso não tira a responsabilidade da loja sobre os dados dos clientes.</p>
+
+      <h3>Quem é o responsável pelos dados</h3>
+      <p>A Lei Geral de Proteção de Dados (LGPD) se aplica sempre que dado pessoal é tratado — nome, telefone, endereço, histórico de fiado — <strong>mesmo guardado só localmente</strong>, sem sair do computador. Pela lei, quem decide coletar e usar esse dado é o <strong>"controlador"</strong> — e esse é <strong>o dono da loja</strong>, não o sistema em si. O sistema é só a ferramenta; a responsabilidade de informar os clientes e atender pedidos deles sobre os próprios dados é da loja.</p>
+
+      <div class="tip"><strong>O que o sistema já ajuda:</strong> tudo fica só neste computador (nada sobe pra nuvem nem é compartilhado com ninguém), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
+
+      <h3>Aviso de privacidade pronto pra usar</h3>
+      <p>Texto pra afixar no balcão ou entregar ao cliente — pode copiar, adaptar e imprimir como quiser:</p>
+      <div class="template-box">AVISO DE PRIVACIDADE — ${escapeHtml(nomeLoja)}
+
+Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura, apenas no computador da loja — não são enviados para a internet nem compartilhados com terceiros.
+
+Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.
+
+${escapeHtml(linhaEncarregado)}</div>
+
+      <h3>Direitos do cliente sobre os próprios dados</h3>
+      <p>Pela LGPD (Art. 18), o cliente pode pedir pra <strong>ver</strong>, <strong>corrigir</strong> ou <strong>apagar</strong> os dados que a loja tem sobre ele. Na prática, no sistema:</p>
+      <ul>
+        <li><strong>Ver e corrigir</strong> — tela <strong>Clientes → Editar</strong>, a qualquer momento.</li>
+        <li><strong>Apagar</strong> — o cadastro pode ser <strong>desativado</strong> (some das buscas, não recebe mais venda fiada), mas o <strong>histórico de vendas e fiado já registrado continua guardado</strong> — não é falha do sistema, é a própria LGPD (Art. 16) que permite manter esse tipo de registro por obrigação legal/fiscal, mesmo depois de um pedido de exclusão.</li>
+      </ul>
+
+      <h3>Encarregado de dados (opcional, mas recomendado)</h3>
+      <p>A LGPD prevê a figura de um <strong>encarregado</strong> — a pessoa de contato pra dúvidas sobre dados pessoais na loja (pode ser o próprio dono). Dá pra cadastrar em <strong>Dados da loja → Privacidade e LGPD</strong>; uma vez preenchido, o nome e contato aparecem automaticamente no aviso de privacidade acima.</p>
+    `;
+    },
+  },
+  {
     id: 'carreto',
     icon: '🛻',
     title: 'Carreto (entregas)',
@@ -377,7 +424,10 @@ export async function renderAjuda(container, ctx) {
   function renderTopic(id) {
     activeId = id;
     const topic = TOPICS.find((t) => t.id === id);
-    contentBox.innerHTML = topic.html;
+    // Só o tópico de LGPD tem `html` como função (precisa dos dados da
+    // loja pra preencher o aviso de privacidade) — os demais são string
+    // fixa, ver comentário junto do tópico 'lgpd' acima.
+    contentBox.innerHTML = typeof topic.html === 'function' ? topic.html(ctx.company) : topic.html;
     topicsNav.querySelectorAll('.help-topic-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.topic === id);
     });

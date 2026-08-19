@@ -177,6 +177,14 @@ leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
 - **Sem backup, os dados não sobrevivem à perda do computador/perfil do
   Chrome.** Use a tela **Backup** (Administrador Geral) regularmente —
   veja a seção "Funcionalidades" acima.
+- **LGPD** — o sistema guarda dado pessoal de clientes (nome, telefone,
+  endereço, histórico de fiado), então a Lei Geral de Proteção de Dados se
+  aplica, mesmo com tudo local. Quem é o responsável legal por esses dados
+  é a **loja** (o sistema é só a ferramenta), não quem desenvolveu o
+  software. A tela **Ajuda → "Privacidade e LGPD"** explica isso em
+  detalhe e já vem com um aviso de privacidade pronto pra imprimir/entregar
+  ao cliente, preenchido automaticamente com o nome da loja e (se
+  cadastrado em **Dados da loja**) o nome e contato do encarregado.
 
 ## Confiabilidade e integridade dos dados
 

@@ -82,6 +82,19 @@ export async function renderCompanySettings(container, ctx) {
           </div>
         </div>
 
+        <p class="section-title">Privacidade e LGPD</p>
+        <div class="form-row" style="max-width:560px;">
+          <div class="field">
+            <label for="encarregadoNome">Encarregado de dados (opcional)</label>
+            <input id="encarregadoNome" value="${escAttr(company.encarregadoLgpd?.nome)}" placeholder="Nome de quem responde por dúvidas de privacidade">
+          </div>
+          <div class="field">
+            <label for="encarregadoContato">Contato do encarregado</label>
+            <input id="encarregadoContato" value="${escAttr(company.encarregadoLgpd?.contato)}" placeholder="Telefone ou e-mail">
+          </div>
+        </div>
+        <span class="hint" style="display:block;margin:-8px 0 16px;">Aparece no aviso de privacidade pronto pra imprimir, na tela de Ajuda → "Privacidade e LGPD". Veja lá o porquê de preencher isso.</span>
+
         <div class="modal-actions" style="justify-content:flex-end;">
           <button type="submit" class="btn">Salvar alterações</button>
         </div>
@@ -139,6 +152,10 @@ export async function renderCompanySettings(container, ctx) {
         cidade: document.getElementById('cidade').value.trim(),
         uf: document.getElementById('uf').value,
         cep: document.getElementById('cep').value.trim(),
+      },
+      encarregadoLgpd: {
+        nome: document.getElementById('encarregadoNome').value.trim(),
+        contato: document.getElementById('encarregadoContato').value.trim(),
       },
     };
 

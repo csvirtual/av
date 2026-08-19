@@ -705,6 +705,21 @@ input.customer-search-input:focus {
   font-size: 13px;
   margin: 4px 0 16px;
 }
+/* Bloco de texto pronto pra copiar/imprimir (ex: aviso de privacidade pro
+ * cliente) — visualmente separado do resto do texto explicativo, com cara
+ * de "papel" mesmo, pra ficar claro que é conteúdo pra levar pra fora do
+ * sistema, não uma explicação. */
+.help-content .template-box {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 4px 0 16px;
+  white-space: pre-wrap;
+  user-select: text;
+}
 
 @media (max-width: 760px) {
   .help-layout { grid-template-columns: 1fr; }

@@ -45,6 +45,19 @@ function buildCompanyRecord(data, existing) {
     email: data.email || '',
     ramos: data.ramos || [],
     horarioFuncionamento: data.horarioFuncionamento || '',
+    // Encarregado de dados (LGPD, Art. 41) — quem os clientes/funcionários
+    // da loja podem procurar sobre uso dos próprios dados pessoais.
+    // Totalmente opcional: o sistema funciona normalmente sem preencher,
+    // mas fica disponível pra citar no aviso de privacidade da loja pros
+    // clientes dela (ver tópico "Privacidade e LGPD" na Ajuda).
+    encarregadoLgpd: {
+      // Segue o mesmo padrão dos outros campos básicos acima (telefone,
+      // email...): a tela de "Dados da loja" sempre reenvia o formulário
+      // inteiro, então não precisa do merge-preserva-se-ausente que
+      // `policies` usa (ali sim, telas diferentes editam pedaços diferentes).
+      nome: data.encarregadoLgpd?.nome || '',
+      contato: data.encarregadoLgpd?.contato || '',
+    },
     // Políticas de venda. Cada campo preserva o valor existente quando quem
     // chama saveCompany não o informa explicitamente (ex: a tela de dados da
     // loja não edita todos de uma vez).
