@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Gestão de Loja — Estoque & Vendas",
   "version": "1.2.0",
-  "description": "Controle de estoque, vendas e usuários para loja de material de construção + mercearia. Funciona 100% local, sem servidor.",
+  "description": "Estoque, vendas, fornecedores e equipe para lojas de construção, mercearias e mercados de bairro. 100% local, sem servidor.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
