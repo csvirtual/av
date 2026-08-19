@@ -51,6 +51,8 @@ const ROUTES = {
   ajuda: { label: 'Ajuda', icon: '❓', roles: ['admin', 'vendedor'], render: renderAjuda },
 };
 
+let unmountLogin = null;
+
 async function boot() {
   // Mesmo motivo do closeAllModals() em renderCurrentRoute (ver comentário
   // lá): um modal aberto fica anexado direto no <body>, fora de #root, e
@@ -61,6 +63,9 @@ async function boot() {
   // abaixo): se esta aba tiver um modal aberto no momento, ele ficaria
   // flutuando por cima da tela de login sem essa chamada.
   closeAllModals();
+  // A tela de login pode deixar um intervalo do contador de bloqueio
+  // rodando (ver views/login.js) — encerra antes de trocar de tela.
+  if (unmountLogin) { unmountLogin(); unmountLogin = null; }
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
 
   const [companyRegistered, anyUser] = await Promise.all([isCompanyRegistered(), hasAnyUser()]);
@@ -75,7 +80,7 @@ async function boot() {
   if (currentUser && !currentUser.active) currentUser = null;
 
   if (!currentUser) {
-    renderLogin(root, { company, onLogin: () => boot() });
+    unmountLogin = renderLogin(root, { company, onLogin: () => boot() });
     return;
   }
 

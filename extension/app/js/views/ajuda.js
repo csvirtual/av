@@ -20,6 +20,7 @@ const TOPICS = [
 
       <h3>Entrando todo dia (Login)</h3>
       <p>Depois desse cadastro inicial, o sistema sempre abre numa tela de <strong>login</strong>. Cada pessoa que trabalha na loja — administrador ou vendedor — tem seu próprio usuário e senha. Ninguém compartilha login: é assim que o sistema sabe exatamente quem fez cada venda, cada estorno, cada mudança de estoque.</p>
+      <div class="tip"><strong>Errou a senha 2 vezes seguidas?</strong> O campo de senha fica bloqueado por 60 segundos (com contagem regressiva na tela) antes de liberar de novo — é uma proteção contra tentativa de adivinhar a senha de outra pessoa no teclado. Não afeta o usuário digitado nem apaga nada; é só esperar a contagem zerar.</div>
 
       <div class="tip"><strong>Dica:</strong> a sessão não fica salva pra sempre — se você fechar o navegador, na próxima vez vai pedir login de novo. Isso é proposital, pra loja não ficar logada sem querer com o computador ligado o dia todo.</div>
 

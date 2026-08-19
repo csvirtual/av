@@ -156,6 +156,10 @@ leitor tiver um modo "porta serial/COM" em vez de "teclado/HID", troque —
   extensão foi instalada.
 - Senhas nunca são gravadas em texto puro — usam **PBKDF2** (Web Crypto API,
   150.000 iterações) com salt único por usuário.
+- **Bloqueio contra força bruta na tela de login** — depois de 2 tentativas
+  de senha incorretas seguidas para o mesmo usuário, o campo de senha fica
+  bloqueado por 60 segundos (com contagem regressiva na tela) antes de
+  liberar de novo.
 - A sessão do usuário logado usa `chrome.storage.session` (efêmero — some ao
   fechar o navegador), então cada início de expediente pede login de novo.
 - Não há nenhuma permissão de rede, câmera ou acesso a outras abas — a única
