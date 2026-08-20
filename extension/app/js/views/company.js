@@ -159,14 +159,25 @@ export async function renderCompanySettings(container, ctx) {
       },
     };
 
-    await saveCompany(data);
-    await logAction({
-      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-      action: 'Edição dos dados da loja',
-      details: `Dados cadastrais da loja atualizados por "${ctx.user.nome}".`,
-      entity: 'company', entityId: 'main',
-    });
-    showToast('Dados da loja atualizados.', 'success');
-    ctx.refreshShell();
+    // Trava contra clique duplo (dois submits em paralelo) + try/catch
+    // pra não deixar o formulário "sem reação nenhuma" se saveCompany
+    // falhar por algum motivo inesperado — achado de auditoria; mesmo
+    // padrão já usado no formulário de mesma cara em views/setup.js.
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try {
+      await saveCompany(data);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: 'Edição dos dados da loja',
+        details: `Dados cadastrais da loja atualizados por "${ctx.user.nome}".`,
+        entity: 'company', entityId: 'main',
+      });
+      showToast('Dados da loja atualizados.', 'success');
+      ctx.refreshShell();
+    } catch (err) {
+      errBox.innerHTML = `<div class="form-error">${escAttr(err.message)}</div>`;
+      submitBtn.disabled = false;
+    }
   });
 }

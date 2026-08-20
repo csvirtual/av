@@ -83,7 +83,16 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
+  /* min-height, não height: com "height: 100%" fixo, conteúdo mais alto
+   * que a janela ainda rola normalmente (o navegador propaga o overflow
+   * pro viewport), mas isso quebra o cálculo de position:sticky dos
+   * filhos (ex: .sidebar) — o elemento fica "preso" ao tamanho do body
+   * em vez de acompanhar a altura real do conteúdo. min-height evita essa
+   * armadilha: body cresce de verdade com o conteúdo, sem perder o
+   * "preenche a tela inteira" em páginas curtas (#root já garante isso
+   * com min-height: 100vh logo abaixo).
+   */
+  min-height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
@@ -279,6 +288,10 @@ a { color: var(--primary); }
   display: grid;
   grid-template-columns: 236px 1fr;
   min-height: 100vh;
+  /* align-items:start (em vez do padrão stretch) — ver comentário em
+   * .sidebar logo abaixo pra entender por que isso é necessário pro
+   * sticky funcionar. */
+  align-items: start;
 }
 
 .sidebar {
@@ -287,6 +300,24 @@ a { color: var(--primary); }
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
+  /* Sem isso, o menu (inclusive o botão "Sair") rola junto com o
+   * conteúdo principal e desaparece da tela em qualquer página mais longa
+   * que a altura da janela (Estoque com muitos produtos, Ajuda, etc.) —
+   * achado auditando antes do lançamento.
+   *
+   * position:sticky sozinho NÃO basta aqui: com align-items:stretch
+   * (padrão do grid), .sidebar nascia esticado pra cobrir a MESMA altura
+   * do conteúdo principal — sem "folga" nenhuma dentro do próprio
+   * container pra segurar, sticky não tem efeito visual nenhum (fica
+   * preso ao static de qualquer jeito; confirmado com um reprodutor HTML
+   * isolado, fora da extensão). Por isso .shell usa align-items:start:
+   * o sidebar volta a ter só a altura do próprio conteúdo (curto), e o
+   * min-height abaixo garante que ele ainda preenche a tela inteira de
+   * cor em páginas curtas, do jeito que já parecia visualmente antes.
+   */
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
 }
 
 /* Botão de menu (☰) e véu por trás do menu — só aparecem em telas estreitas,

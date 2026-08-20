@@ -4,6 +4,7 @@ import { computeSalesReport } from '../data/reportsRepo.js';
 import { getCompany } from '../data/companyRepo.js';
 import { formatMoney, formatDate, escapeHtml } from '../utils/format.js';
 import { printReport } from '../components/reportPrint.js';
+import { showToast } from '../components/toast.js';
 
 const CURVE_BADGE = { A: 'badge-green', B: 'badge-gold', C: 'badge-gray' };
 
@@ -160,11 +161,15 @@ export async function renderRelatorios(container) {
     // de data personalizada sem disparar o "change" ainda (ex: só saiu do
     // campo clicando direto no botão).
     const { from, to } = currentRange();
-    const [report, company] = await Promise.all([
-      computeSalesReport({ from, to }),
-      getCompany(),
-    ]);
-    printReport({ report, periodLabel: periodLabel(), company });
+    try {
+      const [report, company] = await Promise.all([
+        computeSalesReport({ from, to }),
+        getCompany(),
+      ]);
+      printReport({ report, periodLabel: periodLabel(), company });
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   });
 
   refresh();

@@ -185,8 +185,12 @@ export async function renderSale(container, ctx) {
             });
           });
           document.getElementById('quick-new-customer').addEventListener('click', async () => {
-            selectedCustomer = await createCustomer({ nome: term });
-            await renderCustomerBox();
+            try {
+              selectedCustomer = await createCustomer({ nome: term });
+              await renderCustomerBox();
+            } catch (err) {
+              showToast(err.message, 'error');
+            }
           });
         }, 220);
       });
@@ -617,14 +621,23 @@ export async function renderSale(container, ctx) {
           // mandar pro createSale e só descobrir que errou depois de
           // fechar o modal) — quem decide de verdade se autoriza é o
           // createSale, que confere usuário/senha de novo por conta
-          // própria antes de gravar a venda.
-          const admin = await verifyLogin(username, password);
-          if (!admin || admin.role !== 'admin') {
-            errBox.innerHTML = '<div class="form-error">Usuário/senha inválidos ou não é um administrador.</div>';
+          // própria antes de gravar a venda. try/catch por segurança: se
+          // verifyLogin falhar por algum motivo inesperado (ex: erro no
+          // IndexedDB), sem isso o modal ficava sem fechar e sem mostrar
+          // nada pro vendedor — achado de auditoria, mesmo padrão já
+          // corrigido em views/users.js.
+          try {
+            const admin = await verifyLogin(username, password);
+            if (!admin || admin.role !== 'admin') {
+              errBox.innerHTML = '<div class="form-error">Usuário/senha inválidos ou não é um administrador.</div>';
+              return false;
+            }
+            resolve({ username, password });
+            return true;
+          } catch (err) {
+            errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
             return false;
           }
-          resolve({ username, password });
-          return true;
         },
         onCancel: () => resolve(null),
       });

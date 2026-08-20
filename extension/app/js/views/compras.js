@@ -126,14 +126,18 @@ export async function renderCompras(container, ctx) {
           confirmLabel: 'Excluir', danger: true,
         });
         if (!ok) return;
-        await deleteSupplier(supplier.id);
-        await logAction({
-          userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-          action: 'Exclusão de fornecedor', details: `Fornecedor "${supplier.nome}" excluído.`,
-          entity: 'supplier', entityId: supplier.id,
-        });
-        showToast('Fornecedor excluído.', 'success');
-        renderFornecedoresTab();
+        try {
+          await deleteSupplier(supplier.id);
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: 'Exclusão de fornecedor', details: `Fornecedor "${supplier.nome}" excluído.`,
+            entity: 'supplier', entityId: supplier.id,
+          });
+          showToast('Fornecedor excluído.', 'success');
+          renderFornecedoresTab();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
       });
     });
   }

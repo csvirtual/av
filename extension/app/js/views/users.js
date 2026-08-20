@@ -138,16 +138,28 @@ export async function renderUsers(container, ctx) {
         if (p1.length < 6) { errBox.innerHTML = '<div class="form-error">A senha deve ter pelo menos 6 caracteres.</div>'; return false; }
         if (p1 !== p2) { errBox.innerHTML = '<div class="form-error">As senhas não coincidem.</div>'; return false; }
         if (await findByUsername(username)) { errBox.innerHTML = '<div class="form-error">Esse usuário de login já existe.</div>'; return false; }
-        const user = await createUser({ nome, username, password: p1, role: 'vendedor' });
-        await logAction({
-          userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-          action: 'Cadastro de usuário',
-          details: `Vendedor "${user.nome}" (${user.username}) cadastrado.`,
-          entity: 'user', entityId: user.id,
-        });
-        showToast('Vendedor cadastrado.', 'success');
-        refresh();
-        return true;
+        // createUser confere o usuário duplicado de novo por conta própria
+        // (proteção contra a janela entre o findByUsername acima e este
+        // ponto — ver comentário em usersRepo.js) e pode lançar por esse ou
+        // outro motivo inesperado. Sem este try/catch, um erro aqui deixava
+        // o modal parado sem fechar e sem mostrar nada pro usuário — achado
+        // de auditoria: os outros dois formulários desta mesma tela
+        // (redefinir senha, ativar/desativar) já tratavam erro assim.
+        try {
+          const user = await createUser({ nome, username, password: p1, role: 'vendedor' });
+          await logAction({
+            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+            action: 'Cadastro de usuário',
+            details: `Vendedor "${user.nome}" (${user.username}) cadastrado.`,
+            entity: 'user', entityId: user.id,
+          });
+          showToast('Vendedor cadastrado.', 'success');
+          refresh();
+          return true;
+        } catch (err) {
+          errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+          return false;
+        }
       },
     });
   });

@@ -54,17 +54,30 @@ async function renderClosedState(container, ctx, refresh) {
     ${renderHistoryTable(history)}
   `;
 
-  document.getElementById('open-session-btn').addEventListener('click', async () => {
+  const openBtn = document.getElementById('open-session-btn');
+  openBtn.addEventListener('click', async () => {
+    // openSession rejeita abrir um segundo caixa se já existir um aberto
+    // (ex: duplo clique, ou duas abas abrindo ao mesmo tempo) — sem
+    // try/catch aqui, esse erro sumia sem avisar ninguém, e um clique
+    // duplo bem rápido podia disparar duas chamadas em paralelo antes do
+    // primeiro terminar. Trava + try/catch, achado de auditoria.
+    if (openBtn.disabled) return;
+    openBtn.disabled = true;
     const amount = Number(document.getElementById('opening-amount').value) || 0;
-    const session = await openSession({ userId: ctx.user.id, userName: ctx.user.nome, openingAmount: amount });
-    await logAction({
-      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-      action: 'Abertura de caixa',
-      details: `Caixa aberto com R$ ${amount.toFixed(2)} de troco inicial.`,
-      entity: 'cashSession', entityId: session.id,
-    });
-    showToast('Caixa aberto.', 'success');
-    refresh();
+    try {
+      const session = await openSession({ userId: ctx.user.id, userName: ctx.user.nome, openingAmount: amount });
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: 'Abertura de caixa',
+        details: `Caixa aberto com R$ ${amount.toFixed(2)} de troco inicial.`,
+        entity: 'cashSession', entityId: session.id,
+      });
+      showToast('Caixa aberto.', 'success');
+      refresh();
+    } catch (err) {
+      showToast(err.message, 'error');
+      openBtn.disabled = false;
+    }
   });
 }
 

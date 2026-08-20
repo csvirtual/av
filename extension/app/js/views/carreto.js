@@ -301,8 +301,12 @@ export async function renderCarreto(container, ctx) {
                   });
                 });
                 resultsDiv.querySelector('#quick-new-customer').addEventListener('click', async () => {
-                  selectedCustomer = await createCustomer({ nome: term });
-                  renderCustomerBox();
+                  try {
+                    selectedCustomer = await createCustomer({ nome: term });
+                    renderCustomerBox();
+                  } catch (err) {
+                    showToast(err.message, 'error');
+                  }
                 });
               }, 220);
             });
