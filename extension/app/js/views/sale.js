@@ -520,9 +520,18 @@ export async function renderSale(container, ctx) {
     // Total de juro somado de todas as linhas de cartão — é dinheiro A
     // MAIS que o cliente paga, em cima do valor da venda (não faz parte
     // do "pagamento completo" acima, que só olha o valor do carrinho).
+    // Destacado com .notice (achado de auditoria: antes era um texto
+    // pequeno e cinza, discreto demais perto do "Pagamento completo ✓" em
+    // verde — risco real de o vendedor não perceber e cobrar só o valor
+    // sem juro na maquininha física, um aparelho separado que não sabe
+    // desse valor sozinho).
     const interestSum = totalCreditInterest();
     if (interestSum > 0.001) {
-      paymentsBox.insertAdjacentHTML('beforeend', `<div class="text-muted" style="font-size:12.5px;margin-top:4px;text-align:right;">Total com juro do parcelamento: <strong>${formatMoney(total + interestSum)}</strong></div>`);
+      paymentsBox.insertAdjacentHTML('beforeend', `
+        <div class="notice" style="margin:10px 0 0;text-align:center;">
+          💳 Cobrar na maquininha, com juro: <strong>${formatMoney(total + interestSum)}</strong>
+        </div>
+      `);
     }
 
     const disableFinalize = cart.length === 0 || Math.abs(remaining) > PAYMENT_TOLERANCE_UI;

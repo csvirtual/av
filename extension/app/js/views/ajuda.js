@@ -239,6 +239,8 @@ ${escapeHtml(linhaEncarregado)}</div>
       <p>Vá em <strong>Histórico de vendas</strong>, clique em "Ver itens" na venda em questão, e depois em <strong>Estornar itens</strong>. Escolha a quantidade de cada item que está sendo devolvida e escreva o motivo (obrigatório) — pode ser um item só ou a venda inteira.</p>
       <p>O estorno devolve a quantidade pro estoque automaticamente e fica registrado no histórico daquele produto e no log de auditoria.</p>
 
+      <div class="warn-box"><strong>Se a venda teve juro no parcelamento do cartão</strong> (veja "Juro no parcelamento" no tópico Vendas): o estorno devolve só o valor dos <em>produtos</em> — o juro já cobrado na maquininha não é reduzido nem rateado automaticamente, estorno total ou parcial. Isso é porque a extensão não tem nenhuma conexão com a maquininha nem com a operadora do cartão pra saber quanto de juro ela devolveria. Se a loja decidir devolver o juro também, é um acerto manual, fora do sistema.</div>
+
       <h3>Devolver dinheiro ou virar crédito de troca?</h3>
       <p>Ao estornar, tem uma opção <strong>"Gerar crédito de troca"</strong>. Marque quando o cliente vai levar outro produto em vez do dinheiro de volta — o valor fica guardado e aparece como forma de pagamento disponível na próxima venda (dá até pra usar só uma parte e guardar o resto pra depois).</p>
       <p>Se não marcar essa opção, o sistema entende que o dinheiro foi devolvido na hora, em espécie.</p>

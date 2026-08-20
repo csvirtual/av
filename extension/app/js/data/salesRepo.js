@@ -337,6 +337,18 @@ export async function refundSaleItems({ saleId, userId, userName, reason, items,
 
     if (refundItems.length === 0) throw new Error('Selecione ao menos um item para estornar.');
 
+    // Nota (auditoria de bugs/vazamentos): estorno aqui só devolve o lado
+    // "produto" da venda (`sale.refundedTotal`, calculado acima a partir do
+    // preço líquido dos itens). `sale.creditInterestTotal` e
+    // `payments[].interestAmount` — o juro do parcelamento já cobrado na
+    // maquininha (ver createSale mais abaixo) — NÃO são reduzidos nem
+    // rateados aqui, seja estorno total ou parcial. Isso é intencional e
+    // simples de propósito (a extensão não tem integração real com a
+    // maquininha pra saber quanto o emissor do cartão devolveria de juro
+    // num estorno parcial — isso depende da operadora, não da loja), mas é
+    // um comportamento que o lojista precisa saber: se quiser devolver o
+    // juro também, isso é acerto manual fora do sistema. Documentado em
+    // Ajuda, tópico "Juro no parcelamento".
     refund = {
       id: newId(),
       timestamp: Date.now(),
