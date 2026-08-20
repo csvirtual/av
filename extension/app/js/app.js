@@ -393,6 +393,26 @@ function renderShell(user, company) {
 // cada login), senão cada novo login empilharia mais um listener.
 onSessionUserIdChanged(() => boot());
 
+// Rede de segurança contra erro inesperado não tratado em algum ponto do
+// sistema (uma Promise rejeitada sem .catch, ou uma exceção síncrona fora
+// de qualquer try/catch) — achado de auditoria: sem isso, um bug
+// imprevisto nessas condições fazia o clique "não fazer nada" pro
+// usuário, sem toast nem explicação nenhuma (só um erro no console, que
+// ninguém no balcão da loja vai abrir). Não tenta recuperar o estado nem
+// adivinhar o que aconteceu — só garante que SEMPRE aparece um aviso
+// visível, em vez de falha silenciosa. Limitado a 1 aviso a cada 4s pra
+// não empilhar toast repetido se vários erros acontecerem em sequência.
+let lastUnexpectedErrorToastAt = 0;
+function reportUnexpectedError(err) {
+  console.error('[erro não tratado]', err);
+  const now = Date.now();
+  if (now - lastUnexpectedErrorToastAt < 4000) return;
+  lastUnexpectedErrorToastAt = now;
+  showToast('Ocorreu um erro inesperado. Tente novamente — se persistir, recarregue a extensão.', 'error');
+}
+window.addEventListener('unhandledrejection', (event) => reportUnexpectedError(event.reason));
+window.addEventListener('error', (event) => reportUnexpectedError(event.error || event.message));
+
 // A aparência (claro/escuro/automático) é escolhida na tela Personalização
 // (ver views/personalizacao.js), acessível pelo menu depois de logar — só
 // precisa ser aplicada aqui, uma vez, antes do primeiro render, pra abrir
