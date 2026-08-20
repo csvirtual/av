@@ -80,8 +80,11 @@ export async function renderSalesHistory(container, ctx) {
     renderTable(filtered);
   }
 
+  // Inclui o juro de parcelamento no cartão (repassado pro cliente) —
+  // dinheiro real recebido, conta como faturamento igual em Painel e
+  // Relatórios (ver data/reportsRepo.js#netSaleTotalWithInterest).
   function netTotal(sale) {
-    return sale.total - sale.refundedTotal;
+    return sale.total - sale.refundedTotal + (sale.creditInterestTotal || 0);
   }
 
   function renderTable(list) {
@@ -163,7 +166,11 @@ export async function renderSalesHistory(container, ctx) {
         </div>
         <div class="cart-total"><span>Total</span><span class="value">${formatMoney(sale.total)}</span></div>
         <p class="section-title" style="margin-top:14px;">Pagamento</p>
-        ${sale.payments.map((p) => `<div style="display:flex;justify-content:space-between;font-size:13px;"><span>${paymentMethodLabel(p)}</span><span>${formatMoney(p.amount)}</span></div>`).join('')}
+        ${sale.payments.map((p) => `
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span>${paymentMethodLabel(p)}</span><span>${formatMoney(p.amount)}</span></div>
+          ${p.interestAmount > 0.001 ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);"><span>Juro do parcelamento</span><span>+${formatMoney(p.interestAmount)}</span></div>` : ''}
+        `).join('')}
+        ${sale.creditInterestTotal > 0.001 ? `<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;"><span>Total com juro</span><span>${formatMoney(sale.total + sale.creditInterestTotal)}</span></div>` : ''}
         ${sale.refunds.length > 0 ? `
           <p class="section-title" style="margin-top:14px;">Estornos</p>
           ${sale.refunds.map((r) => `

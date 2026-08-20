@@ -57,10 +57,20 @@ cai no Painel normalmente.
   desconto por item e geral (com teto configurável por vendedor + aprovação
   de administrador acima do limite), pagamento misto (mais de uma forma na
   mesma venda, incluindo fiado e crédito de troca), com parcelamento (1x a
-  12x) pra pagamento em cartão de crédito — é só um registro no histórico,
-  o sistema não cobra nem calcula juros. O carrinho não se perde ao trocar
+  12x) pra pagamento em cartão de crédito. O carrinho não se perde ao trocar
   de tela (só some ao finalizar a venda, deslogar, ou pelo botão **Limpar
   carrinho**, que pede confirmação antes).
+- **Juro no parcelamento do cartão (opcional)** — configurável em Dados da
+  loja → Políticas de venda, exclusivo do Administrador Geral: até quantas
+  parcelas ficam isentas de juro (1x sempre é isento, não importa a
+  configuração) e a taxa acima disso, em % ao mês (multiplica pelas
+  parcelas) ou % fixo (igual não importa a quantidade). O vendedor nunca
+  digita nem edita essa taxa — ela é calculada sozinha ao escolher Cartão
+  de crédito e o número de parcelas, aparece na tela de venda, no recibo e
+  no histórico, e conta como faturamento normal nos relatórios. É o juro
+  que a própria loja decide repassar — diferente do juro que o banco
+  emissor do cartão do cliente pode aplicar por conta própria, que o
+  sistema não tem como saber (isso só a maquininha mostra, na hora).
 - **Impressão de recibo** — ao finalizar a venda, um aviso oferece imprimir
   o recibo na hora (ou reimprimir depois, pelo Histórico de vendas). Usa o
   diálogo de impressão do próprio navegador, então funciona com qualquer

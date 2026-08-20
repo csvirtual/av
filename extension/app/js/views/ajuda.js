@@ -91,7 +91,18 @@ const TOPICS = [
 
       <h3>Pagamento</h3>
       <p>Clique em <strong>+ Forma de pagamento</strong> quantas vezes precisar — dá pra dividir a mesma venda entre dinheiro, cartão de débito, cartão de crédito e Pix, por exemplo metade em dinheiro e metade no cartão. O botão de finalizar só libera quando a soma dos pagamentos bate exatamente com o total.</p>
-      <p>Escolheu <strong>Cartão de crédito</strong>? Aparece um seletor de <strong>parcelas</strong> (1x até 12x) do lado — é só pra registro, fica marcado no histórico da venda; o sistema não cobra nem calcula juros, isso é combinado direto na maquininha.</p>
+      <p>Escolheu <strong>Cartão de crédito</strong>? Aparece um seletor de <strong>parcelas</strong> (1x até 12x) do lado. A maquininha em si continua sendo um aparelho separado, sem nenhuma conexão com o sistema (veja por quê no tópico abaixo) — mas se a loja configurar um juro de parcelamento próprio (veja "Juro no parcelamento", logo adiante), ele já aparece calculado ali mesmo, embaixo da forma de pagamento.</p>
+
+      <h3>Juro no parcelamento</h3>
+      <p>Isso é opcional, e só o Administrador Geral configura — em <strong>Dados da loja → Juros no parcelamento do cartão de crédito</strong>. O vendedor nunca vê nem edita essa taxa na hora da venda: ela entra sozinha, calculada, ao escolher Cartão de crédito e o número de parcelas.</p>
+      <p><strong>1x (à vista no cartão) nunca tem juro</strong>, não importa a configuração — não é parcelamento de verdade, é só aceitar o cartão como forma de pagamento.</p>
+      <p>Duas coisas pra configurar:</p>
+      <ul>
+        <li><strong>Até quantas vezes sem juros</strong> (opcional) — marque a caixinha e diga até que parcela fica isento (ex: até 3x sem juros). Desmarcada, qualquer parcelamento (2x em diante) já cobra juro.</li>
+        <li><strong>Tipo de juro</strong> — <em>% ao mês</em> (multiplica pela quantidade de parcelas: mais parcelas, mais juro total, como financiamento de verdade) ou <em>% fixo</em> (o mesmo valor, não importa se são 2x ou 12x). Só um dos dois vale por vez.</li>
+      </ul>
+      <p>O juro calculado aparece na tela de venda, no recibo impresso e no detalhe da venda no Histórico — sempre discriminado à parte do valor dos produtos. Ele conta como faturamento normal nos relatórios, porque é dinheiro que realmente entra na loja.</p>
+      <div class="tip"><strong>Atenção:</strong> esse juro é o que a <em>loja</em> decide repassar — diferente do juro que o banco emissor do cartão do cliente pode aplicar por conta própria (esse aí o sistema nunca sabe, nem tem como calcular — só aparece direto na maquininha, na hora da transação). Configure aqui só se a sua loja realmente cobra juro próprio no parcelamento; se o parcelamento já é "sem juros" (o custo fica só com a loja, prática mais comum), deixe tudo zerado.</div>
 
       <h3>Imprimir recibo</h3>
       <p>Assim que a venda é finalizada, aparece um aviso com o botão <strong>🖨️ Imprimir recibo</strong> — ele abre o diálogo de impressão do próprio navegador, onde você escolhe a impressora (inclusive impressora térmica de cupom, se o computador já tiver uma instalada) ou "Salvar como PDF". Não precisa de nenhuma configuração extra no sistema: qualquer impressora que já funciona no computador funciona aqui.</p>

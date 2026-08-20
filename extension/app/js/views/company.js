@@ -69,6 +69,40 @@ export async function renderCompanySettings(container, ctx) {
           Exigir caixa aberto para registrar vendas
         </label>
 
+        <p class="section-title">Juros no parcelamento do cartão de crédito</p>
+        <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
+          Configurado só aqui — o vendedor nunca vê nem edita essa taxa na hora da venda, ela entra sozinha ao escolher Cartão de crédito e o número de parcelas. 1x (à vista no cartão) nunca tem juro, sempre.
+        </p>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin:10px 0 6px;">
+          <input type="checkbox" id="creditInterestFreeEnabled" ${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'checked' : ''}>
+          Até quantas vezes sem juros
+        </label>
+        <div class="field" id="creditInterestFreeBox" style="max-width:160px;display:${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'block' : 'none'};margin-bottom:14px;">
+          <input id="creditInterestFreeInstallments" type="number" min="1" max="12" step="1" value="${company.policies?.creditInterest?.freeInstallments ?? 1}">
+          <span class="hint">Vezes sem juros (contando o 1x, que já é sempre isento).</span>
+        </div>
+        <p class="text-muted" style="font-size:12.5px;margin:0 0 8px;">Desmarcado: qualquer parcelamento (2x em diante) já cobra juro.</p>
+
+        <div class="form-row" style="align-items:flex-start;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <input type="radio" name="creditInterestType" id="creditInterestTypeMonthly" value="monthly" ${(company.policies?.creditInterest?.type ?? 'monthly') === 'monthly' ? 'checked' : ''}>
+            % ao mês
+          </label>
+          <div class="field" style="max-width:120px;">
+            <input id="creditInterestMonthlyPercent" type="number" min="0" step="0.1" value="${company.policies?.creditInterest?.monthlyPercent ?? 0}">
+          </div>
+        </div>
+        <div class="form-row" style="align-items:flex-start;margin-bottom:16px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <input type="radio" name="creditInterestType" id="creditInterestTypeFixed" value="fixed" ${company.policies?.creditInterest?.type === 'fixed' ? 'checked' : ''}>
+            % fixo
+          </label>
+          <div class="field" style="max-width:120px;">
+            <input id="creditInterestFixedPercent" type="number" min="0" step="0.1" value="${company.policies?.creditInterest?.fixedPercent ?? 0}">
+          </div>
+        </div>
+        <span class="hint" style="display:block;margin:-8px 0 16px;">"% ao mês" multiplica pela quantidade de parcelas (mais parcelas, mais juro total). "% fixo" é o mesmo valor não importa quantas parcelas.</span>
+
         <p class="section-title">Fidelidade</p>
         <div class="form-row" style="max-width:520px;">
           <div class="field">
@@ -104,6 +138,27 @@ export async function renderCompanySettings(container, ctx) {
 
   const cnpjInput = document.getElementById('cnpj');
   cnpjInput.addEventListener('input', () => { cnpjInput.value = formatCnpj(cnpjInput.value); });
+
+  // Mostra/esconde o campo "até quantas vezes" junto com a caixinha, e
+  // trava o campo do tipo de juro que não está selecionado (rádio) — só
+  // um dos dois (% ao mês / % fixo) vale por vez.
+  const creditFreeEnabled = document.getElementById('creditInterestFreeEnabled');
+  const creditFreeBox = document.getElementById('creditInterestFreeBox');
+  creditFreeEnabled.addEventListener('change', () => {
+    creditFreeBox.style.display = creditFreeEnabled.checked ? 'block' : 'none';
+  });
+
+  const creditMonthlyRadio = document.getElementById('creditInterestTypeMonthly');
+  const creditFixedRadio = document.getElementById('creditInterestTypeFixed');
+  const creditMonthlyInput = document.getElementById('creditInterestMonthlyPercent');
+  const creditFixedInput = document.getElementById('creditInterestFixedPercent');
+  function syncCreditInterestTypeFields() {
+    creditMonthlyInput.disabled = !creditMonthlyRadio.checked;
+    creditFixedInput.disabled = !creditFixedRadio.checked;
+  }
+  creditMonthlyRadio.addEventListener('change', syncCreditInterestTypeFields);
+  creditFixedRadio.addEventListener('change', syncCreditInterestTypeFields);
+  syncCreditInterestTypeFields();
 
   document.getElementById('company-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -143,6 +198,13 @@ export async function renderCompanySettings(container, ctx) {
         requireOpenCashSession: document.getElementById('requireCashSession').checked,
         loyaltyPointsPerReal: Math.max(0, Number(document.getElementById('loyaltyPointsPerReal').value) || 0),
         loyaltyRedemptionRate: Math.max(1, Number(document.getElementById('loyaltyRedemptionRate').value) || 100),
+        creditInterest: {
+          freeInstallmentsEnabled: document.getElementById('creditInterestFreeEnabled').checked,
+          freeInstallments: Math.max(1, Math.min(12, Math.floor(Number(document.getElementById('creditInterestFreeInstallments').value)) || 1)),
+          type: document.getElementById('creditInterestTypeFixed').checked ? 'fixed' : 'monthly',
+          monthlyPercent: Math.max(0, Number(document.getElementById('creditInterestMonthlyPercent').value) || 0),
+          fixedPercent: Math.max(0, Number(document.getElementById('creditInterestFixedPercent').value) || 0),
+        },
       },
       endereco: {
         logradouro: document.getElementById('logradouro').value.trim(),

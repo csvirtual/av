@@ -13,18 +13,30 @@ function netSaleTotal(sale) {
   return sale.total - sale.refundedTotal;
 }
 
+// Inclui o juro de parcelamento no cartão (repassado pro cliente — ver
+// utils/pricing.js#computeCreditInterest) — é dinheiro real que entra na
+// loja além do valor dos produtos, então conta no faturamento total e por
+// vendedor. Só usado nesses dois agregados: a divisão por produto/categoria
+// e curva ABC abaixo continua usando netSaleTotal() puro (sem juro), porque
+// juro é um valor da venda inteira, não de um item — misturar ele na
+// proporção por item inflaria a receita atribuída a cada produto sem
+// nenhum sentido.
+function netSaleTotalWithInterest(sale) {
+  return netSaleTotal(sale) + (sale.creditInterestTotal || 0);
+}
+
 export async function computeSalesReport({ from = null, to = null } = {}) {
   const allSales = await listSales();
   const sales = allSales.filter((s) => (!from || s.timestamp >= from) && (!to || s.timestamp <= to));
 
-  const totalRevenue = sales.reduce((sum, s) => sum + netSaleTotal(s), 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + netSaleTotalWithInterest(s), 0);
   const totalCount = sales.length;
   const avgTicket = totalCount > 0 ? totalRevenue / totalCount : 0;
 
   const bySellerMap = {};
   for (const s of sales) {
     if (!bySellerMap[s.userId]) bySellerMap[s.userId] = { userId: s.userId, userName: s.userName, revenue: 0, count: 0 };
-    bySellerMap[s.userId].revenue += netSaleTotal(s);
+    bySellerMap[s.userId].revenue += netSaleTotalWithInterest(s);
     bySellerMap[s.userId].count += 1;
   }
   const bySeller = Object.values(bySellerMap).sort((a, b) => b.revenue - a.revenue);

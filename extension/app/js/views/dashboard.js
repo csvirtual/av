@@ -24,10 +24,15 @@ export async function renderDashboard(container, ctx) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const salesToday = sales.filter((s) => s.timestamp >= startOfDay.getTime());
+  // Inclui o juro de parcelamento no cartão (repassado pro cliente) — é
+  // dinheiro real recebido, então conta no faturamento aqui igual conta em
+  // Relatórios (ver data/reportsRepo.js#netSaleTotalWithInterest, mesmo
+  // cálculo replicado aqui pra não criar uma dependência cruzada de tela).
+  const netWithInterest = (s) => (s.total - s.refundedTotal) + (s.creditInterestTotal || 0);
   // Faturado líquido: desconta estornos já feitos hoje sobre vendas de hoje.
   // Estorno de uma venda de outro dia não mexe no "hoje" (é a venda que
   // define a data, não o estorno) — mantém o painel simples e previsível.
-  const totalToday = salesToday.reduce((sum, s) => sum + (s.total - s.refundedTotal), 0);
+  const totalToday = salesToday.reduce((sum, s) => sum + netWithInterest(s), 0);
 
   const recentSales = sales.slice(0, 8);
 
@@ -104,7 +109,7 @@ function renderSalesTable(sales) {
               <td>${formatDateTime(s.timestamp)}</td>
               <td>${escapeHtml(s.userName)}</td>
               <td>${s.items.length}</td>
-              <td>${formatMoney(s.total - s.refundedTotal)}</td>
+              <td>${formatMoney((s.total - s.refundedTotal) + (s.creditInterestTotal || 0))}</td>
             </tr>
           `).join('')}
         </tbody>

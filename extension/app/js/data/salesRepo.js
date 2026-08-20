@@ -15,10 +15,11 @@ import { recordDebt } from './customersRepo.js';
 import { recordEarn, recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
 import { getCompany } from './companyRepo.js';
 import { verifyLogin } from './usersRepo.js';
-import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
+import { applyDiscount, computeCartTotals, computeCreditInterest } from '../utils/pricing.js';
 
 const PAYMENT_TOLERANCE = 0.01; // arredondamento de centavos
 const FIADO_METHOD = 'Fiado';
+const CREDIT_CARD_METHOD = 'Cartão de crédito';
 
 /** Registra uma venda completa: confere estoque de cada item, calcula
  * descontos (por item e geral), debita a quantidade vendida e grava o
@@ -131,12 +132,13 @@ export async function createSale({
     throw new Error(`Os pagamentos (${paymentsTotal.toFixed(2)}) não somam o total da venda (${total.toFixed(2)}).`);
   }
 
+  const company = await getCompany();
+
   // Desconto acima do limite do vendedor exige autorização de um
   // administrador — verificada de verdade aqui (usuário + senha
   // conferidos contra o hash gravado), não só confiada de quem chamou.
   let discountApprovedBy = null;
   if (userRole !== 'admin') {
-    const company = await getCompany();
     const maxPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
     if (totalDiscountPercent > maxPercent + 0.001) {
       if (!discountApproval || !discountApproval.username || !discountApproval.password) {
@@ -149,6 +151,25 @@ export async function createSale({
       discountApprovedBy = admin.id;
     }
   }
+
+  // Juro de parcelamento no cartão de crédito (utils/pricing.js) —
+  // calculado AQUI, de novo, a partir da política gravada agora mesmo em
+  // Dados da loja, nunca confiando em nada que a tela tenha mandado (a
+  // tela já mostra o mesmo cálculo pro vendedor antes de finalizar, só
+  // pra dar feedback — quem decide de verdade é sempre esta função,
+  // mesmo padrão já usado pra aprovação de desconto acima). `amount` de
+  // cada pagamento continua sendo só a parte do total da venda coberta
+  // por aquela forma — o juro é gravado à parte, não entra na conferência
+  // de paymentsTotal === total logo acima.
+  const paymentsWithInterest = payments.map((p) => {
+    const amount = Number(p.amount) || 0;
+    const installments = Math.max(1, Math.floor(Number(p.installments)) || 1);
+    const interest = p.method === CREDIT_CARD_METHOD
+      ? computeCreditInterest(amount, installments, company?.policies)
+      : { interestAmount: 0 };
+    return { method: p.method, amount, installments, interestAmount: interest.interestAmount };
+  });
+  const creditInterestTotal = paymentsWithInterest.reduce((sum, p) => sum + p.interestAmount, 0);
 
   const sale = {
     id: newId(),
@@ -164,8 +185,14 @@ export async function createSale({
     // installments (parcelas) só faz sentido pra cartão de crédito, mas fica
     // gravado em todo pagamento — sempre 1 quando não se aplica — pra manter
     // o formato do registro previsível em vez de um campo que às vezes existe
-    // e às vezes não.
-    payments: payments.map((p) => ({ method: p.method, amount: Number(p.amount) || 0, installments: Math.max(1, Math.floor(Number(p.installments)) || 1) })),
+    // e às vezes não. interestAmount idem: sempre 0 fora do cartão.
+    payments: paymentsWithInterest,
+    // Juro total cobrado do cliente pelo parcelamento — dinheiro real que
+    // entra na loja além do valor dos produtos, por isso conta como
+    // faturamento normal nos relatórios (ver data/reportsRepo.js). Fica
+    // separado de `total` pra manter `total` sempre igual à soma dos
+    // itens/descontos (o que a tela de venda mostra e valida acima).
+    creditInterestTotal,
     discountApprovedBy,
     cashSessionId,
     customerId,

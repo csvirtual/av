@@ -69,7 +69,10 @@ function buildReceiptHtml(sale, company, customerName) {
 
   const paymentsHtml = sale.payments.map((p) => {
     const installments = p.method === 'Cartão de crédito' && p.installments > 1 ? ` (${p.installments}x)` : '';
-    return `<div class="r-row"><span>${escapeHtml(p.method)}${installments}</span><span>${formatMoney(p.amount)}</span></div>`;
+    const interestRow = p.interestAmount > 0.001
+      ? `<div class="r-row r-small"><span>Juro do parcelamento</span><span>+${formatMoney(p.interestAmount)}</span></div>`
+      : '';
+    return `<div class="r-row"><span>${escapeHtml(p.method)}${installments}</span><span>${formatMoney(p.amount)}</span></div>${interestRow}`;
   }).join('');
 
   const refundsHtml = sale.refunds && sale.refunds.length > 0 ? `
@@ -125,6 +128,7 @@ function buildReceiptHtml(sale, company, customerName) {
       <div class="r-sep"></div>
       <div class="r-section-title">Pagamento</div>
       ${paymentsHtml}
+      ${sale.creditInterestTotal > 0.001 ? `<div class="r-row" style="font-weight:700;"><span>Total com juro do parcelamento</span><span>${formatMoney(sale.total + sale.creditInterestTotal)}</span></div>` : ''}
 
       ${refundsHtml}
 

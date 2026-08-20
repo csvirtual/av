@@ -18,7 +18,7 @@ import { searchCustomers, createCustomer, getCustomerBalance } from '../data/cus
 import { getPendingCredit, setPendingCredit, clearPendingCredit } from '../session.js';
 import { bindBarcodeInput, installGlobalScannerListener } from '../utils/barcode.js';
 import { formatMoney, escapeHtml } from '../utils/format.js';
-import { applyDiscount, computeCartTotals } from '../utils/pricing.js';
+import { applyDiscount, computeCartTotals, computeCreditInterest } from '../utils/pricing.js';
 import { showToast } from '../components/toast.js';
 import { openModal, confirmDialog } from '../components/modal.js';
 import { printSaleReceipt } from '../components/receipt.js';
@@ -417,6 +417,23 @@ export async function renderSale(container, ctx) {
 
   const PAYMENT_TOLERANCE_UI = 0.01;
 
+  // Juro de parcelamento no cartão (ver utils/pricing.js) — sempre
+  // calculado a partir da política configurada em Dados da loja, nunca
+  // digitado nem editável aqui na venda. `p.amount` continua sendo a
+  // parte do total da venda coberta por aquela forma de pagamento (é isso
+  // que precisa somar com as outras linhas pra bater com o total do
+  // carrinho); o juro é um valor A MAIS, cobrado do cliente em cima
+  // disso — não entra na conta de "pagamento completo" do carrinho, mas
+  // conta no total final que sai do cartão dele.
+  function paymentInterest(p) {
+    if (p.method !== CREDIT_CARD_METHOD) return { interestAmount: 0, totalWithInterest: p.amount, ratePercent: 0 };
+    return computeCreditInterest(p.amount, p.installments || 1, company.policies);
+  }
+
+  function totalCreditInterest() {
+    return payments.reduce((sum, p) => sum + paymentInterest(p).interestAmount, 0);
+  }
+
   function renderPayments() {
     const { total } = currentTotals();
     const sum = paymentsSum();
@@ -430,6 +447,7 @@ export async function renderSale(container, ctx) {
         // crédito) — pra trocar de forma, remove a linha e usa o banner.
         const options = p.method === CREDIT_METHOD ? [CREDIT_METHOD, ...PAYMENT_METHODS] : PAYMENT_METHODS;
         const isCreditCard = p.method === CREDIT_CARD_METHOD;
+        const interest = paymentInterest(p);
         return `
         <div class="payment-row">
           <select data-pay-method="${idx}" class="payment-method-select" ${p.method === CREDIT_METHOD ? 'disabled' : ''}>
@@ -443,6 +461,11 @@ export async function renderSale(container, ctx) {
           <input type="number" class="payment-amount-input" min="0" step="0.01" value="${p.amount.toFixed(2)}" data-pay-idx="${idx}">
           <button class="btn btn-ghost btn-sm" data-pay-remove="${idx}">✕</button>
         </div>
+        ${isCreditCard ? (
+          interest.interestAmount > 0.001
+            ? `<div class="text-muted" style="font-size:12px;margin:-4px 0 6px;text-align:right;">+ ${formatMoney(interest.interestAmount)} de juro (${interest.ratePercent.toFixed(1)}%) — total no cartão: <strong>${formatMoney(interest.totalWithInterest)}</strong></div>`
+            : `<div class="text-muted" style="font-size:12px;margin:-4px 0 6px;text-align:right;">Sem juro nesse parcelamento</div>`
+        ) : ''}
       `;
       }).join('');
 
@@ -457,6 +480,10 @@ export async function renderSale(container, ctx) {
     paymentsBox.querySelectorAll('[data-pay-installments]').forEach((select) => {
       select.addEventListener('change', () => {
         payments[Number(select.dataset.payInstallments)].installments = Number(select.value);
+        // Precisa re-renderizar (diferente das outras trocas de campo) —
+        // mudar a quantidade de parcelas muda o juro calculado embaixo,
+        // que só aparece de novo com um render completo desta função.
+        renderPayments();
       });
     });
     paymentsBox.querySelectorAll('[data-pay-idx]').forEach((input) => {
@@ -489,6 +516,14 @@ export async function renderSale(container, ctx) {
         ? `<span style="color:var(--danger);">Excedeu em ${formatMoney(-remaining)}</span>`
         : `<span style="color:var(--success);">Pagamento completo ✓</span>`;
     paymentsBox.insertAdjacentHTML('beforeend', `<div style="font-size:13px;font-weight:600;margin-top:8px;text-align:right;">${label}</div>`);
+
+    // Total de juro somado de todas as linhas de cartão — é dinheiro A
+    // MAIS que o cliente paga, em cima do valor da venda (não faz parte
+    // do "pagamento completo" acima, que só olha o valor do carrinho).
+    const interestSum = totalCreditInterest();
+    if (interestSum > 0.001) {
+      paymentsBox.insertAdjacentHTML('beforeend', `<div class="text-muted" style="font-size:12.5px;margin-top:4px;text-align:right;">Total com juro do parcelamento: <strong>${formatMoney(total + interestSum)}</strong></div>`);
+    }
 
     const disableFinalize = cart.length === 0 || Math.abs(remaining) > PAYMENT_TOLERANCE_UI;
     finalizeBtn.disabled = disableFinalize;

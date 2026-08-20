@@ -80,6 +80,34 @@ function buildCompanyRecord(data, existing) {
       loyaltyRedemptionRate: data.policies?.loyaltyRedemptionRate
         ?? existing?.policies?.loyaltyRedemptionRate
         ?? 100,
+      // Juro de parcelamento no cartão de crédito, repassado pro cliente —
+      // configurado só aqui (Administrador Geral), nunca pelo vendedor na
+      // hora da venda (ver utils/pricing.js#computeCreditInterest e o
+      // tópico "Vendas (PDV)" na Ajuda). 1x nunca tem juro, sempre, não
+      // importa esta configuração.
+      creditInterest: {
+        // Se true, `freeInstallments` parcelas (a partir da 2ª) ficam sem
+        // juro antes de começar a cobrar. Se false, qualquer parcelamento
+        // (2x em diante) já cobra juro.
+        freeInstallmentsEnabled: data.policies?.creditInterest?.freeInstallmentsEnabled
+          ?? existing?.policies?.creditInterest?.freeInstallmentsEnabled
+          ?? false,
+        freeInstallments: data.policies?.creditInterest?.freeInstallments
+          ?? existing?.policies?.creditInterest?.freeInstallments
+          ?? 1,
+        // 'monthly' — percentual ao mês, multiplicado pelas parcelas (mais
+        // parcelas = mais juro total). 'fixed' — percentual único, igual
+        // não importa quantas parcelas.
+        type: data.policies?.creditInterest?.type
+          ?? existing?.policies?.creditInterest?.type
+          ?? 'monthly',
+        monthlyPercent: data.policies?.creditInterest?.monthlyPercent
+          ?? existing?.policies?.creditInterest?.monthlyPercent
+          ?? 0,
+        fixedPercent: data.policies?.creditInterest?.fixedPercent
+          ?? existing?.policies?.creditInterest?.fixedPercent
+          ?? 0,
+      },
     },
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),
