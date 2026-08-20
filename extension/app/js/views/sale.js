@@ -36,16 +36,36 @@ const MAX_INSTALLMENTS = 12; // padrão comum de "parcelamento sem juros" no var
 // vezes ao mesmo tempo.
 let stopGlobalScanner = null;
 
+// Estado da venda em andamento, fora da função de renderização de
+// propósito: o roteador (app.js) apaga e redesenha a tela do zero a cada
+// troca de menu, então qualquer coisa declarada só dentro de renderSale()
+// nasceria de novo (vazia) toda vez que o vendedor saísse de "Nova venda"
+// e voltasse — inclusive só pra checar algo em Estoque no meio de uma
+// venda. Ficando aqui fora, essas variáveis sobrevivem à troca de tela: o
+// carrinho continua exatamente onde estava ao voltar. São resetadas só em
+// dois momentos: ao finalizar a venda (fim de commitSale) e ao trocar de
+// usuário logado (resetSaleDraft(), chamada pelo app.js no logout/troca de
+// sessão — sem isso, o próximo usuário a logar veria o carrinho de quem
+// saiu).
+let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
+let overallDiscountType = null;
+let overallDiscountValue = 0;
+let payments = []; // [{ method, amount }]
+let selectedCustomer = null;
+
+export function resetSaleDraft() {
+  cart = [];
+  overallDiscountType = null;
+  overallDiscountValue = 0;
+  payments = [];
+  selectedCustomer = null;
+}
+
 export async function renderSale(container, ctx) {
   stopGlobalScanner?.();
   stopGlobalScanner = null;
 
-  let cart = []; // [{ productId, name, barcode, unit, unitPrice, qtyAvailable, qty, discountType, discountValue }]
-  let overallDiscountType = null;
-  let overallDiscountValue = 0;
-  let payments = []; // [{ method, amount }]
   let pendingCredit = await getPendingCredit();
-  let selectedCustomer = null;
 
   const company = await getCompany();
   const vendorMaxDiscountPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
@@ -92,7 +112,10 @@ export async function renderSale(container, ctx) {
         <div id="customer-box"></div>
       </div>
       <div class="card">
-        <p class="section-title mt-0">Carrinho</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <p class="section-title mt-0" style="margin-bottom:0;">Carrinho</p>
+          <div id="clear-cart-box"></div>
+        </div>
         <div id="cart-box"></div>
 
         <div id="totals-box"></div>
@@ -112,6 +135,7 @@ export async function renderSale(container, ctx) {
   const creditBanner = document.getElementById('credit-banner');
   const customerBox = document.getElementById('customer-box');
   const cartBox = document.getElementById('cart-box');
+  const clearCartBox = document.getElementById('clear-cart-box');
   const totalsBox = document.getElementById('totals-box');
   const paymentsBox = document.getElementById('payments-box');
   const finalizeBtn = document.getElementById('finalize-btn');
@@ -229,6 +253,32 @@ export async function renderSale(container, ctx) {
   }
 
   function renderCart() {
+    // Botão "Limpar carrinho" só aparece com pelo menos 1 item — sem
+    // sentido oferecer limpar um carrinho que já está vazio.
+    clearCartBox.innerHTML = cart.length > 0
+      ? '<button class="btn btn-ghost btn-sm" id="clear-cart-btn" type="button">🗑️ Limpar carrinho</button>'
+      : '';
+    const clearCartBtn = document.getElementById('clear-cart-btn');
+    if (clearCartBtn) {
+      clearCartBtn.addEventListener('click', async () => {
+        const ok = await confirmDialog({
+          title: 'Limpar carrinho',
+          message: 'Isso remove todos os itens, o desconto geral e as formas de pagamento já adicionadas nesta venda. O cliente selecionado continua o mesmo. Quer continuar?',
+          confirmLabel: 'Limpar carrinho',
+          danger: true,
+        });
+        if (!ok) return;
+        cart = [];
+        overallDiscountType = null;
+        overallDiscountValue = 0;
+        payments = [];
+        renderAll();
+        resultsBox.innerHTML = '';
+        scanInput.value = '';
+        scanInput.focus();
+      });
+    }
+
     if (cart.length === 0) {
       cartBox.innerHTML = '<div class="empty-cart">Carrinho vazio. Escaneie um produto para começar.</div>';
     } else {

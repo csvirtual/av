@@ -83,6 +83,7 @@ const TOPICS = [
       <h3>Adicionar produtos ao carrinho</h3>
       <p>Na tela <strong>Nova venda</strong>, o campo de busca já fica pronto pra usar. Escaneie o código de barras, ou digite o nome do produto e clique em "Adicionar" na lista que aparece.</p>
       <p>Escaneou o mesmo produto de novo? A quantidade dele no carrinho aumenta sozinha, em vez de criar uma linha nova.</p>
+      <div class="tip"><strong>O carrinho não some se você trocar de tela.</strong> Precisou conferir algo em Estoque ou olhar o Painel no meio de uma venda? Pode ir e voltar à vontade — o carrinho, o desconto e as formas de pagamento continuam exatamente do jeito que estavam. Ele só é esvaziado de verdade ao finalizar a venda, ao deslogar, ou clicando no botão <strong>🗑️ Limpar carrinho</strong> (canto superior direito do carrinho, aparece só quando tem pelo menos 1 item) — que pede confirmação antes, pra não perder a venda sem querer.</div>
 
       <h3>Desconto</h3>
       <p>Cada linha do carrinho tem um botão <strong>% desconto</strong> — dá pra descontar em percentual ou em valor fixo (reais), só naquele item. Também existe um <strong>desconto geral</strong>, logo abaixo da lista, que se aplica sobre o total inteiro da venda.</p>
@@ -341,6 +342,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <h3>Relatórios</h3>
       <p>Em <strong>Relatórios</strong>, escolha um período (hoje, últimos 7/30 dias, personalizado ou desde o início) e veja: faturamento total, número de vendas, ticket médio, vendas por vendedor, vendas por categoria, e a <strong>curva ABC</strong> de produtos — os itens que mais geram receita (A), os intermediários (B) e os que menos vendem (C).</p>
       <p>A margem de lucro mostrada é uma <strong>estimativa</strong>: usa o preço de custo atual de cada produto, mesmo pra vendas antigas — se o custo mudou desde então, o valor exato daquela época pode ser um pouco diferente.</p>
+      <p>Quer guardar ou enviar o relatório? Clique em <strong>🖨️ Exportar PDF</strong>, ao lado do seletor de período — abre o diálogo de impressão do navegador, já formatado pra folha (A4/Carta), com todas as tabelas do período escolhido. Escolha "Salvar como PDF" no próprio diálogo, ou uma impressora de verdade se preferir uma cópia em papel.</p>
 
       <h3>Programa de fidelidade</h3>
       <p>Fica desligado por padrão. Pra ativar, vá em <strong>Dados da loja → Políticas de venda → Fidelidade</strong> e defina quantos pontos o cliente ganha por real gasto. A partir daí, toda venda com cliente selecionado já soma pontos sozinha — não precisa de nenhuma ação extra na hora de vender.</p>

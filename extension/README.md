@@ -58,7 +58,9 @@ cai no Painel normalmente.
   de administrador acima do limite), pagamento misto (mais de uma forma na
   mesma venda, incluindo fiado e crédito de troca), com parcelamento (1x a
   12x) pra pagamento em cartão de crédito — é só um registro no histórico,
-  o sistema não cobra nem calcula juros.
+  o sistema não cobra nem calcula juros. O carrinho não se perde ao trocar
+  de tela (só some ao finalizar a venda, deslogar, ou pelo botão **Limpar
+  carrinho**, que pede confirmação antes).
 - **Impressão de recibo** — ao finalizar a venda, um aviso oferece imprimir
   o recibo na hora (ou reimprimir depois, pelo Histórico de vendas). Usa o
   diálogo de impressão do próprio navegador, então funciona com qualquer
@@ -91,6 +93,9 @@ cai no Painel normalmente.
   baixa de pagamento.
 - **Relatórios** — faturamento, ticket médio, vendas por vendedor e por
   categoria, margem de lucro estimada e curva ABC de produtos, por período.
+  Dá pra exportar em PDF (botão **Exportar PDF**, ao lado do seletor de
+  período) — mesmo diálogo de impressão do navegador usado no recibo,
+  formatado pra folha A4/Carta.
 - **Fidelidade** — programa opcional de pontos por real gasto, resgatável
   como crédito de troca.
 - **Log de auditoria** — toda ação relevante do sistema (login, cadastros,

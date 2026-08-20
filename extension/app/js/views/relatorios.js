@@ -1,7 +1,9 @@
 // Relatórios gerenciais — exclusivo do administrador, envolve margem de
 // lucro (calculada a partir do preço de custo, um dado sensível).
 import { computeSalesReport } from '../data/reportsRepo.js';
-import { formatMoney, escapeHtml } from '../utils/format.js';
+import { getCompany } from '../data/companyRepo.js';
+import { formatMoney, formatDate, escapeHtml } from '../utils/format.js';
+import { printReport } from '../components/reportPrint.js';
 
 const CURVE_BADGE = { A: 'badge-green', B: 'badge-gold', C: 'badge-gray' };
 
@@ -21,6 +23,7 @@ export async function renderRelatorios(container) {
         <option value="all">Desde o início</option>
         <option value="custom">Período personalizado</option>
       </select>
+      <button class="btn btn-secondary btn-sm" id="export-report-pdf-btn" type="button">🖨️ Exportar PDF</button>
       <label class="text-muted" style="font-size:13px;" id="custom-from-label">De <input type="date" id="date-from"></label>
       <label class="text-muted" style="font-size:13px;" id="custom-to-label">Até <input type="date" id="date-to"></label>
     </div>
@@ -53,6 +56,25 @@ export async function renderRelatorios(container) {
         return { from, to };
       }
       default: return { from: null, to: null };
+    }
+  }
+
+  // Texto legível do período selecionado, pra mostrar no cabeçalho do PDF
+  // exportado — espelha as mesmas opções de currentRange(), incluindo o
+  // caso "personalizado" com as datas escolhidas.
+  function periodLabel() {
+    switch (presetSelect.value) {
+      case 'today': return 'Hoje';
+      case '7': return 'Últimos 7 dias';
+      case '30': return 'Últimos 30 dias';
+      case 'all': return 'Desde o início';
+      case 'custom': {
+        const { from, to } = currentRange();
+        const de = from ? formatDate(from) : '—';
+        const ate = to ? formatDate(to) : '—';
+        return `${de} até ${ate}`;
+      }
+      default: return '';
     }
   }
 
@@ -130,6 +152,20 @@ export async function renderRelatorios(container) {
   presetSelect.addEventListener('change', () => { toggleCustomInputs(); refresh(); });
   fromInput.addEventListener('change', refresh);
   toInput.addEventListener('change', refresh);
+
+  document.getElementById('export-report-pdf-btn').addEventListener('click', async () => {
+    // Recalcula na hora do clique (em vez de guardar o último relatório
+    // renderizado) — garante que o PDF sempre reflete o período
+    // selecionado no momento, mesmo que o usuário tenha mexido nos campos
+    // de data personalizada sem disparar o "change" ainda (ex: só saiu do
+    // campo clicando direto no botão).
+    const { from, to } = currentRange();
+    const [report, company] = await Promise.all([
+      computeSalesReport({ from, to }),
+      getCompany(),
+    ]);
+    printReport({ report, periodLabel: periodLabel(), company });
+  });
 
   refresh();
 }

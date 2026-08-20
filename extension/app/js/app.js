@@ -16,7 +16,7 @@ import { renderSetup } from './views/setup.js';
 import { renderLogin } from './views/login.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderProducts } from './views/products.js';
-import { renderSale } from './views/sale.js';
+import { renderSale, resetSaleDraft } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
 import { renderCaixa } from './views/caixa.js';
 import { renderClientes } from './views/clientes.js';
@@ -60,6 +60,12 @@ let unmountLogin = null;
 // empilharia mais um conjunto de listeners de atividade + intervalo,
 // nunca desligados.
 let stopIdleWatch = null;
+
+// Mesmo motivo do stopIdleWatch acima: o botão "voltar ao topo" escuta
+// scroll na window (que sobrevive a root.innerHTML ser reescrito), então
+// precisa ser desligado explicitamente antes de renderShell montar um novo
+// — senão cada chamada empilharia mais um listener de scroll.
+let stopScrollTopWatch = null;
 
 // boot() pode ser chamado mais de uma vez quase ao mesmo tempo pro MESMO
 // evento de login/logout — o próprio login.js chama boot() direto ao
@@ -109,6 +115,11 @@ async function bootImpl() {
   if (currentUser && !currentUser.active) currentUser = null;
 
   if (!currentUser) {
+    // Limpa o carrinho de venda em andamento (ver comentário em sale.js)
+    // aqui, no único ponto que cobre logout manual, timeout de
+    // inatividade e qualquer outro caminho que volte pro login — sem
+    // isso, o próximo usuário a logar veria o carrinho de quem saiu.
+    resetSaleDraft();
     // onLogin não chama boot() de propósito — login.js já chama
     // setSessionUserId(), que sozinho dispara o listener de sessão (ver
     // onSessionUserIdChanged mais abaixo) e re-renderiza esta aba. Chamar
@@ -143,6 +154,7 @@ function renderShell(user, company) {
   // da chamada anterior antes de montar um novo, senão cada chamada
   // empilha mais um conjunto de listeners de atividade + intervalo.
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
+  if (stopScrollTopWatch) { stopScrollTopWatch(); stopScrollTopWatch = null; }
 
   root.innerHTML = `
     <div class="shell">
@@ -162,7 +174,24 @@ function renderShell(user, company) {
       </nav>
       <main class="main" id="main-content"></main>
     </div>
+    <button class="scroll-top-btn" id="scroll-top-btn" type="button" aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>
   `;
+
+  // Botão flutuante "voltar ao topo" — funciona em qualquer tela (fica
+  // fora de #main-content, então sobrevive à troca de rota) e só aparece
+  // quando há de fato o que rolar: some sozinho perto do topo da página,
+  // pra não ficar poluindo telas curtas que não precisam dele.
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  const SCROLL_TOP_SHOW_AT = 400;
+  const onScroll = () => {
+    scrollTopBtn.classList.toggle('visible', window.scrollY > SCROLL_TOP_SHOW_AT);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  scrollTopBtn.addEventListener('click', () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  onScroll(); // estado inicial correto se o shell já nascer rolado (ex: refreshShell)
+  stopScrollTopWatch = () => window.removeEventListener('scroll', onScroll);
 
   // Menu lateral em tela estreita vira uma gaveta (ver breakpoint 900px em
   // styles.css) — o botão ☰ e o véu por trás só ficam visíveis nesse modo,

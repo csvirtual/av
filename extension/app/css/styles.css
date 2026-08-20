@@ -492,6 +492,46 @@ tbody tr:hover { background: var(--surface-alt); }
 .modal h2 { margin: 0 0 18px; font-size: 18px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
+/* ---------- Botão "voltar ao topo" ----------
+ * Fica um pouco mais alto que o canto do toast (bottom:18px/right:18px
+ * logo abaixo) de propósito, pra um toast aparecendo não cobrir o botão
+ * bem na hora do clique — os dois moram no mesmo canto, mas em alturas
+ * diferentes. z-index abaixo do toast (200): se algum dia empilhar toast
+ * demais e ainda assim encostar, a mensagem tem prioridade visual. */
+.scroll-top-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 84px;
+  z-index: 190;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.scroll-top-btn.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.scroll-top-btn:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
 /* ---------- Toast ---------- */
 .toast-root {
   position: fixed;
@@ -852,8 +892,9 @@ input.customer-search-input:focus {
 
 @media print {
   body * { visibility: hidden; }
-  #print-receipt-root, #print-receipt-root * { visibility: visible; }
-  #print-receipt-root {
+  #print-receipt-root, #print-receipt-root *,
+  #print-report-root, #print-report-root * { visibility: visible; }
+  #print-receipt-root, #print-report-root {
     display: block;
     position: absolute;
     top: 0;
@@ -955,4 +996,41 @@ input.customer-search-input:focus {
   }
   .r-cell-name { font-weight: 600; }
   .r-cell-unit.r-cell-unit-redundant { display: block; } /* tabela de verdade: coluna "Unitário" sempre visível, é convenção normal de recibo/nota */
+
+  /* ---------- Exportar relatório em PDF (components/reportPrint.js) ----------
+   * Só existe nesta variante larga de propósito: ninguém exporta um
+   * relatório gerencial numa bobina de 58/80mm — ao contrário do recibo,
+   * não precisa de layout estreito alternativo. */
+  .rp-sheet {
+    font-family: -apple-system, 'Segoe UI', system-ui, Roboto, Arial, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #000;
+    max-width: 190mm;
+    margin: 0 auto;
+  }
+  .rp-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .rp-store-name { font-size: 18px; font-weight: 700; }
+  .rp-store-meta { font-size: 11px; color: #555; margin-top: 2px; }
+  .rp-title-block { text-align: right; }
+  .rp-title { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .rp-sep { border-top: 1px solid #ccc; margin: 14px 0; }
+
+  .rp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  .rp-stat { border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; }
+  .rp-stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #666; margin-bottom: 3px; }
+  .rp-stat-value { font-size: 15px; font-weight: 700; }
+
+  .rp-section-title { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; margin: 18px 0 6px; }
+  .rp-note { font-size: 10.5px; color: #666; margin: -4px 0 8px; }
+  .rp-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  .rp-table th, .rp-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+  .rp-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #555; border-bottom: 1.5px solid #000; }
+  .rp-table td.rp-empty { color: #777; font-style: italic; }
+  .rp-center { text-align: center; }
+
+  /* Evita cortar uma linha de tabela ao meio entre duas páginas — cada
+   * bloco (stats + as 3 tabelas) tenta quebrar de página inteiro. */
+  .rp-table tr { break-inside: avoid; }
+  .rp-section-title { break-after: avoid; }
 }
