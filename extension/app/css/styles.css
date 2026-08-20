@@ -919,7 +919,7 @@ input.customer-search-input:focus {
    unitário/total) — só a disposição delas muda entre os dois layouts, o
    conteúdo é sempre o mesmo.
    ========================================================================== */
-#print-receipt-root { display: none; }
+#print-receipt-root, #print-report-root { display: none; }
 
 @media print {
   body * { visibility: hidden; }
