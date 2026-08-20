@@ -77,9 +77,9 @@ export async function renderCompanySettings(container, ctx) {
           <input type="checkbox" id="creditInterestFreeEnabled" ${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'checked' : ''}>
           Até quantas vezes sem juros
         </label>
-        <div class="field" id="creditInterestFreeBox" style="max-width:160px;display:${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'block' : 'none'};margin-bottom:14px;">
-          <input id="creditInterestFreeInstallments" type="number" min="1" max="12" step="1" value="${company.policies?.creditInterest?.freeInstallments ?? 1}">
-          <span class="hint">Vezes sem juros (contando o 1x, que já é sempre isento).</span>
+        <div class="field" id="creditInterestFreeBox" style="display:${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'flex' : 'none'};align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+          <input id="creditInterestFreeInstallments" type="number" min="1" max="12" step="1" style="width:70px;flex-shrink:0;" value="${company.policies?.creditInterest?.freeInstallments ?? 1}">
+          <span class="hint" style="margin:0;">vezes sem juros (contando o 1x, que já é sempre isento).</span>
         </div>
         <p class="text-muted" style="font-size:12.5px;margin:0 0 8px;">Desmarcado: qualquer parcelamento (2x em diante) já cobra juro.</p>
 
@@ -145,7 +145,7 @@ export async function renderCompanySettings(container, ctx) {
   const creditFreeEnabled = document.getElementById('creditInterestFreeEnabled');
   const creditFreeBox = document.getElementById('creditInterestFreeBox');
   creditFreeEnabled.addEventListener('change', () => {
-    creditFreeBox.style.display = creditFreeEnabled.checked ? 'block' : 'none';
+    creditFreeBox.style.display = creditFreeEnabled.checked ? 'flex' : 'none';
   });
 
   const creditMonthlyRadio = document.getElementById('creditInterestTypeMonthly');

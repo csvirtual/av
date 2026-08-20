@@ -463,8 +463,8 @@ export async function renderSale(container, ctx) {
         </div>
         ${isCreditCard ? (
           interest.interestAmount > 0.001
-            ? `<div class="text-muted" style="font-size:12px;margin:-4px 0 6px;text-align:right;">+ ${formatMoney(interest.interestAmount)} de juro (${interest.ratePercent.toFixed(1)}%) — total no cartão: <strong>${formatMoney(interest.totalWithInterest)}</strong></div>`
-            : `<div class="text-muted" style="font-size:12px;margin:-4px 0 6px;text-align:right;">Sem juro nesse parcelamento</div>`
+            ? `<div class="text-muted" style="font-size:12px;margin:6px 0 6px;text-align:right;">+ ${formatMoney(interest.interestAmount)} de juro (${interest.ratePercent.toFixed(1)}%) — total no cartão: <strong>${formatMoney(interest.totalWithInterest)}</strong></div>`
+            : `<div class="text-muted" style="font-size:12px;margin:6px 0 6px;text-align:right;">Sem juro nesse parcelamento</div>`
         ) : ''}
       `;
       }).join('');

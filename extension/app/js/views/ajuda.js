@@ -219,6 +219,7 @@ ${escapeHtml(linhaEncarregado)}</div>
         <li><span class="badge badge-red">Cancelado</span> — não vai mais ser entregue.</li>
       </ul>
       <p>Só um carreto <strong>pendente</strong> pode virar entregue ou ser cancelado — depois de marcado, o status fica travado (se precisar corrigir algo, cadastre um carreto novo).</p>
+      <p>O Painel inicial mostra um card com a <strong>quantidade de carretos pendentes</strong> (clicável, leva direto pra esta tela) e uma lista com os mais recentes — um jeito rápido de ver o que ainda precisa sair pra entrega sem precisar abrir a tela Carreto pra conferir.</p>
 
       <h3>Relação com a Venda</h3>
       <p>O carreto é independente da venda — dá pra cadastrar antes, depois ou até sem nenhuma venda vinculada (por exemplo, entrega de uma troca ou de um material já pago por fora). Por isso ele não desconta do estoque sozinho: se os itens do carreto também precisam sair do estoque, registre a venda normalmente na tela própria — ou use o atalho abaixo, que faz as duas coisas de uma vez.</p>

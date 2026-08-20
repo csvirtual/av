@@ -6,14 +6,16 @@ import { getOpenSession } from '../data/cashRepo.js';
 import { getAllBalances } from '../data/customersRepo.js';
 import { getAllPointsBalances } from '../data/loyaltyRepo.js';
 import { getCompany } from '../data/companyRepo.js';
+import { listDeliveries } from '../data/deliveriesRepo.js';
 import { formatMoney, formatDateTime, escapeHtml } from '../utils/format.js';
 
 export async function renderDashboard(container, ctx) {
   container.innerHTML = '<div class="card">Carregando painel…</div>';
 
-  const [products, sales, cashSession, balances, pointsBalances, company] = await Promise.all([
-    listProducts(), listSales(), getOpenSession(), getAllBalances(), getAllPointsBalances(), getCompany(),
+  const [products, sales, cashSession, balances, pointsBalances, company, deliveries] = await Promise.all([
+    listProducts(), listSales(), getOpenSession(), getAllBalances(), getAllPointsBalances(), getCompany(), listDeliveries(),
   ]);
+  const pendingDeliveries = deliveries.filter((d) => d.status === 'pendente');
   const totalFiado = Object.values(balances).reduce((sum, v) => sum + v, 0);
   const totalPoints = Object.values(pointsBalances).reduce((sum, v) => sum + v, 0);
   const loyaltyOn = (company?.policies?.loyaltyPointsPerReal ?? 0) > 0;
@@ -72,6 +74,10 @@ export async function renderDashboard(container, ctx) {
         <div class="label">Total em fiado</div>
         <div class="value ${totalFiado > 0 ? 'warn' : ''}">${formatMoney(totalFiado)}</div>
       </div>
+      <div class="stat-card" id="carreto-stat-card" style="cursor:pointer;">
+        <div class="label">Carretos pendentes</div>
+        <div class="value ${pendingDeliveries.length > 0 ? 'warn' : ''}">${pendingDeliveries.length}</div>
+      </div>
       ${loyaltyOn || totalPoints > 0 ? `
         <div class="stat-card" id="points-stat-card" style="cursor:pointer;">
           <div class="label">Pontos de fidelidade em aberto</div>
@@ -85,9 +91,14 @@ export async function renderDashboard(container, ctx) {
       ${renderSalesTable(recentSales)}
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:20px;">
       <p class="section-title mt-0">Produtos com estoque baixo</p>
       ${renderLowStockTable(lowStock)}
+    </div>
+
+    <div class="card">
+      <p class="section-title mt-0">Carretos pendentes</p>
+      ${renderPendingDeliveriesTable(pendingDeliveries.slice(0, 8))}
     </div>
   `;
 
@@ -95,6 +106,7 @@ export async function renderDashboard(container, ctx) {
   container.querySelector('#cash-stat-card').addEventListener('click', () => ctx.navigate('caixa'));
   container.querySelector('#fiado-stat-card').addEventListener('click', () => ctx.navigate('clientes'));
   container.querySelector('#points-stat-card')?.addEventListener('click', () => ctx.navigate('clientes'));
+  container.querySelector('#carreto-stat-card').addEventListener('click', () => ctx.navigate('carreto'));
 }
 
 function renderSalesTable(sales) {
@@ -110,6 +122,28 @@ function renderSalesTable(sales) {
               <td>${escapeHtml(s.userName)}</td>
               <td>${s.items.length}</td>
               <td>${formatMoney((s.total - s.refundedTotal) + (s.creditInterestTotal || 0))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderPendingDeliveriesTable(deliveries) {
+  if (deliveries.length === 0) return '<div class="table-empty">Nenhum carreto pendente. 🎉</div>';
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Endereço</th><th>Itens</th><th>Responsável</th></tr></thead>
+        <tbody>
+          ${deliveries.map((d) => `
+            <tr>
+              <td>${formatDateTime(d.createdAt)}</td>
+              <td>${escapeHtml(d.customerName)}</td>
+              <td class="text-muted">${escapeHtml(d.address || '—')}</td>
+              <td>${d.items.length}</td>
+              <td class="text-muted">${escapeHtml(d.responsible || '—')}</td>
             </tr>
           `).join('')}
         </tbody>
