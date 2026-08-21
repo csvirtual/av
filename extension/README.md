@@ -232,6 +232,31 @@ gente clicando rápido e mais de uma aba/tela aberta às vezes:
   a venda continua valendo (o cliente já pagou e o estoque já baixou) e o
   sistema avisa claramente que só o carreto precisa ser cadastrado de
   novo, na tela própria.
+- **Venda com fiado ou fidelidade nunca fica "pela metade"** — a baixa de
+  estoque, a gravação da venda, a dívida de fiado (se houver) e o ganho de
+  pontos de fidelidade (se houver) acontecem todos dentro de uma única
+  transação atômica do banco: ou a venda inteira existe, com tudo isso
+  junto, ou nada dela existe — nunca uma venda "paga em Fiado" sem a
+  dívida correspondente lançada no extrato do cliente.
+- **Movimentação de estoque nunca fica sem explicação** — toda mudança na
+  quantidade de um produto (venda, ajuste manual, entrada de compra,
+  crédito de estorno) grava a nova quantidade E o registro no histórico de
+  movimentações na mesma transação — nunca um estoque que mudou sem
+  nenhuma movimentação que explique por quê.
+- **O Administrador Geral nunca fica sem admin nenhum** — não é possível
+  desativar o único administrador ativo do sistema (a tela nem mostra essa
+  opção pra ele, e a função por trás também recusa) — evita um beco sem
+  saída onde ninguém mais consegue reativar usuários nem restaurar um
+  backup (as duas coisas exigem um admin ativo logado).
+- **Crédito de troca aplicado numa venda que falha não se perde** — usar
+  um crédito de troca como pagamento deduz o saldo pendente na hora; se a
+  venda falhar por qualquer motivo depois disso, o valor volta sozinho pro
+  saldo pendente do cliente, sem precisar de nenhuma ação manual.
+- **Extensão atualizada sozinha em segundo plano não passa em branco** —
+  se o Chrome atualizar a extensão enquanto uma aba do sistema continua
+  aberta (comum numa aba de PDV que fica ligada o turno inteiro), aparece
+  um aviso claro pedindo pra recarregar a aba, em vez de a aba continuar
+  tentando funcionar com erros genéricos e sem explicação.
 
 ## Estrutura de pastas
 
