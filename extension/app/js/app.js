@@ -61,12 +61,6 @@ let unmountLogin = null;
 // nunca desligados.
 let stopIdleWatch = null;
 
-// Mesmo motivo do stopIdleWatch acima: o botão "voltar ao topo" escuta
-// scroll na window (que sobrevive a root.innerHTML ser reescrito), então
-// precisa ser desligado explicitamente antes de renderShell montar um novo
-// — senão cada chamada empilharia mais um listener de scroll.
-let stopScrollTopWatch = null;
-
 // boot() pode ser chamado mais de uma vez quase ao mesmo tempo pro MESMO
 // evento de login/logout — o próprio login.js chama boot() direto ao
 // terminar, e chrome.storage.onChanged (ver onSessionUserIdChanged mais
@@ -168,7 +162,6 @@ function renderShell(user, company) {
   // da chamada anterior antes de montar um novo, senão cada chamada
   // empilha mais um conjunto de listeners de atividade + intervalo.
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
-  if (stopScrollTopWatch) { stopScrollTopWatch(); stopScrollTopWatch = null; }
 
   root.innerHTML = `
     <div class="shell">
@@ -188,24 +181,7 @@ function renderShell(user, company) {
       </nav>
       <main class="main" id="main-content"></main>
     </div>
-    <button class="scroll-top-btn" id="scroll-top-btn" type="button" aria-label="Voltar ao topo" title="Voltar ao topo">↑</button>
   `;
-
-  // Botão flutuante "voltar ao topo" — funciona em qualquer tela (fica
-  // fora de #main-content, então sobrevive à troca de rota) e só aparece
-  // quando há de fato o que rolar: some sozinho perto do topo da página,
-  // pra não ficar poluindo telas curtas que não precisam dele.
-  const scrollTopBtn = document.getElementById('scroll-top-btn');
-  const SCROLL_TOP_SHOW_AT = 400;
-  const onScroll = () => {
-    scrollTopBtn.classList.toggle('visible', window.scrollY > SCROLL_TOP_SHOW_AT);
-  };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  scrollTopBtn.addEventListener('click', () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-  onScroll(); // estado inicial correto se o shell já nascer rolado (ex: refreshShell)
-  stopScrollTopWatch = () => window.removeEventListener('scroll', onScroll);
 
   // Menu lateral em tela estreita vira uma gaveta (ver breakpoint 900px em
   // styles.css) — o botão ☰ e o véu por trás só ficam visíveis nesse modo,
@@ -435,6 +411,34 @@ window.addEventListener('error', (event) => reportUnexpectedError(event.error ||
 (async () => {
   applyTheme(await getThemePreference());
 })();
+
+// Botão flutuante "voltar ao topo" — pedido do usuário: precisa ser global
+// de verdade, disponível em QUALQUER tela que role (login, cadastro
+// inicial, tela de aba bloqueada, app normal), não só dentro do shell já
+// logado. O elemento em si vive em index.html, fora de #root (ver
+// comentário lá) — sobrevive a qualquer root.innerHTML ser reescrito — e a
+// ligação com o scroll é feita uma única vez aqui, também fora de qualquer
+// função que possa rodar mais de uma vez (renderShell, boot etc.), então
+// não há nada pra desligar/religar nunca: um só listener, pra sempre.
+{
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  const SCROLL_TOP_SHOW_AT = 400;
+  const onScroll = () => {
+    const visible = window.scrollY > SCROLL_TOP_SHOW_AT;
+    scrollTopBtn.classList.toggle('visible', visible);
+    // Enquanto invisível, tira do fluxo de tab/leitor de tela — sem isso
+    // um usuário navegando por teclado esbarraria num botão que não dá
+    // pra ver nem faz sentido ativar ainda.
+    scrollTopBtn.tabIndex = visible ? 0 : -1;
+    scrollTopBtn.setAttribute('aria-hidden', String(!visible));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  scrollTopBtn.addEventListener('click', () => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+  onScroll(); // estado inicial correto se a página já nascer rolada (ex: refreshShell)
+}
 
 function renderTabBlockedScreen() {
   root.innerHTML = `

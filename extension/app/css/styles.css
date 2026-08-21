@@ -524,43 +524,67 @@ tbody tr:hover { background: var(--surface-alt); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
 /* ---------- Botão "voltar ao topo" ----------
- * Fica um pouco mais alto que o canto do toast (bottom:18px/right:18px
- * logo abaixo) de propósito, pra um toast aparecendo não cobrir o botão
- * bem na hora do clique — os dois moram no mesmo canto, mas em alturas
- * diferentes. z-index abaixo do toast (200): se algum dia empilhar toast
- * demais e ainda assim encostar, a mensagem tem prioridade visual. */
+ * Global de verdade: vive em index.html, fora de #root (ver comentário lá),
+ * então existe em QUALQUER tela — login, cadastro inicial, aba bloqueada,
+ * app normal — não só dentro do shell já logado.
+ *
+ * Canto inferior direito, um pouco mais alto que o canto do toast
+ * (bottom:18px/right:18px logo abaixo) de propósito, pra um toast
+ * aparecendo não cobrir o botão bem na hora do clique — os dois moram no
+ * mesmo canto, em alturas diferentes. z-index abaixo do toast (200): se
+ * algum dia empilhar toast demais e ainda assim encostar, a mensagem tem
+ * prioridade visual.
+ *
+ * 44px = alvo de toque mínimo recomendado (Apple HIG / Material Design),
+ * cor sólida (--primary) em vez de neutra pra ficar claramente clicável à
+ * distância, sem competir com o conteúdo da página. */
 .scroll-top-btn {
   position: fixed;
-  right: 18px;
-  bottom: 84px;
+  right: 22px;
+  bottom: 90px;
   z-index: 190;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1;
+  border: none;
+  background: var(--primary);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-md);
   cursor: pointer;
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(10px) scale(0.9);
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 .scroll-top-btn.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
   pointer-events: auto;
 }
 .scroll-top-btn:hover {
-  background: var(--primary-light);
-  color: var(--primary);
-  border-color: var(--primary);
+  background: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px) scale(1);
+}
+.scroll-top-btn:active {
+  transform: translateY(0) scale(0.94);
+  box-shadow: var(--shadow);
+}
+.scroll-top-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-top-btn { transition: opacity 0.18s ease; }
+  .scroll-top-btn:hover, .scroll-top-btn:active { transform: none; }
+}
+/* Telas estreitas (ver breakpoint 900px mais abaixo): fica mais perto do
+ * canto pra não roubar espaço de conteúdo que já é justo. */
+@media (max-width: 600px) {
+  .scroll-top-btn { right: 14px; bottom: 82px; width: 42px; height: 42px; }
 }
 
 /* ---------- Toast ---------- */
