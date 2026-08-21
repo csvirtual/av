@@ -16,41 +16,38 @@ const KEY = 'tabPresence';
 const HEARTBEAT_MS = 300;
 // Janela de confirmação: quando alguém aparenta ser mais antiga que eu,
 // espero isso antes de aceitar — se o batimento dela não avançar nesse
-// tempo, trato como morta. Precisa ser MAIOR que HEARTBEAT_MS (senão uma
-// aba genuinamente viva, só ainda não teve a vez de bater de novo, seria
-// acusada de morta por engano); a folga extra cobre variação normal de
-// timing.
-const PROBE_MS = 700;
-const STALE_MS = 3000; // teto absoluto de segurança — ver comentário na função abaixo
+// tempo, trato como morta. Precisa ser bem MAIOR que HEARTBEAT_MS — não só
+// pela variação normal de timing, mas porque o Chrome propositalmente
+// "engorda" o intervalo de setInterval/setTimeout de uma aba em segundo
+// plano (fora de foco) pra economizar bateria: o piso documentado é ~1
+// batimento por segundo depois de poucos segundos sem foco (podendo ficar
+// ainda mais espaçado se a aba ficar minutos parada em segundo plano). Uma
+// aba original perfeitamente viva, só que em segundo plano nesse momento,
+// PRECISA sobreviver a esta checagem — se PROBE_MS fosse curto demais, uma
+// aba nova aberta em primeiro plano concluiria (errado) que a original
+// morreu, e as duas ficariam operando ao mesmo tempo — voltando exatamente
+// ao problema que esta função existe pra evitar. 2.5s dá folga de sobra
+// acima do piso normal de 1s do Chrome, mantendo a detecção de uma aba
+// REALMENTE fechada ainda muito mais rápida que os ~9-13s de antes.
+const PROBE_MS = 2500;
+const STALE_MS = 8000; // teto absoluto de segurança — bem acima de PROBE_MS, ver comentário na função abaixo
 
-/** Achado de auditoria (crítico — travaria a aba pra praticamente todo
- * mundo, mais cedo ou mais tarde): um id gerado do zero a cada carregamento
- * de página trata um F5, ou o Chrome "descartando" uma aba ociosa pra
- * economizar memória e recarregando sozinho ao voltar pra ela (comum,
- * automático, sem o usuário pedir) exatamente como se fosse uma aba
- * DIFERENTE — a entrada antiga desta MESMA aba ainda está "fresca" no mapa
- * compartilhado, então a aba recarregada se via "mais nova" que si mesma
- * e se bloqueava sozinha. `sessionStorage` (diferente de
- * chrome.storage.session) é por ABA de verdade — sobrevive a recarregar a
- * mesma aba, mas nasce vazio numa aba nova de verdade (inclusive
- * duplicada) ou ao reabrir a aba depois de fechada. Guardando o id ali,
- * uma aba recarregada continua sendo "ela mesma" pro resto do mecanismo,
- * nunca se confunde com um fantasma de si própria. */
-const myTabId = (() => {
-  try {
-    let id = sessionStorage.getItem('tabPresenceId');
-    if (!id) {
-      id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      sessionStorage.setItem('tabPresenceId', id);
-    }
-    return id;
-  } catch {
-    // sessionStorage indisponível por algum motivo raro (modo de
-    // navegação restrito, storage bloqueado) — degrada pro comportamento
-    // antigo (id novo a cada carregamento) em vez de quebrar o app inteiro.
-    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-})();
+/** Achado de auditoria GRAVE (usuário reportou em produção): uma versão
+ * anterior guardava este id em `sessionStorage` de propósito, pra uma aba
+ * recarregada (F5) continuar "sendo ela mesma" em vez de se confundir com
+ * um fantasma de si própria. Só que `sessionStorage` é justamente o que o
+ * Chrome CLONA ao duplicar uma aba — então a aba duplicada nascia com o
+ * MESMO id da original, as duas escreviam por cima da mesma entrada no
+ * registro compartilhado, e o mecanismo inteiro ficava cego: nenhuma
+ * aviso, nenhum bloqueio, exatamente o oposto do que deveria acontecer.
+ * Voltou a ser um id novo, aleatório, a cada carregamento de página — o
+ * problema original do F5 (a entrada antiga "fresca demais" bloqueando a
+ * aba recarregada) já é resolvido pela confirmação por batimento em
+ * watchTabPresence() logo abaixo, que não depende de nenhuma identidade
+ * persistida: ela detecta sozinha, em poucos segundos, que a entrada antiga
+ * parou de ser atualizada, não importa o motivo (reload, fechamento,
+ * fantasma de duplicação ou qualquer outra coisa). */
+const myTabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 async function readPresence() {
   const data = await chrome.storage.session.get(KEY);
