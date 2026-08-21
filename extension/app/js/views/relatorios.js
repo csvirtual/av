@@ -53,7 +53,9 @@ export async function renderRelatorios(container) {
       case 'all': return { from: null, to: null };
       case 'custom': {
         const from = fromInput.value ? new Date(`${fromInput.value}T00:00:00`).getTime() : null;
-        const to = toInput.value ? new Date(`${toInput.value}T23:59:59`).getTime() : null;
+        // .999, não .000: senão uma venda no último segundo do dia "até"
+        // ficava fora do relatório (achado de auditoria).
+        const to = toInput.value ? new Date(`${toInput.value}T23:59:59.999`).getTime() : null;
         return { from, to };
       }
       default: return { from: null, to: null };

@@ -8,7 +8,7 @@
 // estorno, só ganha uma entrada em `refunds` e os itens afetados marcam
 // quanto já foi devolvido (`qtyRefunded`), preservando o valor original pra
 // auditoria.
-import { dbGetAll, dbGet, dbUpdate, dbTransaction, newId } from '../db.js';
+import { dbGetAll, dbUpdate, dbTransaction, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { recordDebt } from './customersRepo.js';
@@ -276,10 +276,6 @@ export async function createSale({
 export async function listSales() {
   const sales = await dbGetAll('sales');
   return sales.sort((a, b) => b.timestamp - a.timestamp);
-}
-
-export async function getSale(id) {
-  return dbGet('sales', id);
 }
 
 /** Estorna um ou mais itens de uma venda (total ou parcial). Devolve a

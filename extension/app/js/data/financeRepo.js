@@ -4,18 +4,20 @@
 // pagamento também deve virar uma sangria/suprimento manual no caixa, se
 // for o caso. Cada conta pode opcionalmente ficar vinculada a um
 // fornecedor, pra facilitar achar "quanto devo pra fulano".
-import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
+import { dbGetAll, dbAdd, dbUpdate, newId } from '../db.js';
+// Achado de auditoria: create/marcar-pago/cancelar aqui eram protegidos só
+// pela TELA (rota "financeiro" restrita a admin, ver app.js) — reaproveita
+// a mesma checagem de usersRepo.js pra não deixar essas funções aceitarem
+// chamada direta de um vendedor com acesso ao console.
+import { assertActingUserIsAdmin } from './usersRepo.js';
 
 export async function listEntries() {
   const entries = await dbGetAll('financialEntries');
   return entries.sort((a, b) => a.dueDate - b.dueDate);
 }
 
-export async function getEntry(id) {
-  return dbGet('financialEntries', id);
-}
-
 export async function createEntry({ type, description, amount, dueDate, category = '', supplierId = null, notes = '', userId, userName }) {
+  await assertActingUserIsAdmin();
   if (type !== 'pagar' && type !== 'receber') throw new Error('Tipo de conta inválido.');
   if (!description || !description.trim()) throw new Error('Descrição é obrigatória.');
   const value = Number(amount) || 0;
@@ -47,6 +49,7 @@ export async function createEntry({ type, description, amount, dueDate, category
 // pra duas abas (ou duplo clique, embora openModal já proteja contra isso)
 // não conseguirem os dois passar na checagem antes de qualquer um gravar.
 export async function markAsPaid({ id, paidAmount, paymentMethod, userId, userName }) {
+  await assertActingUserIsAdmin();
   const value = Number(paidAmount);
   if (!(value > 0)) throw new Error('Informe um valor pago maior que zero.');
   return dbUpdate('financialEntries', id, (entry) => {
@@ -63,6 +66,7 @@ export async function markAsPaid({ id, paidAmount, paymentMethod, userId, userNa
 }
 
 export async function cancelEntry(id) {
+  await assertActingUserIsAdmin();
   return dbUpdate('financialEntries', id, (entry) => {
     if (!entry) throw new Error('Conta não encontrada.');
     if (entry.status === 'pago') throw new Error('Não é possível cancelar uma conta já paga.');

@@ -1,6 +1,7 @@
 // Dados cadastrais da loja — um único registro fixo (id: 'main'), preenchido
 // no assistente de configuração inicial e editável depois só pelo admin.
 import { dbGet, dbUpdate } from '../db.js';
+import { hasAnyUser, assertActingUserIsAdmin } from './usersRepo.js';
 
 const COMPANY_ID = 'main';
 
@@ -13,6 +14,23 @@ export async function isCompanyRegistered() {
   return !!company;
 }
 
+/** Achado de auditoria: saveCompany() era só protegido pela TELA ("Dados da
+ * loja" restrita a admin) — a função em si aceitava qualquer chamada. Isso
+ * era especialmente sério porque `policies.vendorMaxDiscountPercent` mora
+ * aqui: um vendedor com acesso ao console podia chamar saveCompany() direto
+ * e subir o próprio limite de desconto pra 100%, driblando por completo a
+ * exigência de senha de admin que createSale() aplica (ver salesRepo.js) —
+ * sem nunca precisar da senha de ninguém. Mesmo raciocínio de
+ * usersRepo.js#assertActingUserIsAdmin: só libera sem sessão de admin
+ * durante o cadastro inicial de verdade (quando ainda não existe usuário
+ * nenhum no sistema — setup.js chama saveCompany() ANTES de criar o
+ * admin), qualquer chamada depois disso precisa ser da sessão realmente
+ * logada como admin agora. */
+async function assertAllowedToSaveCompany() {
+  if (!(await hasAnyUser())) return; // cadastro inicial de verdade, ainda sem ninguém logado
+  await assertActingUserIsAdmin();
+}
+
 /** dbUpdate (get+put na mesma transação) em vez de getCompany()+dbPut
  * separados — o merge de `policies` abaixo depende do valor ATUAL de
  * cada política pra preservar o que não foi informado (ver comentário mais
@@ -21,6 +39,7 @@ export async function isCompanyRegistered() {
  * uma tela só-admin) podiam ler o mesmo estado "antes" e uma delas
  * sobrescrever a política que a outra tinha acabado de mudar. */
 export async function saveCompany(data) {
+  await assertAllowedToSaveCompany();
   return dbUpdate('company', COMPANY_ID, (existing) => buildCompanyRecord(data, existing));
 }
 

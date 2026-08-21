@@ -1,6 +1,14 @@
 // Fornecedores — cadastro exclusivo do administrador, é gestão da loja
 // (igual produto), não operação do dia a dia de venda como cliente é.
 import { dbGetAll, dbGet, dbAdd, dbDelete, dbUpdate, newId } from '../db.js';
+// Achado de auditoria: "exclusivo do administrador" (comentário acima) só
+// valia na tela (rota "compras" restrita a admin, ver app.js) — as funções
+// de escrita abaixo não checavam nada, então reaproveita a mesma checagem
+// de usersRepo.js pra fechar isso. listSuppliers/getSupplier continuam
+// sem checagem de propósito: produtos.js (aberto a vendedor também) lê a
+// lista pra preencher o fornecedor padrão de um produto — leitura não é
+// gestão sensível, só a escrita é.
+import { assertActingUserIsAdmin } from './usersRepo.js';
 
 export async function listSuppliers() {
   const suppliers = await dbGetAll('suppliers');
@@ -12,6 +20,7 @@ export async function getSupplier(id) {
 }
 
 export async function createSupplier(data) {
+  await assertActingUserIsAdmin();
   const nome = (data.nome || '').trim();
   if (!nome) throw new Error('Nome do fornecedor é obrigatório.');
   const record = {
@@ -32,6 +41,7 @@ export async function createSupplier(data) {
 }
 
 export async function updateSupplier(id, data) {
+  await assertActingUserIsAdmin();
   return dbUpdate('suppliers', id, (supplier) => {
     if (!supplier) throw new Error('Fornecedor não encontrado.');
     if (data.nome !== undefined) {
@@ -51,6 +61,7 @@ export async function updateSupplier(id, data) {
 }
 
 export async function setSupplierActive(id, active) {
+  await assertActingUserIsAdmin();
   return dbUpdate('suppliers', id, (supplier) => {
     if (!supplier) throw new Error('Fornecedor não encontrado.');
     supplier.active = active;
@@ -60,5 +71,6 @@ export async function setSupplierActive(id, active) {
 }
 
 export async function deleteSupplier(id) {
+  await assertActingUserIsAdmin();
   await dbDelete('suppliers', id);
 }

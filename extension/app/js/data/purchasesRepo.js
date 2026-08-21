@@ -3,21 +3,23 @@
 // jeito de dar entrada no estoque a partir de um pedido — reaproveita
 // stockRepo.recordMovement (tipo 'entrada'), então o histórico do produto
 // mostra de onde veio cada unidade, igual qualquer outra movimentação.
-import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
+import { dbGetAll, dbAdd, dbUpdate, newId } from '../db.js';
 import { listProducts, updateProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
 import { getSupplier } from './suppliersRepo.js';
+// Achado de auditoria: create/receber/cancelar pedido de compra eram
+// protegidos só pela TELA (rota "compras" restrita a admin, ver app.js) —
+// reaproveita a mesma checagem de usersRepo.js pra não deixar essas funções
+// aceitarem chamada direta de um vendedor com acesso ao console.
+import { assertActingUserIsAdmin } from './usersRepo.js';
 
 export async function listPurchaseOrders() {
   const orders = await dbGetAll('purchaseOrders');
   return orders.sort((a, b) => b.createdAt - a.createdAt);
 }
 
-export async function getPurchaseOrder(id) {
-  return dbGet('purchaseOrders', id);
-}
-
 export async function createPurchaseOrder({ supplierId, items, notes = '', userId, userName }) {
+  await assertActingUserIsAdmin();
   if (!supplierId) throw new Error('Selecione um fornecedor.');
   const supplier = await getSupplier(supplierId);
   if (!supplier) throw new Error('Fornecedor não encontrado.');
@@ -66,6 +68,7 @@ export async function createPurchaseOrder({ supplierId, items, notes = '', userI
  * gravado e validado, não fica "pela metade" de um jeito que permita
  * receber a mesma entrega duas vezes. */
 export async function receivePurchaseOrder({ orderId, items, userId, userName, note = '' }) {
+  await assertActingUserIsAdmin();
   let entry;
   let updatedOrder;
   await dbUpdate('purchaseOrders', orderId, (order) => {
@@ -118,6 +121,7 @@ export async function receivePurchaseOrder({ orderId, items, userId, userName, n
  * mesmo pedido quase ao mesmo tempo (duas abas) podiam os dois passar na
  * validação antes de qualquer um gravar. */
 export async function cancelPurchaseOrder(orderId) {
+  await assertActingUserIsAdmin();
   return dbUpdate('purchaseOrders', orderId, (order) => {
     if (!order) throw new Error('Pedido não encontrado.');
     const anyReceived = order.items.some((i) => i.qtyReceived > 0);

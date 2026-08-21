@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gestão de Loja — Estoque & Vendas",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Gestão de estoque, vendas, fornecedores e colaboradores para lojas de material de construção, mercearias e mercados de bairro.",
   "icons": {
     "16": "icons/icon16.png",

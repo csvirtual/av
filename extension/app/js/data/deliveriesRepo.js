@@ -4,16 +4,12 @@
 // estoque nem em dinheiro — a baixa de estoque de verdade já acontece na
 // Venda; o carreto só ajuda a organizar o que precisa sair, pra quem, e se
 // já foi entregue ou não.
-import { dbGetAll, dbGet, dbAdd, dbUpdate, newId } from '../db.js';
+import { dbGetAll, dbAdd, dbUpdate, newId } from '../db.js';
 import { getCustomer } from './customersRepo.js';
 
 export async function listDeliveries() {
   const list = await dbGetAll('deliveries');
   return list.sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export async function getDelivery(id) {
-  return dbGet('deliveries', id);
 }
 
 /** Cadastra um carreto novo. Cada item vem do estoque (amarrado a um

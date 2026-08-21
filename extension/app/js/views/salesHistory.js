@@ -74,7 +74,10 @@ export async function renderSalesHistory(container, ctx) {
       filtered = filtered.filter((s) => s.timestamp >= fromTs);
     }
     if (to) {
-      const toTs = new Date(`${to}T23:59:59`).getTime();
+      // .999, não .000: uma venda às 23:59:59.500 do dia "até" tem
+      // timestamp em milissegundos maior que ...59.000 e ficava fora do
+      // filtro por até quase 1 segundo (achado de auditoria).
+      const toTs = new Date(`${to}T23:59:59.999`).getTime();
       filtered = filtered.filter((s) => s.timestamp <= toTs);
     }
     renderTable(filtered);

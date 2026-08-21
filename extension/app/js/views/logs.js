@@ -52,7 +52,10 @@ export async function renderLogs(container, ctx) {
       filtered = filtered.filter((l) => l.timestamp >= fromTs);
     }
     if (to) {
-      const toTs = new Date(`${to}T23:59:59`).getTime();
+      // .999, não .000 — mesmo achado de auditoria do filtro de data em
+      // Histórico de vendas e Relatórios: sem isso, um registro no último
+      // segundo do dia "até" ficava fora do filtro.
+      const toTs = new Date(`${to}T23:59:59.999`).getTime();
       filtered = filtered.filter((l) => l.timestamp <= toTs);
     }
     renderTable(filtered);

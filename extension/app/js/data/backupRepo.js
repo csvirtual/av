@@ -7,6 +7,7 @@
 // quem decide quando fazer backup é o lojista.
 import { dbGetAll, dbCount, dbTransaction, STORE_NAMES } from '../db.js';
 import { encryptPayload, decryptPayload } from '../backupCrypto.js';
+import { hasAnyUser, assertActingUserIsAdmin } from './usersRepo.js';
 
 const BACKUP_FORMAT_VERSION = 1;
 
@@ -94,6 +95,22 @@ export async function readBackupFile(fileText, password) {
   return { payload, counts };
 }
 
+/** Achado de auditoria: applyBackup() era só protegido pela TELA ("Backup"
+ * restrita a admin) — a função em si aceitava qualquer chamada. Como ela
+ * APAGA TUDO e regrava (é a ação mais destrutiva do sistema inteiro), um
+ * vendedor com acesso ao console podia chamar applyBackup() direto com um
+ * payload forjado (nem precisa ser um backup de verdade — só um objeto
+ * `{ stores: {...} }` qualquer) e zerar a loja inteira sem senha de backup
+ * nenhuma, sem senha de admin, sem confirmação nenhuma. Mesmo raciocínio de
+ * usersRepo.js/companyRepo.js: só libera sem sessão de admin durante a
+ * restauração de verdade numa instalação NOVA (setup.js chama isto antes
+ * de existir qualquer usuário) — depois disso, precisa ser a sessão
+ * realmente logada como admin agora. */
+async function assertAllowedToApplyBackup() {
+  if (!(await hasAnyUser())) return; // restauração numa instalação nova de verdade, ainda sem ninguém logado
+  await assertActingUserIsAdmin();
+}
+
 /** Aplica os dados decriptados: apaga tudo que existe hoje e regrava com o
  * conteúdo do backup. Ação destrutiva e irreversível — quem chama isso já
  * confirmou com o usuário antes (ver views/backup.js e views/setup.js).
@@ -105,6 +122,7 @@ export async function readBackupFile(fileText, password) {
  * pro estado de antes da restauração — nunca fica com alguns stores já
  * trocados e outros ainda com os dados antigos. */
 export async function applyBackup(payload) {
+  await assertAllowedToApplyBackup();
   await dbTransaction(STORE_NAMES, 'readwrite', (transaction) => {
     for (const name of STORE_NAMES) {
       const store = transaction.objectStore(name);
