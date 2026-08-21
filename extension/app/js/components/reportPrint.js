@@ -93,5 +93,12 @@ export function printReport({ report, periodLabel, company }) {
     document.body.appendChild(root);
   }
   root.innerHTML = buildReportPrintHtml({ report, periodLabel, company });
+  // Achado de auditoria: mesmo raciocínio de components/receipt.js —
+  // @media print mostra os dois roots ao mesmo tempo, então se um recibo
+  // já foi impresso antes nesta sessão, o #print-receipt-root ficava com
+  // HTML antigo parado lá e aparecia sobreposto ao relatório. Esvazia o
+  // outro root aqui, sempre, antes de imprimir.
+  const otherRoot = document.getElementById('print-receipt-root');
+  if (otherRoot) otherRoot.innerHTML = '';
   window.print();
 }

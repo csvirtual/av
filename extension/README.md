@@ -218,13 +218,15 @@ gente clicando rápido e mais de uma aba/tela aberta às vezes:
   tentativas quase simultâneas sobre o mesmo registro (duplo clique restante
   ou duas abas) nunca resultam em dado duplicado ou perdido; a segunda
   tentativa é recusada com um aviso claro, não falha em silêncio.
-- **Sessão sincronizada entre abas** — como a extensão permite abrir mais
-  de uma aba, deslogar (ou ser desativado por um administrador) numa aba
-  reflete automaticamente nas outras, sem precisar recarregar a página.
-- **Aviso de aba duplicada** — abrir o sistema numa segunda aba enquanto já
-  tem uma aberta mostra um aviso rápido (some sozinho). Não bloqueia nada —
-  as duas abas continuam funcionando normalmente — é só um alerta pra quem
-  esqueceu uma aba antiga aberta sem perceber.
+- **Só uma aba opera por vez** — abrir o sistema numa segunda aba (ou
+  duplicar a que já está aberta) mostra um aviso e bloqueia essa segunda
+  aba de verdade, sem menu nem nenhum jeito de mexer no sistema por ali —
+  evita duas telas mexendo na mesma loja ao mesmo tempo sem ninguém
+  perceber. Fechou a aba errada, ou decidiu continuar na nova? A outra
+  libera sozinha em poucos segundos, sem precisar recarregar nada.
+- **Sessão sincronizada** — deslogar (ou ser desativado por um
+  administrador) reflete automaticamente em qualquer aba que existir,
+  sem precisar recarregar a página.
 - **Uma venda com carreto associado nunca fica "pela metade"** — se o
   carreto falhar por algum motivo depois da venda já ter sido registrada,
   a venda continua valendo (o cliente já pagou e o estoque já baixou) e o

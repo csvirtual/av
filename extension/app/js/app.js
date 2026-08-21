@@ -10,7 +10,7 @@ import { showToast } from './components/toast.js';
 import { confirmDialog, closeAllModals } from './components/modal.js';
 import { escapeHtml } from './utils/format.js';
 import { getThemePreference, applyTheme } from './theme.js';
-import { registerTabAndCheckDuplicate } from './tabPresence.js';
+import { watchTabPresence } from './tabPresence.js';
 
 import { renderSetup } from './views/setup.js';
 import { renderLogin } from './views/login.js';
@@ -86,7 +86,21 @@ function boot() {
   return bootQueue;
 }
 
+// Achado do usuário: só avisar que já tinha outra aba aberta não bastava —
+// ele queria a segunda aba REALMENTE bloqueada, não só sinalizada. Nasce
+// bloqueada (true) até watchTabPresence (ver rodapé deste arquivo) decidir
+// que esta aba é a mais antiga viva no navegador — só então vira false, uma
+// única vez, e o app começa a rodar de verdade. Checado aqui dentro do
+// bootImpl (não só no ponto que chama boot() a primeira vez) porque boot()
+// também é chamado por vários outros gatilhos que independem desta aba ter
+// "ganho a eleição" (ex: onSessionUserIdChanged reage a login/logout feito
+// em QUALQUER aba) — sem essa checagem aqui dentro, um desses gatilhos
+// conseguiria fazer uma aba bloqueada renderizar o app de verdade por
+// baixo do pano, contornando o bloqueio.
+let tabIsBlocked = true;
+
 async function bootImpl() {
+  if (tabIsBlocked) return;
   // Mesmo motivo do closeAllModals() em renderCurrentRoute (ver comentário
   // lá): um modal aberto fica anexado direto no <body>, fora de #root, e
   // sobreviveria mesmo a isso reescrever root.innerHTML por completo.
@@ -416,18 +430,47 @@ window.addEventListener('error', (event) => reportUnexpectedError(event.error ||
 // A aparência (claro/escuro/automático) é escolhida na tela Personalização
 // (ver views/personalizacao.js), acessível pelo menu depois de logar — só
 // precisa ser aplicada aqui, uma vez, antes do primeiro render, pra abrir
-// direto no tema certo sem piscar.
+// direto no tema certo sem piscar. Independente do bloqueio de aba abaixo
+// — a tela de bloqueio também precisa nascer no tema certo.
 (async () => {
   applyTheme(await getThemePreference());
-  boot();
 })();
 
-// Aviso de aba duplicada — roda em paralelo com o boot acima (não atrasa o
-// primeiro carregamento por causa disso). Aparece uma vez, ao abrir esta
-// aba, só se OUTRA aba do sistema já estiver aberta no navegador; não
-// bloqueia nada — os dois continuam funcionando normalmente, é só um
-// aviso pra quem esqueceu uma aba antiga aberta sem perceber. Some
-// sozinho em 5s, como qualquer toast (ver components/toast.js).
-registerTabAndCheckDuplicate().then((isDuplicate) => {
-  if (isDuplicate) showToast('O sistema já está aberto em outra aba deste navegador.', 'info');
+function renderTabBlockedScreen() {
+  root.innerHTML = `
+    <div class="boot-loading">
+      <div class="card" style="max-width:420px;text-align:center;">
+        <div style="font-size:34px;margin-bottom:6px;">🗂️</div>
+        <h1 style="font-size:18px;margin:0 0 10px;">Já aberto em outra aba</h1>
+        <p style="margin:0 0 10px;">O sistema já está aberto em outra aba deste navegador. Pra evitar duas telas mexendo na mesma loja ao mesmo tempo, esta aba fica bloqueada.</p>
+        <p class="text-muted" style="font-size:13px;margin:0;">Feche esta aba e continue na outra — ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos, sem precisar recarregar nada.</p>
+      </div>
+    </div>
+  `;
+}
+
+// Impede o sistema de rodar em mais de uma aba ao mesmo tempo (ver
+// tabPresence.js pro mecanismo completo). Chama de volta uma vez logo de
+// início e depois a cada poucos segundos, sempre que o resultado da
+// "eleição" entre as abas abertas pode ter mudado.
+let tabBlockedToastShown = false;
+watchTabPresence((iAmTheOldestAlive, otherTabAlive) => {
+  if (iAmTheOldestAlive) {
+    if (tabIsBlocked) {
+      tabIsBlocked = false;
+      boot();
+    }
+    return;
+  }
+  // Não sou a mais antiga viva agora — só bloqueia se esta aba ainda não
+  // tinha começado a rodar o app de verdade (uma aba que já estava
+  // operando nunca é interrompida no meio por causa de uma aba nova
+  // aparecendo depois — só a aba nova fica bloqueada).
+  if (tabIsBlocked) {
+    renderTabBlockedScreen();
+    if (!tabBlockedToastShown && otherTabAlive) {
+      tabBlockedToastShown = true;
+      showToast('O sistema já está aberto em outra aba deste navegador.', 'info');
+    }
+  }
 });

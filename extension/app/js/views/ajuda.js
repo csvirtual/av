@@ -33,7 +33,8 @@ const TOPICS = [
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
 
       <h3>Mais de uma aba aberta</h3>
-      <p>Dá pra abrir o sistema em mais de uma aba do navegador ao mesmo tempo — nada trava nem duplica dado. Se você abrir uma segunda aba enquanto já tem uma aberta, aparece um aviso rápido avisando (some sozinho em alguns segundos); é só um alerta, útil pra quem esqueceu uma aba antiga aberta em algum canto sem perceber.</p>
+      <p>O sistema roda numa aba de cada vez, de propósito — não dá pra usar em duas abas ao mesmo tempo. Se você abrir uma segunda aba (ou duplicar a que já está aberta), aparece um aviso e essa segunda aba fica <strong>bloqueada</strong>, mostrando só uma mensagem explicando a situação: continue usando a aba original.</p>
+      <p>Fechou a aba original por engano, ou decidiu continuar na nova mesmo? Sem problema — feche a aba que não quer mais usar e a outra libera <strong>sozinha</strong>, em poucos segundos, sem precisar recarregar nada.</p>
 
       <h3>Aparência (claro ou escuro)</h3>
       <p>Além da tela de configuração inicial, dá pra trocar quando quiser em <strong>Personalização</strong>, no menu lateral — escolha entre fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
