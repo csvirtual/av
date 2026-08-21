@@ -14,19 +14,6 @@ export async function getCustomerPoints(customerId) {
   return entries.reduce((sum, e) => sum + (e.type === 'ganho' ? e.points : -e.points), 0);
 }
 
-/** Ganho automático de pontos — chamado pelo salesRepo quando a venda tem
- * cliente selecionado e o programa de fidelidade está ligado (ver
- * companyRepo policies.loyaltyPointsPerReal). */
-export async function recordEarn({ customerId, points, saleId, userId, userName }) {
-  if (points <= 0) return null;
-  const entry = {
-    id: newId(), customerId, type: 'ganho', points, saleId,
-    note: '', userId, userName, timestamp: Date.now(),
-  };
-  await dbAdd('loyaltyEntries', entry);
-  return entry;
-}
-
 /** Resgate de pontos — converte em crédito de troca (mesma sessão usada
  * pelo estorno), pra reaproveitar o fluxo que já existe no PDV em vez de
  * inventar uma segunda forma de pagamento só pra pontos. */

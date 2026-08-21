@@ -106,26 +106,6 @@ export async function listPaymentsForCashSession(cashSessionId) {
   return all.filter((e) => e.type === 'pagamento' && e.cashSessionId === cashSessionId);
 }
 
-/** Lança uma dívida de fiado — chamado pelo salesRepo quando uma venda tem
- * um pagamento com forma "Fiado". Não mexe em caixa (fiado não é dinheiro
- * entrando agora, é uma promessa de pagamento futuro). */
-export async function recordDebt({ customerId, amount, saleId, userId, userName }) {
-  const entry = {
-    id: newId(),
-    customerId,
-    type: 'fiado',
-    amount: Number(amount) || 0,
-    saleId,
-    paymentMethod: null,
-    cashSessionId: null,
-    note: '',
-    userId, userName,
-    timestamp: Date.now(),
-  };
-  await dbAdd('customerDebts', entry);
-  return entry;
-}
-
 /** Registra o pagamento (total ou parcial) de uma dívida existente. Se feito
  * com o caixa aberto, o valor entra na conferência de fechamento — por isso
  * recebe cashSessionId separadamente (ver views/clientes.js).

@@ -4,17 +4,18 @@
 // (que registra a AÇÃO; isto aqui registra o EFEITO no estoque).
 import { dbGetAllByIndex, dbTransaction, newId } from '../db.js';
 
-/** Achado de auditoria (P1): a versão anterior fazia `adjustQuantity` (um
- * dbUpdate, atômico só pra `products`) e DEPOIS, numa transação SEPARADA,
- * `dbAdd` o registro em `stockMovements` — exatamente o padrão que qualquer
- * auditoria de estoque deveria caçar: "estoque é atualizado MAS a
- * movimentação histórica falha". Se o navegador fechasse/travasse bem
- * entre as duas chamadas, a quantidade do produto já tinha mudado, mas
- * NENHUM registro explicava a mudança — nem pra entrada de compra, nem
- * pra ajuste manual, nem pro crédito de estoque de um estorno (todos
- * passam por esta função). Agora as duas escritas (baixa/alta de
- * quantidade + registro da movimentação) vivem na MESMA transação —
- * mesmo padrão já usado em createSale() pro caminho principal de venda. */
+/** Achado de auditoria (P1): a versão anterior ajustava a quantidade do
+ * produto (um dbUpdate, atômico só pra `products`) e DEPOIS, numa
+ * transação SEPARADA, gravava o registro em `stockMovements` —
+ * exatamente o padrão que qualquer auditoria de estoque deveria caçar:
+ * "estoque é atualizado MAS a movimentação histórica falha". Se o
+ * navegador fechasse/travasse bem entre as duas escritas, a quantidade
+ * do produto já tinha mudado, mas NENHUM registro explicava a mudança —
+ * nem pra entrada de compra, nem pra ajuste manual, nem pro crédito de
+ * estoque de um estorno (todos passam por esta função). Agora as duas
+ * escritas (baixa/alta de quantidade + registro da movimentação) vivem
+ * na MESMA transação — mesmo padrão já usado em createSale() pro
+ * caminho principal de venda. */
 export async function recordMovement({ productId, type, qty, userId, userName, note = '' }) {
   const record = {
     id: newId(),

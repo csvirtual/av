@@ -227,16 +227,17 @@ export async function createSale({
   // específica é guardada à parte.
   //
   // Achado de auditoria (P1): a dívida de fiado e o ganho de pontos eram
-  // gravados DEPOIS desta transação, como chamadas separadas
-  // (recordDebt/recordEarn). Se o navegador fechasse/travasse exatamente
-  // no intervalo entre a venda já commitada e essas chamadas, a venda
-  // ficava registrada como "paga em Fiado" sem NENHUMA dívida lançada no
-  // extrato do cliente — dinheiro que a loja deveria cobrar depois, sem
-  // rastro nenhum de que era pra cobrar. `recordDebt`/`recordEarn` em si
-  // são só um `dbAdd` cada (sem leitura condicional própria), então dava
-  // pra virar dois `store.add()` a mais dentro da MESMA transação atômica
-  // da venda, sem perder nada da validação de cada uma — a decisão de
-  // GERAR ou não cada lançamento já foi tomada acima, antes da transação.
+  // gravados DEPOIS desta transação, como duas chamadas separadas (cada
+  // uma um dbAdd próprio, em customersRepo.js/loyaltyRepo.js). Se o
+  // navegador fechasse/travasse exatamente no intervalo entre a venda já
+  // commitada e essas chamadas, a venda ficava registrada como "paga em
+  // Fiado" sem NENHUMA dívida lançada no extrato do cliente — dinheiro
+  // que a loja deveria cobrar depois, sem rastro nenhum de que era pra
+  // cobrar. Como as duas eram só um `dbAdd` cada (sem leitura condicional
+  // própria), deu pra virar dois `store.add()` a mais dentro da MESMA
+  // transação atômica da venda, sem perder nada da validação de cada uma
+  // — a decisão de GERAR ou não cada lançamento já foi tomada acima,
+  // antes da transação.
   //
   // A checagem por item precisa ser sequencial (uma só depois que a
   // anterior terminou), não em paralelo: se o mesmo produto aparecer duas
