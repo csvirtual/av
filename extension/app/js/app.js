@@ -393,7 +393,42 @@ onSessionUserIdChanged(() => boot());
 // visível, em vez de falha silenciosa. Limitado a 1 aviso a cada 4s pra
 // não empilhar toast repetido se vários erros acontecerem em sequência.
 let lastUnexpectedErrorToastAt = 0;
+
+// Achado de auditoria (P1 — "uso contínuo durante todo o expediente"): o
+// Chrome pode atualizar a extensão SOZINHO, em segundo plano, sem avisar
+// nem fechar as abas já abertas — bem plausível numa aba de PDV que fica
+// aberta o turno inteiro. Quando isso acontece, o CONTEXTO desta aba fica
+// "órfão": qualquer chamada a chrome.* (chrome.storage.session, usado por
+// login/sessão/bloqueio de aba) passa a rejeitar, sempre com o mesmo
+// sintoma — e sem essa checagem, cada rejeição só virava mais um toast
+// genérico de "erro inesperado" repetido a cada 4s, sem explicar o que
+// realmente aconteceu nem o que fazer. `chrome.runtime.id` é a forma
+// padrão de detectar isso: vira `undefined` assim que o contexto invalida,
+// mesmo sem nenhuma chamada ter sido feita ainda. Aviso PERSISTENTE (não
+// um toast que some sozinho) porque este estado não se corrige sozinho —
+// só recarregar a aba resolve.
+let extensionInvalidatedShown = false;
+function handleExtensionInvalidated() {
+  if (extensionInvalidatedShown) return;
+  extensionInvalidatedShown = true;
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:rgba(13,20,17,0.55);padding:20px;';
+  banner.innerHTML = `
+    <div class="card" style="max-width:440px;text-align:center;">
+      <div style="font-size:34px;margin-bottom:6px;">🔄</div>
+      <h1 style="font-size:18px;margin:0 0 10px;">A extensão foi atualizada</h1>
+      <p style="margin:0 0 14px;">O Chrome atualizou a extensão sozinho enquanto esta aba estava aberta. Esta aba precisa recarregar pra continuar funcionando — nenhum dado foi perdido, é só recarregar mesmo.</p>
+      <button class="btn" id="extension-invalidated-reload-btn" type="button">Recarregar agora</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+  document.getElementById('extension-invalidated-reload-btn').addEventListener('click', () => location.reload());
+}
 function reportUnexpectedError(err) {
+  // Checa PRIMEIRO, antes de qualquer outra coisa — um contexto invalidado
+  // também quebraria a tentativa de mostrar o toast normal (showToast em
+  // si não depende de chrome.*, mas o resto do app ao redor dela sim).
+  if (!chrome.runtime?.id) { handleExtensionInvalidated(); return; }
   console.error('[erro não tratado]', err);
   const now = Date.now();
   if (now - lastUnexpectedErrorToastAt < 4000) return;

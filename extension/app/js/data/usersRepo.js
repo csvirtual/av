@@ -1,7 +1,7 @@
 // Usuários do sistema: o primeiro cadastrado é sempre o Administrador Geral
 // (role 'admin'); todos os demais nascem como 'vendedor'. Senhas nunca são
 // gravadas em texto puro — ver auth.js.
-import { dbGetAll, dbGet, dbAdd, dbGetByIndex, dbCount, dbUpdate, newId } from '../db.js';
+import { dbGetAll, dbGet, dbAdd, dbGetByIndex, dbCount, dbUpdate, dbTransaction, newId } from '../db.js';
 import { hashPassword, verifyPasswordHash } from '../auth.js';
 import { getSessionUserId } from '../session.js';
 
@@ -41,6 +41,11 @@ export async function listUsers() {
   return users.sort((a, b) => a.createdAt - b.createdAt);
 }
 
+async function assertAllowedToCreateUser() {
+  if (!(await hasAnyUser())) return; // cadastro do Administrador Geral, ainda sem sessão (setup.js)
+  await assertActingUserIsAdmin();
+}
+
 /** Cadastra um usuário novo. O primeiro usuário do sistema é forçado a ser
  * admin pela tela de setup (ver views/setup.js); daqui pra frente só o admin
  * chama isto, sempre criando vendedores.
@@ -55,8 +60,22 @@ export async function listUsers() {
  * desconto (nunca confiar em quem está chamando pra decidir uma coisa
  * sensível). Corrigido aqui: só existe UM jeito de nascer admin — ser
  * literalmente o primeiro usuário do sistema (a checagem abaixo, não o
- * valor que veio no parâmetro). */
+ * valor que veio no parâmetro).
+ *
+ * Achado de auditoria (P2 — consistência): a checagem acima fecha a
+ * escalação de privilégio (ninguém vira admin por fora do primeiro
+ * cadastro), mas a função ainda aceitava CRIAR usuário vendedor a partir
+ * de qualquer chamada, sem exigir sessão de admin — inconsistente com
+ * todo o resto deste arquivo (setUserActive, resetUserPassword) e dos
+ * outros repositórios sensíveis (backupRepo, financeRepo, purchasesRepo),
+ * que sempre exigem a sessão realmente logada como admin. Mesmo não
+ * sendo escalação de privilégio, um vendedor com acesso ao console
+ * conseguia cadastrar contas extras não autorizadas. `assertAllowedToCreateUser`
+ * segue o mesmo padrão de backupRepo.assertAllowedToApplyBackup: sem
+ * exceção só na instalação nova de verdade, ainda sem ninguém logado
+ * (setup.js chama isto antes de existir qualquer usuário). */
 export async function createUser({ nome, username, password }) {
+  await assertAllowedToCreateUser();
   const usernameLower = (username || '').trim().toLowerCase();
   if (!usernameLower) throw new Error('Nome de usuário é obrigatório.');
   if (await findByUsername(usernameLower)) {
@@ -101,13 +120,47 @@ export async function markAjudaSeen(id) {
   });
 }
 
+/** Achado de auditoria (P0 — GRAVE): esta função nunca impedia desativar o
+ * ÚNICO Administrador Geral ativo do sistema. A tela (views/users.js) só
+ * mostra o botão "Desativar" pra linhas de vendedor — nunca pra admin —
+ * então isso é inalcançável pelo uso normal, mas era protegido SÓ pela
+ * tela: qualquer chamada direta a esta função (console do navegador, ou
+ * uma futura tela/atalho que esqueça dessa regra) conseguia desativar o
+ * admin sem checagem nenhuma. Como só existe UM jeito de nascer admin —
+ * ser literalmente o primeiro usuário do sistema (ver createUser acima) —
+ * e restaurar um backup também exige um admin ativo logado (ver
+ * backupRepo.assertAllowedToApplyBackup), desativar o único admin ativo
+ * seria um beco sem saída: nenhum jeito de reativar ninguém, nenhum jeito
+ * de restaurar um backup anterior, a loja inteira travada pra sempre nas
+ * funções administrativas. Corrigido: agora a checagem "sobra pelo menos
+ * um admin ativo depois dessa mudança" vive AQUI, na função, não só na
+ * tela — mesmo raciocínio de "nunca confiar em quem está chamando" já
+ * aplicado no resto deste arquivo. */
 export async function setUserActive(id, active) {
   await assertActingUserIsAdmin();
-  return dbUpdate('users', id, (user) => {
-    if (!user) throw new Error('Usuário não encontrado.');
-    user.active = active;
-    return user;
+  let validationError = null;
+  await dbTransaction('users', 'readwrite', (transaction) => {
+    const store = transaction.objectStore('users');
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const user = getReq.result;
+      if (!user) { validationError = 'Usuário não encontrado.'; return; }
+      if (active || user.role !== 'admin') {
+        store.put({ ...user, active });
+        return;
+      }
+      const getAllReq = store.getAll();
+      getAllReq.onsuccess = () => {
+        const otherActiveAdmins = getAllReq.result.some((u) => u.id !== id && u.role === 'admin' && u.active);
+        if (!otherActiveAdmins) {
+          validationError = 'Não é possível desativar o único Administrador Geral ativo — o sistema ficaria sem nenhum admin, sem jeito de recuperar (nem a restauração de backup funciona sem um admin ativo logado).';
+          return;
+        }
+        store.put({ ...user, active });
+      };
+    };
   });
+  if (validationError) throw new Error(validationError);
 }
 
 export async function resetUserPassword(id, newPassword) {

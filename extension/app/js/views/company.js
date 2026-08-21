@@ -77,7 +77,7 @@ export async function renderCompanySettings(container, ctx) {
           <input type="checkbox" id="creditInterestFreeEnabled" ${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'checked' : ''}>
           Até quantas vezes sem juros
         </label>
-        <div class="field" id="creditInterestFreeBox" style="display:${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'flex' : 'none'};align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <div class="field field-inline-row" id="creditInterestFreeBox" style="display:${company.policies?.creditInterest?.freeInstallmentsEnabled ? 'flex' : 'none'};">
           <input id="creditInterestFreeInstallments" type="number" min="1" max="12" step="1" style="width:70px;flex-shrink:0;" value="${company.policies?.creditInterest?.freeInstallments ?? 1}">
           <span class="hint" style="margin:0;">vezes sem juros (contando o 1x, que já é sempre isento).</span>
         </div>

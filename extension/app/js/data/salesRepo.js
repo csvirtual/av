@@ -11,8 +11,7 @@
 import { dbGetAll, dbUpdate, dbTransaction, newId } from '../db.js';
 import { getProduct } from './productsRepo.js';
 import { recordMovement } from './stockRepo.js';
-import { recordDebt } from './customersRepo.js';
-import { recordEarn, recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
+import { recordReversal, listCustomerLoyaltyLedger } from './loyaltyRepo.js';
 import { getCompany } from './companyRepo.js';
 import { verifyLogin } from './usersRepo.js';
 import { applyDiscount, computeCartTotals, computeCreditInterest } from '../utils/pricing.js';
@@ -200,14 +199,44 @@ export async function createSale({
     refundedTotal: 0,
   };
 
-  // Baixa de estoque de cada item + gravação da venda, tudo numa ÚNICA
-  // transação (cobrindo os 3 stores envolvidos) — ver comentário no topo
-  // da função. `stockError` guarda a mensagem amigável de um item sem
-  // estoque suficiente: a transação é abortada nesse caso (desfaz
-  // qualquer baixa já enfileirada dos itens anteriores do mesmo carrinho),
-  // e o erro de verdade é relançado depois, fora da transação — abortar
-  // faz dbTransaction rejeitar só com "Transação cancelada.", sem contexto
-  // nenhum, por isso a mensagem específica é guardada à parte.
+  // Dívida de fiado e pontos de fidelidade ganhos por esta venda —
+  // calculados aqui, ANTES da transação (só leitura/aritmética pura), pra
+  // poderem ser gravados DENTRO dela logo abaixo. Reaproveita o `company`
+  // já buscado ali em cima (era buscado de novo aqui — leitura redundante
+  // que nunca mudava o resultado, já que nada escreve em `company` entre
+  // os dois pontos).
+  const loyaltyRate = company?.policies?.loyaltyPointsPerReal ?? 0;
+  const loyaltyPoints = customerId && loyaltyRate > 0 ? Math.floor(total * loyaltyRate) : 0;
+  const debtEntry = fiadoTotal > 0 ? {
+    id: newId(), customerId, type: 'fiado', amount: fiadoTotal, saleId: sale.id,
+    paymentMethod: null, cashSessionId: null, note: '', userId, userName, timestamp: Date.now(),
+  } : null;
+  const loyaltyEntry = loyaltyPoints > 0 ? {
+    id: newId(), customerId, type: 'ganho', points: loyaltyPoints, saleId: sale.id,
+    note: '', userId, userName, timestamp: Date.now(),
+  } : null;
+
+  // Baixa de estoque de cada item + gravação da venda + dívida de fiado +
+  // pontos de fidelidade, tudo numa ÚNICA transação (cobrindo os 5 stores
+  // envolvidos) — ver comentário no topo da função. `stockError` guarda a
+  // mensagem amigável de um item sem estoque suficiente: a transação é
+  // abortada nesse caso (desfaz qualquer baixa já enfileirada dos itens
+  // anteriores do mesmo carrinho), e o erro de verdade é relançado depois,
+  // fora da transação — abortar faz dbTransaction rejeitar só com
+  // "Transação cancelada.", sem contexto nenhum, por isso a mensagem
+  // específica é guardada à parte.
+  //
+  // Achado de auditoria (P1): a dívida de fiado e o ganho de pontos eram
+  // gravados DEPOIS desta transação, como chamadas separadas
+  // (recordDebt/recordEarn). Se o navegador fechasse/travasse exatamente
+  // no intervalo entre a venda já commitada e essas chamadas, a venda
+  // ficava registrada como "paga em Fiado" sem NENHUMA dívida lançada no
+  // extrato do cliente — dinheiro que a loja deveria cobrar depois, sem
+  // rastro nenhum de que era pra cobrar. `recordDebt`/`recordEarn` em si
+  // são só um `dbAdd` cada (sem leitura condicional própria), então dava
+  // pra virar dois `store.add()` a mais dentro da MESMA transação atômica
+  // da venda, sem perder nada da validação de cada uma — a decisão de
+  // GERAR ou não cada lançamento já foi tomada acima, antes da transação.
   //
   // A checagem por item precisa ser sequencial (uma só depois que a
   // anterior terminou), não em paralelo: se o mesmo produto aparecer duas
@@ -218,7 +247,7 @@ export async function createSale({
   // ficaria com menos estoque do que deveria.
   let stockError = null;
   try {
-    await dbTransaction(['products', 'stockMovements', 'sales'], 'readwrite', (transaction) => {
+    await dbTransaction(['products', 'stockMovements', 'sales', 'customerDebts', 'loyaltyEntries'], 'readwrite', (transaction) => {
       const productsStore = transaction.objectStore('products');
       const movementsStore = transaction.objectStore('stockMovements');
       const salesStore = transaction.objectStore('sales');
@@ -226,6 +255,8 @@ export async function createSale({
       function processItem(idx) {
         if (idx >= saleItems.length) {
           salesStore.add(sale);
+          if (debtEntry) transaction.objectStore('customerDebts').add(debtEntry);
+          if (loyaltyEntry) transaction.objectStore('loyaltyEntries').add(loyaltyEntry);
           return;
         }
         const item = saleItems[idx];
@@ -255,19 +286,6 @@ export async function createSale({
     });
   } catch (err) {
     throw new Error(stockError || err.message);
-  }
-
-  if (fiadoTotal > 0) {
-    await recordDebt({ customerId, amount: fiadoTotal, saleId: sale.id, userId, userName });
-  }
-
-  if (customerId) {
-    const company = await getCompany();
-    const rate = company?.policies?.loyaltyPointsPerReal ?? 0;
-    if (rate > 0) {
-      const points = Math.floor(total * rate);
-      if (points > 0) await recordEarn({ customerId, points, saleId: sale.id, userId, userName });
-    }
   }
 
   return sale;

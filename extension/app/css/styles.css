@@ -166,6 +166,20 @@ a { color: var(--primary); }
   gap: 5px;
   margin-bottom: 14px;
 }
+/* Achado do usuário: um campo (ex: "Até quantas vezes sem juros" em Dados
+ * da loja) precisa do input ao LADO do texto de apoio, não empilhado como
+ * label/input normal — mas herdar só a classe .field trazia
+ * flex-direction:column junto, então um align-items:center (pra centralizar
+ * a LINHA verticalmente) acabava centralizando cada item HORIZONTALMENTE
+ * dentro da coluna também, fugindo do alinhamento à esquerda do resto da
+ * tela. Esta classe extra garante a direção certa (linha) sem duplicar
+ * align-items/gap/wrap em cada tela que precisar do mesmo padrão inline. */
+.field-inline-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .field label {
   font-size: 13px;
   font-weight: 600;

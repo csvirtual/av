@@ -2,12 +2,20 @@
 // ou venda que muda a quantidade de um produto fica registrada aqui, com
 // quem fez e quando — é o que dá rastreabilidade além do log de auditoria
 // (que registra a AÇÃO; isto aqui registra o EFEITO no estoque).
-import { dbGetAllByIndex, dbAdd, newId } from '../db.js';
-import { adjustQuantity } from './productsRepo.js';
+import { dbGetAllByIndex, dbTransaction, newId } from '../db.js';
 
-/** type: 'entrada' | 'saida' | 'venda' | 'ajuste' */
+/** Achado de auditoria (P1): a versão anterior fazia `adjustQuantity` (um
+ * dbUpdate, atômico só pra `products`) e DEPOIS, numa transação SEPARADA,
+ * `dbAdd` o registro em `stockMovements` — exatamente o padrão que qualquer
+ * auditoria de estoque deveria caçar: "estoque é atualizado MAS a
+ * movimentação histórica falha". Se o navegador fechasse/travasse bem
+ * entre as duas chamadas, a quantidade do produto já tinha mudado, mas
+ * NENHUM registro explicava a mudança — nem pra entrada de compra, nem
+ * pra ajuste manual, nem pro crédito de estoque de um estorno (todos
+ * passam por esta função). Agora as duas escritas (baixa/alta de
+ * quantidade + registro da movimentação) vivem na MESMA transação —
+ * mesmo padrão já usado em createSale() pro caminho principal de venda. */
 export async function recordMovement({ productId, type, qty, userId, userName, note = '' }) {
-  await adjustQuantity(productId, qty);
   const record = {
     id: newId(),
     productId,
@@ -18,7 +26,27 @@ export async function recordMovement({ productId, type, qty, userId, userName, n
     note,
     timestamp: Date.now(),
   };
-  await dbAdd('stockMovements', record);
+  let adjustError = null;
+  await dbTransaction(['products', 'stockMovements'], 'readwrite', (transaction) => {
+    const productsStore = transaction.objectStore('products');
+    const movementsStore = transaction.objectStore('stockMovements');
+    const getReq = productsStore.get(productId);
+    getReq.onsuccess = () => {
+      const product = getReq.result;
+      if (!product) {
+        adjustError = 'Produto não encontrado.';
+        return;
+      }
+      const newQuantity = product.quantity + qty;
+      if (newQuantity < 0) {
+        adjustError = `Estoque insuficiente de "${product.name}".`;
+        return;
+      }
+      productsStore.put({ ...product, quantity: newQuantity, updatedAt: Date.now() });
+      movementsStore.add(record);
+    };
+  });
+  if (adjustError) throw new Error(adjustError);
   return record;
 }
 

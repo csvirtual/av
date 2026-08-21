@@ -819,7 +819,31 @@ export async function renderSale(container, ctx) {
         customerId: selectedCustomer?.id || null,
       });
     } catch (err) {
-      showToast(err.message, 'error');
+      // Achado de auditoria: um crédito de troca aplicado (botão "Usar
+      // nesta venda" — ver renderCreditBanner) já é deduzido do saldo
+      // pendente da SESSÃO na hora do clique, antes de a venda ser
+      // confirmada de verdade. Se a venda falhar por qualquer motivo
+      // depois disso (ex: uma validação que só o servidor pega), sem essa
+      // devolução o crédito ficava só "preso" na linha de pagamento desta
+      // tentativa — se o vendedor desistisse da venda em vez de tentar de
+      // novo, o cliente perdia parte do crédito sem NENHUMA venda
+      // concluída com ele. Devolve automaticamente e tira a linha do
+      // carrinho de pagamentos — mesmo efeito do botão "Remover" (ver
+      // acima), só que automático — assim o estado nunca fica em dois
+      // lugares ao mesmo tempo: ou está disponível em pendingCredit, ou
+      // está de verdade numa venda concluída, nunca os dois, nunca nenhum.
+      const creditPaymentIdx = payments.findIndex((p) => p.method === CREDIT_METHOD);
+      if (creditPaymentIdx !== -1) {
+        const refund = payments[creditPaymentIdx].amount;
+        payments.splice(creditPaymentIdx, 1);
+        const current = await getPendingCredit();
+        pendingCredit = { ...(current || { reason: 'Gerado por estorno' }), amount: (current?.amount || 0) + refund };
+        await setPendingCredit(pendingCredit);
+        renderCreditBanner();
+        showToast(`${err.message} O crédito de troca aplicado foi devolvido — use "Usar nesta venda" de novo se quiser tentar outra vez.`, 'error');
+      } else {
+        showToast(err.message, 'error');
+      }
       renderPayments(); // recalcula o disabled dos dois botões (carrinho/pagamento não mudaram)
       return;
     }
