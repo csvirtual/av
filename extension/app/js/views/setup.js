@@ -16,6 +16,7 @@ import { getThemePreference, setThemePreference } from '../theme.js';
 import { isValidCnpj, formatCnpj, onlyDigits } from '../utils/cnpj.js';
 import { escapeHtml } from '../utils/format.js';
 import { showToast } from '../components/toast.js';
+import { confirmDialog } from '../components/modal.js';
 
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
@@ -269,7 +270,8 @@ export function renderSetup(root, { onComplete }) {
           <input id="horario" placeholder="Ex: Seg a Sáb, 08h às 18h">
         </div>
 
-        <div class="modal-actions" style="justify-content:flex-end;padding-top:8px;">
+        <div class="modal-actions" style="justify-content:space-between;padding-top:8px;">
+          <button type="button" class="btn btn-secondary" id="back-btn">← Voltar</button>
           <button type="submit" class="btn">Continuar →</button>
         </div>
       </form>
@@ -279,12 +281,28 @@ export function renderSetup(root, { onComplete }) {
       stepNum: 1,
     });
 
-    // Sem botão "← Voltar" aqui de propósito: os campos deste formulário
-    // não ficam salvos em nenhum rascunho — voltar pra tela de boas-vindas e
-    // clicar em "Cadastrar do zero" de novo re-renderizaria tudo em branco,
-    // apagando o que já tinha sido digitado. Se quiser mudar a aparência,
-    // dá pra fazer depois, em Personalização, sem perder o cadastro.
     const form = document.getElementById('company-form');
+
+    // Achado do usuário: não tinha jeito de voltar pra escolher "Restaurar
+    // backup" caso a pessoa começasse o cadastro do zero e desistisse no
+    // meio. Os campos deste formulário não ficam salvos em nenhum
+    // rascunho — voltar E recomeçar apaga o que já tinha sido digitado —
+    // então, se algum campo já tiver conteúdo, confirma antes de
+    // descartar; formulário ainda em branco volta direto, sem perguntar.
+    document.getElementById('back-btn').addEventListener('click', async () => {
+      const hasContent = Array.from(form.querySelectorAll('input, select'))
+        .some((el) => el.type !== 'checkbox' && el.value.trim() !== '');
+      if (hasContent) {
+        const ok = await confirmDialog({
+          title: 'Descartar cadastro?',
+          message: 'Os dados já digitados nesta tela não ficam salvos. Voltar agora descarta tudo. Tem certeza?',
+          confirmLabel: 'Descartar e voltar',
+          danger: true,
+        });
+        if (!ok) return;
+      }
+      renderStep0();
+    });
     const cnpjInput = document.getElementById('cnpj');
     cnpjInput.addEventListener('input', () => {
       cnpjInput.value = formatCnpj(cnpjInput.value);
