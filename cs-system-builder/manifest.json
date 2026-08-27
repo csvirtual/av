@@ -4,7 +4,6 @@
   "short_name": "C&S Builder",
   "version": "0.1.0",
   "description": "Crie sistemas web (HTML/CSS/JS) no Chrome descrevendo em texto para uma IA ou montando visualmente por arrastar-e-soltar. Você usa sua própria chave de API (BYOK) — custo zero de operação para o desenvolvedor da extensão.",
-  "default_locale": "pt_BR",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
