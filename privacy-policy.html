@@ -160,8 +160,9 @@
     <ul>
       <li><b>Dados da loja</b> — CNPJ, razão social, endereço, telefone, e-mail.</li>
       <li><b>Dados de quem usa o sistema (administrador e vendedores)</b> — nome, nome de usuário e senha (guardada como hash, nunca em texto puro).</li>
-      <li><b>Dados de clientes da loja</b> — nome, telefone, endereço, CPF/CNPJ (opcional), histórico de compras e de fiado.</li>
+      <li><b>Dados de clientes da loja</b> — nome, telefone, endereço, CPF/CNPJ (opcional), histórico de compras e de fiado, saldo de pontos de fidelidade (se o programa estiver ativo).</li>
       <li><b>Dados de fornecedores</b> — nome, contato, pedidos de compra.</li>
+      <li><b>Dados de entrega (carreto)</b> — endereço de entrega (pode ser diferente do endereço cadastrado do cliente) e nome de quem faz a entrega, quando informado — que pode ser alguém sem cadastro de usuário no sistema.</li>
       <li><b>Dados operacionais</b> — produtos, estoque, vendas, pagamentos, movimentações de caixa, contas a pagar/receber, log de ações realizadas no sistema.</li>
     </ul>
     <p>Nenhum desses dados é coletado para fins de análise, publicidade ou qualquer uso além do funcionamento do próprio sistema de gestão.</p>
@@ -212,7 +213,7 @@
     <table class="perm-table">
       <thead><tr><th>Permissão</th><th>Para que é usada</th></tr></thead>
       <tbody>
-        <tr><td class="perm-name">storage</td><td>Guardar a sessão de quem está logado e a preferência de aparência (claro/escuro) — os dados de negócio em si (vendas, estoque, clientes etc.) usam o IndexedDB do navegador, que não exige nenhuma permissão do manifesto.</td></tr>
+        <tr><td class="perm-name">storage</td><td>Guardar os dados pequenos e de curta duração listados na seção 3 (sessão de login, timeout de inatividade, crédito de troca pendente, bloqueio de aba única, tentativas de senha, preferência de aparência) — os dados de negócio em si (vendas, estoque, clientes etc.) usam o IndexedDB do navegador, que não exige nenhuma permissão do manifesto.</td></tr>
       </tbody>
     </table>
     <p class="subtle" style="margin-top:14px;font-size:14.5px;">Nenhuma outra permissão é solicitada — não há acesso a outras abas, histórico de navegação, câmera, localização ou rede.</p>
