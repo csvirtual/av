@@ -1,0 +1,30 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--av-font-family);
+  font-size: var(--av-text-md);
+  line-height: var(--av-leading-normal);
+  color: var(--av-color-text);
+  background: var(--av-color-background);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible {
+  outline: 2px solid var(--av-color-focus-ring);
+  outline-offset: 2px;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--av-color-muted) 40%, transparent); border-radius: var(--av-radius-full); }
+::-webkit-scrollbar-track { background: transparent; }
+
+.av-app { height: 100vh; display: flex; flex-direction: column; container-type: inline-size; container-name: av-app; }
+
+/* Several elements below get an explicit `display` (flex/grid) from
+   components.css/layout.css for when they're shown — which, per the CSS
+   cascade, beats the UA stylesheet's `[hidden]{display:none}` even though
+   that looks like it should always win. Restate it here with priority so
+   toggling the `hidden` IDL property actually hides them. */
+[hidden] { display: none !important; }

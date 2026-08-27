@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "AV Builder — AI Web Engineering Platform",
+  "short_name": "AV Builder",
+  "version": "0.1.0",
+  "description": "Descreva um app em português e receba uma aplicação web real: planejamento, componentes, código, preview e exportação — tudo local, sem servidor obrigatório.",
+  "default_locale": "pt_BR",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "AV Builder",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "downloads"
+  ],
+  "optional_permissions": [],
+  "optional_host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*"
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "Abrir o AV Builder"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://api.openai.com; base-uri 'none'; form-action 'none'"
+  },
+  "minimum_chrome_version": "116"
+}

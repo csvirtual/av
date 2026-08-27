@@ -1,0 +1,173 @@
+/*
+ * Layout do shell do builder. O Side Panel do Chrome pode ser redimensionado
+ * pelo usuário (de ~320px a boa parte da largura da janela), então o layout
+ * responde ao tamanho do próprio contêiner do app (container query em
+ * .av-app), não ao viewport do navegador — o painel é a "viewport" real
+ * aqui.
+ */
+
+.av-only-narrow { display: none; }
+
+.av-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--av-space-3);
+  padding: var(--av-space-2) var(--av-space-3);
+  background: var(--av-color-surface);
+  border-bottom: var(--av-border-width) solid var(--av-color-border);
+  flex: 0 0 auto;
+}
+.av-topbar__brand { display: flex; align-items: center; gap: var(--av-space-2); min-width: 0; }
+.av-topbar__actions { display: flex; align-items: center; gap: var(--av-space-1); flex-wrap: nowrap; }
+.av-topbar__projectname { width: clamp(6rem, 20cqi, 14rem); font-weight: var(--av-weight-semibold); }
+.av-logo {
+  display: grid; place-items: center;
+  inline-size: 1.75rem; block-size: 1.75rem;
+  border-radius: var(--av-radius-md);
+  background: var(--av-color-primary); color: var(--av-color-on-primary);
+  font-size: var(--av-text-xs); font-weight: var(--av-weight-bold);
+  flex: 0 0 auto;
+}
+.av-divider { inline-size: 1px; block-size: 1.5rem; background: var(--av-color-border); margin-inline: var(--av-space-1); }
+.av-devicebar { display: flex; gap: 2px; background: var(--av-color-background); border-radius: var(--av-radius-md); padding: 2px; }
+
+.av-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(240px, 300px);
+}
+
+.av-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--av-color-surface);
+  container-type: inline-size;
+}
+.av-panel--left { border-inline-end: var(--av-border-width) solid var(--av-color-border); }
+.av-panel--right { border-inline-start: var(--av-border-width) solid var(--av-color-border); overflow-y: auto; }
+
+.av-tabpanel { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--av-space-2); }
+
+.av-stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--av-color-background);
+}
+.av-stage__toolbar {
+  display: flex; align-items: center; gap: var(--av-space-2);
+  padding: var(--av-space-2) var(--av-space-3);
+  border-bottom: var(--av-border-width) solid var(--av-color-border);
+  flex: 0 0 auto;
+}
+.av-stage__spacer { flex: 1 1 auto; }
+
+.av-canvas-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--av-space-5);
+}
+.av-canvas-frame {
+  position: relative;
+  background: #fff;
+  box-shadow: var(--av-elevation-2);
+  border-radius: var(--av-radius-md);
+  overflow: hidden;
+  transition: inline-size var(--av-duration-normal) var(--av-easing-standard);
+}
+.av-canvas-viewport[data-device="mobile"] .av-canvas-frame { inline-size: 390px; block-size: 780px; }
+.av-canvas-viewport[data-device="tablet"] .av-canvas-frame { inline-size: 834px; block-size: 900px; max-block-size: 90%; }
+.av-canvas-viewport[data-device="desktop"] .av-canvas-frame { inline-size: 1280px; block-size: 860px; max-block-size: 90%; }
+.av-canvas-viewport[data-device="full"] .av-canvas-frame { inline-size: 100%; block-size: 100%; }
+
+#previewFrame { display: block; inline-size: 100%; block-size: 100%; border: 0; background: #fff; }
+.av-selection-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.av-selection-box {
+  position: absolute;
+  border: 2px solid var(--av-color-info);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--av-color-info) 10%, transparent);
+  pointer-events: none;
+}
+.av-selection-box__label {
+  position: absolute; top: -1.4rem; left: 0;
+  background: var(--av-color-info); color: #fff;
+  font-size: var(--av-text-xs); padding: 1px 6px; border-radius: var(--av-radius-sm);
+  white-space: nowrap;
+}
+.av-hover-box {
+  position: absolute;
+  border: 1.5px dashed color-mix(in srgb, var(--av-color-info) 60%, transparent);
+  pointer-events: none;
+}
+
+.av-codeview {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  background: var(--av-color-surface);
+}
+.av-codeeditor {
+  flex: 1 1 auto; min-height: 0; resize: none; border: 0;
+  padding: var(--av-space-3);
+  font-family: var(--av-font-mono); font-size: var(--av-text-sm);
+  background: #14161f; color: #d7dbe8;
+  tab-size: 2;
+}
+.av-codeview__actions {
+  display: flex; align-items: center; gap: var(--av-space-3);
+  padding: var(--av-space-2) var(--av-space-3);
+  border-top: var(--av-border-width) solid var(--av-color-border);
+}
+
+.av-console {
+  flex: 0 0 auto; max-block-size: 45%;
+  border-top: var(--av-border-width) solid var(--av-color-border);
+  background: var(--av-color-surface);
+  display: flex; flex-direction: column;
+}
+.av-console[data-open="false"] .av-console__log { display: none; }
+.av-console__header {
+  display: flex; align-items: center; gap: var(--av-space-2);
+  padding: var(--av-space-1) var(--av-space-3);
+  font-size: var(--av-text-sm); font-weight: var(--av-weight-medium);
+}
+.av-console__log {
+  overflow-y: auto; padding: 0 var(--av-space-3) var(--av-space-2);
+  font-family: var(--av-font-mono); font-size: var(--av-text-xs);
+  block-size: 220px;
+}
+
+.av-aipanel { padding: var(--av-space-3); border-bottom: var(--av-border-width) solid var(--av-color-border); }
+.av-aipanel__actions { margin-top: var(--av-space-2); }
+.av-properties { padding: var(--av-space-3); }
+
+/* Painel estreito (<= 720px de contêiner): esconde estrutura/propriedades por
+   padrão e vira drawer sobreposto acionado pelos botões do topo. */
+@container av-app (max-width: 720px) {
+  .av-only-narrow { display: inline-flex; }
+  .av-body { grid-template-columns: minmax(0, 1fr); }
+  .av-panel--left, .av-panel--right {
+    position: absolute; inset-block: 0; inline-size: min(85%, 320px);
+    z-index: 20; box-shadow: var(--av-elevation-3);
+    transform: translateX(-105%);
+    transition: transform var(--av-duration-normal) var(--av-easing-standard);
+  }
+  .av-panel--right { transform: translateX(105%); inset-inline-start: auto; inset-inline-end: 0; }
+  .av-panel--left.is-open { transform: translateX(0); }
+  .av-panel--right.is-open { transform: translateX(0); }
+}
+
+@container av-app (max-width: 480px) {
+  .av-topbar__projectname { display: none; }
+  .av-devicebar { display: none; }
+}

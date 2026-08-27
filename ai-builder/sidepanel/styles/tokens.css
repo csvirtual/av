@@ -1,0 +1,126 @@
+/*
+ * Design tokens — única fonte de verdade visual do produto (extensão e
+ * também o que o gerador de código escreve nos apps exportados).
+ *
+ * Espaçamento e raio usam uma escala fixa em rem (previsível, boa para um
+ * builder onde o usuário arrasta/mede coisas). Tipografia usa clamp() para
+ * ser fluida entre o painel estreito e o painel expandido. Estados de hover/
+ * active de cor são derivados via color-mix() nativo — nunca duplicamos uma
+ * cor "escura" manualmente.
+ */
+:root {
+  color-scheme: light;
+
+  /* --- Cor: papéis semânticos, não nomes de cor --- */
+  --av-color-primary: #212c50;
+  --av-color-secondary: #c6a75e;
+  --av-color-background: #f7f7f9;
+  --av-color-surface: #ffffff;
+  --av-color-border: #e2e4ea;
+  --av-color-text: #1c1f2a;
+  --av-color-muted: #6b7080;
+  --av-color-success: #1f8a53;
+  --av-color-warning: #b8790a;
+  --av-color-danger: #c73434;
+  --av-color-info: #2064c7;
+
+  --av-color-primary-hover: color-mix(in srgb, var(--av-color-primary) 88%, white);
+  --av-color-primary-active: color-mix(in srgb, var(--av-color-primary) 80%, black);
+  --av-color-secondary-hover: color-mix(in srgb, var(--av-color-secondary) 88%, white);
+  --av-color-surface-hover: color-mix(in srgb, var(--av-color-surface) 94%, black);
+  --av-color-danger-hover: color-mix(in srgb, var(--av-color-danger) 88%, white);
+  --av-color-focus-ring: color-mix(in srgb, var(--av-color-info) 55%, transparent);
+
+  --av-color-on-primary: #ffffff;
+  --av-color-on-secondary: #212c50;
+
+  /* --- Espaçamento (escala 4px) --- */
+  --av-space-0: 0;
+  --av-space-1: 0.25rem;
+  --av-space-2: 0.5rem;
+  --av-space-3: 0.75rem;
+  --av-space-4: 1rem;
+  --av-space-5: 1.5rem;
+  --av-space-6: 2rem;
+  --av-space-7: 3rem;
+  --av-space-8: 4rem;
+
+  /* --- Tipografia --- */
+  --av-font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --av-font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --av-text-xs: clamp(0.6875rem, 0.66rem + 0.15vw, 0.75rem);
+  --av-text-sm: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);
+  --av-text-md: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --av-text-lg: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  --av-text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.625rem);
+  --av-text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2.25rem);
+  --av-leading-tight: 1.2;
+  --av-leading-normal: 1.5;
+  --av-weight-normal: 400;
+  --av-weight-medium: 500;
+  --av-weight-semibold: 600;
+  --av-weight-bold: 700;
+
+  /* --- Bordas / raio / elevação --- */
+  --av-radius-sm: 0.25rem;
+  --av-radius-md: 0.5rem;
+  --av-radius-lg: 0.875rem;
+  --av-radius-full: 999px;
+  --av-border-width: 1px;
+
+  --av-elevation-0: none;
+  --av-elevation-1: 0 1px 2px rgba(20, 22, 40, 0.06), 0 1px 1px rgba(20, 22, 40, 0.04);
+  --av-elevation-2: 0 2px 8px rgba(20, 22, 40, 0.10), 0 1px 2px rgba(20, 22, 40, 0.06);
+  --av-elevation-3: 0 8px 24px rgba(20, 22, 40, 0.16), 0 2px 6px rgba(20, 22, 40, 0.08);
+
+  /* --- Movimento --- */
+  --av-duration-fast: 120ms;
+  --av-duration-normal: 200ms;
+  --av-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* --- Breakpoints (referência — usados em JS, @media/@container não aceitam var()) --- */
+  --av-bp-mobile: 390;
+  --av-bp-tablet: 834;
+  --av-bp-desktop: 1280;
+
+  /* --- Densidade (controla espaçamento vertical de listas/tabelas) --- */
+  --av-density-compact: 0.75;
+  --av-density-comfortable: 1;
+  --av-density: var(--av-density-comfortable);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --av-color-primary: #7c8fd6;
+    --av-color-secondary: #d9bd7c;
+    --av-color-background: #14161f;
+    --av-color-surface: #1b1e2a;
+    --av-color-border: #2c3040;
+    --av-color-text: #eceef5;
+    --av-color-muted: #9498aa;
+    --av-color-success: #3fc47b;
+    --av-color-warning: #e0a336;
+    --av-color-danger: #e2665f;
+    --av-color-info: #5b9bf0;
+    --av-color-on-primary: #12162a;
+    --av-color-on-secondary: #12162a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --av-color-primary: #7c8fd6;
+  --av-color-secondary: #d9bd7c;
+  --av-color-background: #14161f;
+  --av-color-surface: #1b1e2a;
+  --av-color-border: #2c3040;
+  --av-color-text: #eceef5;
+  --av-color-muted: #9498aa;
+  --av-color-success: #3fc47b;
+  --av-color-warning: #e0a336;
+  --av-color-danger: #e2665f;
+  --av-color-info: #5b9bf0;
+  --av-color-on-primary: #12162a;
+  --av-color-on-secondary: #12162a;
+}

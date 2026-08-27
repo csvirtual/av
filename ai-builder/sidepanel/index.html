@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>AV Builder</title>
+<link rel="icon" href="../icons/icon-32.png">
+<link rel="stylesheet" href="styles/tokens.css">
+<link rel="stylesheet" href="styles/base.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+<div id="app" class="av-app">
+
+  <header class="av-topbar">
+    <div class="av-topbar__brand">
+      <span class="av-logo" aria-hidden="true">AV</span>
+      <input id="projectName" class="av-input av-input--ghost av-topbar__projectname" value="Novo projeto" aria-label="Nome do projeto">
+    </div>
+    <div class="av-topbar__actions">
+      <button id="btnToggleLeft" class="av-btn av-btn--icon av-only-narrow" title="Estrutura do projeto">🧩</button>
+      <button id="btnUndo" class="av-btn av-btn--icon" title="Desfazer (Ctrl+Z)" disabled>↶</button>
+      <button id="btnRedo" class="av-btn av-btn--icon" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
+      <div class="av-divider" role="separator"></div>
+      <div class="av-devicebar" role="group" aria-label="Tamanho do preview">
+        <button class="av-btn av-btn--icon is-active" data-device="mobile" title="Mobile (390px)">📱</button>
+        <button class="av-btn av-btn--icon" data-device="tablet" title="Tablet (834px)">📔</button>
+        <button class="av-btn av-btn--icon" data-device="desktop" title="Desktop (1280px)">🖥️</button>
+        <button class="av-btn av-btn--icon" data-device="full" title="Largura total">⛶</button>
+      </div>
+      <div class="av-divider" role="separator"></div>
+      <button id="btnToggleCode" class="av-btn" title="Alternar visual / código">{'</>'} Código</button>
+      <button id="btnExport" class="av-btn av-btn--primary" title="Exportar projeto (.zip)">Exportar</button>
+      <button id="btnSettings" class="av-btn av-btn--icon" title="Configurações">⚙️</button>
+      <button id="btnToggleRight" class="av-btn av-btn--icon av-only-narrow" title="Propriedades e IA">🎛️</button>
+    </div>
+  </header>
+
+  <main class="av-body">
+
+    <nav class="av-panel av-panel--left" aria-label="Estrutura do projeto">
+      <div class="av-tabs" role="tablist">
+        <button class="av-tab is-active" data-panel="layers" role="tab" aria-selected="true">Camadas</button>
+        <button class="av-tab" data-panel="library" role="tab" aria-selected="false">Componentes</button>
+        <button class="av-tab" data-panel="pages" role="tab" aria-selected="false">Páginas</button>
+      </div>
+      <div id="panelLayers" class="av-tabpanel" role="tabpanel"></div>
+      <div id="panelLibrary" class="av-tabpanel" role="tabpanel" hidden></div>
+      <div id="panelPages" class="av-tabpanel" role="tabpanel" hidden></div>
+    </nav>
+
+    <section class="av-stage">
+      <div class="av-stage__toolbar">
+        <div id="issueBadge" class="av-badge av-badge--muted" title="Problemas encontrados pelo validador">0 problemas</div>
+        <div class="av-stage__spacer"></div>
+        <button id="btnValidate" class="av-btn av-btn--small">Validar</button>
+        <button id="btnRepair" class="av-btn av-btn--small" disabled>Corrigir automaticamente</button>
+        <button id="btnReload" class="av-btn av-btn--icon av-btn--small" title="Recarregar preview">⟳</button>
+      </div>
+
+      <div id="canvasViewport" class="av-canvas-viewport" data-device="mobile">
+        <div id="canvasFrame" class="av-canvas-frame">
+          <iframe id="previewFrame" title="Preview da aplicação" sandbox="allow-scripts" tabindex="-1"></iframe>
+          <div id="selectionOverlay" class="av-selection-overlay" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div id="codeView" class="av-codeview" hidden>
+        <div class="av-tabs" role="tablist">
+          <button class="av-tab is-active" data-code="html" role="tab">HTML</button>
+          <button class="av-tab" data-code="css" role="tab">CSS</button>
+          <button class="av-tab" data-code="js" role="tab">JS</button>
+        </div>
+        <textarea id="codeEditor" class="av-codeeditor" spellcheck="false" aria-label="Editor de código"></textarea>
+        <div class="av-codeview__actions">
+          <span id="codeSyncStatus" class="av-hint">sincronizado</span>
+          <button id="btnApplyCode" class="av-btn av-btn--small av-btn--primary">Aplicar alterações</button>
+        </div>
+      </div>
+
+      <div id="consoleDrawer" class="av-console" data-open="false">
+        <div class="av-console__header">
+          <span>Console</span>
+          <div class="av-stage__spacer"></div>
+          <button id="btnClearConsole" class="av-btn av-btn--small">Limpar</button>
+          <button id="btnToggleConsole" class="av-btn av-btn--icon av-btn--small">▾</button>
+        </div>
+        <div id="consoleLog" class="av-console__log" role="log"></div>
+      </div>
+    </section>
+
+    <aside class="av-panel av-panel--right" aria-label="Propriedades e IA">
+      <div id="aiPanel" class="av-aipanel">
+        <label for="aiPrompt" class="av-label">Comando universal</label>
+        <textarea id="aiPrompt" class="av-textarea" rows="4" placeholder="Ex: Sistema de controle de estoque para uma loja de materiais de construção, com produtos, fornecedores, entradas, saídas e estoque mínimo."></textarea>
+        <div class="av-aipanel__actions">
+          <button id="btnGenerate" class="av-btn av-btn--primary av-btn--block">Gerar aplicação</button>
+        </div>
+        <div id="aiPlan" class="av-aiplan" hidden></div>
+      </div>
+      <div id="propertiesPanel" class="av-properties" hidden></div>
+    </aside>
+
+  </main>
+
+  <div id="commandPalette" class="av-palette" hidden>
+    <div class="av-palette__box" role="dialog" aria-label="Paleta de comandos" aria-modal="true">
+      <input id="paletteInput" class="av-input" placeholder="Digite um comando ou pedido para a IA…" autocomplete="off">
+      <ul id="paletteResults" class="av-palette__results" role="listbox"></ul>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="av-modal" hidden>
+    <div class="av-modal__box" role="dialog" aria-label="Configurações" aria-modal="true">
+      <h2 class="av-modal__title">Configurações</h2>
+      <label class="av-label" for="providerSelect">Provedor de IA</label>
+      <select id="providerSelect" class="av-select">
+        <option value="local">Local (determinístico, grátis, offline)</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI-compatível</option>
+      </select>
+      <label class="av-label" for="apiKeyInput">Chave de API (guardada só nesta sessão do navegador)</label>
+      <input id="apiKeyInput" class="av-input" type="password" autocomplete="off" placeholder="sk-...">
+      <p class="av-hint">A chave nunca é enviada para nenhum lugar além do provedor selecionado, não é salva em disco e some ao fechar o navegador.</p>
+      <div class="av-modal__actions">
+        <button id="btnCloseSettings" class="av-btn">Fechar</button>
+        <button id="btnSaveSettings" class="av-btn av-btn--primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="scripts/main.js"></script>
+</body>
+</html>
