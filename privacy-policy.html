@@ -170,7 +170,7 @@
   <section>
     <span class="sec-num">3</span>
     <h2 class="sec-title">Onde os dados ficam guardados</h2>
-    <p>Tudo é armazenado localmente, usando o <b>IndexedDB</b> do navegador — um banco de dados que vive dentro do perfil do Chrome onde a extensão está instalada, no computador da loja. A extensão também usa duas áreas pequenas de <code>chrome.storage</code> para dados de curta duração: a sessão de quem está logado no momento (apagada ao fechar o navegador) e a preferência de aparência (claro/escuro).</p>
+    <p>Tudo é armazenado localmente, usando o <b>IndexedDB</b> do navegador — um banco de dados que vive dentro do perfil do Chrome onde a extensão está instalada, no computador da loja. A extensão também usa o <code>chrome.storage</code> para um punhado de dados pequenos e de curta duração: a sessão de quem está logado no momento (apagada ao fechar o navegador); o horário da última ação na tela, usado só para encerrar a sessão automaticamente após 30 minutos sem uso; um crédito de troca pendente de uso na próxima venda, quando existir; um registro temporário indicando que a extensão está aberta, usado só para impedir que ela opere em mais de uma aba do navegador ao mesmo tempo; o histórico de tentativas de senha incorretas, usado só para o bloqueio temporário do campo de senha; e a preferência de aparência (claro/escuro).</p>
     <p><b>Não existe nenhum servidor, nuvem ou serviço externo envolvido.</b> A extensão não faz nenhuma chamada de rede — isso pode ser conferido diretamente no código-fonte, que não contém nenhuma linha de comunicação com a internet.</p>
   </section>
 
@@ -203,7 +203,7 @@
     <span class="sec-num">7</span>
     <h2 class="sec-title">Responsabilidade sobre os dados de clientes (LGPD)</h2>
     <p>O sistema guarda dado pessoal de clientes da loja (nome, telefone, endereço, histórico de fiado), o que sujeita esse uso à Lei Geral de Proteção de Dados (LGPD). É importante deixar claro: <b>quem é o controlador desses dados — o responsável legal perante a LGPD — é a loja que opera o sistema, não a desenvolvedora da extensão</b>, que apenas fornece a ferramenta e não tem acesso, custódia ou qualquer forma de processamento sobre esses dados.</p>
-    <p>Recomendamos que cada loja que usa o sistema informe seus próprios clientes sobre a coleta desses dados, conforme exigido pela LGPD. A própria extensão inclui, na tela <b>Ajuda → "Privacidade e LGPD"</b>, um modelo de aviso de privacidade pronto para imprimir ou entregar ao cliente, preenchido automaticamente com o nome da loja.</p>
+    <p>Recomendamos que cada loja que usa o sistema informe seus próprios clientes sobre a coleta desses dados, conforme exigido pela LGPD. A própria extensão ajuda de duas formas: a tela <b>Ajuda → "Privacidade e LGPD"</b> traz um modelo de aviso de privacidade pronto para imprimir ou entregar ao cliente, preenchido automaticamente com o nome da loja; e a tela <b>Dados da loja</b> tem um campo opcional para cadastrar o nome e contato do Encarregado de Dados (DPO) da loja, caso ela tenha um.</p>
   </section>
 
   <section>
@@ -233,7 +233,7 @@
   <section>
     <span class="sec-num">11</span>
     <h2 class="sec-title">Contato</h2>
-    <p>Dúvidas sobre esta política ou sobre o funcionamento da extensão podem ser enviadas através da página da extensão na Chrome Web Store.</p>
+    <p>Dúvidas sobre esta política ou sobre o funcionamento da extensão podem ser enviadas para <code>csvirtual.av@gmail.com</code>, ou através da página da extensão na Chrome Web Store.</p>
   </section>
 </main>
 
