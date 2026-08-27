@@ -38,8 +38,10 @@ Provedores suportados: **Groq**, **OpenAI**, **Anthropic (Claude)** e
 3. Ative o **Modo do desenvolvedor** (canto superior direito).
 4. Clique em **Carregar sem compactação** e selecione a pasta deste
    repositório.
-5. Clique no ícone da extensão (ou abra o painel lateral do Chrome) para
-   abrir o **C&S System Builder**.
+5. Clique no ícone da extensão: ela abre como uma **aba de verdade**
+   (`C&S System Builder`), com todo o espaço de tela pra trabalhar — não é
+   um popup nem o painel lateral do Chrome. Clicar de novo no ícone foca a
+   aba já aberta em vez de abrir outra.
 6. Vá na aba **Config**, escolha um provedor, cole sua chave de API e
    salve.
 
@@ -62,9 +64,9 @@ Em vez de a IA gerar HTML solto, ela gera (e o editor visual manipula) uma
 **árvore JSON de componentes** com um esquema fechado de tipos (`container`,
 `heading`, `text`, `button`, `image`, `link`, `input`, `textarea`, `select`,
 `form`, `list`, `table`, `card`, `divider`) e um conjunto fixo de propriedades
-de estilo. Esse esquema compartilhado (`sidepanel/schema.js`) é o que permite
+de estilo. Esse esquema compartilhado (`dashboard/schema.js`) é o que permite
 o chat e o arrastar-e-soltar editarem exatamente a mesma coisa. A árvore é
-serializada para HTML/CSS estático em `sidepanel/render.js` na hora de
+serializada para HTML/CSS estático em `dashboard/render.js` na hora de
 exportar ou mostrar o preview.
 
 ## Modelo de segurança
@@ -94,10 +96,10 @@ exportar ou mostrar o preview.
 ## Estrutura do código
 
 ```
-manifest.json           Manifest V3 (side panel, permissões, host_permissions)
-background.js            Abre o side panel ao clicar no ícone
-sidepanel/
-  index.html              Shell da UI (abas: Chat, Editor, Preview, Config, Projetos)
+manifest.json           Manifest V3 (permissões, host_permissions)
+background.js            Abre/foca a aba do dashboard ao clicar no ícone
+dashboard/
+  index.html              Shell da UI (barra lateral: Chat, Editor, Preview, Config, Projetos)
   styles.css              Estilos
   schema.js               Modelo de dados (árvore de componentes) + sanitização
   render.js                Serializa a árvore para HTML/CSS

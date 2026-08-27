@@ -1,5 +1,5 @@
 // Editor visual (arrastar-e-soltar). Renderiza a árvore do projeto como DOM
-// real dentro do side panel — mas SEM nunca executar o JS gerado (onclick/
+// real dentro da aba do dashboard — mas SEM nunca executar o JS gerado (onclick/
 // onsubmit ficam só como atributos de dados aqui). Quem realmente roda o JS
 // do sistema é o iframe sandboxed do preview (chat.js/app.js), nunca esta
 // página da extensão. Isso mantém a edição segura mesmo que o código gerado

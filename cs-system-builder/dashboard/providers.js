@@ -1,5 +1,5 @@
-// Integração BYOK ("bring your own key"): todas as chamadas saem direto do
-// side panel (extensão) para a API do provedor escolhido, usando a chave que
+// Integração BYOK ("bring your own key"): todas as chamadas saem direto da
+// aba do dashboard (extensão) para a API do provedor escolhido, usando a chave que
 // o próprio usuário colou nas configurações. Nenhuma chamada passa por um
 // servidor nosso — por isso o custo de operação da extensão é zero: quem
 // paga (ou usa a camada gratuita) é o usuário, com a própria chave dele.

@@ -15,10 +15,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "side_panel": {
-    "default_path": "sidepanel/index.html"
-  },
-  "permissions": ["sidePanel", "storage"],
+  "permissions": ["tabs", "storage"],
   "host_permissions": [
     "https://api.openai.com/*",
     "https://api.anthropic.com/*",

@@ -22,17 +22,22 @@ function scheduleSave() {
 // ---- Tabs ----
 
 function initTabs() {
-  const tabs = document.querySelectorAll('.tab-btn');
+  const tabs = document.querySelectorAll('.nav-item');
   tabs.forEach((btn) => {
     btn.addEventListener('click', () => {
       tabs.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
       $(`view-${btn.dataset.tab}`).classList.add('active');
+      $('header-title').textContent = btn.dataset.title || btn.textContent.trim();
       if (btn.dataset.tab === 'preview') updatePreview();
       if (btn.dataset.tab === 'editor') rerenderEditor();
     });
   });
+}
+
+function syncHeaderProjectName() {
+  $('header-project-name').textContent = project.name || 'Sem nome';
 }
 
 // ---- Editor visual ----
@@ -276,6 +281,7 @@ async function loadProjectById(id) {
   selectedId = null;
   await Storage.setCurrentProjectId(project.id);
   $('proj-name').value = project.name;
+  syncHeaderProjectName();
   rerenderEditor();
   updatePreview();
 }
@@ -285,6 +291,7 @@ function startNewProject() {
   selectedId = null;
   dirty = false;
   $('proj-name').value = project.name;
+  syncHeaderProjectName();
   rerenderEditor();
   updatePreview();
 }
@@ -294,6 +301,7 @@ function initProjectsTab() {
     const name = $('proj-name').value.trim() || 'Projeto sem nome';
     project.name = name;
     project.meta.title = name;
+    syncHeaderProjectName();
     await Storage.saveProject(project);
     dirty = false;
     refreshProjectsList();
@@ -321,6 +329,7 @@ async function boot() {
     project = Schema.createProject('Meu sistema');
   }
   $('proj-name').value = project.name;
+  syncHeaderProjectName();
 
   Canvas.renderPalette($('palette'));
   rerenderEditor();
