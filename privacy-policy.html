@@ -4,221 +4,241 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Política de Privacidade — Gestão de Loja</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   :root {
-    --bg: #e9e8e2;
-    --surface: #fbfaf7;
-    --surface-line: rgba(27,36,32,0.13);
-    --ink: #1b2420;
-    --ink-soft: #52605a;
-    --ink-faint: #7c887f;
-    --accent: #a85a26;
-    --accent-ink: #fbfaf7;
-    --rule: rgba(27,36,32,0.16);
-    --tag-bg: #f2efe6;
-    --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
-    --font-body: "Source Sans 3", "Segoe UI", sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    --bg: #f3f4f1;
+    --bg-raised: #ffffff;
+    --bg-well: #eaece7;
+    --ink: #1c211e;
+    --ink-soft: #4d564f;
+    --ink-faint: #7c8580;
+    --border: #d7dad2;
+    --border-strong: #b9bdb1;
+    --accent: #1f5a45;
+    --accent-soft: #e2ede7;
+    --accent-strong: #163f31;
+    --link: #1f5a45;
+
+    --font-display: 'Source Serif 4', Georgia, serif;
+    --font-body: 'Public Sans', -apple-system, system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+    --shadow: 0 1px 2px rgba(20,24,21,0.05), 0 6px 20px rgba(20,24,21,0.05);
   }
+
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #131c17;
-      --surface: #1a251e;
-      --surface-line: rgba(237,239,233,0.10);
-      --ink: #ecefe9;
-      --ink-soft: #a9b6ac;
-      --ink-faint: #7c8a80;
-      --accent: #dd8a4a;
-      --accent-ink: #14201a;
-      --rule: rgba(237,239,233,0.14);
-      --tag-bg: #1f2b23;
+      --bg: #141815;
+      --bg-raised: #1b201c;
+      --bg-well: #10130f;
+      --ink: #e7e9e3;
+      --ink-soft: #adb5ab;
+      --ink-faint: #7c8580;
+      --border: #2b322c;
+      --border-strong: #3c453d;
+      --accent: #6fbf9e;
+      --accent-soft: #1b2d24;
+      --accent-strong: #9adfc0;
+      --link: #7fcba6;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px rgba(0,0,0,0.4);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #131c17;
-    --surface: #1a251e;
-    --surface-line: rgba(237,239,233,0.10);
-    --ink: #ecefe9;
-    --ink-soft: #a9b6ac;
-    --ink-faint: #7c8a80;
-    --accent: #dd8a4a;
-    --accent-ink: #14201a;
-    --rule: rgba(237,239,233,0.14);
-    --tag-bg: #1f2b23;
+    --bg: #141815;
+    --bg-raised: #1b201c;
+    --bg-well: #10130f;
+    --ink: #e7e9e3;
+    --ink-soft: #adb5ab;
+    --ink-faint: #7c8580;
+    --border: #2b322c;
+    --border-strong: #3c453d;
+    --accent: #6fbf9e;
+    --accent-soft: #1b2d24;
+    --accent-strong: #9adfc0;
+    --link: #7fcba6;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 28px rgba(0,0,0,0.4);
   }
 
   * { box-sizing: border-box; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.6;
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); font-size: 16.5px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
   }
-  .sheet {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 56px 24px 80px;
-  }
-  .eyebrow {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 0 0 10px;
-  }
-  h1 {
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: clamp(30px, 5vw, 42px);
-    line-height: 1.08;
-    letter-spacing: -0.01em;
-    margin: 0 0 6px;
-    text-wrap: balance;
-  }
-  .meta {
-    color: var(--ink-faint);
-    font-size: 14px;
-    margin: 0 0 34px;
-    font-variant-numeric: tabular-nums;
-  }
-  .lede {
-    background: var(--surface);
-    border: 1px solid var(--surface-line);
-    border-left: 3px solid var(--accent);
-    border-radius: 3px;
-    padding: 18px 20px;
-    font-size: 16.5px;
-    margin: 0 0 44px;
-  }
-  .lede strong { color: var(--accent); }
+  ::selection { background: var(--accent-soft); color: var(--accent-strong); }
+  a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; color: var(--ink); }
+  code { font-family: var(--font-mono); font-size: 0.88em; background: var(--bg-well); padding: 0.1em 0.4em; border-radius: 4px; }
 
-  h2 {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 22px;
-    letter-spacing: 0.01em;
-    margin: 40px 0 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--rule);
+  header.masthead {
+    border-bottom: 1px solid var(--border);
+    padding: 22px 28px;
   }
-  h2 .num {
-    display: inline-block;
-    color: var(--ink-faint);
-    font-variant-numeric: tabular-nums;
-    margin-right: 10px;
-  }
-  p { margin: 0 0 14px; max-width: 62ch; }
-  ul { margin: 0 0 14px; padding-left: 22px; max-width: 60ch; }
-  li { margin-bottom: 6px; }
-  strong { font-weight: 600; }
-
-  .fill {
-    font-family: var(--font-mono);
-    background: var(--tag-bg);
-    border: 1px solid var(--surface-line);
-    border-radius: 3px;
-    padding: 1px 8px;
-    color: var(--accent);
+  .masthead-inner { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.05em; color: var(--ink-soft); }
+  .brand strong { color: var(--ink); font-weight: 600; }
+  .doc-label {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 5px;
   }
 
-  footer {
-    margin-top: 56px;
-    padding-top: 18px;
-    border-top: 1px solid var(--rule);
-    color: var(--ink-faint);
-    font-size: 13px;
-  }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 28px 100px; }
 
-  @media (max-width: 520px) {
-    .sheet { padding: 40px 18px 60px; }
+  h1.title { font-size: 34px; line-height: 1.15; margin: 0 0 10px; }
+  .updated { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-faint); margin: 0 0 40px; }
+
+  .summary-box {
+    background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px;
+    padding: 26px 28px; box-shadow: var(--shadow); margin-bottom: 48px;
   }
+  .summary-box h2 { font-size: 17px; margin: 0 0 14px; }
+  .summary-box ul { margin: 0; padding-left: 20px; }
+  .summary-box li { margin-bottom: 9px; font-size: 15px; color: var(--ink-soft); }
+  .summary-box li b { color: var(--ink); font-weight: 600; }
+  .summary-box li:last-child { margin-bottom: 0; }
+
+  section { margin-bottom: 44px; }
+  .sec-num { font-family: var(--font-mono); font-size: 12.5px; color: var(--accent); letter-spacing: 0.03em; display: block; margin-bottom: 4px; }
+  h2.sec-title { font-size: 22px; margin: 0 0 14px; }
+  p { max-width: 66ch; }
+  p + p { margin-top: 12px; }
+  ul, ol { max-width: 64ch; padding-left: 22px; }
+  li { margin-bottom: 7px; }
+  .subtle { color: var(--ink-soft); }
+
+  table.perm-table { width: 100%; border-collapse: collapse; margin-top: 14px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  table.perm-table th, table.perm-table td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 14.5px; }
+  table.perm-table th { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); background: var(--bg-well); }
+  table.perm-table tr:last-child td { border-bottom: none; }
+  table.perm-table td.perm-name { font-family: var(--font-mono); font-weight: 600; color: var(--accent-strong); }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 16px 20px; border-radius: 0 8px 8px 0; margin-top: 16px;
+  }
+  .callout p { margin: 0; font-size: 14.5px; color: var(--ink); max-width: none; }
+
+  footer { border-top: 1px solid var(--border); padding: 32px 28px 60px; }
+  .footer-inner { max-width: 760px; margin: 0 auto; font-size: 13px; color: var(--ink-faint); font-family: var(--font-mono); }
 </style>
 </head>
 <body>
-<div class="sheet">
-  <p class="eyebrow">Gestão de Loja — Estoque & Vendas</p>
-  <h1>Política de Privacidade</h1>
-  <p class="meta">Última atualização: 21 de agosto de 2026</p>
 
-  <div class="lede">
-    Em uma frase: <strong>este aplicativo não coleta, não transmite e não tem acesso a nenhum dado seu.</strong>
-    Tudo o que você cadastra fica salvo apenas no navegador onde a extensão está instalada.
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">Extensão para Chrome · <strong>Gestão de Loja — Estoque &amp; Vendas</strong></div>
+    <span class="doc-label">Política de privacidade</span>
+  </div>
+</header>
+
+<main>
+  <h1 class="title">Política de Privacidade</h1>
+  <p class="updated">Última atualização: 27 de agosto de 2026 · Versão da extensão: 1.6.0</p>
+
+  <div class="summary-box">
+    <h2>Resumo em 30 segundos</h2>
+    <ul>
+      <li><b>Nenhum dado sai do seu computador.</b> Tudo fica salvo localmente no navegador, dentro do próprio perfil do Chrome onde a extensão foi instalada.</li>
+      <li><b>Não existe servidor.</b> A extensão não faz nenhuma chamada de rede — não há backend, não há analytics, não há terceiros envolvidos.</li>
+      <li><b>Senhas nunca ficam em texto puro</b> — são protegidas com hash criptográfico (PBKDF2).</li>
+      <li><b>Backups são criptografados</b> com a senha que você escolhe (AES-256-GCM) — sem ela, o arquivo é ilegível.</li>
+      <li><b>Você é quem decide o que fazer com os dados</b> — exportar, restaurar ou apagar tudo é sempre uma ação manual sua, nunca automática.</li>
+    </ul>
   </div>
 
-  <h2><span class="num">01</span>Como os dados são guardados</h2>
-  <p>
-    "Gestão de Loja — Estoque & Vendas" é uma extensão do Google Chrome que roda inteiramente no seu navegador. Os dados que você
-    cadastra — produtos, vendas, clientes, caixa, financeiro e demais telas — ficam salvos localmente,
-    usando duas tecnologias padrão do próprio navegador:
-  </p>
-  <ul>
-    <li><strong>IndexedDB</strong> — banco de dados local do navegador, onde fica o conteúdo da loja (estoque, vendas, clientes, etc.).</li>
-    <li><strong>chrome.storage</strong> — usado só para: a preferência de aparência (claro/escuro); a sessão do usuário logado no momento, apagada sozinha ao fechar o navegador; o horário da última ação na tela, usado apenas para encerrar a sessão automaticamente após 30 minutos sem uso; e um registro temporário indicando que a extensão está aberta, usado apenas para impedir que ela opere em mais de uma aba do navegador ao mesmo tempo (a segunda aba fica bloqueada, com um aviso explicando a situação).</li>
-  </ul>
-  <p>Não existe servidor. Não existe backend. Os dados nunca saem do computador onde a extensão foi instalada.</p>
+  <section>
+    <span class="sec-num">1</span>
+    <h2 class="sec-title">Quem é o responsável por este documento</h2>
+    <p>A extensão <b>Gestão de Loja — Estoque &amp; Vendas</b> é uma ferramenta de controle de estoque, vendas, caixa, clientes e financeiro voltada a lojas de material de construção, mercearias e mercados de bairro. Este documento explica que dados a extensão processa, onde ficam guardados, e quais são os direitos de quem usa o sistema e de quem tem seus dados cadastrados nele.</p>
+  </section>
 
-  <h2><span class="num">02</span>Permissões usadas</h2>
-  <p>
-    A extensão pede uma única permissão do Chrome: <strong>storage</strong>. É o que permite usar o
-    IndexedDB e o chrome.storage descritos acima. A extensão não pede (nem usa) acesso a rede,
-    câmera, localização, outras abas, histórico de navegação ou qualquer outro dado do Chrome.
-  </p>
+  <section>
+    <span class="sec-num">2</span>
+    <h2 class="sec-title">Que dados o sistema processa</h2>
+    <p>Para funcionar, o sistema guarda os seguintes tipos de dado, todos inseridos manualmente por quem usa a extensão:</p>
+    <ul>
+      <li><b>Dados da loja</b> — CNPJ, razão social, endereço, telefone, e-mail.</li>
+      <li><b>Dados de quem usa o sistema (administrador e vendedores)</b> — nome, nome de usuário e senha (guardada como hash, nunca em texto puro).</li>
+      <li><b>Dados de clientes da loja</b> — nome, telefone, endereço, CPF/CNPJ (opcional), histórico de compras e de fiado.</li>
+      <li><b>Dados de fornecedores</b> — nome, contato, pedidos de compra.</li>
+      <li><b>Dados operacionais</b> — produtos, estoque, vendas, pagamentos, movimentações de caixa, contas a pagar/receber, log de ações realizadas no sistema.</li>
+    </ul>
+    <p>Nenhum desses dados é coletado para fins de análise, publicidade ou qualquer uso além do funcionamento do próprio sistema de gestão.</p>
+  </section>
 
-  <h2><span class="num">03</span>Compartilhamento com terceiros</h2>
-  <p>
-    Nenhum. Não há anúncios, não há analytics, não há telemetria, não há chamadas de rede de nenhum
-    tipo — a extensão não tem permissão de rede e o código não faz nenhuma requisição a servidor
-    externo. O que você cadastra é visto só por você, no seu navegador.
-  </p>
+  <section>
+    <span class="sec-num">3</span>
+    <h2 class="sec-title">Onde os dados ficam guardados</h2>
+    <p>Tudo é armazenado localmente, usando o <b>IndexedDB</b> do navegador — um banco de dados que vive dentro do perfil do Chrome onde a extensão está instalada, no computador da loja. A extensão também usa duas áreas pequenas de <code>chrome.storage</code> para dados de curta duração: a sessão de quem está logado no momento (apagada ao fechar o navegador) e a preferência de aparência (claro/escuro).</p>
+    <p><b>Não existe nenhum servidor, nuvem ou serviço externo envolvido.</b> A extensão não faz nenhuma chamada de rede — isso pode ser conferido diretamente no código-fonte, que não contém nenhuma linha de comunicação com a internet.</p>
+  </section>
 
-  <h2><span class="num">04</span>Backup</h2>
-  <p>
-    Existe uma função opcional de exportar/restaurar backup, para levar os dados a outro computador ou
-    guardá-los em outro lugar. É uma ação manual, disparada só quando você clica em "Exportar": gera um
-    arquivo único, protegido por senha (criptografado com AES-256-GCM, chave derivada por PBKDF2), que
-    fica salvo onde você escolher — o próprio download do navegador, não a extensão, decide o destino
-    do arquivo. Sem essa ação manual, nenhum arquivo é gerado nem enviado a lugar nenhum.
-  </p>
+  <section>
+    <span class="sec-num">4</span>
+    <h2 class="sec-title">Com quem os dados são compartilhados</h2>
+    <p>Com ninguém. A desenvolvedora da extensão não tem acesso a nenhum dado inserido no sistema — não existe um canal técnico pelo qual isso seria sequer possível, já que nada é enviado para fora do navegador de quem instalou. Os dados só saem do computador se a própria loja optar por exportar um backup e movê-lo manualmente para outro lugar (um pendrive, um e-mail para si mesma, etc.) — uma ação sempre deliberada, nunca automática.</p>
+  </section>
 
-  <h2><span class="num">05</span>LGPD — Lei Geral de Proteção de Dados</h2>
-  <p>
-    Esta extensão em si não coleta nem transmite dado nenhum, então não atua como "operadora" de dados
-    de terceiros perante a LGPD. Se você, dono(a) ou gerente da loja, usar o sistema para cadastrar
-    dados pessoais de clientes ou funcionários (nome, telefone, endereço de entrega etc.), quem se torna
-    "controlador" desses dados — e responsável pelas obrigações da LGPD perante essas pessoas — é a sua
-    loja, não o software. O sistema ajuda de duas formas: um tópico dedicado em "Ajuda → Privacidade e
-    LGPD" dentro do próprio app, com um aviso de privacidade pronto pra você usar com seus clientes; e um
-    campo opcional, em "Dados da loja", para cadastrar o nome e contato do Encarregado de dados
-    (DPO) da sua loja, caso você tenha um.
-  </p>
+  <section>
+    <span class="sec-num">5</span>
+    <h2 class="sec-title">Segurança</h2>
+    <ul>
+      <li>Senhas de login são protegidas com <b>PBKDF2</b> (150.000 iterações, salt único por usuário) — nunca gravadas em texto puro.</li>
+      <li>Backups exportados são criptografados com <b>AES-256-GCM</b>, chave derivada da senha escolhida na hora da exportação. Sem essa senha, o arquivo é ilegível — inclusive para a própria desenvolvedora.</li>
+      <li>A sessão de quem está logado expira automaticamente após 30 minutos sem uso, e o campo de senha bloqueia temporariamente após tentativas incorretas seguidas.</li>
+    </ul>
+    <div class="callout">
+      <p>Como todo o dado vive no computador da loja, a segurança física desse computador (e de quem tem acesso a ele) faz parte da proteção geral dos dados — a mesma lógica de qualquer sistema local, como uma planilha ou um banco de dados instalado na máquina.</p>
+    </div>
+  </section>
 
-  <h2><span class="num">06</span>Como remover seus dados</h2>
-  <p>
-    Desinstalar a extensão do Chrome remove também os dados salvos no IndexedDB associado a ela. Dentro
-    do próprio sistema, cada tela de cadastro (produtos, clientes, usuários etc.) também permite
-    desativar ou remover registros individualmente.
-  </p>
+  <section>
+    <span class="sec-num">6</span>
+    <h2 class="sec-title">Por quanto tempo os dados ficam guardados</h2>
+    <p>Os dados permanecem no IndexedDB indefinidamente, até que a loja decida excluí-los — seja removendo um cadastro individual (ex.: excluir um cliente ou produto) pela própria interface do sistema, seja desinstalando a extensão ou limpando os dados do perfil do Chrome, o que apaga tudo de uma vez. Não existe exclusão automática por tempo.</p>
+  </section>
 
-  <h2><span class="num">07</span>Alterações nesta política</h2>
-  <p>
-    Se esta política mudar, a data no topo da página é atualizada. Como o aplicativo não coleta contato
-    nenhum dos usuários, não há como notificar diretamente — a versão mais recente estará sempre nesta
-    mesma página.
-  </p>
+  <section>
+    <span class="sec-num">7</span>
+    <h2 class="sec-title">Responsabilidade sobre os dados de clientes (LGPD)</h2>
+    <p>O sistema guarda dado pessoal de clientes da loja (nome, telefone, endereço, histórico de fiado), o que sujeita esse uso à Lei Geral de Proteção de Dados (LGPD). É importante deixar claro: <b>quem é o controlador desses dados — o responsável legal perante a LGPD — é a loja que opera o sistema, não a desenvolvedora da extensão</b>, que apenas fornece a ferramenta e não tem acesso, custódia ou qualquer forma de processamento sobre esses dados.</p>
+    <p>Recomendamos que cada loja que usa o sistema informe seus próprios clientes sobre a coleta desses dados, conforme exigido pela LGPD. A própria extensão inclui, na tela <b>Ajuda → "Privacidade e LGPD"</b>, um modelo de aviso de privacidade pronto para imprimir ou entregar ao cliente, preenchido automaticamente com o nome da loja.</p>
+  </section>
 
-  <h2><span class="num">08</span>Contato</h2>
-  <p>
-    Dúvidas sobre esta política: <span class="fill">csvirtual.av@gmail.com</span>.
-  </p>
+  <section>
+    <span class="sec-num">8</span>
+    <h2 class="sec-title">Permissões que a extensão solicita</h2>
+    <table class="perm-table">
+      <thead><tr><th>Permissão</th><th>Para que é usada</th></tr></thead>
+      <tbody>
+        <tr><td class="perm-name">storage</td><td>Guardar a sessão de quem está logado e a preferência de aparência (claro/escuro) — os dados de negócio em si (vendas, estoque, clientes etc.) usam o IndexedDB do navegador, que não exige nenhuma permissão do manifesto.</td></tr>
+      </tbody>
+    </table>
+    <p class="subtle" style="margin-top:14px;font-size:14.5px;">Nenhuma outra permissão é solicitada — não há acesso a outras abas, histórico de navegação, câmera, localização ou rede.</p>
+  </section>
 
-  <footer>
-    Gestão de Loja — Estoque &amp; Vendas. Extensão 100% local, sem servidor.
-  </footer>
-</div>
+  <section>
+    <span class="sec-num">9</span>
+    <h2 class="sec-title">Seus direitos</h2>
+    <p>Como titular de dados cadastrado num sistema que usa esta extensão (por exemplo, como cliente de uma loja que a utiliza), você pode solicitar diretamente à loja — controladora dos seus dados — acesso, correção ou exclusão das suas informações. Como a loja tem controle total sobre o sistema (os dados vivem no computador dela), ela consegue atender esses pedidos diretamente pela própria interface do sistema.</p>
+  </section>
+
+  <section>
+    <span class="sec-num">10</span>
+    <h2 class="sec-title">Alterações a esta política</h2>
+    <p>Esta política pode ser atualizada conforme a extensão evolui. A data no topo desta página sempre reflete a versão mais recente.</p>
+  </section>
+
+  <section>
+    <span class="sec-num">11</span>
+    <h2 class="sec-title">Contato</h2>
+    <p>Dúvidas sobre esta política ou sobre o funcionamento da extensão podem ser enviadas através da página da extensão na Chrome Web Store.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-inner">Gestão de Loja — Estoque &amp; Vendas · Política de Privacidade</div>
+</footer>
 </body>
 </html>
