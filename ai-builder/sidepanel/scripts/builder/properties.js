@@ -56,13 +56,13 @@ export function renderProperties(container, node, project) {
   const styleHtml = STYLE_FIELDS.map(([key, label]) => `<div class="av-prop-field" data-scope="style"><label class="av-label">${escapeHtml(label)}</label><input class="av-input" type="text" data-style="${key}" value="${escapeAttr(node.style?.[key] || '')}"></div>`).join('');
 
   container.innerHTML = `
-    <h3 class="av-label" style="margin-block-start:0">${escapeHtml(def.meta.label)}</h3>
+    <h3 class="av-label">${escapeHtml(def.meta.label)}</h3>
     ${propsHtml || '<p class="av-hint">Este componente não tem propriedades editáveis.</p>'}
     ${bindHtml ? `<h3 class="av-label">Dados</h3>${bindHtml}` : ''}
-    <details><summary class="av-label" style="cursor:pointer">Estilo</summary>${styleHtml}</details>
-    <details><summary class="av-label" style="cursor:pointer">Avançado (JSON)</summary>
+    <details><summary class="av-label">Estilo</summary>${styleHtml}</details>
+    <details><summary class="av-label">Avançado (JSON)</summary>
       <textarea class="av-textarea" data-role="json" rows="6">${escapeHtml(JSON.stringify(node.props, null, 2))}</textarea>
-      <button class="av-btn av-btn--small" data-action="apply-json" style="margin-block-start:4px">Aplicar JSON</button>
+      <button class="av-btn av-btn--small av-mt-1" data-action="apply-json">Aplicar JSON</button>
     </details>
   `;
 }

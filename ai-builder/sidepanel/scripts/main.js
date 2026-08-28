@@ -139,7 +139,7 @@ function renderPagesPanel() {
       <button class="av-btn av-btn--icon av-btn--small" data-action="delete-page" title="Excluir página" tabindex="-1">${icons.trash}</button>
     </div>`
       )
-      .join('') + `<button id="btnAddPage" class="av-btn av-btn--block av-btn--small" style="margin-block-start:8px">${icons.plus} Nova página</button>`;
+      .join('') + `<button id="btnAddPage" class="av-btn av-btn--block av-btn--small av-mt-2">${icons.plus} Nova página</button>`;
 }
 
 function persist() {

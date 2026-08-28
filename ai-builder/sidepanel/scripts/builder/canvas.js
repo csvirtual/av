@@ -2,24 +2,48 @@
 // is the only renderer (ARCHITECTURE.md §3) — this module never draws the
 // app, only the thin chrome (selection box + label) on top of it, positioned
 // from rects the iframe measures and reports via postMessage.
-import { escapeHtml } from '../codegen/sanitize.js';
+//
+// Positions are set via the CSSOM (`el.style.left = ...`), never via an
+// inline `style="..."` attribute in an HTML string — the latter is exactly
+// what the extension's `style-src 'self'` CSP (no `unsafe-inline`) blocks.
+// Individual property assignment through the CSSOM isn't governed by CSP,
+// so this keeps the overlay working without loosening the policy.
+
+function applyRect(el, rect) {
+  el.style.left = `${rect.x}px`;
+  el.style.top = `${rect.y}px`;
+  el.style.width = `${rect.width}px`;
+  el.style.height = `${rect.height}px`;
+}
 
 export function createCanvasOverlay(overlayEl) {
+  const hoverBox = document.createElement('div');
+  hoverBox.className = 'av-hover-box';
+  hoverBox.hidden = true;
+
+  const selectionBox = document.createElement('div');
+  selectionBox.className = 'av-selection-box';
+  selectionBox.hidden = true;
+  const selectionLabel = document.createElement('span');
+  selectionLabel.className = 'av-selection-box__label';
+  selectionBox.appendChild(selectionLabel);
+
+  overlayEl.append(hoverBox, selectionBox);
+
   function paint({ selectedRect, selectedLabel, hoverRect }) {
-    let html = '';
-    if (hoverRect) {
-      html += `<div class="av-hover-box" style="left:${hoverRect.x}px;top:${hoverRect.y}px;width:${hoverRect.width}px;height:${hoverRect.height}px"></div>`;
-    }
+    hoverBox.hidden = !hoverRect;
+    if (hoverRect) applyRect(hoverBox, hoverRect);
+
+    selectionBox.hidden = !selectedRect;
     if (selectedRect) {
-      html += `<div class="av-selection-box" style="left:${selectedRect.x}px;top:${selectedRect.y}px;width:${selectedRect.width}px;height:${selectedRect.height}px">
-        <span class="av-selection-box__label">${escapeHtml(selectedLabel || '')}</span>
-      </div>`;
+      applyRect(selectionBox, selectedRect);
+      selectionLabel.textContent = selectedLabel || '';
     }
-    overlayEl.innerHTML = html;
   }
 
   function clear() {
-    overlayEl.innerHTML = '';
+    hoverBox.hidden = true;
+    selectionBox.hidden = true;
   }
 
   return { paint, clear };

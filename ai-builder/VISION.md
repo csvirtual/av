@@ -80,7 +80,7 @@ proíbe. O que está implementado é uma **vertical slice completa e verificáve
 |---|---|
 | 1 Visão | Este documento |
 | 2 Arquitetura | `ARCHITECTURE.md` |
-| 3 UX | Side panel: entrada única de comando, canvas, layers, propriedades, preview multi-dispositivo, command palette (`Ctrl/Cmd+K`) |
+| 3 UX | Aba própria da extensão: entrada única de comando, canvas, layers, propriedades, preview multi-dispositivo, command palette (`Ctrl/Cmd+K`) |
 | 4 Modelo de dados | `data/db.js`, `data/project.js` (IndexedDB: Project → Pages → ComponentTree) |
 | 5 Engine | `codegen/generator.js`, `components/registry.js`, `runtime/preview.js` |
 | 6 IA | `ai/provider.js`, `ai/planner.js`, `ai/contextManager.js`, `ai/providers/*` |
@@ -88,7 +88,7 @@ proíbe. O que está implementado é uma **vertical slice completa e verificáve
 | 8 Runtime | `runtime/preview.js` (iframe sandboxed, sem `eval`) |
 | 9 Validação | `validate/validator.js`, `validate/repair.js` |
 | 10 Export | `export/zip.js`, `export/exporter.js` |
-| 11 Hardening | Sanitização central (`codegen/sanitize.js`), CSP do side panel, permissões mínimas + opcionais no `manifest.json` |
+| 11 Hardening | Sanitização central (`codegen/sanitize.js`), CSP da extensão, permissões mínimas + opcionais no `manifest.json` |
 | 12 Performance | Sem frameworks, DOM real, workers reservados para validação em projetos grandes (`validate/validator.worker.js`) |
 | 13 QA | `tests/run-tests.mjs` (unitário) — testes de estresse de UI real (100–500 componentes, undo/redo em lote) ficam como próximo passo declarado abaixo |
 

@@ -7,7 +7,7 @@ navegador é feito com API nativa do navegador (ver decisões abaixo).
 ## 1. Arquitetura geral
 
 ```
-Side Panel (documento privilegiado da extensão)
+Aba própria da extensão (documento privilegiado, chrome-extension://…)
  ├── UI shell (sidepanel/index.html + scripts/main.js)
  ├── State store (pub/sub simples, sem framework)
  ├── Data layer (IndexedDB via data/db.js)
@@ -18,18 +18,26 @@ Side Panel (documento privilegiado da extensão)
  └── Validador / auto-repair / exportador
 
 Service Worker (background, MV3)
- └── Só o mínimo: abre o side panel, comandos de teclado, badge de status.
-     Não guarda estado — todo estado vive no IndexedDB, acessível também pelo
-     side panel diretamente (não há necessidade de mensageria constante).
+ └── Só o mínimo: abre (ou foca, se já aberta) a aba do builder ao clicar no
+     ícone, comandos de teclado. Não guarda estado — todo estado vive no
+     IndexedDB, acessível também pela aba diretamente (não há necessidade de
+     mensageria constante).
 ```
 
 ## 2. Arquitetura da extensão (Manifest V3)
 
-- `side_panel` como superfície principal (não popup — precisa persistir
-  durante navegação e ser redimensionável).
-- `permissions`: `sidePanel`, `storage`, `downloads`, `commands`. Todas
-  necessárias para o loop principal (abrir painel, persistir config, exportar
-  projeto, atalho de teclado).
+- A UI abre como **aba própria** (`chrome.tabs.create`), não como popup nem
+  como Side Panel do Chrome — um builder visual precisa de largura real para
+  caber canvas + camadas + propriedades ao mesmo tempo, e o Side Panel é
+  tipicamente estreito demais (e não redimensionável pelo usuário além de um
+  limite pequeno) para isso. Clicar no ícone de novo foca a aba já aberta em
+  vez de abrir outra (`chrome.tabs.query` + `chrome.tabs.update`).
+- `permissions`: `storage`, `downloads`, `tabs`, `commands`. `tabs` é
+  necessário especificamente para localizar uma aba já aberta da extensão ao
+  clicar no ícone de novo (sem essa permissão, `chrome.tabs.query` não
+  encontra nem as próprias abas da extensão — verificado empiricamente, não
+  é só documentação) — sem ela o clique duplicaria abas em vez de focar a
+  existente.
 - `optional_permissions` / `optional_host_permissions`: hosts de provedores de
   IA (`https://api.anthropic.com/*`, `https://api.openai.com/*`) só são
   solicitados quando o usuário configura aquele provedor em Configurações —

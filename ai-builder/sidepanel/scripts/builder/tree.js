@@ -25,9 +25,13 @@ function renderRow(node, depth, selectedId) {
   // Indent is capped: past ~7 levels a 220px panel has no room left for the
   // label no matter what, so further depth is shown by the guide rail
   // (border on .av-tree-children) rather than by eating more padding.
-  const indent = Math.min(depth, 7) * 11;
+  // A `data-depth` attribute + CSS rules (components.css) instead of an
+  // inline `style="padding-inline-start:…"` — the extension's CSP has no
+  // `unsafe-inline` for style-src, so an inline style attribute would just
+  // be silently dropped by the browser.
+  const depthStep = Math.min(depth, 7);
   return `<div class="av-tree-node" data-node-id="${node.id}">
-    <div class="av-tree-row${node.id === selectedId ? ' is-selected' : ''}" draggable="true" data-node-id="${node.id}" style="padding-inline-start:${indent}px">
+    <div class="av-tree-row${node.id === selectedId ? ' is-selected' : ''}" draggable="true" data-node-id="${node.id}" data-depth="${depthStep}">
       <span class="av-tree-row__toggle" data-action="toggle">${hasChildren ? icons[isCollapsed ? 'chevronRight' : 'chevronDown'] : ''}</span>
       <span class="av-tree-row__icon" aria-hidden="true">${icon}</span>
       <span class="av-tree-row__label" title="${escapeHtml(nodeLabel(node))}">${escapeHtml(nodeLabel(node))}</span>

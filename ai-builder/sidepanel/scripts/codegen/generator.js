@@ -75,13 +75,24 @@ if(window.parent!==window){
   });
 }`;
 
-const BOOTSTRAP_JS = `document.addEventListener('DOMContentLoaded',function(){
-  AV.router.init();
-  document.querySelectorAll('[data-av-type]').forEach(function(el){
-    var fn=AV.init[el.dataset.avType];
-    if(fn){try{fn(el);}catch(err){console.error('Falha ao inicializar '+el.dataset.avType+': '+err.message);}}
-  });
-});`;
+const BOOTSTRAP_JS = `(function(){
+  function boot(){
+    AV.router.init();
+    document.querySelectorAll('[data-av-type]').forEach(function(el){
+      var fn=AV.init[el.dataset.avType];
+      if(fn){try{fn(el);}catch(err){console.error('Falha ao inicializar '+el.dataset.avType+': '+err.message);}}
+    });
+  }
+  // In the exported static app this script runs while the document is still
+  // parsing, so DOMContentLoaded hasn't fired yet — the listener is correct
+  // there. In the live builder preview this same script is injected into an
+  // already-loaded shell document (see runtime/preview.js): DOMContentLoaded
+  // already fired once, long before this code exists, and would never fire
+  // again, so boot() has to run immediately instead of waiting for an event
+  // that has already passed.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();`;
 
 /**
  * Builds the whole site (all pages, one router) as {html, css, js}.

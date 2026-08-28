@@ -100,6 +100,16 @@
 .av-tree-row:hover { background: var(--av-color-surface-hover); }
 .av-tree-row.is-selected { background: color-mix(in srgb, var(--av-color-primary) 9%, transparent); color: var(--av-color-primary); font-weight: var(--av-weight-medium); border-inline-start-color: var(--av-color-primary); }
 .av-tree-row.is-dragover { outline: 2px solid var(--av-color-primary); outline-offset: -2px; background: color-mix(in srgb, var(--av-color-primary) 12%, transparent); }
+/* Indent per nesting depth (tree.js caps depth at 7). A fixed, small rule
+   table instead of an inline style="padding-inline-start:…" — CSP-safe. */
+.av-tree-row[data-depth="0"] { padding-inline-start: 4px; }
+.av-tree-row[data-depth="1"] { padding-inline-start: 15px; }
+.av-tree-row[data-depth="2"] { padding-inline-start: 26px; }
+.av-tree-row[data-depth="3"] { padding-inline-start: 37px; }
+.av-tree-row[data-depth="4"] { padding-inline-start: 48px; }
+.av-tree-row[data-depth="5"] { padding-inline-start: 59px; }
+.av-tree-row[data-depth="6"] { padding-inline-start: 70px; }
+.av-tree-row[data-depth="7"] { padding-inline-start: 81px; }
 .av-tree-row__toggle { inline-size: 12px; block-size: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--av-color-muted); flex: 0 0 auto; }
 .av-tree-row__icon { flex: 0 0 auto; opacity: 0.6; font-size: 11px; inline-size: 13px; text-align: center; }
 .av-tree-row__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
@@ -147,7 +157,9 @@
 .av-prop-field__row > * { flex: 1 1 0; }
 .av-prop-checkbox { display: flex; align-items: center; gap: var(--av-space-2); }
 .av-prop-empty { color: var(--av-color-muted); font-size: var(--av-text-sm); text-align: center; padding: var(--av-space-6) var(--av-space-3); }
-details > summary { list-style: none; }
+details > summary { list-style: none; cursor: pointer; }
+.av-mt-1 { margin-block-start: var(--av-space-1); }
+.av-mt-2 { margin-block-start: var(--av-space-2); }
 details > summary::-webkit-details-marker { display: none; }
 details > summary::before { content: '›'; display: inline-block; margin-inline-end: 4px; transition: transform var(--av-duration-fast); }
 details[open] > summary::before { transform: rotate(90deg); }

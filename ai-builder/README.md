@@ -16,7 +16,8 @@ Este diretório é autocontido: não depende de nada do resto do repositório
 
 1. `chrome://extensions` → ative "Modo do desenvolvedor".
 2. "Carregar sem compactação" → selecione a pasta `ai-builder/`.
-3. Clique no ícone da extensão para abrir o **Side Panel**.
+3. Clique no ícone da extensão — abre o builder em **uma aba própria** (clicar
+   de novo foca a mesma aba em vez de abrir outra).
 4. Digite um pedido, ex: *"Sistema de controle de estoque para uma loja de
    materiais de construção, com produtos, fornecedores, entradas, saídas e
    estoque mínimo"* → **Gerar aplicação**.

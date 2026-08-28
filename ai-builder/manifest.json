@@ -19,17 +19,14 @@
       "128": "icons/icon-128.png"
     }
   },
-  "side_panel": {
-    "default_path": "sidepanel/index.html"
-  },
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
   },
   "permissions": [
-    "sidePanel",
     "storage",
-    "downloads"
+    "downloads",
+    "tabs"
   ],
   "optional_permissions": [],
   "optional_host_permissions": [
@@ -45,8 +42,12 @@
       "description": "Abrir o AV Builder"
     }
   },
+  "sandbox": {
+    "pages": ["sidepanel/preview-shell.html"]
+  },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://api.openai.com; base-uri 'none'; form-action 'none'"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://api.openai.com; base-uri 'none'; form-action 'none'",
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
   },
   "minimum_chrome_version": "116"
 }

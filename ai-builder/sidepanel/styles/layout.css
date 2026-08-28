@@ -182,3 +182,17 @@
   .av-topbar__projectname { display: none; }
   .av-devicebar { display: none; }
 }
+
+/* The builder now always opens as its own browser tab (see
+   service-worker.js), so it normally gets real width — but the browser
+   window itself can still be narrowed. When that happens, shed button text
+   before anything gets a chance to overflow past the edge of the window: an
+   icon-only "Código"/"Exportar" plus a scrollable fallback (below) means the
+   worst case is a slightly cramped toolbar, never a control that's simply
+   unreachable off-screen. */
+@container av-app (max-width: 620px) {
+  #btnToggleCode span, #btnExport span { display: none; }
+}
+
+.av-topbar__actions { overflow-x: auto; scrollbar-width: none; }
+.av-topbar__actions::-webkit-scrollbar { display: none; }
