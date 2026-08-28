@@ -1,0 +1,150 @@
+/*
+ * Design tokens — única fonte de verdade visual do produto (extensão e
+ * também o que o gerador de código escreve nos apps exportados).
+ *
+ * Espaçamento e raio usam uma escala fixa em rem (previsível, boa para um
+ * builder onde o usuário arrasta/mede coisas). Tipografia usa clamp() para
+ * ser fluida entre o painel estreito e o painel expandido. Estados de hover/
+ * active de cor são derivados via color-mix() nativo — nunca duplicamos uma
+ * cor "escura" manualmente. Sombras usam a cor primária como tint (em vez de
+ * preto puro) — é o que faz elevação parecer desenhada, não "CSS padrão".
+ */
+:root {
+  color-scheme: light;
+
+  /* --- Cor: papéis semânticos, não nomes de cor --- */
+  --av-color-primary: #232a52;
+  --av-color-secondary: #c6a75e;
+  --av-color-background: #f6f6fa;
+  --av-color-surface: #ffffff;
+  --av-color-surface-raised: #ffffff;
+  --av-color-border: #e5e6f0;
+  --av-color-border-strong: #d3d5e4;
+  --av-color-text: #15172c;
+  --av-color-muted: #6c7086;
+  --av-color-success: #1a8f5a;
+  --av-color-warning: #b6790a;
+  --av-color-danger: #d1433f;
+  --av-color-info: #2f5fd9;
+
+  --av-color-primary-hover: color-mix(in srgb, var(--av-color-primary) 88%, white);
+  --av-color-primary-active: color-mix(in srgb, var(--av-color-primary) 80%, black);
+  --av-color-secondary-hover: color-mix(in srgb, var(--av-color-secondary) 88%, white);
+  --av-color-surface-hover: color-mix(in srgb, var(--av-color-primary) 4%, var(--av-color-surface));
+  --av-color-surface-active: color-mix(in srgb, var(--av-color-primary) 8%, var(--av-color-surface));
+  --av-color-danger-hover: color-mix(in srgb, var(--av-color-danger) 88%, white);
+  --av-color-focus-ring: color-mix(in srgb, var(--av-color-info) 55%, transparent);
+
+  --av-color-on-primary: #ffffff;
+  --av-color-on-secondary: #232a52;
+
+  /* Sombra tintada com a cor primária — mais "desenhado" que preto puro. */
+  --av-shadow-tint: 226 30% 14%;
+  --av-scrim: color-mix(in srgb, hsl(var(--av-shadow-tint)) 55%, transparent);
+
+  /* --- Espaçamento (escala 4px) --- */
+  --av-space-0: 0;
+  --av-space-1: 0.25rem;
+  --av-space-2: 0.5rem;
+  --av-space-3: 0.75rem;
+  --av-space-4: 1rem;
+  --av-space-5: 1.5rem;
+  --av-space-6: 2rem;
+  --av-space-7: 3rem;
+  --av-space-8: 4rem;
+
+  /* --- Tipografia --- */
+  --av-font-family: 'Inter var', 'Inter', -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --av-font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+  --av-text-xs: clamp(0.6875rem, 0.66rem + 0.15vw, 0.75rem);
+  --av-text-sm: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);
+  --av-text-md: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  --av-text-lg: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  --av-text-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.625rem);
+  --av-text-2xl: clamp(1.5rem, 1.3rem + 1vw, 2.25rem);
+  --av-leading-tight: 1.2;
+  --av-leading-normal: 1.5;
+  --av-weight-normal: 420;
+  --av-weight-medium: 520;
+  --av-weight-semibold: 600;
+  --av-weight-bold: 700;
+  --av-tracking-tight: -0.015em;
+  --av-tracking-normal: 0;
+  --av-tracking-wide: 0.04em;
+
+  /* --- Bordas / raio / elevação --- */
+  --av-radius-sm: 0.375rem;
+  --av-radius-md: 0.625rem;
+  --av-radius-lg: 1rem;
+  --av-radius-xl: 1.375rem;
+  --av-radius-full: 999px;
+  --av-border-width: 1px;
+
+  --av-elevation-0: none;
+  --av-elevation-1: 0 1px 2px hsl(var(--av-shadow-tint) / 0.06), 0 1px 1px hsl(var(--av-shadow-tint) / 0.05);
+  --av-elevation-2: 0 3px 10px hsl(var(--av-shadow-tint) / 0.09), 0 1px 3px hsl(var(--av-shadow-tint) / 0.07);
+  --av-elevation-3: 0 12px 28px hsl(var(--av-shadow-tint) / 0.16), 0 4px 10px hsl(var(--av-shadow-tint) / 0.08);
+  --av-elevation-4: 0 24px 56px hsl(var(--av-shadow-tint) / 0.22), 0 8px 20px hsl(var(--av-shadow-tint) / 0.10);
+  --av-ring-primary: 0 0 0 1px hsl(var(--av-shadow-tint) / 0.04), 0 0 0 4px color-mix(in srgb, var(--av-color-primary) 14%, transparent);
+
+  --av-blur-overlay: 20px;
+
+  /* --- Movimento --- */
+  --av-duration-fast: 120ms;
+  --av-duration-normal: 200ms;
+  --av-duration-slow: 320ms;
+  --av-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --av-easing-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --- Breakpoints (referência — usados em JS, @media/@container não aceitam var()) --- */
+  --av-bp-mobile: 390;
+  --av-bp-tablet: 834;
+  --av-bp-desktop: 1280;
+
+  /* --- Densidade (controla espaçamento vertical de listas/tabelas) --- */
+  --av-density-compact: 0.75;
+  --av-density-comfortable: 1;
+  --av-density: var(--av-density-comfortable);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --av-shadow-tint: 230 60% 2%;
+    --av-color-primary: #8b9ae8;
+    --av-color-secondary: #dcc07f;
+    --av-color-background: #0e0f18;
+    --av-color-surface: #171925;
+    --av-color-surface-raised: #1c1f2e;
+    --av-color-border: #2a2d40;
+    --av-color-border-strong: #383c56;
+    --av-color-text: #eef0fa;
+    --av-color-muted: #9296b0;
+    --av-color-success: #47c98a;
+    --av-color-warning: #e3ab48;
+    --av-color-danger: #ea746d;
+    --av-color-info: #7ea3f5;
+    --av-color-on-primary: #0e0f18;
+    --av-color-on-secondary: #14162a;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --av-shadow-tint: 230 60% 2%;
+  --av-color-primary: #8b9ae8;
+  --av-color-secondary: #dcc07f;
+  --av-color-background: #0e0f18;
+  --av-color-surface: #171925;
+  --av-color-surface-raised: #1c1f2e;
+  --av-color-border: #2a2d40;
+  --av-color-border-strong: #383c56;
+  --av-color-text: #eef0fa;
+  --av-color-muted: #9296b0;
+  --av-color-success: #47c98a;
+  --av-color-warning: #e3ab48;
+  --av-color-danger: #ea746d;
+  --av-color-info: #7ea3f5;
+  --av-color-on-primary: #0e0f18;
+  --av-color-on-secondary: #14162a;
+}
