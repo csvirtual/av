@@ -3,6 +3,7 @@
 // perf doesn't degrade as the tree grows to hundreds of nodes.
 import { getComponent } from '../components/registry.js';
 import { escapeHtml } from '../codegen/sanitize.js';
+import { icons } from '../utils/icons.js';
 
 const collapsed = new Set();
 
@@ -21,13 +22,19 @@ function renderRow(node, depth, selectedId) {
     /* unknown type — keep default icon, validator will flag it */
   }
   const childrenHtml = hasChildren ? node.children.map((c) => renderRow(c, depth + 1, selectedId)).join('') : '';
+  // Indent is capped: past ~7 levels a 220px panel has no room left for the
+  // label no matter what, so further depth is shown by the guide rail
+  // (border on .av-tree-children) rather than by eating more padding.
+  const indent = Math.min(depth, 7) * 11;
   return `<div class="av-tree-node" data-node-id="${node.id}">
-    <div class="av-tree-row${node.id === selectedId ? ' is-selected' : ''}" draggable="true" data-node-id="${node.id}" style="padding-inline-start:${depth * 14}px">
-      <span class="av-tree-row__toggle" data-action="toggle">${hasChildren ? (isCollapsed ? '▸' : '▾') : ''}</span>
+    <div class="av-tree-row${node.id === selectedId ? ' is-selected' : ''}" draggable="true" data-node-id="${node.id}" style="padding-inline-start:${indent}px">
+      <span class="av-tree-row__toggle" data-action="toggle">${hasChildren ? icons[isCollapsed ? 'chevronRight' : 'chevronDown'] : ''}</span>
       <span class="av-tree-row__icon" aria-hidden="true">${icon}</span>
-      <span class="av-tree-row__label">${escapeHtml(nodeLabel(node))}</span>
-      <button class="av-btn av-btn--icon av-btn--small" data-action="duplicate" title="Duplicar" tabindex="-1">⧉</button>
-      <button class="av-btn av-btn--icon av-btn--small" data-action="delete" title="Excluir" tabindex="-1">✕</button>
+      <span class="av-tree-row__label" title="${escapeHtml(nodeLabel(node))}">${escapeHtml(nodeLabel(node))}</span>
+      <span class="av-tree-row__actions">
+        <button class="av-btn av-btn--icon av-btn--small" data-action="duplicate" title="Duplicar" tabindex="-1">${icons.duplicate}</button>
+        <button class="av-btn av-btn--icon av-btn--small" data-action="delete" title="Excluir" tabindex="-1">${icons.trash}</button>
+      </span>
     </div>
     <div class="av-tree-children" ${isCollapsed ? 'hidden' : ''}>${childrenHtml}</div>
   </div>`;

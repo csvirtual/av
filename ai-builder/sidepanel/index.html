@@ -14,25 +14,51 @@
 
   <header class="av-topbar">
     <div class="av-topbar__brand">
-      <span class="av-logo" aria-hidden="true">AV</span>
+      <span class="av-logo" aria-hidden="true">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15.5L9.3 4.8a.8.8 0 0 1 1.4 0L16 15.5"/><path d="M6.7 11h6.6"/></svg>
+      </span>
       <input id="projectName" class="av-input av-input--ghost av-topbar__projectname" value="Novo projeto" aria-label="Nome do projeto">
     </div>
     <div class="av-topbar__actions">
-      <button id="btnToggleLeft" class="av-btn av-btn--icon av-only-narrow" title="Estrutura do projeto">🧩</button>
-      <button id="btnUndo" class="av-btn av-btn--icon" title="Desfazer (Ctrl+Z)" disabled>↶</button>
-      <button id="btnRedo" class="av-btn av-btn--icon" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
+      <button id="btnToggleLeft" class="av-btn av-btn--icon av-only-narrow" title="Estrutura do projeto">
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="13" height="11" rx="2"/><path d="M7.3 3.5v11"/></svg>
+      </button>
+      <button id="btnUndo" class="av-btn av-btn--icon" title="Desfazer (Ctrl+Z)" disabled>
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.3L2.7 7l2.8 2.7"/><path d="M2.7 7h7.3a4 4 0 1 1 0 8h-2"/></svg>
+      </button>
+      <button id="btnRedo" class="av-btn av-btn--icon" title="Refazer (Ctrl+Shift+Z)" disabled>
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 4.3L15.3 7l-2.8 2.7"/><path d="M15.3 7H8a4 4 0 1 0 0 8h2"/></svg>
+      </button>
       <div class="av-divider" role="separator"></div>
       <div class="av-devicebar" role="group" aria-label="Tamanho do preview">
-        <button class="av-btn av-btn--icon is-active" data-device="mobile" title="Mobile (390px)">📱</button>
-        <button class="av-btn av-btn--icon" data-device="tablet" title="Tablet (834px)">📔</button>
-        <button class="av-btn av-btn--icon" data-device="desktop" title="Desktop (1280px)">🖥️</button>
-        <button class="av-btn av-btn--icon" data-device="full" title="Largura total">⛶</button>
+        <button class="av-btn av-btn--icon is-active" data-device="mobile" title="Mobile (390px)">
+          <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="2" width="7" height="14" rx="1.8"/><path d="M8 13.6h2"/></svg>
+        </button>
+        <button class="av-btn av-btn--icon" data-device="tablet" title="Tablet (834px)">
+          <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="12" height="12" rx="1.8"/><path d="M7.8 13.4h2.4"/></svg>
+        </button>
+        <button class="av-btn av-btn--icon" data-device="desktop" title="Desktop (1280px)">
+          <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.3" width="14" height="9.4" rx="1.5"/><path d="M6.3 16h5.4M9 12.7V16"/></svg>
+        </button>
+        <button class="av-btn av-btn--icon" data-device="full" title="Largura total">
+          <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5H2.5v4M11.5 2.5h4v4M2.5 11.5v4h4M15.5 11.5v4h-4"/></svg>
+        </button>
       </div>
       <div class="av-divider" role="separator"></div>
-      <button id="btnToggleCode" class="av-btn" title="Alternar visual / código">{'</>'} Código</button>
-      <button id="btnExport" class="av-btn av-btn--primary" title="Exportar projeto (.zip)">Exportar</button>
-      <button id="btnSettings" class="av-btn av-btn--icon" title="Configurações">⚙️</button>
-      <button id="btnToggleRight" class="av-btn av-btn--icon av-only-narrow" title="Propriedades e IA">🎛️</button>
+      <button id="btnToggleCode" class="av-btn" title="Alternar visual / código">
+        <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 5.3L2.8 9l4 3.7M11.2 5.3l4 3.7-4 3.7"/></svg>
+        Código
+      </button>
+      <button id="btnExport" class="av-btn av-btn--primary" title="Exportar projeto (.zip)">
+        <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5v9M5.5 8l3.5 3.5L12.5 8"/><path d="M3.5 13.5v1.3a1.2 1.2 0 0 0 1.2 1.2h8.6a1.2 1.2 0 0 0 1.2-1.2v-1.3"/></svg>
+        Exportar
+      </button>
+      <button id="btnSettings" class="av-btn av-btn--icon" title="Configurações">
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="2.4"/><path d="M9 3.2v1.5M9 13.3v1.5M14.8 9h-1.5M4.7 9H3.2M12.8 5.2l-1.05 1.05M6.25 11.75L5.2 12.8M12.8 12.8l-1.05-1.05M6.25 6.25L5.2 5.2"/></svg>
+      </button>
+      <button id="btnToggleRight" class="av-btn av-btn--icon av-only-narrow" title="Propriedades e IA">
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h6M3.5 13h3.2"/><circle cx="12.3" cy="6" r="1.7"/><circle cx="9.3" cy="13" r="1.7"/></svg>
+      </button>
     </div>
   </header>
 
@@ -55,7 +81,9 @@
         <div class="av-stage__spacer"></div>
         <button id="btnValidate" class="av-btn av-btn--small">Validar</button>
         <button id="btnRepair" class="av-btn av-btn--small" disabled>Corrigir automaticamente</button>
-        <button id="btnReload" class="av-btn av-btn--icon av-btn--small" title="Recarregar preview">⟳</button>
+        <button id="btnReload" class="av-btn av-btn--icon av-btn--small" title="Recarregar preview">
+          <svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 5.2A5.8 5.8 0 1 0 15.5 9.5"/><path d="M14.6 2.8v3.4h-3.4"/></svg>
+        </button>
       </div>
 
       <div id="canvasViewport" class="av-canvas-viewport" data-device="mobile">
@@ -83,7 +111,9 @@
           <span>Console</span>
           <div class="av-stage__spacer"></div>
           <button id="btnClearConsole" class="av-btn av-btn--small">Limpar</button>
-          <button id="btnToggleConsole" class="av-btn av-btn--icon av-btn--small">▾</button>
+          <button id="btnToggleConsole" class="av-btn av-btn--icon av-btn--small" title="Expandir/recolher console">
+            <svg viewBox="0 0 18 18" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5l5 5 5-5"/></svg>
+          </button>
         </div>
         <div id="consoleLog" class="av-console__log" role="log"></div>
       </div>
@@ -94,7 +124,10 @@
         <label for="aiPrompt" class="av-label">Comando universal</label>
         <textarea id="aiPrompt" class="av-textarea" rows="4" placeholder="Ex: Sistema de controle de estoque para uma loja de materiais de construção, com produtos, fornecedores, entradas, saídas e estoque mínimo."></textarea>
         <div class="av-aipanel__actions">
-          <button id="btnGenerate" class="av-btn av-btn--primary av-btn--block">Gerar aplicação</button>
+          <button id="btnGenerate" class="av-btn av-btn--primary av-btn--block">
+            <svg viewBox="0 0 18 18" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M9 2.3l1.55 4.15L14.7 8l-4.15 1.55L9 13.7l-1.55-4.15L3.3 8l4.15-1.55z"/></svg>
+            Gerar aplicação
+          </button>
         </div>
         <div id="aiPlan" class="av-aiplan" hidden></div>
       </div>
@@ -105,14 +138,23 @@
 
   <div id="commandPalette" class="av-palette" hidden>
     <div class="av-palette__box" role="dialog" aria-label="Paleta de comandos" aria-modal="true">
-      <input id="paletteInput" class="av-input" placeholder="Digite um comando ou pedido para a IA…" autocomplete="off">
+      <div class="av-palette__inputrow">
+        <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="av-palette__searchicon"><circle cx="8" cy="8" r="4.6"/><path d="M14.5 14.5l-3-3"/></svg>
+        <input id="paletteInput" class="av-input av-input--ghost" placeholder="Digite um comando ou pedido para a IA…" autocomplete="off">
+        <kbd class="av-kbd">Esc</kbd>
+      </div>
       <ul id="paletteResults" class="av-palette__results" role="listbox"></ul>
     </div>
   </div>
 
   <div id="settingsModal" class="av-modal" hidden>
     <div class="av-modal__box" role="dialog" aria-label="Configurações" aria-modal="true">
-      <h2 class="av-modal__title">Configurações</h2>
+      <div class="av-modal__head">
+        <h2 class="av-modal__title">Configurações</h2>
+        <button id="btnCloseSettingsX" class="av-btn av-btn--icon av-btn--small" title="Fechar" aria-label="Fechar">
+          <svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 5l8 8M13 5l-8 8"/></svg>
+        </button>
+      </div>
       <label class="av-label" for="providerSelect">Provedor de IA</label>
       <select id="providerSelect" class="av-select">
         <option value="local">Local (determinístico, grátis, offline)</option>

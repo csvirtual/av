@@ -20,6 +20,7 @@ import { generateApp, runCommand } from './ai/planner.js';
 import { getSettings, saveSettings } from './ai/contextManager.js';
 import { createCommandPalette } from './commandPalette.js';
 import { escapeHtml } from './codegen/sanitize.js';
+import { icons } from './utils/icons.js';
 
 const $ = (id) => document.getElementById(id);
 const CONTAINER_TYPES = new Set(['Container', 'Stack', 'Grid', 'Card', 'Header', 'Sidebar', 'Navbar', 'Footer', 'Modal', 'Tabs', 'Form']);
@@ -38,7 +39,7 @@ const el = {
   aiPanel: $('aiPanel'), aiPrompt: $('aiPrompt'), btnGenerate: $('btnGenerate'), aiPlan: $('aiPlan'), propertiesPanel: $('propertiesPanel'),
   commandPalette: $('commandPalette'), paletteInput: $('paletteInput'), paletteResults: $('paletteResults'),
   settingsModal: $('settingsModal'), providerSelect: $('providerSelect'), apiKeyInput: $('apiKeyInput'),
-  btnCloseSettings: $('btnCloseSettings'), btnSaveSettings: $('btnSaveSettings'),
+  btnCloseSettings: $('btnCloseSettings'), btnCloseSettingsX: $('btnCloseSettingsX'), btnSaveSettings: $('btnSaveSettings'),
 };
 
 let history = createHistory(updateUndoRedoButtons);
@@ -135,10 +136,10 @@ function renderPagesPanel() {
         (p) => `<div class="av-tree-row${p.id === activePageId ? ' is-selected' : ''}" data-page-id="${p.id}">
       <span class="av-tree-row__label">${escapeHtml(p.name)}</span>
       <span class="av-hint">${escapeHtml(p.route)}</span>
-      <button class="av-btn av-btn--icon av-btn--small" data-action="delete-page" title="Excluir página" tabindex="-1">✕</button>
+      <button class="av-btn av-btn--icon av-btn--small" data-action="delete-page" title="Excluir página" tabindex="-1">${icons.trash}</button>
     </div>`
       )
-      .join('') + `<button id="btnAddPage" class="av-btn av-btn--block av-btn--small" style="margin-block-start:8px">+ Nova página</button>`;
+      .join('') + `<button id="btnAddPage" class="av-btn av-btn--block av-btn--small" style="margin-block-start:8px">${icons.plus} Nova página</button>`;
 }
 
 function persist() {
@@ -187,6 +188,16 @@ function log(level, message) {
   el.consoleLog.appendChild(entry);
   el.consoleLog.scrollTop = el.consoleLog.scrollHeight;
   if (level === 'error') el.consoleDrawer.dataset.open = 'true';
+}
+
+function setButtonBusy(btn, busy, busyLabel) {
+  if (busy) {
+    btn.dataset.idleHtml ??= btn.innerHTML;
+    btn.innerHTML = `<span class="av-spinner"></span> ${escapeHtml(busyLabel)}`;
+  } else if (btn.dataset.idleHtml) {
+    btn.innerHTML = btn.dataset.idleHtml;
+  }
+  btn.disabled = busy;
 }
 
 function handlePreviewConsole(d) {
@@ -249,9 +260,14 @@ function wireEvents() {
 
   el.btnSettings.addEventListener('click', openSettings);
   el.btnCloseSettings.addEventListener('click', () => (el.settingsModal.hidden = true));
+  el.btnCloseSettingsX.addEventListener('click', () => (el.settingsModal.hidden = true));
   el.btnSaveSettings.addEventListener('click', async () => {
     await saveSettings({ provider: el.providerSelect.value, model: '', apiKey: el.apiKeyInput.value.trim() });
     el.settingsModal.hidden = true;
+  });
+  el.settingsModal.addEventListener('click', (e) => { if (e.target === el.settingsModal) el.settingsModal.hidden = true; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.settingsModal.hidden) el.settingsModal.hidden = true;
   });
 
   el.btnGenerate.addEventListener('click', () => doGenerate(el.aiPrompt.value));
@@ -419,16 +435,14 @@ function doRepair() {
 
 async function doExport() {
   const { project } = store.getState();
-  el.btnExport.disabled = true;
-  el.btnExport.textContent = 'Exportando…';
+  setButtonBusy(el.btnExport, true, 'Exportando…');
   try {
     await downloadProjectZip(project);
     log('info', 'Projeto exportado com sucesso.');
   } catch (err) {
     log('error', `Falha ao exportar: ${err.message}`);
   } finally {
-    el.btnExport.disabled = false;
-    el.btnExport.textContent = 'Exportar';
+    setButtonBusy(el.btnExport, false);
   }
 }
 
@@ -442,8 +456,7 @@ async function openSettings() {
 async function doGenerate(promptText) {
   const text = (promptText || '').trim();
   if (!text) return;
-  el.btnGenerate.disabled = true;
-  el.btnGenerate.textContent = 'Gerando…';
+  setButtonBusy(el.btnGenerate, true, 'Gerando…');
   el.aiPlan.hidden = true;
   try {
     const { project: currentProject, selectedNodeId } = store.getState();
@@ -462,8 +475,7 @@ async function doGenerate(promptText) {
   } catch (err) {
     log('error', `Falha ao gerar: ${err.message}`);
   } finally {
-    el.btnGenerate.disabled = false;
-    el.btnGenerate.textContent = 'Gerar aplicação';
+    setButtonBusy(el.btnGenerate, false);
   }
 }
 

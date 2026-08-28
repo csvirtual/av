@@ -1,26 +1,63 @@
+/* Self-hosted (no CDN, no runtime fetch beyond the extension's own bundle —
+   see fonts/LICENSE-Inter.txt, SIL OFL 1.1). Variable font: one file covers
+   every weight the UI uses (420–700), so `font-weight` just works. */
+@font-face {
+  font-family: 'Inter var';
+  src: url('../fonts/InterVariable.woff2') format('woff2-variations'), url('../fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0;
   font-family: var(--av-font-family);
   font-size: var(--av-text-md);
+  font-weight: var(--av-weight-normal);
   line-height: var(--av-leading-normal);
+  letter-spacing: var(--av-tracking-normal);
   color: var(--av-color-text);
   background: var(--av-color-background);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv05', 'cv11', 'ss01', 'tnum';
+  font-variation-settings: 'opsz' 20;
 }
 h1, h2, h3, p { margin: 0; }
-button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3 { letter-spacing: var(--av-tracking-tight); font-weight: var(--av-weight-semibold); }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 button { cursor: pointer; }
+
+::selection { background: color-mix(in srgb, var(--av-color-primary) 28%, transparent); color: var(--av-color-text); }
+
 :focus-visible {
   outline: 2px solid var(--av-color-focus-ring);
   outline-offset: 2px;
+  border-radius: var(--av-radius-sm);
 }
+
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--av-color-muted) 35%, transparent) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--av-color-muted) 40%, transparent); border-radius: var(--av-radius-full); }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--av-color-muted) 32%, transparent);
+  border-radius: var(--av-radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--av-color-muted) 55%, transparent); background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-.av-app { height: 100vh; display: flex; flex-direction: column; container-type: inline-size; container-name: av-app; }
+.av-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+  container-name: av-app;
+  isolation: isolate;
+}
 
 /* Several elements below get an explicit `display` (flex/grid) from
    components.css/layout.css for when they're shown — which, per the CSS
@@ -28,3 +65,7 @@ button { cursor: pointer; }
    that looks like it should always win. Restate it here with priority so
    toggling the `hidden` IDL property actually hides them. */
 [hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
