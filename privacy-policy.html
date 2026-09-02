@@ -143,11 +143,12 @@
 <div class="sheet">
   <p class="eyebrow">Gestão de Loja — Estoque & Vendas</p>
   <h1>Política de Privacidade</h1>
-  <p class="meta">Última atualização: 1 de setembro de 2026 · Versão 1.13.6 · Desenvolvida por C&amp;S Virtual</p>
+  <p class="meta">Última atualização: 2 de setembro de 2026 · Versão 1.15.0 · Desenvolvida por C&amp;S Virtual</p>
 
   <div class="lede">
-    Em uma frase: <strong>este aplicativo não coleta, não transmite e não tem acesso a nenhum dado seu.</strong>
-    Tudo o que você cadastra fica salvo apenas no navegador onde a extensão está instalada.
+    Em uma frase: <strong>este aplicativo não coleta nem transmite dado nenhum por conta própria.</strong>
+    Tudo o que você cadastra fica salvo apenas no navegador onde a extensão está instalada — a única exceção é um
+    contato opcional por WhatsApp ou e-mail que só acontece se você mesmo decidir fazer (veja a seção 03).
   </div>
 
   <h2><span class="num">01</span>Como os dados são guardados</h2>
@@ -160,7 +161,7 @@
     <li><strong>IndexedDB</strong> — banco de dados local do navegador, onde fica o conteúdo da loja (estoque, vendas, fiado, clientes, fornecedores, carreto, fidelidade, log de ações do sistema, etc.).</li>
     <li><strong>chrome.storage</strong> — usado só para: a preferência de aparência (claro/escuro); a sessão do usuário logado no momento, apagada sozinha ao fechar o navegador; o horário da última ação na tela, usado apenas para encerrar a sessão automaticamente após 30 minutos sem uso; um crédito de troca pendente de uso na próxima venda, quando existir; o histórico de tentativas de senha incorretas, usado só para o bloqueio temporário do campo de senha; um registro temporário indicando que a extensão está aberta, usado apenas para impedir que ela opere em mais de uma aba do navegador ao mesmo tempo (a segunda aba fica bloqueada, com um aviso explicando a situação); e o controle local do período de teste e da chave de ativação deste programa, usado apenas para liberar o uso da extensão após o cadastro.</li>
   </ul>
-  <p>Não existe servidor. Não existe backend. Os dados nunca saem do computador onde a extensão foi instalada.</p>
+  <p>Não existe servidor. Não existe backend. Os dados de negócio (produtos, vendas, clientes, caixa, financeiro etc.) nunca saem do computador onde a extensão foi instalada — a única exceção, pontual e opcional, está descrita na seção 03.</p>
 
   <h2><span class="num">02</span>Permissões usadas</h2>
   <p>
@@ -171,9 +172,18 @@
 
   <h2><span class="num">03</span>Compartilhamento com terceiros</h2>
   <p>
-    Nenhum. Não há anúncios, não há analytics, não há telemetria, não há chamadas de rede de nenhum
-    tipo — a extensão não tem permissão de rede e o código não faz nenhuma requisição a servidor
-    externo. O que você cadastra é visto só por você, no seu navegador.
+    Quase nenhum — com uma única exceção, que só acontece se você escolher: quando o período de teste
+    termina, a tela de bloqueio oferece dois botões opcionais, <strong>WhatsApp</strong> e
+    <strong>E-mail</strong>, pra pedir a chave de ativação. Clicar num deles abre uma mensagem já
+    preenchida com o nome e o CNPJ da loja, pronta pra revisar antes de enviar — nada sai sozinho. É só
+    se você efetivamente mandar a mensagem que essas duas informações (nome da loja e CNPJ, nada além
+    disso) chegam ao WhatsApp (Meta) ou ao seu aplicativo de e-mail.
+  </p>
+  <p>
+    Fora essa situação pontual: não há anúncios, não há analytics, não há telemetria, não há chamada de
+    rede de nenhum tipo — a extensão não faz nenhuma requisição a servidor externo por conta própria. O
+    que você cadastra (produtos, vendas, clientes, caixa, financeiro etc.) é visto só por você, no seu
+    navegador.
   </p>
 
   <h2><span class="num">04</span>Backup</h2>
