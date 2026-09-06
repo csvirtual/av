@@ -13,9 +13,11 @@ npm install
 npx playwright test
 ```
 
-Precisa de um Chromium instalado localmente pro Playwright achar (ou ajuste
-`CHROMIUM_PATH` em `fixtures.js` pro caminho do seu). Roda headless por
-padrão.
+Sem nenhuma variável de ambiente, usa o Chromium que o próprio Playwright
+gerencia (baixado por `npx playwright install chromium`, se ainda não
+tiver). Se preferir apontar pra um Chromium já instalado na máquina, defina
+`CHROMIUM_PATH` com o caminho do executável antes de rodar. Roda headless
+por padrão.
 
 Relatório em HTML depois de rodar:
 

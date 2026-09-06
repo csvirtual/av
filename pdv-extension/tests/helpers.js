@@ -52,6 +52,17 @@ async function completeSetupWizard(page, overrides = {}) {
   }
 }
 
+/** Desloga direto pela sessão (sem passar pelo botão "Sair" + confirmação
+ * — não é o que está sendo testado nos specs que precisam disso) e espera
+ * a tela de login aparecer, pronta pra um próximo login(). */
+async function logout(page) {
+  await page.evaluate(async () => {
+    const { clearSession } = await import('./js/session.js');
+    await clearSession();
+  });
+  await page.waitForSelector('#username', { timeout: 15000 });
+}
+
 async function login(page, username, password) {
   await page.fill('#username', username);
   await page.fill('#password', password);
@@ -130,4 +141,4 @@ async function makeSimpleSale(page, productName) {
   });
 }
 
-module.exports = { completeSetupWizard, login, goTo, seedProduct, seedCustomer, addProductToCart, makeSimpleSale, DEFAULT_ADMIN };
+module.exports = { completeSetupWizard, login, logout, goTo, seedProduct, seedCustomer, addProductToCart, makeSimpleSale, DEFAULT_ADMIN };

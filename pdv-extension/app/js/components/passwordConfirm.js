@@ -28,7 +28,9 @@ export async function confirmUserPassword({
   }
   let user;
   try {
-    user = await verifyLogin(username, password);
+    // namespace próprio (ver usersRepo.js#verifyLogin): a trava de força-
+    // bruta daqui nunca deve bloquear o login de verdade do admin.
+    user = await verifyLogin(username, password, { namespace: 'confirmPassword' });
   } catch (err) {
     errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
     return null;

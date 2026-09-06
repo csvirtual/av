@@ -9,7 +9,12 @@ const fs = require('fs');
 const os = require('os');
 
 const EXT_PATH = path.join(__dirname, '..');
-const CHROMIUM_PATH = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Achado de auditoria: caminho fixo, específico do sandbox onde esta
+// suíte foi escrita — noutra máquina/CI sem exatamente esse binário, todo
+// spec falhava de cara. CHROMIUM_PATH permite apontar pro Chromium local;
+// sem a variável, cai no comportamento padrão do Playwright (o Chromium
+// que `npx playwright install` baixa), que é o caminho certo pra CI.
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || undefined;
 
 const test = base.test.extend({
   context: async ({}, use) => {

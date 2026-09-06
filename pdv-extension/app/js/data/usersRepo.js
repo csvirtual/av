@@ -227,21 +227,31 @@ export async function updateUser(id, { nome, permissions } = {}) {
  * Agora o bloqueio é verificado e mantido AQUI — a tela continua lendo o
  * mesmo estado (loginLockout.js#getLoginLockState) só pra exibir o aviso/
  * contagem regressiva, não pra decidir se libera a tentativa. */
-export async function verifyLogin(username, password) {
-  const lockState = await getLoginLockState(username);
+// Achado de auditoria (P1): `namespace` isola a trava de força-bruta de
+// QUEM está chamando — o login de verdade (views/login.js, sem passar
+// namespace) usa uma, e os três modais de "confirmar senha de admin"
+// (aprovar desconto em sale.js, fechar caixa em caixa.js, zerar dados em
+// backup.js — todos via components/passwordConfirm.js) usam outra
+// própria, compartilhada só entre eles. Antes, os quatro dividiam a MESMA
+// trava por nome de usuário: um vendedor errando a senha do admin 2x num
+// desses modais bloqueava o LOGIN de verdade do admin por 60s, sem o
+// admin nunca ter tentado logar — repetível à vontade, um jeito indireto
+// de negar acesso ao próprio admin.
+export async function verifyLogin(username, password, { namespace } = {}) {
+  const lockState = await getLoginLockState(username, namespace);
   if (lockState.remainingMs > 0) return null;
 
   const user = await findByUsername(username);
   if (!user || !user.active) {
-    await recordFailedLogin(username);
+    await recordFailedLogin(username, namespace);
     return null;
   }
   const ok = await verifyPasswordHash(password, user.passwordSalt, user.passwordHash);
   if (!ok) {
-    await recordFailedLogin(username);
+    await recordFailedLogin(username, namespace);
     return null;
   }
-  await clearLoginLock(username);
+  await clearLoginLock(username, namespace);
   return user;
 }
 
@@ -316,6 +326,25 @@ export async function resetUserPassword(id, newPassword) {
   const target = await dbGet('users', id);
   if (isAdmin(target)) {
     await assertActingUserIsAdmin();
+  } else {
+    // Achado de auditoria (P1): a checagem acima só cobria o alvo ser
+    // admin — resetar a senha de um vendedor comum e logar como ele era
+    // um jeito indireto de herdar QUALQUER poder que esse vendedor
+    // tivesse, mesmo que quem fez o reset não tivesse esse poder — o
+    // mesmo furo que updateUser (abaixo) já fecha pra edição de
+    // permissões, só que por uma porta lateral (reset de senha) que
+    // ninguém tinha fechado. Vale o mesmo raciocínio: delegação nunca
+    // pode dar mais poder do que quem delega já possui.
+    const actingUserId = await getSessionUserId();
+    const actingUser = actingUserId ? await dbGet('users', actingUserId) : null;
+    if (!isAdmin(actingUser)) {
+      const targetPerms = target?.permissions || {};
+      const actingPerms = actingUser?.permissions || {};
+      const hasExtraPower = Object.keys(targetPerms).some((key) => targetPerms[key] && !actingPerms[key]);
+      if (hasExtraPower) {
+        throw new Error('Você não pode redefinir a senha de um usuário com mais poderes que você — peça pra um Administrador Geral fazer isso.');
+      }
+    }
   }
   // hashPassword é assíncrono — precisa rodar ANTES do dbUpdate, cujo
   // updateFn é síncrono por definição (ver db.js). Não depende de ler o
