@@ -1,0 +1,1983 @@
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-alt: #eef1f0;
+  --border: #dde3e1;
+  --text: #1c2523;
+  --text-muted: #62716d;
+  /* Cor única de borda (em repouso) pra todo campo de digitação/seleção E
+   * pro botão de tela cheia da tela de login — ponto central de controle:
+   * qualquer ajuste de tom entra aqui (nos três blocos de tema) em vez de
+   * cada componente por vez. Hoje é igual a --text-muted de propósito
+   * (harmonia visual pedida pelo usuário), mas é uma variável própria pra
+   * não prender essa decisão à cor de texto — que muda por outros motivos. */
+  --control-border: var(--text-muted);
+  --primary: #145333;
+  --primary-dark: #0d3b24;
+  --primary-light: #e4f0e9;
+  --accent: #c98a2c;
+  --danger: #b3261e;
+  --danger-dark: #8f1e18;
+  --danger-light: #fbe9e7;
+  --success: #1a7a45;
+  --warning: #a6650f;
+  --warning-light: #fbeecd;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(20, 30, 27, 0.08), 0 1px 2px rgba(20, 30, 27, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+  font-size: 15px;
+}
+
+/* Modo escuro — duas formas de ativar, com a escolha explícita do usuário
+ * sempre vencendo:
+ * 1) automático, seguindo o tema do sistema operacional (prefers-color-scheme);
+ * 2) o botão 🌙/☀️/🖥️ fixo no canto da tela (ver theme.js + app.js), que
+ *    grava a escolha em chrome.storage.local e aplica um atributo
+ *    data-theme na <html> — como o seletor com atributo tem mais
+ *    especificidade que o :root sozinho de dentro do @media, ele sempre
+ *    ganha, nas duas direções (força escuro com SO claro, ou força claro
+ *    com SO escuro).
+ * Como todo componente da folha de estilo usa os tokens de --root em vez de
+ * cor fixa, redefinir os tokens nos três lugares abaixo é a única coisa que
+ * precisa mudar — nenhum outro seletor do arquivo depende do tema. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101613;
+    --surface: #1a221e;
+    --surface-alt: #212b25;
+    --border: #34413a;
+    --text: #e9efec;
+    --text-muted: #93a89e;
+    --control-border: var(--text-muted);
+    --primary: #2f9d6b;
+    --primary-dark: #0d2b1c;
+    --primary-light: rgba(47, 157, 107, 0.18);
+    --accent: #b27c2a;
+    --danger: #e5645a;
+    --danger-dark: #b23a30;
+    --danger-light: rgba(229, 100, 90, 0.18);
+    --success: #3fae6c;
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #101613;
+  --surface: #1a221e;
+  --surface-alt: #212b25;
+  --border: #34413a;
+  --text: #e9efec;
+  --text-muted: #93a89e;
+  --control-border: var(--text-muted);
+  --primary: #2f9d6b;
+  --primary-dark: #0d2b1c;
+  --primary-light: rgba(47, 157, 107, 0.18);
+  --accent: #b27c2a;
+  --danger: #e5645a;
+  --danger-dark: #b23a30;
+  --danger-light: rgba(229, 100, 90, 0.18);
+  --success: #3fae6c;
+  --warning: #d99a35;
+  --warning-light: rgba(217, 154, 53, 0.18);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* Achado do usuário: sem isso, uma tela centralizada (ex: o assistente de
+   * configuração inicial) desloca alguns pixels pra esquerda sempre que o
+   * conteúdo é alto o bastante pra precisar de barra de rolagem, comparado
+   * com uma tela vizinha mais curta que não rola — a barra de rolagem "rouba"
+   * espaço só da tela que a tem, puxando o centro pra fora do lugar. Reservar
+   * o espaço dela sempre (mesmo quando não tem nada pra rolar) faz o centro
+   * da tela ficar sempre no mesmo pixel, role ou não role.
+   */
+  scrollbar-gutter: stable;
+}
+/* Achado do usuário: com scrollbar-gutter:stable acima, o Chrome/Edge
+ * desenham uma faixa cinza permanente na borda direita da janela mesmo
+ * quando a página não está rolando de verdade (ex: tela de login, tela
+ * cheia) — é só o espaço reservado, mas visualmente parece uma barra de
+ * rolagem "grudada" e feia. A rolagem em si continua funcionando (roda,
+ * trackpad, teclado) quando o conteúdo realmente for mais alto que a
+ * janela (ex: o formulário longo do Passo 1 do assistente inicial) — só
+ * o desenho nativo da barra fica escondido.
+ *
+ * De propósito só nas telas de ANTES de logar (boas-vindas, configuração
+ * inicial, login — classe ligada/desligada em app.js, dentro de boot()).
+ * Depois de logado, o Painel e o resto do sistema continuam com a barra
+ * nativa visível, como sempre foi: ali o conteúdo varia bastante de
+ * altura (cards, tabelas) e, ao contrário do menu lateral — que tem seu
+ * próprio indicador de "tem mais conteúdo", ver .nav-group mais abaixo —,
+ * a barra é a única pista de que dá pra rolar mais.
+ */
+html.pre-login-screen {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge legado */
+}
+html.pre-login-screen::-webkit-scrollbar { display: none; } /* Chrome/Edge/Safari */
+html, body {
+  margin: 0;
+  padding: 0;
+  /* min-height, não height: com "height: 100%" fixo, conteúdo mais alto
+   * que a janela ainda rola normalmente (o navegador propaga o overflow
+   * pro viewport), mas isso quebra o cálculo de position:sticky dos
+   * filhos (ex: .sidebar) — o elemento fica "preso" ao tamanho do body
+   * em vez de acompanhar a altura real do conteúdo. min-height evita essa
+   * armadilha: body cresce de verdade com o conteúdo, sem perder o
+   * "preenche a tela inteira" em páginas curtas (#root já garante isso
+   * com min-height: 100vh logo abaixo).
+   */
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#root { min-height: 100vh; }
+
+.boot-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100vh;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ---------- Spinner de carregamento ----------
+ * Achado de auditoria: toda tela que espera um dado (boot da extensão,
+ * Painel, Log, Histórico de vendas) mostrava só o texto parado
+ * "Carregando…", sem nenhum indicador de movimento — mesmo numa espera
+ * curta (leitura local do IndexedDB, quase sempre instantânea), texto
+ * parado passa a impressão de travado, não de "processando". Reaproveitado
+ * em ".loading-state" (linha com espaçamento certo pro texto do lado) e
+ * ".boot-loading" (tela cheia). Desenhado com border-trick (um lado da
+ * borda colorido, resto transparente) em vez de imagem/ícone externo —
+ * nada pra carregar, gira liso em qualquer tamanho. */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
+button {
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+}
+/* Padrão global de foco por teclado/mouse pra QUALQUER input/select/
+ * textarea do app — acompanha .field input:focus (a origem deste padrão,
+ * ver comentário lá). Fica como um "backstop": cobre de graça qualquer
+ * campo que não redeclare border/box-shadow no próprio :focus. Quando um
+ * seletor mais específico (mesma especificidade + vem depois no arquivo,
+ * ex: ".scan-box input") define border SEM properia regra de :focus,
+ * essa regra sozinha não é suficiente pra ele (o border unconditional
+ * "ganha" a troca de cor) — por isso os campos que precisam do halo
+ * visível têm, cada um, seu próprio ":focus" explícito repetindo esta
+ * mesma receita (ver .scan-box input:focus, .payment-*:focus etc.),
+ * igual o resto do arquivo já fazia antes desta regra existir. */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+a { color: var(--primary); }
+
+/* ---------- Botões ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn-secondary:hover { background: var(--surface-alt); }
+
+.btn-danger { background: var(--danger); }
+.btn-danger:hover { background: var(--danger-dark); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+}
+.btn-ghost:hover { background: var(--surface-alt); color: var(--text); }
+
+.btn-sm { padding: 5px 10px; font-size: 13px; }
+
+/* Botão redondo só com ícone — hoje só usado nos atalhos de contato
+ * (WhatsApp/e-mail) da tela de trial encerrado (ver app.js). */
+.contact-icon-btn {
+  width: 46px; height: 46px; border-radius: 50%; border: none; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.contact-icon-btn:hover { background: var(--surface-alt); transform: translateY(-1px); }
+.contact-icon-btn svg { filter: drop-shadow(0 2px 3px rgba(20, 30, 27, 0.18)); }
+
+/* ---------- Formulários ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+/* Achado do usuário: um campo (ex: "Até quantas vezes sem juros" em Dados
+ * da loja) precisa do input ao LADO do texto de apoio, não empilhado como
+ * label/input normal — mas herdar só a classe .field trazia
+ * flex-direction:column junto, então um align-items:center (pra centralizar
+ * a LINHA verticalmente) acabava centralizando cada item HORIZONTALMENTE
+ * dentro da coluna também, fugindo do alinhamento à esquerda do resto da
+ * tela. Esta classe extra garante a direção certa (linha) sem duplicar
+ * align-items/gap/wrap em cada tela que precisar do mesmo padrão inline. */
+.field-inline-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.field input, .field select, .field textarea {
+  padding: 9px 11px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* Achado de auditoria: o foco de teclado aqui era só a borda mudando de cor
+ * (1px) — sutil demais pra localizar rápido onde o Tab está, bem abaixo do
+ * anel de foco bem visível que Google/Amazon usam nos campos deles. Agora
+ * soma um halo (box-shadow, acompanha o border-radius igual outline não
+ * acompanha) usando --primary-light, o mesmo tom já usado noutros
+ * destaques do sistema — não é cor nova, só um uso a mais do token. */
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.field .hint { font-size: 12px; color: var(--text-muted); }
+
+/* Ícone "?" de informação ao lado de um label (hoje só o aviso legal do
+ * CNPJ, ver components/infoTooltip.js) + o popover de texto que ele abre. */
+.field-label-row { display: flex; align-items: center; gap: 6px; position: relative; }
+.info-tip-btn {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.info-tip-btn:hover { border-color: var(--primary); color: var(--primary); }
+.info-tip-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(340px, 80vw);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text);
+}
+.info-tip-popover p { margin: 6px 0 0; }
+.info-tip-popover strong { color: var(--text); }
+.info-tip-popover .info-tip-disclaimer { margin-top: 8px; font-size: 11px; color: var(--text-muted); font-style: italic; }
+.field input.invalid { border-color: var(--danger); }
+.field input:disabled, .field select:disabled, .field textarea:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.form-row { display: flex; gap: 12px; }
+.form-row > .field { flex: 1; min-width: 0; }
+
+/* ---------- Estoque: "Equivalência" das formas de venda (Personalizado) ----------
+   Achado do usuário: um número solto de "fator de equivalência" (digitar de
+   cabeça "1 Carrada = quantas latas?") pedia conta mental de quem cadastra.
+   Troca por duas caixas ligadas por "=" (ex: "2 Carrada = 80 lata") — a
+   pessoa informa uma conta que já fez na vida real, em vez de uma proporção
+   abstrata, e o app divide sozinho pra achar o fator (ver syncEquivDerived
+   em products.js). Os dois lados usam os mesmos +/- grandes de toque fácil.
+*/
+.custom-form-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface-alt);
+}
+.equiv-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.equiv-equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.equiv-stepper-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 108px;
+}
+.equiv-stepper {
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.equiv-stepper button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 20px;
+  font-weight: 700;
+  width: 38px;
+  height: 42px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.equiv-stepper button:hover { background: var(--primary-light); }
+.equiv-stepper button:active { background: var(--primary); color: #fff; }
+.equiv-stepper input {
+  /* Achado do usuário: largura fixa cortava valores mais longos (ex:
+     "0.018", ou um fator com várias casas) — agora cresce com o conteúdo,
+     sem passar de 96px pra não estourar o layout em telas estreitas. */
+  width: auto;
+  min-width: 56px;
+  max-width: 96px;
+  padding: 0 6px;
+  height: 42px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.equiv-stepper input::-webkit-outer-spin-button,
+.equiv-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.equiv-stepper input:focus { outline: none; background: var(--primary-light); box-shadow: none; }
+.equiv-unit-caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.equiv-eq-sign { font-size: 18px; font-weight: 800; color: var(--text-muted); }
+.equiv-derived {
+  font-size: 12.5px;
+  color: var(--primary);
+  text-align: center;
+  margin: 10px 0 0;
+}
+.equiv-derived.equiv-warn { color: var(--warning); }
+
+.form-error {
+  background: var(--danger-light);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ---------- Aviso em destaque (fora da Ajuda) — ex.: tela de Backup ---------- */
+.notice {
+  border-left: 3px solid var(--primary);
+  background: var(--primary-light);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.notice strong { color: var(--primary); }
+.notice.notice-danger { border-left-color: var(--danger); background: var(--danger-light); }
+.notice.notice-danger strong { color: var(--danger); }
+
+/* ---------- Telas cheias (setup / login) ---------- */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--primary-dark), var(--primary) 65%);
+  padding: 32px;
+}
+
+.auth-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 560px;
+  padding: 36px 40px;
+}
+
+.auth-card.wide { max-width: 720px; }
+
+.auth-fullscreen-btn {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--control-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.18s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.18s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.auth-fullscreen-btn:hover {
+  background: var(--surface);
+  border-color: var(--primary);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  transform: translateY(-1px);
+}
+.auth-fullscreen-btn:active {
+  transform: translateY(0) scale(0.92);
+  box-shadow: 0 0 0 3px var(--primary-light);
+  transition-duration: 0.08s;
+}
+.auth-fullscreen-btn:focus-visible {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--primary);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.auth-brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.auth-brand span { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+
+.auth-card h1 { font-size: 22px; margin: 6px 0 4px; }
+.auth-card p.subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; }
+
+.steps {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.steps .step {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-alt);
+}
+.steps .step.active { background: var(--primary); }
+.steps .step.done { background: var(--accent); }
+
+/* ---------- Setup: escolha inicial (cadastrar do zero ou restaurar) ---------- */
+.setup-choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px; }
+.setup-choice-card {
+  text-align: left;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.setup-choice-card:hover { border-color: var(--primary); background: var(--primary-light); }
+.setup-choice-card .icon { font-size: 22px; margin-bottom: 8px; display: block; }
+.setup-choice-card .title { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; }
+.setup-choice-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+@media (max-width: 620px) { .setup-choice-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Shell do app (pós-login) ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 236px 1fr;
+  min-height: 100vh;
+  /* align-items:start (em vez do padrão stretch) — ver comentário em
+   * .sidebar logo abaixo pra entender por que isso é necessário pro
+   * sticky funcionar. */
+  align-items: start;
+}
+
+.sidebar {
+  background: var(--primary-dark);
+  color: #eef4f0;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  /* Sem isso, o menu (inclusive o botão "Sair") rola junto com o
+   * conteúdo principal e desaparece da tela em qualquer página mais longa
+   * que a altura da janela (Estoque com muitos produtos, Ajuda, etc.) —
+   * achado auditando antes do lançamento.
+   *
+   * position:sticky sozinho NÃO basta aqui: com align-items:stretch
+   * (padrão do grid), .sidebar nascia esticado pra cobrir a MESMA altura
+   * do conteúdo principal — sem "folga" nenhuma dentro do próprio
+   * container pra segurar, sticky não tem efeito visual nenhum (fica
+   * preso ao static de qualquer jeito; confirmado com um reprodutor HTML
+   * isolado, fora da extensão). Por isso .shell usa align-items:start:
+   * o sidebar volta a ter só a altura do próprio conteúdo, e a altura
+   * fixa abaixo (height, não min-height) trava esse conteúdo em exatamente
+   * um viewport — é o que sobra de "folga" que faz o .nav-group interno
+   * rolar sozinho (ver logo abaixo) em vez de esticar o sidebar inteiro
+   * além da tela quando tem menu demais pra caber.
+   */
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+/* Botão de menu e véu por trás do menu — só aparecem em telas estreitas,
+ * quando o menu lateral vira uma gaveta que desliza por cima do conteúdo em
+ * vez de dividir a largura da tela com ele (ver breakpoint 900px). */
+.menu-toggle-btn {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 160;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 18px;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 20, 0.45);
+  z-index: 140;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-brand {
+  padding: 6px 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  margin-bottom: 14px;
+}
+.sidebar-brand .name { font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px; }
+.sidebar-brand .sub { font-size: 11px; color: rgba(238,244,240,0.6); margin-top: 2px; }
+
+/* Área rolável do menu — ocupa todo o espaço entre a marca e o rodapé
+ * (flex:1 dentro do .sidebar, que agora tem altura travada em 100vh, ver
+ * comentário acima).
+ */
+.nav-scroll-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nav-scroll-wrap::before,
+.nav-scroll-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 1;
+}
+.nav-scroll-wrap::before { top: 0; background: linear-gradient(to bottom, var(--primary-dark), transparent); }
+.nav-scroll-wrap::after { bottom: 0; background: linear-gradient(to top, var(--primary-dark), transparent); }
+.nav-scroll-wrap.has-more-above::before { opacity: 1; }
+.nav-scroll-wrap.has-more-below::after { opacity: 1; }
+
+/* Achado do usuário: a rolagem por roda/trackpad do menu tinha sido
+ * desligada de propósito numa versão anterior (overflow:hidden, só os
+ * botões de seta rolavam) — pedido reativado agora, mas com um cuidado que
+ * a versão antiga evitava por completo: com o mouse sobre o menu, a roda
+ * rola SÓ o menu; com o mouse sobre a página, rola SÓ a página — nunca os
+ * dois ao mesmo tempo, nem um "vazando" pro outro.
+ *
+ * overflow-y:auto sozinho já cobre a primeira metade (o navegador manda o
+ * wheel pro elemento rolável mais próximo do cursor — .nav-group quando o
+ * mouse está em cima dele, o scroll da página quando não está — nunca os
+ * dois pro mesmo gesto). overscroll-behavior:contain cobre a segunda
+ * metade, mais sutil: sem isso, ao rolar o menu e chegar no topo/fim da
+ * lista NO MEIO do gesto de rolagem, o restante do movimento "vaza" pro
+ * elemento rolável seguinte (o scroll da página) — o padrão "scroll
+ * chaining" do navegador. `contain` trava esse vazamento na borda do
+ * próprio menu: rolagem do menu nunca termina rolando a página, nem por
+ * acidente ao encostar no limite da lista.
+ */
+.nav-group {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  /* A rolagem continua funcionando (roda, trackpad, setinhas acima) — só a
+   * barra nativa do navegador fica escondida, porque o menu já tem seu
+   * próprio indicador visual (gradiente + setinhas .nav-scroll-btn, ver
+   * acima); a barra nativa por cima disso ficava redundante e destoava do
+   * verde escuro do menu. */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge legado */
+}
+.nav-group::-webkit-scrollbar { display: none; } /* Chrome/Edge/Safari */
+
+.nav-scroll-btn {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.16);
+  color: #eef4f0;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, background 0.15s ease;
+  z-index: 2;
+}
+.nav-scroll-btn:hover { background: rgba(255,255,255,0.3); }
+.nav-scroll-btn svg { width: 14px; height: 14px; display: block; }
+.nav-scroll-up { top: 2px; }
+.nav-scroll-down { bottom: 2px; }
+.nav-scroll-wrap.has-more-above .nav-scroll-up { opacity: 1; pointer-events: auto; }
+.nav-scroll-wrap.has-more-below .nav-scroll-down { opacity: 1; pointer-events: auto; }
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: rgba(238,244,240,0.82);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 2px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.nav-link:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.nav-link.active { background: var(--accent); color: #fff; }
+.nav-icon { width: 18px; text-align: center; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  text-align: center;
+}
+.sidebar-user { font-size: 13px; margin-bottom: 2px; }
+.sidebar-role {
+  display: inline-block;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.main {
+  padding: 28px 34px 60px;
+  overflow-x: auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page-header h1 { font-size: 21px; margin: 0; }
+.page-header .desc { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+.page-actions { display: flex; gap: 8px; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+/* Achado do usuário: tentei fixar o indicador de Caixa (aberto/fechado) no
+   canto superior direito com grid-column:-1 direto dentro de .stat-grid —
+   quebrou visualmente (o auto-fit soma mais uma coluna pra caber o item
+   "forçado" na última posição, empurrando o cartão pra fora da tela em vez
+   de encolher os outros). Ver views/dashboard.js#cash-stat-card: a solução
+   de verdade foi tirar o cartão da grade e colocar no cabeçalho da página
+   (.page-actions), ao lado do botão "Nova venda" — aí "canto superior
+   direito" é garantido pela própria estrutura da página, não por um truque
+   de grid frágil.
+*/
+.page-actions .stat-card {
+  padding: 10px 16px;
+  box-shadow: none;
+}
+.page-actions .stat-card .label { margin-bottom: 2px; }
+.page-actions .stat-card .value { margin-top: 0; font-size: 16px; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.stat-card .label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+.stat-card .value.warn { color: var(--warning); }
+.stat-card .value.danger { color: var(--danger); }
+
+/* ---------- Tabelas ----------
+ * Achado de auditoria: a página tinha o CONTEÚDO INTEIRO limitado a
+ * 1440px, o que evitava tabela esticada em monitor grande/ultrawide, mas
+ * também limitava tudo o mais (cabeçalho, grade de cards, barra de busca)
+ * que nem sofre desse problema — numa tela gigante, sobrava fundo vazio o
+ * tempo todo, não só ao lado da tabela. O limite certo é só na tabela em
+ * si (o único componente que fica feio esticado, com vão enorme entre
+ * colunas quando tem poucas): o resto da página (.stat-grid, cabeçalho,
+ * botões) usa a tela toda normalmente, ganhando mais colunas de card por
+ * linha em vez de ficar com margem morta do lado. */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 1440px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th {
+  text-align: left;
+  padding: 11px 14px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-alt); }
+.table-empty { padding: 32px; text-align: center; color: var(--text-muted); }
+
+/* Menu "Opções" das linhas de tabela (ver views/products.js) — anexado
+ * direto no <body>, nunca dentro de .table-wrap: essa caixa tem
+ * overflow-x:auto (barra de rolagem horizontal em tela estreita), que por
+ * regra do CSS também vira overflow-y:auto sozinho — um menu posicionado
+ * DENTRO dela cortava embaixo/rolava junto da tabela em vez de flutuar por
+ * cima. position:fixed + anexado no body evita isso, igual o padrão já
+ * usado pelos modais (ver components/modal.js). */
+.row-options-menu {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.row-options-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.row-options-item:hover { background: var(--surface-alt); }
+.row-options-item.danger { color: var(--danger); }
+
+/* Paginação numerada + seletor de quantidade (ver components/pagination.js) */
+.pagination-bar { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 16px; }
+.pg-size-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.pg-size-row select { padding: 5px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; }
+.pg-size-row select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.pg-page-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.pg-ellipsis { padding: 0 4px; color: var(--text-muted); }
+
+/* MOCKUP de padronização — campo numérico compacto dentro de tabela/linha
+ * (quantidade, custo, valor). Antes cada tela copiava isso à mão com
+ * padding variando entre 5px 8px e 6px 8px sem motivo; aqui usa o mesmo
+ * padding do seletor "Mostrar N por página" (.pg-size-row select acima),
+ * que já era o padrão mais estabelecido da extensão pra controle compacto.
+ * A largura continua um `style="width:...px"` à parte — isso é legítimo
+ * (cada campo cabe um conteúdo diferente), só o resto vira compartilhado. */
+.table-inline-input {
+  padding: 5px 8px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.table-inline-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* Lista de resultados de busca do PDV — linhas flex independentes (não
+ * <table>) de propósito: cada linha se dimensiona pelo próprio conteúdo, e
+ * o gap uniforme (--pdv-gap) garante o mesmo espaçamento dos dois lados de
+ * qualquer badge de validade, sem depender da largura de outras linhas
+ * (ver renderPickList() em views/sale.js). */
+.pdv-results {
+  --pdv-gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pdv-result-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pdv-gap);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.pdv-result-row:last-child { border-bottom: none; }
+.pdv-result-row:hover { background: var(--surface-alt); }
+.pdv-result-name {
+  display: flex;
+  align-items: center;
+  gap: var(--pdv-gap);
+  min-width: 0;
+}
+.pdv-result-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdv-result-price { flex-shrink: 0; }
+.pdv-result-qty { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  text-align: center;
+}
+.badge-green { background: var(--primary-light); color: var(--primary); }
+.badge-gold { background: var(--warning-light); color: var(--warning); }
+.badge-red { background: var(--danger-light); color: var(--danger); }
+.badge-gray { background: var(--surface-alt); color: var(--text-muted); }
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.toolbar input[type="search"], .toolbar input[type="text"], .toolbar input[type="date"] {
+  padding: 9px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  min-width: 240px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.toolbar input[type="date"] { min-width: 0; }
+.toolbar input[type="search"]:focus, .toolbar input[type="text"]:focus, .toolbar input[type="date"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.toolbar select { padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+
+/* Dropdown próprio dos filtros (ver components/customSelect.js) — o
+ * <select> nativo escondido continua sendo a fonte de verdade do valor,
+ * isto aqui é só a aparência. Existe porque a lista aberta de um <select>
+ * comum, no Linux, é desenhada pelo sistema operacional e ignora o CSS da
+ * página (fica sempre branca, mesmo no tema escuro). */
+.custom-select { position: relative; display: inline-flex; }
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.custom-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.custom-select-trigger .cs-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform 0.15s ease; }
+.custom-select.is-open .custom-select-trigger .cs-chevron { transform: rotate(180deg); }
+.custom-select-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  z-index: 40;
+  display: none;
+}
+.custom-select.is-open .custom-select-list { display: block; }
+.custom-select-option {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.custom-select-option.is-active { background: var(--surface-alt); }
+.custom-select-option.is-selected { background: var(--primary-light); font-weight: 600; }
+
+/* ---------- Modal ---------- */
+/* Entrada suave (backdrop esmaece, diálogo sobe+cresce um pouco) — igual
+ * todo modal de produto sério faz, em vez de aparecer instantâneo do nada.
+ * Só a entrada: fechar continua imediato (ver components/modal.js), porque
+ * animar a saída exigiria atrasar o remove() do DOM até a animação acabar,
+ * complexidade que não compensa aqui. Respeita prefers-reduced-motion —
+ * quem pediu menos movimento no sistema operacional não recebe animação
+ * nenhuma, só aparece direto. */
+@keyframes modalBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop, .modal { animation: none !important; }
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 20, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  animation: modalBackdropIn 160ms ease-out;
+}
+/* Cabeçalho e rodapé ficam fixos, só o miolo (.modal-body) rola — achado de
+ * auditoria: antes o modal inteiro era uma única área com scroll, então um
+ * formulário comprido (ex: cadastro de produto com validade) escondia o
+ * título e os botões "Cadastrar/Cancelar" rolando pra fora da tela junto
+ * com os campos. display:flex + overflow:hidden aqui, min-height:0 no
+ * .modal-body abaixo (sem isso o flex item não encolhe pra caber, e o
+ * scroll interno nunca ativa — pegadinha clássica de flexbox).
+ */
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal h2 { margin: 0; padding: 24px 26px 18px; font-size: 18px; flex-shrink: 0; }
+.modal-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 0 26px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 26px 24px; margin: 0; flex-shrink: 0; }
+/* Achado de auditoria: `wide: true` (openModal, ver components/modal.js) só
+ * tinha efeito no breakpoint mobile (max-width:640px, mais abaixo) — no
+ * desktop um modal "wide" ficava idêntico a um normal, 520px. Inofensivo
+ * pros modais que já usavam wide antes (cabiam bem mesmo estreitos), mas o
+ * de cadastro/edição de produto passou a ter 3 campos por linha na seção de
+ * validade, e o de vendedor ganhou uma grade de permissões — os dois
+ * precisam de verdade da largura extra no desktop. */
+.modal.wide { max-width: 760px; }
+
+/* ---------- Botão "voltar ao topo" ----------
+ * Global de verdade: vive em index.html, fora de #root (ver comentário lá),
+ * então existe em QUALQUER tela — login, cadastro inicial, aba bloqueada,
+ * app normal — não só dentro do shell já logado.
+ *
+ * Canto inferior direito de verdade, rente ao mesmo cantinho do toast
+ * (bottom:18px/right:18px logo abaixo) — pedido explícito, em vez da
+ * versão anterior que ficava mais alta pra nunca coincidir com um toast
+ * aparecendo. z-index abaixo do toast (200) continua de propósito: se
+ * algum toast aparecer bem na hora, a mensagem tem prioridade visual e
+ * fica por cima, nunca escondida atrás do botão.
+ *
+ * 44px = alvo de toque mínimo recomendado (Apple HIG / Material Design),
+ * cor sólida (--primary) em vez de neutra pra ficar claramente clicável à
+ * distância, sem competir com o conteúdo da página. */
+.scroll-top-btn {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 190;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(10px) scale(0.9);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.scroll-top-btn.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.scroll-top-btn:hover {
+  background: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px) scale(1);
+}
+.scroll-top-btn:active {
+  transform: translateY(0) scale(0.94);
+  box-shadow: var(--shadow);
+}
+.scroll-top-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-top-btn { transition: opacity 0.18s ease; }
+  .scroll-top-btn:hover, .scroll-top-btn:active { transform: none; }
+}
+/* Telas estreitas (ver breakpoint 900px mais abaixo): fica mais perto do
+ * canto pra não roubar espaço de conteúdo que já é justo. */
+@media (max-width: 600px) {
+  .scroll-top-btn { right: 14px; bottom: 14px; width: 42px; height: 42px; }
+}
+
+/* ---------- Toast ---------- */
+.toast-root {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  font-size: 13.5px;
+  max-width: 340px;
+  animation: toast-in 0.2s ease;
+}
+.toast.error { background: var(--danger); }
+.toast.success { background: var(--success); }
+.toast-icon { display: inline-flex; vertical-align: -3px; margin: 0 3px; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Busca de cliente (Nova venda, Carreto) — um input que em Nova venda fica
+ * solto, fora de um .field (não tem label do lado), e sem isso herdaria só
+ * a regra crua de "input, select, textarea" (só fonte/tamanho, sem borda
+ * nem padding decente). No Carreto ele fica dentro de um .field — por
+ * isso o seletor usa "input.customer-search-input" (empata em
+ * especificidade com ".field input" e ganha por vir depois no arquivo),
+ * garantindo a mesma aparência nos dois lugares em vez de só um deles. */
+input.customer-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input.customer-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+/* ---------- PDV (Nova Venda) ---------- */
+.pdv-layout {
+  display: grid;
+  /* minmax(0, 1fr) em vez de só "1fr" — achado do usuário: um texto sem
+   * quebra de linha (ex: o aviso de fração no QTD) dentro da coluna do
+   * carrinho fazia a TRACK inteira do grid crescer pra caber o conteúdo,
+   * espremendo a busca à esquerda. Sem o "minmax(0, ...)" o grid trata "1fr"
+   * como minmax(auto, 1fr) por padrão, e "auto" respeita o min-content dos
+   * filhos — travando em 0 aqui garante que a proporção 1.4fr/1fr nunca
+   * estoura por causa de conteúdo interno — o que não couber fica só visualmente
+   * apertado dentro do próprio cartão, nunca empurra a coluna vizinha. */
+  grid-template-columns: 1.4fr minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.scan-box {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.scan-box input {
+  flex: 1;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 2px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.scan-box input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.cart-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.cart-item:last-child { border-bottom: none; }
+.cart-item .name { flex: 1; font-weight: 600; font-size: 13.5px; }
+.cart-item .meta { font-size: 12px; color: var(--text-muted); }
+.cart-item .qty-input { width: 60px; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: center; }
+.cart-item .qty-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+/* Linha de produto no carrinho da PDV — estrutura própria (não usa
+ * .cart-item) porque tem uma hierarquia de texto mais rica que as outras
+ * linhas que reaproveitam essa classe (cliente selecionado, forma de
+ * pagamento). Duas fileiras por item: a de cima (nome, preço/código,
+ * estoque restante) sempre com a largura inteira do cartão pra respirar
+ * sem quebrar palavra no meio; a de baixo, só com os controles
+ * (quantidade, desconto, preço, remover), que não competem por espaço
+ * com o texto. É o mesmo padrão de nota fiscal/PDV profissional — texto
+ * em cima, ação embaixo — em vez de espremer tudo numa única linha. */
+.cart-line {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.cart-line:first-child { padding-top: 6px; }
+.cart-line:last-child { border-bottom: none; padding-bottom: 6px; }
+
+.cart-line-info { display: flex; flex-direction: column; gap: 6px; }
+.cart-line-info .name { font-weight: 600; font-size: 14.5px; line-height: 1.3; }
+
+.cart-line-details { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--text-muted); }
+.cart-line-details .sep { opacity: 0.45; }
+.cart-line-details .code-value { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 11px; letter-spacing: 0.2px; }
+
+.cart-line-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text-muted);
+}
+.cart-line-stock .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.cart-line-stock.warn { color: var(--warning); }
+.cart-line-stock.danger { color: var(--danger); }
+
+/* flex-wrap — achado ao gerar print em 1280px (tamanho exigido pela Chrome
+ * Web Store): com carrinho alto o bastante pra aparecer barra de rolagem
+ * vertical (reduz a largura útil da página) e um preço mais longo (ex: "R$
+ * 189,90"), a linha de controles (QTD + desconto + preço + remover) não
+ * cabia mais numa linha só e o preço ficava cortado pela borda da janela —
+ * sem quebrar, o flex simplesmente estourava porque os dois grupos
+ * (esquerda/direita) tinham flex-shrink:0. Com wrap, aperta e vai pra duas
+ * linhas em vez de vazar da tela. */
+.cart-line-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; }
+.cart-line-controls-left { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.cart-line-controls-left .btn { white-space: nowrap; }
+.cart-line-controls-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.cart-line-qty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; flex-shrink: 0; }
+.cart-line-qty-row { display: flex; align-items: center; gap: 8px; }
+.cart-line-qty label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.cart-line-qty .qty-input { width: 82px; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: center; }
+.cart-line-qty .qty-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.cart-line-qty-hint { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); line-height: 1.3; white-space: nowrap; }
+
+.cart-line-price { text-align: right; }
+.cart-line-price .gross { font-size: 11.5px; color: var(--text-muted); text-decoration: line-through; margin-bottom: 3px; }
+.cart-line-price .net { font-weight: 700; font-size: 15px; }
+
+/* Linha de forma de pagamento — mesmo espírito do .cart-line (evita
+ * espremer campos numa linha corrida), mas mais simples porque tem só
+ * 2-3 controles ao invés de texto + controles. */
+.payment-row { display: flex; align-items: center; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.payment-row:first-child { padding-top: 4px; }
+.payment-row:last-child { border-bottom: none; padding-bottom: 4px; }
+.payment-method-select { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); }
+.payment-installments-select { width: 60px; flex-shrink: 0; padding: 8px 4px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: center; }
+.payment-amount-input { width: 110px; flex-shrink: 0; padding: 8px 10px; border: 1px solid var(--control-border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); text-align: right; }
+.payment-method-select:focus, .payment-installments-select:focus, .payment-amount-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 2px solid var(--border);
+  font-size: 15px;
+  font-weight: 700;
+}
+.cart-total .value { font-size: 24px; color: var(--primary); }
+.empty-cart { color: var(--text-muted); font-size: 13px; padding: 24px 0; text-align: center; }
+
+/* Carrinhos "congelados" (ver views/sale.js#holdCurrentSale), logo abaixo
+ * da busca de cliente. Cada card leva uma barrinha lateral cuja cor
+ * evolui com o tempo de espera (ver heldSaleUrgency) — verde recém
+ * congelado, dourado depois de alguns minutos, vermelho esperando muito
+ * tempo — pra dar uma prioridade visual imediata quando há mais de um
+ * cliente esperando, sem precisar ler o relógio de cada linha.
+ * --danger só entra aqui pra "esperando há muito tempo", nunca como "erro"
+ * (esse continua reservado pra avisos de verdade em todo o resto do app). */
+.held-sales-wrap { margin-top: 14px; }
+.held-sales-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  margin: 0 0 9px;
+}
+.held-sale-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 12px 10px 15px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.held-sale-card:last-child { margin-bottom: 0; }
+.held-sale-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.held-sale-card.ok::before { background: var(--primary); }
+.held-sale-card.warn::before { background: var(--warning); }
+.held-sale-card.late::before { background: var(--danger); }
+.held-sale-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.held-sale-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.held-sale-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.held-sale-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.held-sale-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.5; flex-shrink: 0; }
+.held-sale-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.held-sale-resume, .held-sale-discard {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.held-sale-resume { background: var(--primary); color: #fff; }
+.held-sale-resume:hover { filter: brightness(1.08); }
+.held-sale-discard { background: transparent; color: var(--text-muted); }
+.held-sale-discard:hover { background: var(--surface-alt); }
+
+.low-stock-row { background: var(--danger-light) !important; }
+/* Produto perto de vencer (Painel) — dourado/aviso, não vermelho: é uma
+ * oportunidade de venda (promoção), não um risco operacional como estoque
+ * baixo, então usa o mesmo tom de --warning-light já associado a "atenção,
+ * mas não crítico" em todo o resto da extensão (badge-gold, diferença de
+ * caixa etc.), nunca a cor de perigo. */
+.near-expiry-row { background: var(--warning-light) !important; }
+
+.utility-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.text-muted { color: var(--text-muted); }
+.mt-0 { margin-top: 0; }
+.section-title { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+.section-title-row { display: flex; align-items: center; gap: 8px; }
+
+/* Botão "?" de ajuda contextual, ao lado de um título de seção (ex: guia de
+ * validade/promoção em views/products.js) — sempre um círculo pequeno e
+ * discreto, nunca competindo visualmente com o título ao lado. */
+.help-btn-inline {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ---------- Ajuda ---------- */
+/* Achado do usuário: com 15 tópicos e 33 perguntas de F.A.Q, navegar só
+ * pelo menu lateral demorava — a busca cobre título de tópico + pergunta
+ * do F.A.Q (ver ajuda.js#SEARCH_INDEX). position:relative aqui é o que
+ * ancora o dropdown de resultados (position:absolute) logo abaixo do
+ * campo, sem empurrar o resto da página quando ele aparece. */
+.help-search-box { position: relative; margin: 16px 0 20px; }
+.help-search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  display: flex;
+  pointer-events: none;
+}
+#help-search-input {
+  width: 100%;
+  padding: 11px 14px 11px 40px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+#help-search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.help-search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 30;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.help-search-group-label {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.help-search-group-label:not(:first-child) { border-top: 1px solid var(--border); margin-top: 2px; padding-top: 10px; }
+.help-search-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.help-search-result:hover { background: var(--surface-alt); }
+.help-search-result strong { color: var(--primary); }
+.help-search-empty { padding: 14px; font-size: 13px; color: var(--text-muted); text-align: center; }
+.help-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.help-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: sticky;
+  top: 0;
+}
+.help-topic-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.help-topic-btn:hover { background: var(--surface-alt); }
+.help-topic-btn.active { background: var(--primary-light); color: var(--primary); }
+.help-topic-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+.help-content h2 { margin: 0 0 4px; font-size: 19px; }
+.help-content .help-subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+.help-content h3 { font-size: 15px; margin: 22px 0 8px; color: var(--primary); }
+.help-content h3:first-of-type { margin-top: 0; }
+/* Rótulo de categoria do tópico F.A.Q (ver ajuda.js) — separa os avisos por
+ * tela sem virar um novo <h2> (que é reservado pro título do próprio
+ * tópico) nem duplicar o estilo do <h3>, que já é a pergunta em si. */
+.help-content .faq-section-label {
+  margin: 30px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+.help-content .faq-section-label:first-of-type { margin-top: 4px; padding-top: 0; border-top: none; }
+/* Item de acordeão do F.A.Q (ver ajuda.js#wireFaqAccordion) — cada
+ * pergunta nasce fechada (a resposta tem o atributo `hidden`, não é só
+ * `max-height:0` escondendo visualmente) e abre/fecha na hora, sem
+ * transição: era exatamente o oposto de "instantâneo" ter uma resposta
+ * gigante deslizando por 300ms toda vez que se troca de pergunta. */
+.help-content .faq-item { border-bottom: 1px solid var(--border); }
+.help-content .faq-question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 10px;
+  margin: 0 -10px;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13.8px;
+  color: var(--text);
+  cursor: pointer;
+}
+.help-content .faq-question:hover { color: var(--primary); }
+/* Achado do usuário: a seta sozinha girando 90° é sutil demais pra notar
+ * numa lista de 33 perguntas — o fundo verde-claro na pergunta aberta
+ * (mesmo tratamento que .help-topic-btn.active já usa no menu lateral
+ * desta mesma tela) dá o destaque óbvio que a seta por si só não dava. */
+.help-content .faq-item.open .faq-question { color: var(--primary); background: var(--primary-light); }
+.help-content .faq-chevron { flex-shrink: 0; display: inline-flex; color: var(--text-muted); transition: transform 0.15s ease; }
+.help-content .faq-item.open .faq-chevron { transform: rotate(90deg); color: var(--primary); }
+.help-content .faq-answer { padding: 0 2px 15px; }
+.help-content .faq-answer p { margin: 0; }
+.help-content .faq-answer .tip { margin: 10px 0 0; }
+.help-content p { line-height: 1.65; font-size: 13.8px; margin: 0 0 12px; }
+.help-content ol, .help-content ul { padding-left: 20px; line-height: 1.75; font-size: 13.8px; margin: 0 0 14px; }
+.help-content li { margin-bottom: 4px; }
+.help-content .tip {
+  background: var(--primary-light);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin: 4px 0 16px;
+}
+.help-content .tip strong { color: var(--primary); }
+.help-content .warn-box {
+  background: var(--warning-light);
+  border-left: 3px solid var(--warning);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin: 4px 0 16px;
+}
+/* Bloco de texto pronto pra copiar/imprimir (ex: aviso de privacidade pro
+ * cliente) — visualmente separado do resto do texto explicativo, com cara
+ * de "papel" mesmo, pra ficar claro que é conteúdo pra levar pra fora do
+ * sistema, não uma explicação. */
+.help-content .template-box {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 4px 0 16px;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+@media (max-width: 760px) {
+  .help-layout { grid-template-columns: 1fr; }
+  .help-topics { flex-direction: row; overflow-x: auto; position: static; }
+}
+
+/* ---------- Personalização ---------- */
+.theme-options { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.theme-option {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.theme-option:hover { border-color: var(--primary); }
+.theme-option.active { border-color: var(--primary); background: var(--primary-light); }
+.theme-option .icon { font-size: 30px; }
+.theme-option .label { font-weight: 700; font-size: 14px; }
+.theme-option .desc { font-size: 12px; color: var(--text-muted); text-align: center; line-height: 1.4; }
+.theme-option.active .check { color: var(--primary); font-weight: 700; font-size: 12px; }
+.theme-option .check { visibility: hidden; font-size: 12px; }
+.theme-option.active .check { visibility: visible; }
+
+/* Variante compacta — usada na tela de boas-vindas do Setup (setup.js),
+   onde a escolha de aparência fica embutida acima dos cartões de
+   cadastrar do zero / restaurar backup, então precisa ocupar menos altura
+   que a versão de tela cheia da tela de Personalização. */
+.theme-options-compact .theme-option { padding: 12px 10px; flex-direction: row; justify-content: flex-start; gap: 10px; min-width: 0; }
+.theme-options-compact .theme-option .icon { font-size: 20px; }
+.theme-options-compact .theme-option .label { font-size: 13px; }
+.theme-options-compact .theme-option .desc { display: none; }
+.theme-options-compact .theme-option .check { display: none; }
+@media (max-width: 620px) { .theme-options-compact { flex-direction: column; } .theme-options-compact .theme-option { min-width: 0; } }
+
+/* ---------- Usuários: grade de permissões (cadastro/edição de vendedor) ----------
+ * Sem precedente direto na extensão (o único outro lugar com checkbox +
+ * label solto é "Ramo de atuação" em company.js/setup.js, mas ali são só 2
+ * itens lado a lado) — 13 poderes agrupados em 4 categorias, uma delas
+ * (Telas) com 7 itens, não cabe no mesmo padrão de "checkbox inline num
+ * .form-row" sem espremer. Título de grupo reaproveita a mesma "etiqueta"
+ * já usada em .stat-card .label (maiúsculas, discreta) — não é uma fonte
+ * nova, é a mesma convenção só aplicada aqui. O grid responsivo
+ * (auto-fill/minmax) segue o mesmo espírito de .stat-grid/.pdv-layout: se
+ * o modal for estreito, vira 1 coluna sozinho, sem media query própria. */
+.permission-groups { display: flex; flex-direction: column; gap: 18px; }
+.permission-group-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px 20px;
+}
+.permission-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 3px 0;
+}
+.permission-item input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+/* Poder que quem está cadastrando/editando não tem — nunca pode conceder
+ * (ver data/usersRepo.js#createUser/updateUser), então a caixinha fica
+ * travada. Mesma opacidade de .btn:disabled, pro "isto está desligado" ter
+ * sempre a mesma leitura visual em qualquer canto do sistema. */
+.permission-item.locked { opacity: 0.5; cursor: not-allowed; }
+
+/* ==========================================================================
+   Responsividade — a extensão abre numa aba comum, então a janela do
+   navegador pode ficar tão estreita quanto o usuário quiser (lado a lado
+   com outra janela, notebook pequeno, zoom alto etc.). As regras abaixo
+   cobrem do desktop largo até uma tela de celular, sempre priorizando
+   nunca deixar a página inteira rolar na horizontal — quem rola é só o
+   componente que precisa (tabela, menu de tópicos da ajuda).
+   ========================================================================== */
+
+/* ---------- ~1024px: PDV empilha carrinho/pagamento embaixo da busca ---------- */
+@media (max-width: 1024px) {
+  .pdv-layout { grid-template-columns: 1fr; }
+}
+
+/* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */
+@media (max-width: 900px) {
+  .shell { display: block; }
+  .menu-toggle-btn { display: flex; }
+  /* Fica no fluxo (display:block) o tempo todo dentro do breakpoint — só
+   * assim a opacidade consegue transicionar; display não anima. */
+  .sidebar-overlay { display: block; }
+  .sidebar-overlay.open { opacity: 1; pointer-events: auto; }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 250px;
+    max-width: 82vw;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    z-index: 150;
+    box-shadow: var(--shadow-md);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .main { padding: 76px 18px 48px; }
+  .page-header { margin-bottom: 18px; }
+}
+
+/* ---------- ~640px: formulários, modais e telas de autenticação compactos ---------- */
+@media (max-width: 640px) {
+  html, body { font-size: 14px; }
+  .main { padding: 72px 12px 40px; }
+
+  .form-row { flex-direction: column; gap: 0; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar input, .toolbar select, .toolbar label, .toolbar .custom-select { width: 100%; min-width: 0; }
+  .toolbar label { display: flex; justify-content: space-between; gap: 8px; }
+
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1; }
+
+  .modal-backdrop { padding: 10px; align-items: flex-end; }
+  .modal { max-width: 100%; max-height: 92vh; }
+  .modal h2 { padding: 18px 16px 14px; }
+  .modal-body { padding: 0 16px; }
+  .modal-actions { padding: 16px 16px 18px; }
+  .modal.wide { max-width: 100%; }
+
+  .auth-screen { padding: 16px; }
+  .auth-card, .auth-card.wide { padding: 26px 20px; max-width: 100%; }
+
+  .cart-item { flex-wrap: wrap; }
+  .cart-item .name { flex: 1 1 100%; }
+
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
+/* ---------- ~420px: telas de celular ---------- */
+@media (max-width: 420px) {
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .sidebar-brand .name { font-size: 14px; }
+}
+
+/* ==========================================================================
+   Recibo de venda (impressão) — ver components/receipt.js. Fica escondido
+   o tempo todo na tela normal; @media print vira ele visível e some com
+   todo o resto da página, sem precisar abrir aba nova nem popup.
+
+   DUAS aparências a partir do MESMO html, escolhidas automaticamente pela
+   largura do papel que a pessoa selecionar no diálogo de impressão (o
+   Chrome resolve @media print and (min-width) contra o tamanho de página
+   escolhido — impressora térmica de 58/80mm cai no layout estreito tipo
+   cupom; A4/Carta numa impressora comum cai no layout largo tipo nota/
+   recibo de verdade). Cada item já sai em 4 células separadas (nome/qtd/
+   unitário/total) — só a disposição delas muda entre os dois layouts, o
+   conteúdo é sempre o mesmo.
+   ========================================================================== */
+#print-receipt-root, #print-report-root { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  #print-receipt-root, #print-receipt-root *,
+  #print-report-root, #print-report-root * { visibility: visible; }
+  #print-receipt-root, #print-report-root {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  @page { margin: 4mm; }
+}
+
+/* ---------- Layout estreito (padrão — bobina térmica 58/80mm) ---------- */
+.receipt {
+  width: 100%;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #000;
+}
+.r-header { text-align: center; }
+.r-store-name { font-size: 13px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.3px; }
+.r-small { font-size: 9.5px; }
+.r-center { text-align: center; }
+.r-title-block { text-align: center; }
+.r-title { font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.r-receipt-number { font-size: 9px; color: #333; margin-top: 1px; }
+.r-nonfiscal { margin-top: 1px; }
+.r-section-title { font-weight: 700; text-transform: uppercase; font-size: 9.5px; margin-bottom: 2px; }
+.r-sep { border-top: 1px dashed #000; margin: 5px 0; }
+/* flex-wrap:wrap + margin-left:auto no valor: se o rótulo for comprido
+ * demais pra caber ao lado do valor (ex.: "Cartão de crédito (12x)" numa
+ * bobina de 58mm), o valor desce inteiro pra sua própria linha, alinhado
+ * à direita — nunca quebra no meio da frase nem sobrepõe o valor. */
+.r-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.r-row > span:first-child { white-space: nowrap; }
+.r-row > span:last-child { white-space: nowrap; margin-left: auto; }
+.r-row.r-total { font-weight: 700; font-size: 12px; margin-top: 3px; border-top: 1px solid #000; padding-top: 3px; }
+
+.r-items-head { display: none; }
+.r-item-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas: "name name name" "qty unit total";
+  column-gap: 8px;
+  padding: 2px 0;
+}
+.r-cell-name { grid-area: name; font-weight: 700; }
+.r-cell-qty { grid-area: qty; white-space: nowrap; }
+.r-cell-unit { grid-area: unit; text-align: right; white-space: nowrap; color: #333; }
+.r-cell-unit.r-cell-unit-redundant { display: none; } /* qtd. 1: já é o mesmo valor do total, não repete */
+.r-cell-total { grid-area: total; text-align: right; white-space: nowrap; font-weight: 700; }
+.r-item-refunded { font-weight: 400; text-decoration: line-through; color: #555; }
+
+/* ---------- Layout largo (impressora comum — A4/Carta) ---------- */
+@media print and (min-width: 120mm) {
+  @page { margin: 14mm; }
+
+  .receipt {
+    width: 100%;
+    max-width: 190mm;
+    margin: 0 auto;
+    font-family: -apple-system, 'Segoe UI', system-ui, Roboto, Arial, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.6;
+    border: 1px solid #ccc;
+    padding: 12mm;
+  }
+  .r-header { text-align: left; }
+  .r-store-name { font-size: 19px; letter-spacing: 0.2px; }
+  .r-small { font-size: 11px; color: #444; }
+
+  .r-title-block { display: flex; justify-content: space-between; align-items: baseline; text-align: left; }
+  .r-title { font-size: 15px; }
+  .r-receipt-number { font-size: 12px; color: #555; margin-top: 0; }
+  .r-nonfiscal { text-align: left; margin-top: -2px; color: #777; }
+
+  .r-section-title { font-size: 11px; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .r-sep { border-top: 1px solid #ddd; margin: 12px 0; }
+  .r-row { padding: 3px 0; }
+  .r-row.r-total { font-size: 16px; margin-top: 6px; padding-top: 8px; }
+  .r-totals { max-width: 260px; margin-left: auto; }
+
+  .r-items-head {
+    display: grid;
+    grid-template-columns: 1fr 90px 110px 110px;
+    grid-template-areas: "name qty unit total";
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    letter-spacing: 0.4px;
+    color: #555;
+    border-bottom: 1.5px solid #000;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  .r-items-head .r-cell-qty, .r-items-head .r-cell-unit, .r-items-head .r-cell-total { text-align: right; }
+  .r-item-row {
+    grid-template-columns: 1fr 90px 110px 110px;
+    grid-template-areas: "name qty unit total";
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .r-cell-name { font-weight: 600; }
+  .r-cell-unit.r-cell-unit-redundant { display: block; } /* tabela de verdade: coluna "Unitário" sempre visível, é convenção normal de recibo/nota */
+
+  /* ---------- Exportar relatório em PDF (components/reportPrint.js) ----------
+   * Só existe nesta variante larga de propósito: ninguém exporta um
+   * relatório gerencial numa bobina de 58/80mm — ao contrário do recibo,
+   * não precisa de layout estreito alternativo. */
+  .rp-sheet {
+    font-family: -apple-system, 'Segoe UI', system-ui, Roboto, Arial, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: #000;
+    max-width: 190mm;
+    margin: 0 auto;
+  }
+  .rp-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .rp-store-name { font-size: 18px; font-weight: 700; text-transform: uppercase; }
+  .rp-store-meta { font-size: 11px; color: #555; margin-top: 2px; }
+  .rp-title-block { text-align: right; }
+  .rp-title { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .rp-sep { border-top: 1px solid #ccc; margin: 14px 0; }
+
+  .rp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  .rp-stat { border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; }
+  .rp-stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #666; margin-bottom: 3px; }
+  .rp-stat-value { font-size: 15px; font-weight: 700; }
+
+  .rp-section-title { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; margin: 18px 0 6px; }
+  .rp-note { font-size: 10.5px; color: #666; margin: -4px 0 8px; }
+  .rp-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  .rp-table th, .rp-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+  .rp-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #555; border-bottom: 1.5px solid #000; }
+  .rp-table td.rp-empty { color: #777; font-style: italic; }
+  .rp-center { text-align: center; }
+
+  /* Evita cortar uma linha de tabela ao meio entre duas páginas — cada
+   * bloco (stats + as 3 tabelas) tenta quebrar de página inteiro. */
+  .rp-table tr { break-inside: avoid; }
+  .rp-section-title { break-after: avoid; }
+}
