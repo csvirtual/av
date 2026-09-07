@@ -728,6 +728,7 @@ ${escapeHtml(linhaEncarregado)}</div>
 
       <h3>Inventário / balanço</h3>
       <p>Em <strong>Estoque → Fazer inventário</strong>, dá pra contar fisicamente todos os produtos de uma vez e digitar o valor encontrado — o sistema ajusta sozinho só os produtos com diferença, registrando tudo no histórico de cada um. O valor contado também aceita fração (ex: 77,5), pra produtos medidos em kg, litro ou metro.</p>
+      <p>O campo de busca no topo da lista filtra por nome ou código de barras — útil pra achar um produto específico sem rolar o catálogo inteiro. É só visual: os valores já digitados nos produtos que ficam escondidos pela busca não se perdem, e continuam entrando no ajuste normalmente ao confirmar.</p>
     `,
   },
   {
