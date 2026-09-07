@@ -49,16 +49,21 @@ export async function renderCaixa(container, ctx) {
 // de Caixa é um passo a mais sem necessidade — o próximo lugar pra onde
 // todo mundo vai de qualquer jeito é o PDV. Um aviso com contagem
 // regressiva deixa isso claro (em vez de pular direto, sem explicação) e
-// ainda dá um jeito de ir na hora ("Ir agora") pra quem não quer esperar.
+// ainda dá um jeito de ir na hora ("Ir agora") pra quem não quer esperar —
+// ou de cancelar o redirecionamento e ficar mesmo na tela de Caixa
+// ("Ficar aqui", ex: quem só abriu o caixa e quer conferir o troco inicial
+// antes de vender). Esc e clique fora do modal fazem a mesma coisa que
+// "Ficar aqui" (cancel() padrão de openModal, ver components/modal.js) —
+// o botão só torna essa saída visível, não é o único jeito de cancelar.
 // Só acontece nesse caso específico — abrir o caixa sem a política ligada
 // continua do jeito que sempre foi, ficando na tela de Caixa.
 function showRedirectToPdvNotice(ctx) {
-  const TOTAL_SECONDS = 5;
+  const TOTAL_SECONDS = 7;
   let remaining = TOTAL_SECONDS;
   const { close, modalEl } = openModal({
     title: '<span style="text-transform:uppercase;">Caixa aberto</span>',
     submitLabel: 'Ir agora',
-    singleButton: true,
+    cancelLabel: 'Ficar aqui',
     centerTitle: true,
     centerActions: true,
     bodyHtml: `
