@@ -18,6 +18,14 @@ test.describe('Caixa — aviso de redirecionamento pro PDV', () => {
     await expect(page.locator('.modal h2')).toHaveText('Caixa aberto');
     await expect(page.locator('#redirect-count')).toHaveText('7');
 
+    // Achado de auditoria: a duração da transição da barra de progresso já
+    // ficou hardcoded no CSS (5000ms) enquanto TOTAL_SECONDS mudava aqui —
+    // a barra zerava visualmente antes do número chegar a zero. Corrigido
+    // pra vir só do JS (fill.style.transitionDuration), derivada do próprio
+    // TOTAL_SECONDS — este assert trava a dupla nunca mais dessincronizar.
+    const transitionDuration = await page.locator('#redirect-progress-fill').evaluate((el) => getComputedStyle(el).transitionDuration);
+    expect(transitionDuration).toBe('7s');
+
     // Não precisa esperar os 7s de verdade pra confirmar que funciona —
     // clicar "Ir agora" já cobre o caminho de navegação; o timer em si
     // (setInterval) é testado separadamente logo abaixo.

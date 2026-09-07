@@ -1157,9 +1157,16 @@ tbody tr:hover { background: var(--surface-alt); }
 
 /* Aviso de "abriu o caixa, redirecionando pro PDV" (ver
  * views/caixa.js#showRedirectToPdvNotice) — a barra nasce cheia e
- * transiciona pra 0% em exatamente 5s, sincronizada com o número da
- * contagem regressiva ao lado (os dois contam a mesma coisa, de dois
- * jeitos: um exato/textual, outro contínuo/visual). */
+ * transiciona pra 0%, sincronizada com o número da contagem regressiva ao
+ * lado (os dois contam a mesma coisa, de dois jeitos: um exato/textual,
+ * outro contínuo/visual). Achado de auditoria: a duração da transição
+ * ficava fixa AQUI (5000ms), independente de TOTAL_SECONDS em caixa.js —
+ * quando TOTAL_SECONDS mudou pra 7 sem atualizar isto aqui junto, a barra
+ * passou a zerar visualmente aos 5s enquanto o número ainda contava até
+ * 7s. Corrigido pra nunca mais dessincronizar: a duração agora vem só do
+ * JS (fill.style.transitionDuration, calculada a partir do próprio
+ * TOTAL_SECONDS), não mais duplicada aqui — só a propriedade/curva ficam
+ * no CSS. */
 .redirect-progress-track {
   width: 100%;
   height: 6px;
@@ -1172,7 +1179,8 @@ tbody tr:hover { background: var(--surface-alt); }
   width: 100%;
   border-radius: 999px;
   background: var(--primary);
-  transition: width 5000ms linear;
+  transition-property: width;
+  transition-timing-function: linear;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 26px 24px; margin: 0; flex-shrink: 0; }
 /* Achado de auditoria: `wide: true` (openModal, ver components/modal.js) só

@@ -79,8 +79,15 @@ function showRedirectToPdvNotice(ctx) {
       // Começa em 100% e transiciona pra 0% em exatamente TOTAL_SECONDS —
       // rAF garante que o navegador pinte a barra cheia ANTES de aplicar a
       // largura final, senão a transição CSS não tem "de onde" animar (as
-      // duas larguras já seriam a mesma no primeiro paint).
+      // duas larguras já seriam a mesma no primeiro paint). Achado de
+      // auditoria: a duração já foi hardcoded direto no CSS (5000ms) — quando
+      // TOTAL_SECONDS mudou aqui sem atualizar o CSS junto, a barra passou a
+      // zerar visualmente antes do número chegar a zero. Setando a duração
+      // aqui, a partir do PRÓPRIO TOTAL_SECONDS (ver styles.css#redirect-
+      // progress-fill — só a propriedade/curva ficam lá), os dois nunca mais
+      // podem dessincronizar.
       const fill = mountedModalEl.querySelector('#redirect-progress-fill');
+      fill.style.transitionDuration = `${TOTAL_SECONDS * 1000}ms`;
       requestAnimationFrame(() => { fill.style.width = '0%'; });
 
       const countEl = mountedModalEl.querySelector('#redirect-count');
