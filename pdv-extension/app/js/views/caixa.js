@@ -65,7 +65,7 @@ function showRedirectToPdvNotice(ctx) {
       <div style="text-align:center;">
         ${icon('checkCircle', { size: 46 })}
         <p style="font-size:13.5px;color:var(--text-muted);margin:16px 0 18px;line-height:1.5;">
-          Redirecionando para o PDV em <strong id="redirect-count">${TOTAL_SECONDS}</strong>s…
+          Redirecionando para o PDV em <strong id="redirect-count">${TOTAL_SECONDS}</strong>s
         </p>
         <div class="redirect-progress-track"><div class="redirect-progress-fill" id="redirect-progress-fill"></div></div>
       </div>
