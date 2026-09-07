@@ -9,6 +9,7 @@ import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
 import { openModal, confirmDialog, closeAllModals } from './components/modal.js';
 import { closeAllCustomSelects } from './components/customSelect.js';
+import { openSupportWhatsappModal, openSupportEmailModal } from './components/supportContact.js';
 import { icon } from './components/icon.js';
 import { escapeHtml } from './utils/format.js';
 import { userCan, isAdmin } from './utils/permissions.js';
@@ -595,78 +596,9 @@ window.addEventListener('error', (event) => reportUnexpectedError(event.error ||
 // Contato direto (WhatsApp/e-mail) na tela de trial encerrado — achado do
 // usuário: "fale com quem te passou o sistema" sozinho não reforçava ONDE
 // conseguir a chave. Loja e CNPJ vêm prontos do cadastro (a pessoa nunca
-// precisa redigitar o que o sistema já sabe).
-const TRIAL_SUPPORT_WHATSAPP = '5571986461027'; // 71 98646-1027, formato E.164 pro link wa.me
-const TRIAL_SUPPORT_EMAIL = 'csvirtual.av@gmail.com';
-
-function trialContactMessage(company) {
-  return `Olá! Testei o sistema PDV - C&S Virtual e meu período de teste encerrou. Gostaria de saber mais sobre a ativação.\n\nLoja: ${company.nomeFantasia}\nCNPJ: ${company.cnpj}`;
-}
-
-function trialContactChipsHtml(company) {
-  return `
-    <div style="display:flex;gap:10px;margin-bottom:14px;">
-      <div style="flex:1;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Loja</div>
-        <div style="font-size:13.5px;font-weight:600;">${escapeHtml(company.nomeFantasia)}</div>
-      </div>
-      <div style="flex:1;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;">
-        <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">CNPJ</div>
-        <div style="font-size:13.5px;font-weight:600;">${escapeHtml(company.cnpj)}</div>
-      </div>
-    </div>
-  `;
-}
-
-function openTrialWhatsappModal(company) {
-  const message = trialContactMessage(company);
-  openModal({
-    title: 'Contato via WhatsApp',
-    centerTitle: true,
-    centerActions: true,
-    submitLabel: `${icon('whatsapp', { size: 15 })} Abrir WhatsApp`,
-    bodyHtml: `
-      <p style="margin:0 0 16px;font-size:13.5px;color:var(--text-muted);line-height:1.5;text-align:center;">Vamos abrir uma conversa com o suporte no WhatsApp, já com a mensagem abaixo pronta pra enviar.</p>
-      ${trialContactChipsHtml(company)}
-      <div style="background:var(--surface-alt);border-radius:var(--radius-sm);padding:12px 14px;font-size:12.5px;color:var(--text-muted);line-height:1.6;white-space:pre-wrap;">${escapeHtml(message)}</div>
-    `,
-    onSubmit: () => {
-      window.open(`https://wa.me/${TRIAL_SUPPORT_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
-      return true;
-    },
-  });
-}
-
-function openTrialEmailModal(company) {
-  const message = trialContactMessage(company);
-  openModal({
-    title: 'Contato por e-mail',
-    centerTitle: true,
-    centerActions: true,
-    submitLabel: `${icon('mail', { size: 15 })} Enviar e-mail`,
-    bodyHtml: `
-      <p style="margin:0 0 16px;font-size:13.5px;color:var(--text-muted);line-height:1.5;text-align:center;">Confirme seu e-mail e clique em enviar — seu programa de e-mail abre com a mensagem pronta pra <strong>${escapeHtml(TRIAL_SUPPORT_EMAIL)}</strong>.</p>
-      ${trialContactChipsHtml(company)}
-      <div id="trial-email-error"></div>
-      <div class="field">
-        <label for="trial-contact-email">Seu e-mail para contato *</label>
-        <input id="trial-contact-email" type="email" placeholder="seuemail@exemplo.com" value="${escapeHtml(company.email || '')}">
-      </div>
-    `,
-    onSubmit: (modalEl) => {
-      const input = modalEl.querySelector('#trial-contact-email');
-      const contactEmail = input.value.trim();
-      if (!contactEmail || !contactEmail.includes('@')) {
-        modalEl.querySelector('#trial-email-error').innerHTML = '<div class="form-error">Informe um e-mail válido.</div>';
-        return false;
-      }
-      const subject = `Solicitação de chave de ativação — ${company.nomeFantasia}`;
-      const body = `${message}\nE-mail para contato: ${contactEmail}`;
-      window.location.href = `mailto:${TRIAL_SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      return true;
-    },
-  });
-}
+// precisa redigitar o que o sistema já sabe). Núcleo compartilhado com o
+// atalho "Solicitar chave" em Dados da loja — ver components/supportContact.js.
+const TRIAL_REASON_TEXT = 'meu período de teste encerrou — gostaria de saber mais sobre a ativação';
 
 // Tela de bloqueio por trial expirado (sem chave de ativação válida
 // guardada). Tem campo pra colar a chave na hora — sem isso a pessoa
@@ -699,8 +631,8 @@ function renderLicenseBlockedScreen(company) {
       </div>
     </div>
   `;
-  document.getElementById('license-whatsapp-btn').addEventListener('click', () => openTrialWhatsappModal(company));
-  document.getElementById('license-email-btn').addEventListener('click', () => openTrialEmailModal(company));
+  document.getElementById('license-whatsapp-btn').addEventListener('click', () => openSupportWhatsappModal(company, TRIAL_REASON_TEXT));
+  document.getElementById('license-email-btn').addEventListener('click', () => openSupportEmailModal(company, TRIAL_REASON_TEXT));
   document.getElementById('license-activate-btn').addEventListener('click', async () => {
     const errBox = document.getElementById('license-error');
     errBox.innerHTML = '';

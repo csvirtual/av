@@ -249,8 +249,10 @@ a { color: var(--primary); }
 
 .btn-sm { padding: 5px 10px; font-size: 13px; }
 
-/* Botão redondo só com ícone — hoje só usado nos atalhos de contato
- * (WhatsApp/e-mail) da tela de trial encerrado (ver app.js). */
+/* Botão redondo só com ícone — usado nos atalhos de contato (WhatsApp/
+ * e-mail), tanto na tela de trial encerrado (app.js) quanto no modal de
+ * escolha do atalho "Solicitar chave" em Dados da loja (ver
+ * components/supportContact.js). */
 .contact-icon-btn {
   width: 46px; height: 46px; border-radius: 50%; border: none; background: transparent;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;

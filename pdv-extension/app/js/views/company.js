@@ -15,6 +15,7 @@ import { wireMaskedInput } from '../components/maskedInput.js';
 import { escapeHtml as escAttr } from '../utils/format.js';
 import { infoTooltipHtml, initInfoTooltips, CNPJ_LEGAL_NOTICE_HTML } from '../components/infoTooltip.js';
 import { getLicenseStatus, setStoredActivationKey } from '../data/licenseRepo.js';
+import { openSupportContactChoiceModal } from '../components/supportContact.js';
 import { verifyLicenseKey } from '../license.js';
 import { formatDateTime, onlyDigits, UFS } from '../utils/format.js';
 
@@ -55,7 +56,10 @@ export async function renderCompanySettings(container, ctx) {
           <label for="license-settings-input">Tem uma chave de ativação definitiva? Cole aqui pra sair do teste/demo</label>
           <input id="license-settings-input" placeholder="Cole a chave de ativação">
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" id="license-settings-btn">Ativar</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary btn-sm" id="license-settings-btn">Ativar</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="request-key-btn">${icon('key', { size: 15 })} Solicitar chave</button>
+        </div>
       ` : ''}
     </div>
     <div class="card" style="max-width:760px;">
@@ -219,6 +223,14 @@ export async function renderCompanySettings(container, ctx) {
     });
     showToast('Chave ativada com sucesso!', 'success');
     ctx.refreshShell();
+  });
+
+  // Pedido do usuário: atalho pra pedir a chave ao suporte direto daqui, sem
+  // precisar esperar o trial/demo travar (a única forma que existia antes —
+  // ver app.js#renderLicenseBlockedScreen). Mesmo modal de escolha
+  // WhatsApp/e-mail, só que acessível a qualquer momento.
+  document.getElementById('request-key-btn')?.addEventListener('click', () => {
+    openSupportContactChoiceModal(company, 'gostaria de solicitar minha chave de ativação definitiva');
   });
 
   // chrome.runtime.requestUpdateCheck() pede pro Chrome checar AGORA (em
