@@ -1026,7 +1026,35 @@ tbody tr:hover { background: var(--surface-alt); }
  * isto aqui é só a aparência. Existe porque a lista aberta de um <select>
  * comum, no Linux, é desenhada pelo sistema operacional e ignora o CSS da
  * página (fica sempre branca, mesmo no tema escuro). */
-.custom-select { position: relative; display: inline-flex; }
+.custom-select { position: relative; display: inline-flex; align-items: stretch; gap: 4px; }
+/* Botão "x" que aparece só quando o filtro não está no valor padrão (ver
+ * components/customSelect.js#syncFromSelect) — mesma altura/borda/raio do
+ * gatilho ao lado pra formar um par visual único, só que quadrado e sem
+ * texto, pra não competir com ele. */
+.custom-select-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+/* `display:flex` acima empata em especificidade com a regra nativa do
+ * navegador pro atributo `hidden` (as duas são (0,1,0)) — sem isto aqui,
+ * a regra de autor (esta folha de estilo) ganha do UA stylesheet mesmo
+ * empatada, e o botão continuava visível com `hidden` presente. */
+.custom-select-clear[hidden] { display: none; }
+.custom-select-clear:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
+.custom-select-clear:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
 .custom-select-trigger {
   display: flex;
   align-items: center;
@@ -1049,11 +1077,12 @@ tbody tr:hover { background: var(--surface-alt); }
 }
 .custom-select-trigger .cs-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform 0.15s ease; }
 .custom-select.is-open .custom-select-trigger .cs-chevron { transform: rotate(180deg); }
+/* position:fixed, não absolute — a posição real (top/left/width) é
+ * calculada em JS na abertura (ver components/customSelect.js#position),
+ * porque a lista é reparentada pro <body> nesse momento, fugindo do
+ * overflow de `.main` (ver comentário no JS pro porquê). */
 .custom-select-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 100%;
+  position: fixed;
   max-height: 260px;
   overflow-y: auto;
   background: var(--surface);
@@ -1064,7 +1093,7 @@ tbody tr:hover { background: var(--surface-alt); }
   z-index: 40;
   display: none;
 }
-.custom-select.is-open .custom-select-list { display: block; }
+.custom-select-list.is-open { display: block; }
 .custom-select-option {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
