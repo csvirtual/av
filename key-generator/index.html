@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Chaves — Gestão de Loja</title>
+<style>
+  :root {
+    --bg: #f4f6f5;
+    --surface: #ffffff;
+    --surface-alt: #eef1f0;
+    --border: #dde3e1;
+    --text: #1c2523;
+    --text-muted: #62716d;
+    --primary: #145333;
+    --primary-dark: #0d3b24;
+    --primary-light: #e4f0e9;
+    --accent: #c98a2c;
+    --danger: #b3261e;
+    --danger-light: #fbe9e7;
+    --warning: #a6650f;
+    --warning-light: #fbeecd;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(20, 30, 27, 0.08), 0 1px 2px rgba(20, 30, 27, 0.06);
+    --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101613;
+      --surface: #1a221e;
+      --surface-alt: #212b25;
+      --border: #34413a;
+      --text: #e9efec;
+      --text-muted: #93a89e;
+      --primary: #2f9d6b;
+      --primary-dark: #0d2b1c;
+      --primary-light: rgba(47, 157, 107, 0.18);
+      --accent: #b27c2a;
+      --danger: #e5645a;
+      --danger-light: rgba(229, 100, 90, 0.18);
+      --warning: #d99a35;
+      --warning-light: rgba(217, 154, 53, 0.18);
+      --shadow: 0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.3);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101613;
+    --surface: #1a221e;
+    --surface-alt: #212b25;
+    --border: #34413a;
+    --text: #e9efec;
+    --text-muted: #93a89e;
+    --primary: #2f9d6b;
+    --primary-dark: #0d2b1c;
+    --primary-light: rgba(47, 157, 107, 0.18);
+    --accent: #b27c2a;
+    --danger: #e5645a;
+    --danger-light: rgba(229, 100, 90, 0.18);
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
+    --shadow: 0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.3);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.45);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Source Sans 3", Arial, sans-serif;
+    font-size: 14.5px; line-height: 1.5;
+  }
+  .shell { max-width: 760px; margin: 0 auto; padding: 32px 20px 60px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--primary); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 14px; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); display: inline-block; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  h3 { font-size: 15px; margin: 0 0 10px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--text-muted); font-size: 13px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 20px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .field input, .field select, .field textarea {
+    padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--text); outline: none; font: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+  .field input.invalid { border-color: var(--danger); }
+  .field .hint { font-size: 12px; color: var(--text-muted); }
+  .field .hint.ok { color: var(--primary); }
+  .field .hint.bad { color: var(--danger); }
+  textarea.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; resize: vertical; min-height: 64px; width: 100%; box-sizing: border-box; display: block; }
+  .radio-row { display: flex; flex-direction: column; gap: 6px; }
+  .radio-row label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 400; cursor: pointer; }
+  .btn {
+    padding: 9px 16px; border-radius: var(--radius-sm); border: none; background: var(--primary);
+    color: #fff; font-weight: 600; font-size: 13.5px; cursor: pointer; font: inherit;
+  }
+  .btn:hover { background: var(--primary-dark); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface-alt); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-sm { padding: 6px 11px; font-size: 12.5px; }
+  .row-between { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .row-gap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .warn-box { background: var(--warning-light); border-left: 3px solid var(--warning); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 10px 14px; font-size: 13px; margin: 10px 0; }
+  .danger-box { background: var(--danger-light); border-left: 3px solid var(--danger); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 10px 14px; font-size: 13px; margin: 10px 0; }
+  .success-box { background: var(--primary-light); border-left: 3px solid var(--primary); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 14px 16px; margin: 10px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .table-wrap { overflow-x: auto; }
+  .table-empty { text-align: center; color: var(--text-muted); padding: 18px; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .badge-gold { background: var(--warning-light); color: var(--warning); }
+  .badge-green { background: var(--primary-light); color: var(--primary); }
+  .badge-gray { background: var(--surface-alt); color: var(--text-muted); }
+  .pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+  .page-indicator { font-size: 12.5px; color: var(--text-muted); }
+  .gk-modal-overlay {
+    position: fixed; inset: 0; background: rgba(16,22,19,.5); display: flex;
+    align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  .gk-modal { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 22px 24px; max-width: 420px; width: 100%; }
+  .summary-box { background: var(--surface-alt); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; margin-bottom: 10px; }
+  .summary-box div { margin-bottom: 4px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .form-error { color: var(--danger); font-size: 12.5px; margin: 6px 0; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--primary-dark); color: #fff; padding: 10px 18px; border-radius: var(--radius-sm);
+    font-size: 13px; box-shadow: var(--shadow-md); z-index: 200; opacity: 0; transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+  .theme-toggle-btn {
+    position: fixed; top: 14px; right: 14px; z-index: 50;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface);
+    font-size: 15px; cursor: pointer; box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .theme-toggle-btn:hover { background: var(--surface-alt); }
+</style>
+</head>
+<body>
+<div class="shell" id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ================= Utilidades gerais =================
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function b64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+  function b64ToBuf(str) {
+    const bin = atob(str);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  }
+  function b64url(buf) { return b64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+
+  function todayStamp() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  function downloadFile(filename, content) {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyToClipboard(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    showToast(ok ? 'Copiado!' : 'Não foi possível copiar — selecione o texto manualmente.');
+  }
+
+  let toastTimer = null;
+  function showToast(msg) {
+    let el = document.getElementById('gk-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'gk-toast'; el.className = 'toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  function showModal(bodyHtml) {
+    const overlay = document.createElement('div');
+    overlay.className = 'gk-modal-overlay';
+    overlay.innerHTML = `<div class="gk-modal">${bodyHtml}</div>`;
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function closeModal(overlay) { overlay.remove(); }
+
+  // ================= Aparência (mesmo esquema claro/escuro/automático da extensão) =================
+  const THEME_KEY = 'gk_theme';
+  function getThemePreference() { return localStorage.getItem(THEME_KEY) || 'system'; }
+  function applyTheme(value) {
+    if (value === 'dark' || value === 'light') document.documentElement.setAttribute('data-theme', value);
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  function themeIcon(value) { return value === 'dark' ? '🌙' : value === 'light' ? '☀️' : '🖥️'; }
+  function updateThemeButton() {
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) { const v = getThemePreference(); btn.textContent = themeIcon(v); btn.title = `Aparência: ${v === 'dark' ? 'Escuro' : v === 'light' ? 'Claro' : 'Automático'} (clique pra trocar)`; }
+  }
+  function setThemePreference(value) {
+    localStorage.setItem(THEME_KEY, value);
+    applyTheme(value);
+    updateThemeButton();
+  }
+  function initThemeToggle() {
+    applyTheme(getThemePreference());
+    const btn = document.createElement('button');
+    btn.id = 'theme-toggle-btn';
+    btn.className = 'theme-toggle-btn';
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      const order = ['system', 'light', 'dark'];
+      const next = order[(order.indexOf(getThemePreference()) + 1) % order.length];
+      setThemePreference(next);
+    });
+    document.body.appendChild(btn);
+    updateThemeButton();
+  }
+
+  // ================= Bloqueio de aba duplicada (mesmo mecanismo da extensão) =================
+  // Igual ao tabPresence.js da extensão: sem nenhuma API de aba disponível
+  // (isso aqui é um arquivo local comum, nem tem chrome.* nenhum), cada aba
+  // registra um "batimento" periódico com um id próprio que já embute o
+  // instante do registro — ordenar os ids também ordena por "quem abriu
+  // primeiro". Só a mais antiga viva roda de verdade; as outras ficam
+  // bloqueadas por uma sobreposição, sem perder o que já estava na tela.
+  const TABPRESENCE_KEY = 'gk_tab_presence';
+  const TABPRESENCE_HEARTBEAT_MS = 300;
+  const TABPRESENCE_PROBE_MS = 2500;
+  const TABPRESENCE_STALE_MS = 8000;
+  const myTabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  function readTabPresence() {
+    try { return JSON.parse(localStorage.getItem(TABPRESENCE_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function writeTabPresence(map) { localStorage.setItem(TABPRESENCE_KEY, JSON.stringify(map)); }
+
+  function renderTabBlockedOverlay() {
+    if (document.getElementById('gk-tab-blocked-overlay')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'gk-tab-blocked-overlay';
+    overlay.className = 'gk-modal-overlay';
+    overlay.innerHTML = `
+      <div class="gk-modal" style="text-align:center;">
+        <div style="font-size:34px;margin-bottom:6px;">🗂️</div>
+        <h3>Já aberto em outra aba</h3>
+        <p class="muted">Esta ferramenta já está aberta em outra aba deste navegador. Feche esta aba e continue na outra — ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos.</p>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  function removeTabBlockedOverlay() {
+    document.getElementById('gk-tab-blocked-overlay')?.remove();
+  }
+
+  function watchTabPresence(onChange) {
+    let running = false;
+    function tick() {
+      if (running) return;
+      running = true;
+      const finish = () => { running = false; };
+      const now = Date.now();
+      let map = readTabPresence();
+      for (const [id, ts] of Object.entries(map)) {
+        if (now - ts > TABPRESENCE_STALE_MS) delete map[id];
+      }
+      map[myTabId] = now;
+      writeTabPresence(map);
+
+      let liveIds = Object.keys(map).sort();
+      if (liveIds[0] !== myTabId) {
+        const rivalId = liveIds[0];
+        const rivalTsBefore = map[rivalId];
+        setTimeout(() => {
+          const mapAfterProbe = readTabPresence();
+          const rivalTsAfter = mapAfterProbe[rivalId];
+          if (rivalTsAfter === undefined || rivalTsAfter === rivalTsBefore) delete mapAfterProbe[rivalId];
+          mapAfterProbe[myTabId] = Date.now();
+          writeTabPresence(mapAfterProbe);
+          const liveIdsAfter = Object.keys(mapAfterProbe).sort();
+          onChange(liveIdsAfter.length === 0 || liveIdsAfter[0] === myTabId, liveIdsAfter.some((id) => id !== myTabId));
+          finish();
+        }, TABPRESENCE_PROBE_MS);
+        return;
+      }
+      onChange(true, liveIds.some((id) => id !== myTabId));
+      finish();
+    }
+    tick();
+    setInterval(tick, TABPRESENCE_HEARTBEAT_MS);
+    window.addEventListener('pagehide', (event) => {
+      if (event.persisted) return;
+      const map = readTabPresence();
+      delete map[myTabId];
+      writeTabPresence(map);
+    });
+    window.addEventListener('pageshow', (event) => { if (event.persisted) tick(); });
+  }
+
+  // ================= CNPJ (mesmo algoritmo da extensão) =================
+  function onlyDigits(str) { return (str || '').replace(/\D/g, ''); }
+  function formatCnpj(value) {
+    const d = onlyDigits(value).slice(0, 14);
+    let out = d;
+    if (d.length > 2) out = `${d.slice(0, 2)}.${d.slice(2)}`;
+    if (d.length > 5) out = `${out.slice(0, 6)}.${out.slice(6)}`;
+    if (d.length > 8) out = `${out.slice(0, 10)}/${out.slice(10)}`;
+    if (d.length > 12) out = `${out.slice(0, 15)}-${out.slice(15)}`;
+    return out;
+  }
+  function calcDigit(digits, weights) {
+    const sum = digits.reduce((acc, d, i) => acc + d * weights[i], 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  }
+  function isValidCnpj(value) {
+    const d = onlyDigits(value);
+    if (d.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(d)) return false;
+    const digits = d.split('').map(Number);
+    const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    if (calcDigit(digits.slice(0, 12), w1) !== digits[12]) return false;
+    if (calcDigit(digits.slice(0, 13), w2) !== digits[13]) return false;
+    return true;
+  }
+
+  // ================= Criptografia (par de chaves + registro) =================
+  const STORE_KEY = 'gk_store_v1';
+  const REGISTRY_KEY = 'gk_registry_v1';
+  const PBKDF2_ITER = 250000;
+
+  async function deriveAesKey(password, saltBuf) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: saltBuf, iterations: PBKDF2_ITER, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    );
+  }
+
+  async function generateKeyPair(password) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    const publicJwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
+    const privateJwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const aesKey = await deriveAesKey(password, salt);
+    const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, enc.encode(JSON.stringify(privateJwk)));
+    const store = { saltB64: b64(salt), ivB64: b64(iv), cipherB64: b64(cipherBuf), publicJwk };
+    localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    return { store, privateKey: kp.privateKey };
+  }
+
+  function loadStore() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { return null; }
+  }
+
+  async function decryptPrivateKey(password) {
+    const store = loadStore();
+    if (!store) throw new Error('Nenhuma chave encontrada neste computador.');
+    const salt = new Uint8Array(b64ToBuf(store.saltB64));
+    const iv = new Uint8Array(b64ToBuf(store.ivB64));
+    const aesKey = await deriveAesKey(password, salt);
+    let plainBuf;
+    try {
+      plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, b64ToBuf(store.cipherB64));
+    } catch (e) {
+      throw new Error('Senha incorreta.');
+    }
+    const privateJwk = JSON.parse(dec.decode(plainBuf));
+    return crypto.subtle.importKey('jwk', privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  }
+
+  async function signWithKey(privateKey, payloadObj) {
+    const payloadB64 = b64url(enc.encode(JSON.stringify(payloadObj)));
+    const sigBuf = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, enc.encode(payloadB64));
+    return `${payloadB64}.${b64url(sigBuf)}`;
+  }
+
+  // ================= Bloqueio por força bruta na senha mestra =================
+  // Mesmo esquema de views/login.js + loginLockout.js da extensão: 2
+  // tentativas erradas seguidas trava o campo por 60s, com contagem
+  // regressiva visível. Guardado à parte da chave em si (localStorage
+  // próprio), sobrevive a reload — reabrir a página no meio da espera
+  // continua bloqueado, não reseta a punição.
+  const LOCK_KEY = 'gk_unlock_lock';
+  const UNLOCK_MAX_ATTEMPTS = 2;
+  const UNLOCK_LOCK_DURATION_MS = 60 * 1000;
+
+  function getUnlockLockState() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(LOCK_KEY)); } catch (e) { /* ignora lixo salvo */ }
+    const state = raw || { failedAttempts: 0, lockedUntil: null };
+    const activelyLocked = !!(state.lockedUntil && state.lockedUntil > Date.now());
+    return {
+      failedAttempts: state.failedAttempts || 0,
+      lockedUntil: activelyLocked ? state.lockedUntil : null,
+      remainingMs: activelyLocked ? state.lockedUntil - Date.now() : 0,
+    };
+  }
+  function recordFailedUnlock() {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(LOCK_KEY)); } catch (e) { /* ignora lixo salvo */ }
+    const prev = raw || { failedAttempts: 0, lockedUntil: null };
+    if (prev.lockedUntil && prev.lockedUntil > Date.now()) return getUnlockLockState();
+    const lockExpired = !!(prev.lockedUntil && prev.lockedUntil <= Date.now());
+    const failedAttempts = lockExpired ? 1 : (prev.failedAttempts || 0) + 1;
+    const lockedUntil = failedAttempts >= UNLOCK_MAX_ATTEMPTS ? Date.now() + UNLOCK_LOCK_DURATION_MS : null;
+    localStorage.setItem(LOCK_KEY, JSON.stringify({ failedAttempts, lockedUntil }));
+    return getUnlockLockState();
+  }
+  function clearUnlockLock() { localStorage.removeItem(LOCK_KEY); }
+
+  // ================= Sessão: desbloqueio, "Sair" e trava por inatividade =================
+  // A chave privada descriptografada fica só nesta variável, em memória —
+  // nunca em localStorage nem em disco. "Sair" e a inatividade de 5 min
+  // simplesmente zeram esta variável e voltam pra tela de senha; nada é
+  // apagado do computador, é só a sessão atual que trava.
+  let unlockedPrivateKey = null;
+  const IDLE_LIMIT_MS = 5 * 60 * 1000;
+  let idleTimer = null;
+
+  function armIdleTimer() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      unlockedPrivateKey = null;
+      render();
+      showToast('Sessão bloqueada por inatividade (5 min).');
+    }, IDLE_LIMIT_MS);
+  }
+  ['click', 'keydown', 'mousemove', 'scroll', 'input'].forEach((evt) => {
+    document.addEventListener(evt, () => { if (unlockedPrivateKey) armIdleTimer(); }, { passive: true });
+  });
+
+  function lockSession() {
+    unlockedPrivateKey = null;
+    clearTimeout(idleTimer);
+    render();
+  }
+
+  /** Troca a senha mestra: decripta com a atual, recriptografa (salt/iv
+   * novos) com a nova. Não mexe na sessão desbloqueada em memória — quem já
+   * estava desbloqueado continua gerando chave normalmente, sem precisar
+   * digitar a senha nova agora. Só decripta um JWK "solto" (nunca importa
+   * como CryptoKey extraível), pra não precisar afrouxar a chave usada
+   * pra assinar (essa continua non-extractable, ver decryptPrivateKey). */
+  async function changeMasterPassword(currentPassword, newPassword) {
+    const store = loadStore();
+    const salt = new Uint8Array(b64ToBuf(store.saltB64));
+    const iv = new Uint8Array(b64ToBuf(store.ivB64));
+    const aesKey = await deriveAesKey(currentPassword, salt);
+    let plainBuf;
+    try {
+      plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, b64ToBuf(store.cipherB64));
+    } catch (e) {
+      throw new Error('Senha atual incorreta.');
+    }
+    const privateJwk = plainBuf; // ainda cifrado como bytes — reencripta direto, sem reimportar
+
+    const newSalt = crypto.getRandomValues(new Uint8Array(16));
+    const newIv = crypto.getRandomValues(new Uint8Array(12));
+    const newAesKey = await deriveAesKey(newPassword, newSalt);
+    const newCipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: newIv }, newAesKey, privateJwk);
+    const newStore = { saltB64: b64(newSalt), ivB64: b64(newIv), cipherB64: b64(newCipherBuf), publicJwk: store.publicJwk };
+    localStorage.setItem(STORE_KEY, JSON.stringify(newStore));
+  }
+
+  function loadRegistry() {
+    try { return JSON.parse(localStorage.getItem(REGISTRY_KEY)) || []; } catch (e) { return []; }
+  }
+  function saveRegistry(list) { localStorage.setItem(REGISTRY_KEY, JSON.stringify(list)); }
+  function addRegistryEntry(entry) {
+    const list = loadRegistry();
+    list.unshift(entry);
+    saveRegistry(list);
+    return list;
+  }
+
+  // ================= Onboarding (gerar par de chaves, 1 vez só) =================
+  function renderOnboarding() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="brand"><span class="dot"></span>Gerador de Chaves — Gestão de Loja</div>
+      <h1>Primeiros passos</h1>
+      <p class="muted">Ferramenta local para gerar chaves de ativação por CNPJ. Roda inteiramente neste navegador, sem internet — nada sai deste computador.</p>
+      <div class="card">
+        <h2>Gerar o par de chaves</h2>
+        <p class="muted">Isso só deve ser feito <strong>uma única vez</strong>. A chave pública gerada agora vai embutida na extensão; a chave privada fica só neste computador, protegida pela senha que você definir abaixo. Gerar um novo par depois invalidaria todas as chaves já emitidas.</p>
+        <div id="onboard-error"></div>
+        <div class="field">
+          <label for="setup-pass">Senha mestra (mín. 8 caracteres) *</label>
+          <input type="password" id="setup-pass" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label for="setup-pass-confirm">Confirmar senha *</label>
+          <input type="password" id="setup-pass-confirm" autocomplete="new-password">
+        </div>
+        <button class="btn" id="setup-generate-btn" disabled>Gerar par de chaves</button>
+      </div>
+      <div class="card">
+        <h2>Já tenho um backup</h2>
+        <p class="muted">Se você já gerou o par de chaves antes (em outro momento ou outro computador), restaure o backup em vez de gerar um novo.</p>
+        <button class="btn btn-secondary" id="setup-restore-btn">Importar chave privada (backup)</button>
+        <input type="file" id="setup-restore-file" accept="application/json" hidden>
+      </div>
+    `;
+
+    const passInput = document.getElementById('setup-pass');
+    const passConfirm = document.getElementById('setup-pass-confirm');
+    const genBtn = document.getElementById('setup-generate-btn');
+    function validate() {
+      genBtn.disabled = !(passInput.value.length >= 8 && passInput.value === passConfirm.value);
+    }
+    passInput.addEventListener('input', validate);
+    passConfirm.addEventListener('input', validate);
+
+    genBtn.addEventListener('click', async () => {
+      const errBox = document.getElementById('onboard-error');
+      errBox.innerHTML = '';
+      genBtn.disabled = true;
+      genBtn.textContent = 'Gerando...';
+      try {
+        const { store, privateKey } = await generateKeyPair(passInput.value);
+        unlockedPrivateKey = privateKey;
+        armIdleTimer();
+        renderOnboardingSuccess(store);
+      } catch (e) {
+        errBox.innerHTML = `<div class="form-error">Erro ao gerar: ${escapeHtml(e.message)}</div>`;
+        genBtn.disabled = false;
+        genBtn.textContent = 'Gerar par de chaves';
+      }
+    });
+
+    document.getElementById('setup-restore-btn').addEventListener('click', () => {
+      document.getElementById('setup-restore-file').click();
+    });
+    document.getElementById('setup-restore-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed.saltB64 || !parsed.ivB64 || !parsed.cipherB64 || !parsed.publicJwk) {
+          throw new Error('Arquivo não parece ser um backup de chave privada válido.');
+        }
+        localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+        showToast('Chave restaurada com sucesso.');
+        render();
+      } catch (err) {
+        document.getElementById('onboard-error').innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+      }
+    });
+  }
+
+  function renderOnboardingSuccess(store) {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="brand"><span class="dot"></span>Gerador de Chaves — Gestão de Loja</div>
+      <div class="card">
+        <h2>Par de chaves gerado ✅</h2>
+        <div class="success-box">Guarde a chave pública abaixo — é ela que vai embutida no código da extensão quando essa função for ligada de vez. Não é secreta, pode ficar visível.</div>
+        <div class="field">
+          <label>Chave pública</label>
+          <textarea class="mono" readonly rows="4">${escapeHtml(JSON.stringify(store.publicJwk))}</textarea>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="copy-pub-onboard">Copiar chave pública</button>
+        <div class="danger-box">⚠️ Faça o backup da chave privada agora (seção "Chave privada", na tela principal) antes de fechar esta página. Sem esse backup, se você perder este computador, nunca mais vai conseguir gerar chave nova pra nenhum cliente.</div>
+        <button class="btn" id="continue-btn" style="margin-top:10px;">Continuar para o gerador →</button>
+      </div>
+    `;
+    document.getElementById('copy-pub-onboard').addEventListener('click', () => copyToClipboard(JSON.stringify(store.publicJwk)));
+    document.getElementById('continue-btn').addEventListener('click', () => render());
+  }
+
+  // ================= Tela de desbloqueio (par de chaves já existe, sessão trancada) =================
+  function renderUnlockScreen() {
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="brand"><span class="dot"></span>Gerador de Chaves — Gestão de Loja</div>
+      <h1>Sessão bloqueada</h1>
+      <p class="muted">Digite a senha mestra pra desbloquear e continuar gerando chaves.</p>
+      <div class="card">
+        <div id="unlock-error"></div>
+        <div class="field">
+          <label for="unlock-pass">Senha mestra</label>
+          <input type="password" id="unlock-pass" autocomplete="off">
+        </div>
+        <button class="btn" id="unlock-btn">Desbloquear</button>
+      </div>
+    `;
+    const passInput = document.getElementById('unlock-pass');
+    const unlockBtn = document.getElementById('unlock-btn');
+    const errBox = document.getElementById('unlock-error');
+
+    let lockInterval = null;
+    function stopLockInterval() { if (lockInterval) { clearInterval(lockInterval); lockInterval = null; } }
+    function showLockMessage(lockedUntil) {
+      const secs = Math.max(1, Math.ceil((lockedUntil - Date.now()) / 1000));
+      errBox.innerHTML = `<div class="form-error">Muitas tentativas incorretas. O campo de senha está bloqueado por segurança — tente novamente em ${secs}s.</div>`;
+      errBox.dataset.kind = 'lock';
+    }
+    function lockFields(lockedUntil) {
+      passInput.disabled = true;
+      unlockBtn.disabled = true;
+      showLockMessage(lockedUntil);
+      stopLockInterval();
+      lockInterval = setInterval(() => {
+        const remaining = lockedUntil - Date.now();
+        if (remaining <= 0) { stopLockInterval(); unlockFields(); }
+        else showLockMessage(lockedUntil);
+      }, 1000);
+    }
+    function unlockFields() {
+      passInput.disabled = false;
+      unlockBtn.disabled = false;
+      if (errBox.dataset.kind === 'lock') { errBox.innerHTML = ''; delete errBox.dataset.kind; }
+    }
+
+    const initialLock = getUnlockLockState();
+    if (initialLock.remainingMs > 0) lockFields(initialLock.lockedUntil);
+    else passInput.focus();
+
+    async function tryUnlock() {
+      const lockNow = getUnlockLockState();
+      if (lockNow.remainingMs > 0) { lockFields(lockNow.lockedUntil); return; }
+      errBox.innerHTML = '';
+      unlockBtn.disabled = true;
+      unlockBtn.textContent = 'Verificando...';
+      try {
+        unlockedPrivateKey = await decryptPrivateKey(passInput.value);
+        clearUnlockLock();
+        armIdleTimer();
+        renderMain();
+      } catch (e) {
+        const state = recordFailedUnlock();
+        unlockBtn.textContent = 'Desbloquear';
+        if (state.remainingMs > 0) { lockFields(state.lockedUntil); return; }
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(e.message)}</div>`;
+        unlockBtn.disabled = false;
+      }
+    }
+    unlockBtn.addEventListener('click', tryUnlock);
+    passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+  }
+
+  // ================= Tela principal =================
+  const PAGE_SIZE = 8;
+  let registryPage = 1;
+  let registrySearch = '';
+
+  function renderMain() {
+    const store = loadStore();
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div class="row-between">
+        <div class="brand" style="margin-bottom:0;"><span class="dot"></span>Gerador de Chaves — Gestão de Loja</div>
+        <button class="btn btn-secondary btn-sm" id="logout-btn">Sair</button>
+      </div>
+      <h1>Gerador de chaves de ativação</h1>
+      <p class="muted">Ferramenta local — nunca sai deste computador. Sessão trava sozinha após 5 minutos sem uso. Cada chave é assinada com a chave privada e amarrada a um CNPJ específico.</p>
+
+      <div id="result-panel"></div>
+
+      <div class="card">
+        <h2>Gerar nova chave</h2>
+        <div id="gen-error"></div>
+        <div class="field">
+          <label for="gen-cnpj">CNPJ do cliente *</label>
+          <input id="gen-cnpj" placeholder="xx.xxx.xxx/xxxx-xx" maxlength="18">
+          <span class="hint" id="gen-cnpj-hint"></span>
+        </div>
+        <div class="field">
+          <label>Tipo de chave</label>
+          <div class="radio-row">
+            <label><input type="radio" name="gen-tipo" value="demo" checked> Demo — expira 1 hora após a geração</label>
+            <label><input type="radio" name="gen-tipo" value="full"> Definitiva — sem expiração</label>
+          </div>
+        </div>
+        <button class="btn" id="gen-review-btn">Conferir e gerar →</button>
+      </div>
+
+      <div class="card">
+        <h2>Gerar código de liberação de CNPJ</h2>
+        <p class="muted">Não é uma chave de ativação — é um código de uso único que libera, na extensão, a edição de um CNPJ já salvo (para corrigir erro de digitação). Expira em 24h.</p>
+        <div id="unlock-gen-error"></div>
+        <div class="field">
+          <label for="unlock-gen-cnpj">CNPJ atual cadastrado na loja *</label>
+          <input id="unlock-gen-cnpj" placeholder="xx.xxx.xxx/xxxx-xx" maxlength="18">
+          <span class="hint" id="unlock-gen-cnpj-hint"></span>
+        </div>
+        <button class="btn btn-secondary" id="unlock-gen-review-btn">Conferir e gerar →</button>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h2 style="margin:0;">Registro de chaves emitidas</h2>
+          <div class="row-gap">
+            <button class="btn btn-secondary btn-sm" id="export-registry-btn">Exportar registro</button>
+            <button class="btn btn-secondary btn-sm" id="import-registry-btn">Importar registro</button>
+            <input type="file" id="import-registry-file" accept="application/json" hidden>
+          </div>
+        </div>
+        <div class="field">
+          <input id="registry-search" placeholder="Buscar por CNPJ ou tipo (demo / definitiva)...">
+        </div>
+        <p class="muted" id="registry-count"></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>CNPJ</th><th>Tipo</th><th>Gerada em</th><th>Expira em</th><th></th></tr></thead>
+            <tbody id="registry-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="registry-pagination"></div>
+      </div>
+
+      <div class="card">
+        <h2>Chave privada e chave pública</h2>
+        <p class="muted">A chave pública é a que vai embutida na extensão (não é secreta). A chave privada nunca aparece em texto puro aqui — só pode ser exportada já criptografada, protegida pela sua senha mestra.</p>
+        <div class="field">
+          <label>Chave pública</label>
+          <textarea class="mono" readonly rows="3">${escapeHtml(JSON.stringify(store.publicJwk))}</textarea>
+        </div>
+        <div class="row-gap">
+          <button class="btn btn-secondary btn-sm" id="copy-pubkey-btn">Copiar chave pública</button>
+          <button class="btn btn-secondary btn-sm" id="export-privkey-btn">Exportar chave privada (backup)</button>
+          <button class="btn btn-secondary btn-sm" id="import-privkey-btn">Importar chave privada (restaurar)</button>
+          <input type="file" id="import-privkey-file" accept="application/json" hidden>
+        </div>
+        <div class="warn-box">⚠️ Importar substitui a chave privada atual neste computador. Use só para restaurar um backup, tipicamente num computador novo — nunca troque por engano uma chave já em uso: chaves já emitidas param de validar contra uma chave pública diferente.</div>
+      </div>
+
+      <div class="card">
+        <h2>Alterar senha mestra</h2>
+        <p class="muted">A senha protege a chave privada guardada neste computador. Trocar aqui não muda a chave em si (as chaves de ativação já emitidas continuam valendo do mesmo jeito).</p>
+        <div id="changepass-error"></div>
+        <div class="field" style="max-width:340px;">
+          <label for="changepass-current">Senha atual *</label>
+          <input type="password" id="changepass-current" autocomplete="off">
+        </div>
+        <div class="field" style="max-width:340px;">
+          <label for="changepass-new">Nova senha (mín. 8 caracteres) *</label>
+          <input type="password" id="changepass-new" autocomplete="off">
+        </div>
+        <div class="field" style="max-width:340px;">
+          <label for="changepass-confirm">Confirmar nova senha *</label>
+          <input type="password" id="changepass-confirm" autocomplete="off">
+        </div>
+        <button class="btn btn-secondary btn-sm" id="changepass-btn" disabled>Alterar senha</button>
+        <div class="warn-box">Ao trocar, um backup novo (chave privada já com a senha nova + registro) baixa automaticamente — sem precisar lembrar de fazer isso manualmente. Backups exportados ANTES desta troca continuam com a senha antiga.</div>
+      </div>
+    `;
+
+    document.getElementById('logout-btn').addEventListener('click', () => lockSession());
+
+    wireGenerateForm(store);
+    wireUnlockCodeForm();
+    wireRegistrySection();
+    wireKeySection(store);
+    wireChangePasswordSection();
+    registryPage = 1;
+    renderRegistryTable();
+  }
+
+  function wireGenerateForm() {
+    const cnpjInput = document.getElementById('gen-cnpj');
+    const hint = document.getElementById('gen-cnpj-hint');
+    cnpjInput.addEventListener('input', () => {
+      cnpjInput.value = formatCnpj(cnpjInput.value);
+      if (onlyDigits(cnpjInput.value).length < 14) { hint.textContent = ''; hint.className = 'hint'; return; }
+      if (isValidCnpj(cnpjInput.value)) { hint.textContent = 'CNPJ válido.'; hint.className = 'hint ok'; }
+      else { hint.textContent = 'CNPJ inválido — confira os números.'; hint.className = 'hint bad'; }
+    });
+
+    document.getElementById('gen-review-btn').addEventListener('click', () => {
+      const errBox = document.getElementById('gen-error');
+      errBox.innerHTML = '';
+      const cnpj = cnpjInput.value;
+      if (!isValidCnpj(cnpj)) {
+        errBox.innerHTML = '<div class="form-error">Digite um CNPJ válido antes de continuar.</div>';
+        return;
+      }
+      const tipo = document.querySelector('input[name="gen-tipo"]:checked').value;
+      openGenerateModal(cnpj, tipo);
+    });
+  }
+
+  function openGenerateModal(cnpj, tipo) {
+    const expiraEm = tipo === 'demo' ? new Date(Date.now() + 60 * 60 * 1000).toISOString() : null;
+    const overlay = showModal(`
+      <h3>Conferir antes de gerar</h3>
+      <div class="summary-box">
+        <div><strong>CNPJ:</strong> ${escapeHtml(cnpj)}</div>
+        <div><strong>Tipo:</strong> ${tipo === 'demo' ? `Demo — expira em ${formatDateTime(expiraEm)}` : 'Definitiva — sem expiração'}</div>
+      </div>
+      <p class="muted">Confira os dados. Uma chave gerada não pode ser editada — só gerar outra.</p>
+      <div id="modal-error"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+        <button class="btn" id="modal-confirm">Confirmar e gerar</button>
+      </div>
+    `);
+    document.getElementById('modal-cancel').addEventListener('click', () => closeModal(overlay));
+    document.getElementById('modal-confirm').addEventListener('click', async () => {
+      const errBox = document.getElementById('modal-error');
+      errBox.innerHTML = '';
+      const btn = document.getElementById('modal-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Gerando...';
+      try {
+        const geradoEm = new Date().toISOString();
+        const payload = { cnpj, tipo, geradoEm, expiraEm };
+        const key = await signWithKey(unlockedPrivateKey, payload);
+        addRegistryEntry({ id: crypto.randomUUID(), cnpjFormatted: cnpj, tipo, geradoEm, expiraEm, key });
+        closeModal(overlay);
+        showResultPanel(key, cnpj, tipo, expiraEm);
+        registryPage = 1;
+        renderRegistryTable();
+      } catch (e) {
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(e.message)}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'Confirmar e gerar';
+      }
+    });
+  }
+
+  function showResultPanel(key, cnpj, tipo, expiraEm) {
+    const panel = document.getElementById('result-panel');
+    const label = tipoLabel(tipo);
+    const titulo = tipo === 'cnpj-unlock' ? 'Código de liberação gerado ✅' : 'Chave gerada ✅';
+    panel.innerHTML = `
+      <div class="card">
+        <h2>${titulo}</h2>
+        <p class="muted">${escapeHtml(cnpj)} — ${label.text}${expiraEm ? `, expira em ${formatDateTime(expiraEm)}` : ''}</p>
+        <textarea class="mono" readonly rows="3" id="result-key-text">${escapeHtml(key)}</textarea>
+        <button class="btn btn-sm" id="copy-result-btn" style="margin-top:8px;">Copiar chave</button>
+      </div>
+    `;
+    document.getElementById('copy-result-btn').addEventListener('click', () => copyToClipboard(key));
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- Código de liberação de CNPJ (mesmo mecanismo, tipo diferente) ----------
+  const CNPJ_UNLOCK_DURATION_MS = 24 * 60 * 60 * 1000; // 24h
+
+  function wireUnlockCodeForm() {
+    const cnpjInput = document.getElementById('unlock-gen-cnpj');
+    const hint = document.getElementById('unlock-gen-cnpj-hint');
+    cnpjInput.addEventListener('input', () => {
+      cnpjInput.value = formatCnpj(cnpjInput.value);
+      if (onlyDigits(cnpjInput.value).length < 14) { hint.textContent = ''; hint.className = 'hint'; return; }
+      if (isValidCnpj(cnpjInput.value)) { hint.textContent = 'CNPJ válido.'; hint.className = 'hint ok'; }
+      else { hint.textContent = 'CNPJ inválido — confira os números.'; hint.className = 'hint bad'; }
+    });
+
+    document.getElementById('unlock-gen-review-btn').addEventListener('click', () => {
+      const errBox = document.getElementById('unlock-gen-error');
+      errBox.innerHTML = '';
+      const cnpj = cnpjInput.value;
+      if (!isValidCnpj(cnpj)) {
+        errBox.innerHTML = '<div class="form-error">Digite um CNPJ válido antes de continuar.</div>';
+        return;
+      }
+      openUnlockCodeModal(cnpj);
+    });
+  }
+
+  function openUnlockCodeModal(cnpj) {
+    const expiraEm = new Date(Date.now() + CNPJ_UNLOCK_DURATION_MS).toISOString();
+    const overlay = showModal(`
+      <h3>Conferir antes de gerar</h3>
+      <div class="summary-box">
+        <div><strong>CNPJ:</strong> ${escapeHtml(cnpj)}</div>
+        <div><strong>Tipo:</strong> Liberação de edição de CNPJ — expira em ${formatDateTime(expiraEm)}</div>
+      </div>
+      <p class="muted">Esse código só serve pra destravar o campo de CNPJ nesta loja — não ativa nada. Confirme que o CNPJ digitado é exatamente o que está salvo hoje na loja do cliente.</p>
+      <div id="modal-error"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+        <button class="btn" id="modal-confirm">Confirmar e gerar</button>
+      </div>
+    `);
+    document.getElementById('modal-cancel').addEventListener('click', () => closeModal(overlay));
+    document.getElementById('modal-confirm').addEventListener('click', async () => {
+      const errBox = document.getElementById('modal-error');
+      errBox.innerHTML = '';
+      const btn = document.getElementById('modal-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Gerando...';
+      try {
+        const geradoEm = new Date().toISOString();
+        const payload = { cnpj, tipo: 'cnpj-unlock', geradoEm, expiraEm };
+        const key = await signWithKey(unlockedPrivateKey, payload);
+        addRegistryEntry({ id: crypto.randomUUID(), cnpjFormatted: cnpj, tipo: 'cnpj-unlock', geradoEm, expiraEm, key });
+        closeModal(overlay);
+        showResultPanel(key, cnpj, 'cnpj-unlock', expiraEm);
+        registryPage = 1;
+        renderRegistryTable();
+      } catch (e) {
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(e.message)}</div>`;
+        btn.disabled = false;
+        btn.textContent = 'Confirmar e gerar';
+      }
+    });
+  }
+
+  // ---------- Registro: busca, paginação, exportar/importar ----------
+  function wireRegistrySection() {
+    document.getElementById('registry-search').addEventListener('input', (e) => {
+      registrySearch = e.target.value;
+      registryPage = 1;
+      renderRegistryTable();
+    });
+
+    document.getElementById('export-registry-btn').addEventListener('click', () => {
+      downloadFile(`registro-chaves-${todayStamp()}.json`, JSON.stringify(loadRegistry(), null, 2));
+    });
+
+    document.getElementById('import-registry-btn').addEventListener('click', () => {
+      document.getElementById('import-registry-file').click();
+    });
+    document.getElementById('import-registry-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) throw new Error('Arquivo não parece ser um registro válido.');
+        const overlay = showModal(`
+          <h3>Substituir registro atual?</h3>
+          <p class="muted">Isso troca todo o registro exibido nesta tela pelo conteúdo do arquivo importado (${parsed.length} chave(s)). O arquivo atual não é apagado do seu computador, só deixa de aparecer aqui.</p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+            <button class="btn" id="modal-confirm">Substituir</button>
+          </div>
+        `);
+        document.getElementById('modal-cancel').addEventListener('click', () => closeModal(overlay));
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+          saveRegistry(parsed);
+          closeModal(overlay);
+          showToast('Registro importado.');
+          registryPage = 1;
+          renderRegistryTable();
+        });
+      } catch (err) {
+        showToast('Erro: ' + err.message);
+      }
+    });
+  }
+
+  const TIPO_LABELS = {
+    demo: { text: 'Demo (1h)', cls: 'badge-gold' },
+    full: { text: 'Definitiva', cls: 'badge-green' },
+    'cnpj-unlock': { text: 'Liberação CNPJ', cls: 'badge-gray' },
+  };
+  function tipoLabel(tipo) { return TIPO_LABELS[tipo] || { text: tipo, cls: 'badge-gray' }; }
+
+  function renderRegistryTable() {
+    const all = loadRegistry();
+    const q = registrySearch.trim().toLowerCase();
+    const filtered = q ? all.filter((r) => {
+      return r.cnpjFormatted.toLowerCase().includes(q) || onlyDigits(r.cnpjFormatted).includes(onlyDigits(q)) || tipoLabel(r.tipo).text.toLowerCase().includes(q);
+    }) : all;
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (registryPage > totalPages) registryPage = totalPages;
+    const start = (registryPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+    document.getElementById('registry-count').textContent = `${filtered.length} chave(s)/código(s) emitido(s)`;
+    document.getElementById('registry-tbody').innerHTML = pageItems.length ? pageItems.map((r) => {
+      const label = tipoLabel(r.tipo);
+      return `
+      <tr>
+        <td>${escapeHtml(r.cnpjFormatted)}</td>
+        <td><span class="badge ${label.cls}">${label.text}</span></td>
+        <td>${formatDateTime(r.geradoEm)}</td>
+        <td>${r.expiraEm ? formatDateTime(r.expiraEm) : '—'}</td>
+        <td><button class="btn btn-secondary btn-sm" data-copy-key="${r.id}">Copiar</button></td>
+      </tr>
+    `;
+    }).join('') : '<tr><td colspan="5" class="table-empty">Nenhuma chave encontrada.</td></tr>';
+
+    document.querySelectorAll('[data-copy-key]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const rec = all.find((r) => r.id === btn.dataset.copyKey);
+        if (rec) copyToClipboard(rec.key);
+      });
+    });
+
+    const pagBox = document.getElementById('registry-pagination');
+    pagBox.innerHTML = totalPages <= 1 ? '' : `
+      <button class="btn btn-secondary btn-sm" id="page-prev" ${registryPage <= 1 ? 'disabled' : ''}>← Anterior</button>
+      <span class="page-indicator">Página ${registryPage} de ${totalPages}</span>
+      <button class="btn btn-secondary btn-sm" id="page-next" ${registryPage >= totalPages ? 'disabled' : ''}>Próxima →</button>
+    `;
+    document.getElementById('page-prev')?.addEventListener('click', () => { registryPage--; renderRegistryTable(); });
+    document.getElementById('page-next')?.addEventListener('click', () => { registryPage++; renderRegistryTable(); });
+  }
+
+  // ---------- Chave privada: exportar/importar backup ----------
+  function wireKeySection(store) {
+    document.getElementById('copy-pubkey-btn').addEventListener('click', () => copyToClipboard(JSON.stringify(store.publicJwk)));
+
+    document.getElementById('export-privkey-btn').addEventListener('click', () => {
+      downloadFile(`chave-privada-backup-${todayStamp()}.json`, localStorage.getItem(STORE_KEY));
+    });
+
+    document.getElementById('import-privkey-btn').addEventListener('click', () => {
+      document.getElementById('import-privkey-file').click();
+    });
+    document.getElementById('import-privkey-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed.saltB64 || !parsed.ivB64 || !parsed.cipherB64 || !parsed.publicJwk) {
+          throw new Error('Arquivo não parece ser um backup de chave privada válido.');
+        }
+        const overlay = showModal(`
+          <h3>Substituir a chave privada atual?</h3>
+          <div class="danger-box">⚠️ Isso substitui a chave privada usada neste computador. Só faça isso pra restaurar um backup — se você trocar por uma chave diferente da que já está em uso, todas as chaves já emitidas com a chave anterior param de validar.</div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+            <button class="btn" id="modal-confirm" style="background:var(--danger);">Substituir mesmo assim</button>
+          </div>
+        `);
+        document.getElementById('modal-cancel').addEventListener('click', () => closeModal(overlay));
+        document.getElementById('modal-confirm').addEventListener('click', () => {
+          localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+          closeModal(overlay);
+          // Força travar a sessão: a chave desbloqueada em memória era da
+          // chave ANTERIOR — continuar usando ela por engano assinaria
+          // chaves novas com a privada errada, sem ninguém perceber na
+          // hora. Precisa desbloquear de novo (com a senha da chave
+          // recém-importada) antes de gerar qualquer coisa.
+          unlockedPrivateKey = null;
+          clearTimeout(idleTimer);
+          showToast('Chave privada restaurada. Digite a senha pra desbloquear.');
+          render();
+        });
+      } catch (err) {
+        showToast('Erro: ' + err.message);
+      }
+    });
+  }
+
+  // ---------- Alterar senha mestra ----------
+  function wireChangePasswordSection() {
+    const currentInput = document.getElementById('changepass-current');
+    const newInput = document.getElementById('changepass-new');
+    const confirmInput = document.getElementById('changepass-confirm');
+    const btn = document.getElementById('changepass-btn');
+    const errBox = document.getElementById('changepass-error');
+
+    function validate() {
+      btn.disabled = !(currentInput.value.length > 0 && newInput.value.length >= 8 && newInput.value === confirmInput.value);
+    }
+    [currentInput, newInput, confirmInput].forEach((el) => el.addEventListener('input', validate));
+
+    btn.addEventListener('click', async () => {
+      errBox.innerHTML = '';
+      btn.disabled = true;
+      btn.textContent = 'Alterando...';
+      try {
+        await changeMasterPassword(currentInput.value, newInput.value);
+        // Backup forçado logo após trocar a senha — automático, não fica
+        // só no aviso: baixa a chave privada JÁ recriptografada com a
+        // senha nova, junto com o registro, pra nunca sobrar sem nenhum
+        // backup batendo com a senha atual.
+        downloadFile(`chave-privada-backup-${todayStamp()}.json`, localStorage.getItem(STORE_KEY));
+        downloadFile(`registro-chaves-${todayStamp()}.json`, JSON.stringify(loadRegistry(), null, 2));
+        showToast('Senha alterada. Backup atualizado (chave privada + registro) baixado automaticamente.');
+        currentInput.value = '';
+        newInput.value = '';
+        confirmInput.value = '';
+      } catch (e) {
+        errBox.innerHTML = `<div class="form-error">${escapeHtml(e.message)}</div>`;
+      }
+      btn.textContent = 'Alterar senha';
+      validate();
+    });
+  }
+
+  // ================= Ponto de entrada =================
+  function render() {
+    if (!loadStore()) { renderOnboarding(); return; }
+    if (!unlockedPrivateKey) { renderUnlockScreen(); return; }
+    renderMain();
+  }
+  initThemeToggle();
+  watchTabPresence((iAmTheOldestAlive) => {
+    if (iAmTheOldestAlive) removeTabBlockedOverlay();
+    else renderTabBlockedOverlay();
+  });
+  render();
+})();
+</script>
+</body>
+</html>

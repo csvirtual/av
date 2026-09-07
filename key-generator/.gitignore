@@ -1,0 +1,4 @@
+# Nunca versionar backups de chave privada ou do registro de chaves
+# emitidos por esta ferramenta.
+chave-privada-backup-*.json
+registro-chaves-*.json
