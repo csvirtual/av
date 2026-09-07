@@ -248,6 +248,9 @@ a { color: var(--primary); }
 .btn-ghost:hover { background: var(--surface-alt); color: var(--text); }
 
 .btn-sm { padding: 5px 10px; font-size: 13px; }
+/* Pedido do usuário: só maiúsculo, sem mexer em mais nada (tamanho,
+ * espaçamento, fonte) — ver views/sale.js. */
+#hold-cart-btn, #clear-cart-btn { text-transform: uppercase; }
 
 /* Botão redondo só com ícone — hoje só usado nos atalhos de contato
  * (WhatsApp/e-mail) da tela de trial encerrado (ver app.js). */
@@ -1154,6 +1157,26 @@ tbody tr:hover { background: var(--surface-alt); }
 }
 .modal h2 { margin: 0; padding: 24px 26px 18px; font-size: 18px; flex-shrink: 0; }
 .modal-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 0 26px; }
+
+/* Aviso de "abriu o caixa, redirecionando pro PDV" (ver
+ * views/caixa.js#showRedirectToPdvNotice) — a barra nasce cheia e
+ * transiciona pra 0% em exatamente 5s, sincronizada com o número da
+ * contagem regressiva ao lado (os dois contam a mesma coisa, de dois
+ * jeitos: um exato/textual, outro contínuo/visual). */
+.redirect-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+.redirect-progress-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 5000ms linear;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 26px 24px; margin: 0; flex-shrink: 0; }
 /* Achado de auditoria: `wide: true` (openModal, ver components/modal.js) só
  * tinha efeito no breakpoint mobile (max-width:640px, mais abaixo) — no

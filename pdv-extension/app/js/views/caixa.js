@@ -14,12 +14,14 @@ import {
   getOpenSession, openSession, listSessionMovements, recordCashMovement,
   computeExpectedAmounts, closeSession, listSessions, recordCashAdjustment, effectiveAmount,
 } from '../data/cashRepo.js';
+import { getCompany } from '../data/companyRepo.js';
 import { confirmUserPassword } from '../components/passwordConfirm.js';
 import { buildAutomaticCashCloseBackup } from '../data/backupRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { formatMoney, formatDateTime, escapeHtml, BASE_PAYMENT_METHODS } from '../utils/format.js';
 import { openModal, confirmDialog } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
+import { icon } from '../components/icon.js';
 import { downloadBlob, timestampForFilename } from './backup.js';
 import { paginationHtml, wirePagination, createPageState } from '../components/pagination.js';
 
@@ -42,8 +44,71 @@ export async function renderCaixa(container, ctx) {
   await refresh();
 }
 
+// Pedido do usuário: quando a loja exige caixa aberto pra vender (Dados da
+// loja → Políticas de venda), abrir o caixa e ficar parado na própria tela
+// de Caixa é um passo a mais sem necessidade — o próximo lugar pra onde
+// todo mundo vai de qualquer jeito é o PDV. Um aviso com contagem
+// regressiva deixa isso claro (em vez de pular direto, sem explicação) e
+// ainda dá um jeito de ir na hora ("Ir agora") pra quem não quer esperar.
+// Só acontece nesse caso específico — abrir o caixa sem a política ligada
+// continua do jeito que sempre foi, ficando na tela de Caixa.
+function showRedirectToPdvNotice(ctx) {
+  const TOTAL_SECONDS = 5;
+  let remaining = TOTAL_SECONDS;
+  const { close, modalEl } = openModal({
+    title: 'Caixa aberto',
+    submitLabel: 'Ir agora',
+    singleButton: true,
+    centerTitle: true,
+    centerActions: true,
+    bodyHtml: `
+      <div style="text-align:center;">
+        ${icon('checkCircle', { size: 46 })}
+        <p style="font-size:13.5px;color:var(--text-muted);margin:16px 0 18px;line-height:1.5;">
+          A loja exige caixa aberto pra registrar vendas — redirecionando pro PDV em
+          <strong id="redirect-count">${TOTAL_SECONDS}</strong>s…
+        </p>
+        <div class="redirect-progress-track"><div class="redirect-progress-fill" id="redirect-progress-fill"></div></div>
+      </div>
+    `,
+    onMount: (mountedModalEl) => {
+      // Começa em 100% e transiciona pra 0% em exatamente TOTAL_SECONDS —
+      // rAF garante que o navegador pinte a barra cheia ANTES de aplicar a
+      // largura final, senão a transição CSS não tem "de onde" animar (as
+      // duas larguras já seriam a mesma no primeiro paint).
+      const fill = mountedModalEl.querySelector('#redirect-progress-fill');
+      requestAnimationFrame(() => { fill.style.width = '0%'; });
+
+      const countEl = mountedModalEl.querySelector('#redirect-count');
+      const timer = setInterval(() => {
+        // O modal pode ter sido fechado por outro motivo nesse meio tempo
+        // (troca de rota manual, Esc, clique fora) — closeAllModals() em
+        // app.js já derruba o backdrop, mas não tem como avisar este
+        // intervalo diretamente. Checar se o elemento ainda está no DOM é
+        // a forma mais simples de nunca deixar um timer "zumbi" navegando
+        // sozinho depois que o usuário já saiu daqui.
+        if (!document.body.contains(mountedModalEl)) { clearInterval(timer); return; }
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          close();
+          ctx.navigate('venda');
+          return;
+        }
+        countEl.textContent = String(remaining);
+      }, 1000);
+    },
+    onSubmit: () => {
+      ctx.navigate('venda');
+      return true;
+    },
+  });
+}
+
 async function renderClosedState(container, ctx, refresh) {
   const history = await listSessions();
+  const company = await getCompany();
+  const requireOpenCashSession = company?.policies?.requireOpenCashSession ?? false;
 
   container.innerHTML = `
     <div class="page-header">
@@ -103,6 +168,7 @@ async function renderClosedState(container, ctx, refresh) {
       });
       showToast('Caixa aberto.', 'success');
       refresh();
+      if (requireOpenCashSession) showRedirectToPdvNotice(ctx);
     } catch (err) {
       showToast(err.message, 'error');
       openBtn.disabled = false;
