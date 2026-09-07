@@ -193,6 +193,27 @@ const FAQ_CATEGORIES = [
     ],
   },
   {
+    label: 'Licença e ativação',
+    items: [
+      {
+        q: '"Chave em formato inválido" / "Chave inválida — assinatura não confere" / "Essa chave não corresponde ao CNPJ cadastrado nesta loja"',
+        a: 'A chave colada não é válida pra esta loja — confira se copiou o texto inteiro, sem espaço a mais no início/fim, e se é mesmo a chave que o suporte mandou pra este CNPJ específico (cada chave é amarrada a um CNPJ, não funciona em outra loja). Se o texto está certinho e o erro continua, peça uma nova chave ao suporte (veja "Como conseguir a chave", acima).',
+      },
+      {
+        q: '"Essa chave já expirou. Peça uma nova chave" / "Esse código de liberação já expirou. Peça um novo"',
+        a: 'Chaves demo e códigos de liberação de CNPJ têm prazo de validade. Se passou desse prazo antes de colar, é só pedir um novo — mesmo caminho de sempre (WhatsApp, e-mail, ou o botão "Solicitar chave" em Dados da loja).',
+      },
+      {
+        q: '"Esse código não é uma chave de ativação (é um código de outro tipo)" / "Esse código não é um código de liberação de CNPJ"',
+        a: 'Existem dois tipos de código diferentes — a <strong>chave de ativação</strong> (cola na tela de bloqueio ou em Dados da loja → Ativação) e o <strong>código de liberação de CNPJ</strong> (cola em Dados da loja → CNPJ → "Desbloquear edição"), pedidos ao suporte por motivos diferentes. Colar um no lugar do outro dá este aviso — confira com quem te mandou qual dos dois você recebeu.',
+      },
+      {
+        q: '"Informe um e-mail válido"',
+        a: 'Aparece no modal de contato por e-mail (tela de bloqueio, ou o botão "Solicitar chave" em Dados da loja) quando o campo de e-mail pra contato fica vazio ou sem o formato de um e-mail (falta o "@", por exemplo). Preencha um e-mail de verdade pra receber a resposta do suporte e tente enviar de novo.',
+      },
+    ],
+  },
+  {
     label: 'Um padrão que se repete em várias telas',
     items: [
       {
