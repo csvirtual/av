@@ -520,12 +520,15 @@ export async function renderProducts(container, ctx) {
           Conte fisicamente cada produto e digite o valor encontrado. Só os produtos com contagem
           diferente do sistema geram um ajuste — o resto fica como está.
         </p>
+        <div class="field" style="margin-bottom:10px;">
+          <input type="search" id="f-inventory-search" placeholder="Buscar por nome ou código de barras..." autocomplete="off">
+        </div>
         <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
           <table>
             <thead><tr><th>Produto</th><th>No sistema</th><th>Contagem física</th></tr></thead>
-            <tbody>
+            <tbody id="inventory-tbody">
               ${products.map((p) => `
-                <tr>
+                <tr data-row-for="${p.id}">
                   <td>${escapeHtml(p.name)}</td>
                   <td>${formatQty(p.quantity)} ${escapeHtml(displayUnit(p))}</td>
                   <td><input type="number" min="0" step="0.5" value="${p.quantity}" data-count="${p.id}" class="table-inline-input" style="width:90px;"></td>
@@ -533,12 +536,36 @@ export async function renderProducts(container, ctx) {
               `).join('')}
             </tbody>
           </table>
+          <div class="table-empty" id="inventory-no-match" hidden>Nenhum produto encontrado.</div>
         </div>
         <div class="field" style="margin-top:12px;">
           <label>Observação</label>
           <input id="f-note" placeholder="Ex: balanço mensal de agosto">
         </div>
       `,
+      onMount: (modalEl) => {
+        // Achado do usuário: sem busca, achar um produto específico num
+        // catálogo grande exigia rolar a lista inteira. Filtra só a
+        // VISIBILIDADE da linha (nunca remove do DOM nem zera o valor
+        // digitado) — os inputs de contagem de linhas escondidas continuam
+        // com o valor certo, e onSubmit lê todos eles sem se importar com o
+        // que está filtrado na hora do envio.
+        const searchInput = modalEl.querySelector('#f-inventory-search');
+        const rows = Array.from(modalEl.querySelectorAll('[data-row-for]'));
+        const noMatch = modalEl.querySelector('#inventory-no-match');
+        searchInput.addEventListener('input', () => {
+          const q = searchInput.value.trim().toLowerCase();
+          let visibleCount = 0;
+          rows.forEach((row) => {
+            const product = products.find((p) => p.id === row.dataset.rowFor);
+            const matches = !q || product.name.toLowerCase().includes(q) || product.barcode.toLowerCase().includes(q);
+            row.hidden = !matches;
+            if (matches) visibleCount += 1;
+          });
+          noMatch.hidden = visibleCount > 0;
+        });
+        searchInput.focus();
+      },
       onSubmit: async (modalEl) => {
         const errBox = modalEl.querySelector('#modal-error');
         const note = modalEl.querySelector('#f-note').value.trim() || 'Inventário/balanço';
