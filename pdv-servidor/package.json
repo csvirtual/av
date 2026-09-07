@@ -1,0 +1,16 @@
+{
+  "name": "gestao-loja-servidor",
+  "version": "0.1.0-fase1",
+  "description": "Servidor local (rede da loja) para uso multi-terminal do Gestao de Loja — Estoque & Vendas. Fase 1: esqueleto + Estoque compartilhado em tempo real.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.1",
+    "ws": "^8.18.0"
+  }
+}

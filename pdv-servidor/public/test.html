@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Fase 3 — Caixa compartilhado (teste)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 980px; margin: 30px auto; padding: 0 16px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin-top: 26px; }
+  .muted { color: #666; font-size: 13px; }
+  #login-box, #app-box { display: none; }
+  input, select, button { font-size: 14px; padding: 6px 8px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #ddd; font-size: 13px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .cols { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1; min-width: 360px; }
+  #error { color: #b00; font-size: 13px; min-height: 18px; }
+  #ws-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .connected { background: #d5f0d5; color: #146114; }
+  .disconnected { background: #f0d5d5; color: #611414; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+  .badge-ok { background: #d5f0d5; color: #146114; }
+  .badge-partial { background: #fbeecd; color: #a6650f; }
+  .badge-void { background: #fbe9e7; color: #8f1e18; }
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+  .modal { background: #fff; padding: 20px; border-radius: 8px; width: 420px; max-height: 80vh; overflow: auto; }
+  fieldset { border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; margin-top: 10px; }
+  legend { font-size: 12px; color: #666; padding: 0 4px; }
+</style>
+</head>
+<body>
+  <h1>Gestão de Loja — teste de Caixa compartilhado (Fase 3)</h1>
+  <p class="muted">Página de teste, não é a tela final. Prova PDV com baixa de estoque atômica, histórico/estorno em tempo real e caixa configurável (único pra loja ou um por terminal) entre máquinas.</p>
+
+  <div id="login-box">
+    <div class="row">
+      <input id="username" placeholder="usuário" value="admin">
+      <input id="password" type="password" placeholder="senha" value="admin123">
+      <button id="login-btn">Entrar</button>
+    </div>
+  </div>
+
+  <div id="app-box">
+    <div class="row">
+      <span>Logado como <strong id="user-name"></strong></span>
+      <span id="ws-status" class="disconnected">desconectado</span>
+      <button id="logout-btn" style="margin-left:auto;">Sair</button>
+    </div>
+
+    <h2>Caixa</h2>
+    <div class="row">
+      <label class="muted">Modo do caixa:
+        <select id="caixa-mode-select">
+          <option value="unico">Único (loja inteira)</option>
+          <option value="porTerminal">Um por terminal</option>
+        </select>
+      </label>
+      <button id="save-caixa-mode-btn">Salvar modo</button>
+      <label class="muted" id="terminal-name-label" style="display:none;">Nome deste terminal:
+        <input id="terminal-name-input" style="width:140px;">
+      </label>
+    </div>
+    <div id="cash-box"></div>
+
+    <div class="cols">
+      <div class="col">
+        <h2>Estoque</h2>
+        <div class="row">
+          <input id="f-barcode" placeholder="código de barras">
+          <input id="f-name" placeholder="nome">
+          <input id="f-price" type="number" step="0.01" placeholder="preço" style="width:90px;">
+          <button id="add-btn">+ Adicionar</button>
+        </div>
+        <table>
+          <thead><tr><th>Nome</th><th>Preço</th><th>Estoque</th><th></th></tr></thead>
+          <tbody id="products-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="col">
+        <h2>Nova venda</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Qtd</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cart-tbody"></tbody>
+        </table>
+        <div class="row" style="justify-content:space-between;font-weight:600;">
+          <span>Total</span><span id="cart-total">R$ 0,00</span>
+        </div>
+        <div class="row">
+          <label class="muted">Cliente:
+            <select id="sale-customer-select" style="width:220px;"><option value="">— nenhum —</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <label class="muted">Desconto no total (R$): <input id="sale-discount" type="number" step="0.01" min="0" value="0" style="width:80px;"></label>
+        </div>
+        <fieldset>
+          <legend>Pagamento</legend>
+          <div class="row">
+            <select id="pay-method">
+              <option>Dinheiro</option>
+              <option>Cartão de débito</option>
+              <option>Cartão de crédito</option>
+              <option>Pix</option>
+              <option>Fiado</option>
+              <option>Crédito de troca</option>
+            </select>
+            <button id="finalize-btn">Finalizar venda</button>
+          </div>
+        </fieldset>
+      </div>
+    </div>
+
+    <h2>Clientes</h2>
+    <div class="row">
+      <label class="muted">Fidelidade: <input id="loyalty-points-rate" type="number" step="0.1" min="0" style="width:60px;"> pontos por real gasto ·
+        <input id="loyalty-redemption-rate" type="number" step="1" min="1" style="width:60px;"> pontos = R$ 1,00 no resgate</label>
+      <button id="save-loyalty-config-btn">Salvar</button>
+    </div>
+    <div class="row">
+      <input id="customer-search" placeholder="buscar por nome ou telefone">
+      <input id="new-customer-nome" placeholder="nome do cliente novo">
+      <input id="new-customer-telefone" placeholder="telefone" style="width:130px;">
+      <button id="add-customer-btn">+ Cliente</button>
+    </div>
+    <table>
+      <thead><tr><th>Nome</th><th>Telefone</th><th>Saldo devedor</th><th>Pontos</th><th>Crédito</th><th></th></tr></thead>
+      <tbody id="customers-tbody"></tbody>
+    </table>
+
+    <h2>Carreto</h2>
+    <div class="row">
+      <select id="delivery-customer-select"><option value="">— selecione o cliente —</option></select>
+      <select id="delivery-item-product-select"></select>
+      <input id="delivery-item-qty" type="number" step="0.01" placeholder="qtd" style="width:70px;">
+      <button id="add-delivery-item-btn">+ Item</button>
+      <input id="delivery-address" placeholder="endereço (opcional)" style="width:180px;">
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th>Qtd</th><th></th></tr></thead>
+      <tbody id="delivery-cart-tbody"></tbody>
+    </table>
+    <button id="create-delivery-btn">Criar carreto</button>
+    <table>
+      <thead><tr><th>Cliente</th><th>Endereço</th><th>Itens</th><th>Status</th><th></th></tr></thead>
+      <tbody id="deliveries-tbody"></tbody>
+    </table>
+
+    <div id="compras-section">
+      <h2>Fornecedores</h2>
+      <div class="row">
+        <input id="new-supplier-nome" placeholder="nome do fornecedor novo">
+        <input id="new-supplier-telefone" placeholder="telefone" style="width:130px;">
+        <button id="add-supplier-btn">+ Fornecedor</button>
+      </div>
+      <table>
+        <thead><tr><th>Nome</th><th>Telefone</th></tr></thead>
+        <tbody id="suppliers-tbody"></tbody>
+      </table>
+
+      <h2>Compras</h2>
+      <div class="row">
+        <select id="order-supplier-select"><option value="">— selecione o fornecedor —</option></select>
+        <select id="order-item-product-select"></select>
+        <input id="order-item-qty" type="number" step="0.01" placeholder="qtd" style="width:70px;">
+        <input id="order-item-cost" type="number" step="0.01" placeholder="custo unit." style="width:90px;">
+        <button id="add-order-item-btn">+ Item</button>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th>Qtd</th><th>Custo unit.</th><th></th></tr></thead>
+        <tbody id="order-cart-tbody"></tbody>
+      </table>
+      <button id="create-order-btn">Criar pedido de compra</button>
+      <table>
+        <thead><tr><th>Fornecedor</th><th>Status</th><th>Itens</th><th>Criado em</th><th></th></tr></thead>
+        <tbody id="orders-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="financeiro-section">
+      <h2>Financeiro</h2>
+      <div class="row">
+        <select id="fin-type-select"><option value="pagar">A pagar</option><option value="receber">A receber</option></select>
+        <input id="fin-description" placeholder="descrição">
+        <input id="fin-amount" type="number" step="0.01" placeholder="valor" style="width:90px;">
+        <input id="fin-duedate" type="date" style="width:150px;">
+        <button id="add-finance-btn">Lançar</button>
+      </div>
+      <table>
+        <thead><tr><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Restante</th><th>Vencimento</th><th>Status</th><th></th></tr></thead>
+        <tbody id="finance-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="users-section">
+      <h2>Usuários</h2>
+      <div class="row">
+        <input id="new-user-nome" placeholder="nome">
+        <input id="new-user-username" placeholder="usuário (login)">
+        <input id="new-user-password" type="password" placeholder="senha">
+        <button id="add-user-btn">+ Usuário</button>
+      </div>
+      <div id="new-user-permissions" class="row" style="flex-wrap:wrap;"></div>
+      <table>
+        <thead><tr><th>Nome</th><th>Usuário</th><th>Papel</th><th>Ativo</th><th></th></tr></thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="audit-section">
+      <h2>Log de auditoria</h2>
+      <div class="row">
+        <input id="audit-search" placeholder="buscar por ação/detalhes">
+        <button id="audit-refresh-btn">Atualizar</button>
+      </div>
+      <table>
+        <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Perfil</th><th>Ação</th><th>Detalhes</th></tr></thead>
+        <tbody id="audit-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="company-section">
+      <h2>Dados da loja</h2>
+      <div class="row">
+        <label class="muted">Limite de desconto do vendedor sem autorização: <input id="company-max-discount" type="number" step="1" min="0" style="width:60px;">%</label>
+        <button id="save-company-btn">Salvar</button>
+      </div>
+    </div>
+
+    <div id="backup-section">
+      <h2>Backup</h2>
+      <div class="row">
+        <input id="backup-password" type="password" placeholder="senha do backup">
+        <button id="backup-export-btn">Exportar backup</button>
+      </div>
+      <div class="row">
+        <input id="backup-file" type="file" accept="application/json">
+        <input id="backup-import-password" type="password" placeholder="senha do backup">
+        <button id="backup-preview-btn">Ver conteúdo</button>
+        <button id="backup-import-btn" disabled>Restaurar (substitui tudo)</button>
+      </div>
+      <div id="backup-preview-box" class="muted" style="font-size:12px;"></div>
+    </div>
+
+    <h2>Histórico de vendas</h2>
+    <table>
+      <thead><tr><th>Data/Hora</th><th>Vendedor</th><th>Itens</th><th>Total</th><th>Status</th><th></th></tr></thead>
+      <tbody id="sales-tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="error"></div>
+  <div id="modal-root"></div>
+
+<script>
+const API = '';
+let currentUser = null;
+let products = [];
+let cart = []; // { productId, name, price, qty }
+let cashState = null; // { mode, session }
+
+// Identidade do TERMINAL (esta máquina/navegador) — gerada uma vez e
+// guardada no localStorage, então sobrevive a F5 mas é única por
+// navegador/perfil (cada "máquina" de verdade tem a sua). Vai em todo
+// request via X-Terminal-Id; o servidor usa isso só no modo de caixa
+// "porTerminal", pra saber qual sessão pertence a qual terminal.
+function getOrCreateTerminalId() {
+  let id = localStorage.getItem('terminalId');
+  if (!id) { id = crypto.randomUUID(); localStorage.setItem('terminalId', id); }
+  return id;
+}
+const terminalId = getOrCreateTerminalId();
+function getTerminalName() { return localStorage.getItem('terminalName') || 'Terminal'; }
+function setTerminalName(name) { localStorage.setItem('terminalName', name || 'Terminal'); }
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Terminal-Id': terminalId, ...(opts.headers || {}) },
+    credentials: 'include',
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Erro ${res.status}`);
+  return body;
+}
+
+function showError(msg) { document.getElementById('error').textContent = msg || ''; }
+function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function money(n) { return 'R$ ' + Number(n).toFixed(2).replace('.', ','); }
+function dedupeKey() { return crypto.randomUUID(); }
+
+async function checkSession() {
+  try {
+    const { user } = await api('/api/auth/me');
+    await onLoggedIn(user);
+  } catch {
+    document.getElementById('login-box').style.display = 'block';
+    document.getElementById('app-box').style.display = 'none';
+  }
+}
+
+async function onLoggedIn(user) {
+  currentUser = user;
+  document.getElementById('login-box').style.display = 'none';
+  document.getElementById('app-box').style.display = 'block';
+  document.getElementById('user-name').textContent = `${user.nome} (${user.role})`;
+  document.getElementById('terminal-name-input').value = getTerminalName();
+  applyPermissionVisibility();
+  await loadProducts();
+  await loadSales();
+  await loadCaixaConfig();
+  await loadCash();
+  await loadLoyaltyConfig();
+  await loadCustomers();
+  if (userCan('compras')) { await loadSuppliers(); await loadPurchaseOrders(); }
+  if (userCan('financeiro')) await loadFinance();
+  await loadDeliveries();
+  if (userCan('usuarios')) await loadUsers();
+  if (userCan('logs')) await loadAuditLog();
+  if (userCan('empresa')) await loadCompanyConfig();
+  connectWs();
+}
+
+// Espelha utils/permissions.js#userCan da extensão: admin sempre pode tudo;
+// vendedor só o que estiver marcado no próprio cadastro. Usado aqui só pra
+// mostrar/esconder seção da tela (a garantia de verdade é sempre no
+// servidor — cada rota gated confere de novo, ver server.js/routes/*.js).
+function userCan(key) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+  return !!currentUser.permissions?.[key];
+}
+
+function applyPermissionVisibility() {
+  document.getElementById('compras-section').style.display = userCan('compras') ? '' : 'none';
+  document.getElementById('financeiro-section').style.display = userCan('financeiro') ? '' : 'none';
+  document.getElementById('users-section').style.display = userCan('usuarios') ? '' : 'none';
+  document.getElementById('audit-section').style.display = userCan('logs') ? '' : 'none';
+  document.getElementById('company-section').style.display = userCan('empresa') ? '' : 'none';
+  document.getElementById('backup-section').style.display = userCan('backup') ? '' : 'none';
+}
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const { user } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    await onLoggedIn(user);
+  } catch (err) { showError(err.message); }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await api('/api/auth/logout', { method: 'POST' });
+  location.reload();
+});
+
+document.getElementById('add-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const barcode = document.getElementById('f-barcode').value;
+    const name = document.getElementById('f-name').value;
+    const price = document.getElementById('f-price').value;
+    await api('/api/products', { method: 'POST', body: JSON.stringify({ barcode, name, price }) });
+    document.getElementById('f-barcode').value = '';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-price').value = '';
+    await loadProducts();
+  } catch (err) { showError(err.message); }
+});
+
+async function loadProducts() {
+  const res = await api('/api/products');
+  products = res.products;
+  const tbody = document.getElementById('products-tbody');
+  tbody.innerHTML = products.map((p) => `
+    <tr>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${money(p.price)}</td>
+      <td>${p.quantity}</td>
+      <td>
+        <button data-entrada="${p.id}">+1</button>
+        <button data-cart="${p.id}" ${p.quantity <= 0 ? 'disabled' : ''}>Vender</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-entrada]').forEach((btn) => {
+    btn.addEventListener('click', () => ajustarEstoque(btn.dataset.entrada, 1));
+  });
+  tbody.querySelectorAll('[data-cart]').forEach((btn) => {
+    btn.addEventListener('click', () => addToCart(btn.dataset.cart));
+  });
+  populateOrderProductSelect();
+  populateDeliveryProductSelect();
+}
+
+async function ajustarEstoque(id, delta) {
+  showError('');
+  try {
+    await api(`/api/products/${id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta }) });
+    await loadProducts();
+  } catch (err) { showError(err.message); }
+}
+
+function addToCart(productId) {
+  const product = products.find((p) => p.id === productId);
+  const line = cart.find((l) => l.productId === productId);
+  if (line) line.qty += 1;
+  else cart.push({ productId, name: product.name, price: product.price, qty: 1 });
+  renderCart();
+}
+
+function renderCart() {
+  const tbody = document.getElementById('cart-tbody');
+  tbody.innerHTML = cart.map((l, idx) => `
+    <tr>
+      <td>${escapeHtml(l.name)}</td>
+      <td>${l.qty}</td>
+      <td>${money(l.price * l.qty)}</td>
+      <td><button data-remove="${idx}">✕</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-remove]').forEach((btn) => {
+    btn.addEventListener('click', () => { cart.splice(Number(btn.dataset.remove), 1); renderCart(); });
+  });
+  const total = cart.reduce((s, l) => s + l.price * l.qty, 0);
+  document.getElementById('cart-total').textContent = money(total);
+}
+
+async function submitSale(discountApproval) {
+  const total = cart.reduce((s, l) => s + l.price * l.qty, 0);
+  const method = document.getElementById('pay-method').value;
+  const customerId = document.getElementById('sale-customer-select').value || null;
+  const discount = Number(document.getElementById('sale-discount').value) || 0;
+  const payAmount = Math.max(0, total - discount);
+  return api('/api/sales', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: cart.map((l) => ({ productId: l.productId, qty: l.qty, unitPrice: l.price })),
+      overallDiscountAmount: discount,
+      payments: [{ method, amount: payAmount }],
+      customerId,
+      discountApproval,
+      dedupeKey: dedupeKey(),
+    }),
+  });
+}
+
+async function afterSaleCommitted() {
+  const customerId = document.getElementById('sale-customer-select').value || null;
+  cart = [];
+  renderCart();
+  document.getElementById('sale-discount').value = '0';
+  await loadProducts();
+  await loadSales();
+  if (customerId) await loadCustomers();
+}
+
+document.getElementById('finalize-btn').addEventListener('click', async () => {
+  showError('');
+  if (cart.length === 0) { showError('Carrinho vazio.'); return; }
+  const method = document.getElementById('pay-method').value;
+  const customerId = document.getElementById('sale-customer-select').value || null;
+  if (method === 'Fiado' && !customerId) { showError('Selecione um cliente para vender fiado.'); return; }
+  if (method === 'Crédito de troca' && !customerId) { showError('Selecione um cliente para usar crédito de troca.'); return; }
+  try {
+    await submitSale();
+    await afterSaleCommitted();
+  } catch (err) {
+    // Desconto acima do limite da loja (routes/sales.js) — em vez de só
+    // mostrar o erro, abre um modal pra pedir usuário+senha de um admin e
+    // tentar de novo com a autorização, sem perder o carrinho montado.
+    if (/peça a autorização de um administrador/i.test(err.message)) openDiscountApprovalModal(err.message);
+    else showError(err.message);
+  }
+});
+
+function openDiscountApprovalModal(originalMessage) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Autorização de desconto</h2>
+        <p class="muted" style="font-size:13px;">${escapeHtml(originalMessage)}</p>
+        <div class="row">
+          <input id="approval-username" placeholder="usuário admin">
+          <input id="approval-password" type="password" placeholder="senha admin">
+          <button id="confirm-approval-btn">Autorizar e finalizar</button>
+        </div>
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <button id="close-modal-btn" style="margin-top:12px;">Cancelar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-approval-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const username = document.getElementById('approval-username').value;
+    const password = document.getElementById('approval-password').value;
+    try {
+      await submitSale({ username, password });
+      root.innerHTML = '';
+      await afterSaleCommitted();
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+let loadedSales = [];
+async function loadSales() {
+  const res = await api('/api/sales?limit=20');
+  loadedSales = res.items;
+  const tbody = document.getElementById('sales-tbody');
+  tbody.innerHTML = loadedSales.map((s) => {
+    const totalQty = s.items.reduce((sum, i) => sum + i.qty, 0);
+    const refundedQty = s.items.reduce((sum, i) => sum + i.qtyRefunded, 0);
+    const status = refundedQty === 0 ? 'Completa' : refundedQty >= totalQty ? 'Estornada' : 'Parcial';
+    const cls = status === 'Completa' ? 'badge-ok' : status === 'Parcial' ? 'badge-partial' : 'badge-void';
+    return `
+    <tr>
+      <td>${new Date(s.timestamp).toLocaleString('pt-BR')}</td>
+      <td>${escapeHtml(s.userName)}</td>
+      <td>${s.items.length}</td>
+      <td>${money(s.total - s.refundedTotal)}</td>
+      <td><span class="badge ${cls}">${status}</span></td>
+      <td><button data-view="${s.id}">Ver itens</button></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('[data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => openSaleModal(loadedSales.find((s) => s.id === btn.dataset.view)));
+  });
+}
+
+function openSaleModal(sale) {
+  const root = document.getElementById('modal-root');
+  const refundable = sale.items.filter((i) => i.qty - i.qtyRefunded > 0);
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Venda de ${new Date(sale.timestamp).toLocaleString('pt-BR')}</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Qtd</th><th>Estornado</th><th>Total</th></tr></thead>
+          <tbody>
+            ${sale.items.map((i) => `<tr><td>${escapeHtml(i.name)}</td><td>${i.qty}</td><td>${i.qtyRefunded}</td><td>${money(i.lineTotal)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <p><strong>Total líquido:</strong> ${money(sale.total - sale.refundedTotal)}</p>
+        ${refundable.length > 0 ? `
+          <fieldset>
+            <legend>Estornar</legend>
+            ${refundable.map((i) => {
+              const idx = sale.items.indexOf(i);
+              return `<div class="row"><span style="flex:1;">${escapeHtml(i.name)}</span><input type="number" min="0" max="${i.qty - i.qtyRefunded}" value="0" data-refund-qty="${idx}" style="width:60px;"></div>`;
+            }).join('')}
+            <input id="refund-reason" placeholder="Motivo do estorno" style="width:100%;margin-top:6px;">
+            ${sale.customerId ? `<label class="muted" style="display:block;margin-top:6px;"><input type="checkbox" id="refund-generate-credit"> Gerar crédito de troca em vez de devolver em espécie</label>` : ''}
+            <button id="confirm-refund-btn" style="margin-top:8px;">Confirmar estorno</button>
+          </fieldset>
+        ` : ''}
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <button id="close-modal-btn" style="margin-top:12px;">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  const confirmBtn = document.getElementById('confirm-refund-btn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      const errBox = document.getElementById('modal-error');
+      const items = refundable.map((i) => {
+        const idx = sale.items.indexOf(i);
+        const qty = Number(document.querySelector(`[data-refund-qty="${idx}"]`).value) || 0;
+        return { productId: i.productId, itemIndex: idx, qty };
+      }).filter((i) => i.qty > 0);
+      const reason = document.getElementById('refund-reason').value;
+      const generateCreditEl = document.getElementById('refund-generate-credit');
+      const generateCredit = generateCreditEl ? generateCreditEl.checked : false;
+      try {
+        await api(`/api/sales/${sale.id}/refund`, {
+          method: 'POST',
+          body: JSON.stringify({ items, reason, generateCredit, dedupeKey: dedupeKey() }),
+        });
+        root.innerHTML = '';
+        await loadProducts();
+        await loadSales();
+        if (sale.customerId) await loadCustomers();
+      } catch (err) { errBox.textContent = err.message; }
+    });
+  }
+}
+
+async function loadCaixaConfig() {
+  const { caixaMode } = await api('/api/cash/config');
+  document.getElementById('caixa-mode-select').value = caixaMode;
+  document.getElementById('terminal-name-label').style.display = caixaMode === 'porTerminal' ? 'inline' : 'none';
+}
+
+document.getElementById('save-caixa-mode-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const caixaMode = document.getElementById('caixa-mode-select').value;
+    await api('/api/cash/config', { method: 'PUT', body: JSON.stringify({ caixaMode }) });
+    await loadCaixaConfig();
+    await loadCash();
+  } catch (err) { showError(err.message); }
+});
+
+document.getElementById('terminal-name-input').addEventListener('change', (ev) => {
+  setTerminalName(ev.target.value.trim());
+});
+
+async function loadCash() {
+  const res = await api('/api/cash/open');
+  cashState = res;
+  renderCash();
+}
+
+function renderCash() {
+  const box = document.getElementById('cash-box');
+  const { mode, session } = cashState;
+  if (!session) {
+    box.innerHTML = `
+      <div class="row">
+        <input id="opening-amount" type="number" step="0.01" placeholder="valor de abertura" value="0" style="width:140px;">
+        <button id="open-cash-btn">Abrir caixa${mode === 'porTerminal' ? ' (deste terminal)' : ''}</button>
+        <span class="muted">Nenhum caixa aberto${mode === 'porTerminal' ? ' neste terminal' : ' na loja'}.</span>
+      </div>
+    `;
+    document.getElementById('open-cash-btn').addEventListener('click', openCash);
+    return;
+  }
+  box.innerHTML = `
+    <div class="row">
+      <span class="muted">
+        Aberto por <strong>${escapeHtml(session.openedBy.userName)}</strong> em ${new Date(session.openedAt).toLocaleString('pt-BR')}
+        — troco inicial ${money(session.openingAmount)}${session.terminalName ? ` — terminal "${escapeHtml(session.terminalName)}"` : ''}
+      </span>
+    </div>
+    <div class="row">
+      <input id="mov-amount" type="number" step="0.01" placeholder="valor" style="width:100px;">
+      <input id="mov-reason" placeholder="motivo" style="width:200px;">
+      <button data-mov="sangria">− Sangria</button>
+      <button data-mov="suprimento">+ Suprimento</button>
+      <button id="close-cash-btn" style="margin-left:auto;">Fechar caixa</button>
+    </div>
+    <table>
+      <thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th><th>Motivo</th></tr></thead>
+      <tbody id="cash-mov-tbody"><tr><td colspan="4" class="muted">Carregando…</td></tr></tbody>
+    </table>
+  `;
+  box.querySelectorAll('[data-mov]').forEach((btn) => {
+    btn.addEventListener('click', () => recordCashMovement(session.id, btn.dataset.mov));
+  });
+  document.getElementById('close-cash-btn').addEventListener('click', () => openCloseCashModal(session.id));
+  loadCashMovements(session.id);
+}
+
+async function loadCashMovements(sessionId) {
+  const { movements } = await api(`/api/cash/sessions/${sessionId}`);
+  const tbody = document.getElementById('cash-mov-tbody');
+  if (!tbody) return; // a sessão pode ter sido fechada enquanto isso carregava
+  tbody.innerHTML = movements.length === 0
+    ? '<tr><td colspan="4" class="muted">Nenhum movimento ainda.</td></tr>'
+    : movements.map((m) => `
+      <tr>
+        <td>${new Date(m.timestamp).toLocaleString('pt-BR')}</td>
+        <td>${m.type === 'sangria' ? 'Sangria' : 'Suprimento'}</td>
+        <td>${m.type === 'sangria' ? '−' : '+'}${money(m.amount)}</td>
+        <td>${escapeHtml(m.reason)}</td>
+      </tr>`).join('');
+}
+
+async function openCash() {
+  showError('');
+  try {
+    const openingAmount = document.getElementById('opening-amount').value;
+    await api('/api/cash/open', {
+      method: 'POST',
+      body: JSON.stringify({ openingAmount, terminalName: getTerminalName() }),
+    });
+    await loadCash();
+  } catch (err) { showError(err.message); }
+}
+
+async function recordCashMovement(sessionId, type) {
+  showError('');
+  try {
+    const amount = document.getElementById('mov-amount').value;
+    const reason = document.getElementById('mov-reason').value;
+    await api(`/api/cash/sessions/${sessionId}/movimento`, {
+      method: 'POST',
+      body: JSON.stringify({ type, amount, reason, dedupeKey: dedupeKey() }),
+    });
+    await loadCash();
+  } catch (err) { showError(err.message); }
+}
+
+async function openCloseCashModal(sessionId) {
+  showError('');
+  let expected;
+  try {
+    ({ expected } = await api(`/api/cash/sessions/${sessionId}`));
+  } catch (err) { showError(err.message); return; }
+  const methods = Object.keys(expected);
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Fechar caixa</h2>
+        <table>
+          <thead><tr><th>Forma</th><th>Esperado</th><th>Contado</th></tr></thead>
+          <tbody>
+            ${methods.map((m) => `
+              <tr>
+                <td>${escapeHtml(m)}</td>
+                <td>${money(expected[m])}</td>
+                <td><input type="number" step="0.01" data-count="${escapeHtml(m)}" value="${expected[m].toFixed(2)}" style="width:100px;"></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <input id="closing-notes" placeholder="Observações (opcional)" style="width:100%;margin-top:8px;">
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <div class="row" style="margin-top:12px;">
+          <button id="confirm-close-btn">Confirmar fechamento</button>
+          <button id="close-modal-btn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-close-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const countedAmounts = {};
+    methods.forEach((m) => { countedAmounts[m] = document.querySelector(`[data-count="${m}"]`).value; });
+    const closingNotes = document.getElementById('closing-notes').value;
+    try {
+      await api(`/api/cash/sessions/${sessionId}/fechar`, {
+        method: 'POST',
+        body: JSON.stringify({ countedAmounts, closingNotes }),
+      });
+      root.innerHTML = '';
+      await loadCash();
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+let customers = [];
+let customerBalances = {};
+let loyaltyBalances = { points: {}, credit: {} };
+let openCustomerModalId = null;
+
+async function loadCustomers() {
+  const q = document.getElementById('customer-search').value;
+  const [listRes, balancesRes, loyaltyRes] = await Promise.all([
+    api(`/api/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    api('/api/customers/balances'),
+    api('/api/loyalty/balances'),
+  ]);
+  customers = listRes.customers;
+  customerBalances = balancesRes.balances;
+  loyaltyBalances = loyaltyRes;
+  renderCustomersTable();
+  populateSaleCustomerSelect();
+  populateDeliveryCustomerSelect();
+}
+
+function renderCustomersTable() {
+  const tbody = document.getElementById('customers-tbody');
+  tbody.innerHTML = customers.map((c) => `
+    <tr>
+      <td>${escapeHtml(c.nome)}</td>
+      <td>${escapeHtml(c.telefone || '—')}</td>
+      <td>${money(customerBalances[c.id] || 0)}</td>
+      <td>${loyaltyBalances.points[c.id] || 0}</td>
+      <td>${money(loyaltyBalances.credit[c.id] || 0)}</td>
+      <td><button data-open-customer="${c.id}">Extrato / pagamento</button></td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-open-customer]').forEach((btn) => {
+    btn.addEventListener('click', () => openCustomerModal(btn.dataset.openCustomer));
+  });
+}
+
+function populateSaleCustomerSelect() {
+  const select = document.getElementById('sale-customer-select');
+  const current = select.value;
+  select.innerHTML = '<option value="">— nenhum —</option>' + customers.map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  if (customers.some((c) => c.id === current)) select.value = current;
+}
+
+async function loadLoyaltyConfig() {
+  const { pointsPerReal, redemptionRate } = await api('/api/loyalty/config');
+  document.getElementById('loyalty-points-rate').value = pointsPerReal;
+  document.getElementById('loyalty-redemption-rate').value = redemptionRate;
+}
+
+document.getElementById('save-loyalty-config-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const pointsPerReal = document.getElementById('loyalty-points-rate').value;
+    const redemptionRate = document.getElementById('loyalty-redemption-rate').value;
+    await api('/api/loyalty/config', { method: 'PUT', body: JSON.stringify({ pointsPerReal, redemptionRate }) });
+  } catch (err) { showError(err.message); }
+});
+
+document.getElementById('customer-search').addEventListener('input', () => loadCustomers());
+
+document.getElementById('add-customer-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const nome = document.getElementById('new-customer-nome').value;
+    const telefone = document.getElementById('new-customer-telefone').value;
+    await api('/api/customers', { method: 'POST', body: JSON.stringify({ nome, telefone }) });
+    document.getElementById('new-customer-nome').value = '';
+    document.getElementById('new-customer-telefone').value = '';
+    await loadCustomers();
+  } catch (err) { showError(err.message); }
+});
+
+async function openCustomerModal(customerId) {
+  openCustomerModalId = customerId;
+  await refreshCustomerModal();
+}
+
+async function refreshCustomerModal() {
+  if (!openCustomerModalId) return;
+  const [{ customer, balance }, { entries }, loyalty] = await Promise.all([
+    api(`/api/customers/${openCustomerModalId}`),
+    api(`/api/customers/${openCustomerModalId}/ledger`),
+    api(`/api/loyalty/${openCustomerModalId}`),
+  ]);
+  const root = document.getElementById('modal-root');
+  const typeLabel = { fiado: 'Venda fiada', pagamento: 'Pagamento', estorno: 'Estorno' };
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>${escapeHtml(customer.nome)}</h2>
+        <p><strong>Saldo devedor:</strong> ${money(balance)} · <strong>Pontos:</strong> ${loyalty.points} · <strong>Crédito de troca:</strong> ${money(loyalty.credit)}</p>
+        <table>
+          <thead><tr><th>Data/Hora</th><th>Tipo</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${entries.length === 0 ? '<tr><td colspan="3" class="muted">Nenhum lançamento ainda.</td></tr>' : entries.map((e) => `
+              <tr>
+                <td>${new Date(e.timestamp).toLocaleString('pt-BR')}</td>
+                <td>${typeLabel[e.type] || e.type}</td>
+                <td>${e.type === 'fiado' ? '+' : '−'}${money(e.amount)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        ${balance > 0.01 ? `
+          <fieldset>
+            <legend>Registrar pagamento</legend>
+            <div class="row">
+              <input id="payment-amount" type="number" step="0.01" placeholder="valor" style="width:100px;" value="${balance.toFixed(2)}">
+              <select id="payment-method">
+                <option>Dinheiro</option>
+                <option>Cartão de débito</option>
+                <option>Cartão de crédito</option>
+                <option>Pix</option>
+              </select>
+              <button id="confirm-payment-btn">Confirmar</button>
+            </div>
+          </fieldset>
+        ` : ''}
+        ${loyalty.points > 0 ? `
+          <fieldset>
+            <legend>Resgatar pontos de fidelidade</legend>
+            <div class="row">
+              <input id="redeem-points" type="number" min="1" max="${loyalty.points}" step="1" value="${loyalty.points}" style="width:80px;">
+              <button id="confirm-redeem-btn">Resgatar (vira crédito de troca)</button>
+            </div>
+          </fieldset>
+        ` : ''}
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <button id="close-modal-btn" style="margin-top:12px;">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { openCustomerModalId = null; root.innerHTML = ''; });
+  const confirmBtn = document.getElementById('confirm-payment-btn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      const errBox = document.getElementById('modal-error');
+      const amount = document.getElementById('payment-amount').value;
+      const paymentMethod = document.getElementById('payment-method').value;
+      try {
+        await api(`/api/customers/${customer.id}/pagamento`, {
+          method: 'POST',
+          body: JSON.stringify({ amount, paymentMethod, dedupeKey: dedupeKey() }),
+        });
+        await refreshCustomerModal();
+        await loadCustomers();
+      } catch (err) { errBox.textContent = err.message; }
+    });
+  }
+  const redeemBtn = document.getElementById('confirm-redeem-btn');
+  if (redeemBtn) {
+    redeemBtn.addEventListener('click', async () => {
+      const errBox = document.getElementById('modal-error');
+      const points = document.getElementById('redeem-points').value;
+      try {
+        await api(`/api/loyalty/${customer.id}/resgatar`, { method: 'POST', body: JSON.stringify({ points, dedupeKey: dedupeKey() }) });
+        await refreshCustomerModal();
+        await loadCustomers();
+      } catch (err) { errBox.textContent = err.message; }
+    });
+  }
+}
+
+// ---------- Fornecedores ----------
+
+let suppliers = [];
+
+async function loadSuppliers() {
+  const res = await api('/api/suppliers');
+  suppliers = res.suppliers;
+  const tbody = document.getElementById('suppliers-tbody');
+  tbody.innerHTML = suppliers.map((s) => `<tr><td>${escapeHtml(s.nome)}</td><td>${escapeHtml(s.telefone || '—')}</td></tr>`).join('');
+  const select = document.getElementById('order-supplier-select');
+  const current = select.value;
+  select.innerHTML = '<option value="">— selecione o fornecedor —</option>' + suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.nome)}</option>`).join('');
+  if (suppliers.some((s) => s.id === current)) select.value = current;
+}
+
+document.getElementById('add-supplier-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const nome = document.getElementById('new-supplier-nome').value;
+    const telefone = document.getElementById('new-supplier-telefone').value;
+    await api('/api/suppliers', { method: 'POST', body: JSON.stringify({ nome, telefone }) });
+    document.getElementById('new-supplier-nome').value = '';
+    document.getElementById('new-supplier-telefone').value = '';
+    await loadSuppliers();
+  } catch (err) { showError(err.message); }
+});
+
+// ---------- Compras ----------
+
+let orderCart = []; // { productId, name, qty, unitCost }
+let purchaseOrders = [];
+
+function populateOrderProductSelect() {
+  const select = document.getElementById('order-item-product-select');
+  const current = select.value;
+  select.innerHTML = products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  if (products.some((p) => p.id === current)) select.value = current;
+}
+
+document.getElementById('add-order-item-btn').addEventListener('click', () => {
+  const productId = document.getElementById('order-item-product-select').value;
+  const product = products.find((p) => p.id === productId);
+  if (!product) { showError('Cadastre um produto no Estoque antes de montar o pedido.'); return; }
+  const qty = Number(document.getElementById('order-item-qty').value) || 0;
+  const unitCost = Number(document.getElementById('order-item-cost').value) || 0;
+  if (qty <= 0) { showError('Informe uma quantidade maior que zero.'); return; }
+  showError('');
+  orderCart.push({ productId, name: product.name, qty, unitCost });
+  renderOrderCart();
+});
+
+function renderOrderCart() {
+  const tbody = document.getElementById('order-cart-tbody');
+  tbody.innerHTML = orderCart.map((l, idx) => `
+    <tr><td>${escapeHtml(l.name)}</td><td>${l.qty}</td><td>${money(l.unitCost)}</td><td><button data-remove-order-item="${idx}">✕</button></td></tr>
+  `).join('');
+  tbody.querySelectorAll('[data-remove-order-item]').forEach((btn) => {
+    btn.addEventListener('click', () => { orderCart.splice(Number(btn.dataset.removeOrderItem), 1); renderOrderCart(); });
+  });
+}
+
+document.getElementById('create-order-btn').addEventListener('click', async () => {
+  showError('');
+  const supplierId = document.getElementById('order-supplier-select').value;
+  if (!supplierId) { showError('Selecione um fornecedor.'); return; }
+  if (orderCart.length === 0) { showError('Adicione ao menos um item ao pedido.'); return; }
+  try {
+    await api('/api/purchases', { method: 'POST', body: JSON.stringify({ supplierId, items: orderCart }) });
+    orderCart = [];
+    renderOrderCart();
+    await loadPurchaseOrders();
+  } catch (err) { showError(err.message); }
+});
+
+const ORDER_STATUS_LABEL = { aberto: 'Aberto', recebido_parcial: 'Recebido parcial', recebido: 'Recebido', cancelado: 'Cancelado' };
+
+async function loadPurchaseOrders() {
+  const res = await api('/api/purchases');
+  purchaseOrders = res.orders;
+  const tbody = document.getElementById('orders-tbody');
+  tbody.innerHTML = purchaseOrders.map((o) => `
+    <tr>
+      <td>${escapeHtml(o.supplierName)}</td>
+      <td>${ORDER_STATUS_LABEL[o.status] || o.status}</td>
+      <td>${o.items.length}</td>
+      <td>${new Date(o.createdAt).toLocaleString('pt-BR')}</td>
+      <td>
+        ${o.status !== 'recebido' && o.status !== 'cancelado' ? `<button data-receive-order="${o.id}">Receber</button>` : ''}
+        ${o.status === 'aberto' ? `<button data-cancel-order="${o.id}">Cancelar</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-receive-order]').forEach((btn) => {
+    btn.addEventListener('click', () => openReceiveModal(purchaseOrders.find((o) => o.id === btn.dataset.receiveOrder)));
+  });
+  tbody.querySelectorAll('[data-cancel-order]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      showError('');
+      try { await api(`/api/purchases/${btn.dataset.cancelOrder}/cancelar`, { method: 'POST' }); await loadPurchaseOrders(); }
+      catch (err) { showError(err.message); }
+    });
+  });
+}
+
+function openReceiveModal(order) {
+  const root = document.getElementById('modal-root');
+  const pending = order.items.filter((i) => i.qtyReceived < i.qtyOrdered);
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Receber pedido — ${escapeHtml(order.supplierName)}</h2>
+        <table>
+          <thead><tr><th>Item</th><th>Pedido</th><th>Recebido</th><th>Receber agora</th><th>Custo unit.</th></tr></thead>
+          <tbody>
+            ${pending.map((i) => `
+              <tr>
+                <td>${escapeHtml(i.name)}</td>
+                <td>${i.qtyOrdered}</td>
+                <td>${i.qtyReceived}</td>
+                <td><input type="number" min="0" max="${i.qtyOrdered - i.qtyReceived}" step="0.01" value="0" data-receive-qty="${i.productId}" style="width:70px;"></td>
+                <td><input type="number" step="0.01" value="${i.unitCost}" data-receive-cost="${i.productId}" style="width:80px;"></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <div class="row" style="margin-top:12px;">
+          <button id="confirm-receive-btn">Confirmar recebimento</button>
+          <button id="close-modal-btn">Fechar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-receive-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const items = pending.map((i) => ({
+      productId: i.productId,
+      qty: Number(document.querySelector(`[data-receive-qty="${i.productId}"]`).value) || 0,
+      unitCost: document.querySelector(`[data-receive-cost="${i.productId}"]`).value,
+    })).filter((i) => i.qty > 0);
+    try {
+      await api(`/api/purchases/${order.id}/receber`, { method: 'POST', body: JSON.stringify({ items, dedupeKey: dedupeKey() }) });
+      root.innerHTML = '';
+      await loadPurchaseOrders();
+      await loadProducts();
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+// ---------- Financeiro ----------
+
+let financeEntries = [];
+const FIN_STATUS_LABEL = { pendente: 'Pendente', parcial: 'Parcial', pago: 'Pago', vencido: 'Vencido', cancelado: 'Cancelado' };
+
+async function loadFinance() {
+  const res = await api('/api/finance');
+  financeEntries = res.entries;
+  const tbody = document.getElementById('finance-tbody');
+  tbody.innerHTML = financeEntries.map((e) => `
+    <tr>
+      <td>${escapeHtml(e.description)}</td>
+      <td>${e.type === 'pagar' ? 'A pagar' : 'A receber'}</td>
+      <td>${money(e.amount)}</td>
+      <td>${money(e.remaining)}</td>
+      <td>${new Date(e.dueDate).toLocaleDateString('pt-BR')}</td>
+      <td>${FIN_STATUS_LABEL[e.displayStatus] || e.displayStatus}</td>
+      <td>
+        ${e.displayStatus !== 'pago' && e.displayStatus !== 'cancelado' ? `<button data-pay-entry="${e.id}">Pagar</button>` : ''}
+        ${e.displayStatus === 'pendente' ? `<button data-cancel-entry="${e.id}">Cancelar</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-pay-entry]').forEach((btn) => {
+    btn.addEventListener('click', () => openFinancePaymentModal(financeEntries.find((e) => e.id === btn.dataset.payEntry)));
+  });
+  tbody.querySelectorAll('[data-cancel-entry]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      showError('');
+      try { await api(`/api/finance/${btn.dataset.cancelEntry}/cancelar`, { method: 'POST' }); await loadFinance(); }
+      catch (err) { showError(err.message); }
+    });
+  });
+}
+
+document.getElementById('add-finance-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const type = document.getElementById('fin-type-select').value;
+    const description = document.getElementById('fin-description').value;
+    const amount = document.getElementById('fin-amount').value;
+    const dueDateStr = document.getElementById('fin-duedate').value;
+    if (!dueDateStr) { showError('Informe a data de vencimento.'); return; }
+    const dueDate = new Date(dueDateStr + 'T00:00:00').getTime();
+    await api('/api/finance', { method: 'POST', body: JSON.stringify({ type, description, amount, dueDate }) });
+    document.getElementById('fin-description').value = '';
+    document.getElementById('fin-amount').value = '';
+    document.getElementById('fin-duedate').value = '';
+    await loadFinance();
+  } catch (err) { showError(err.message); }
+});
+
+function openFinancePaymentModal(entry) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>${escapeHtml(entry.description)}</h2>
+        <p>Restante: <strong>${money(entry.remaining)}</strong></p>
+        <div class="row">
+          <input id="fin-payment-amount" type="number" step="0.01" value="${entry.remaining.toFixed(2)}" style="width:100px;">
+          <select id="fin-payment-method">
+            <option>Dinheiro</option>
+            <option>Cartão de débito</option>
+            <option>Cartão de crédito</option>
+            <option>Pix</option>
+          </select>
+          <button id="confirm-fin-payment-btn">Confirmar</button>
+        </div>
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <button id="close-modal-btn" style="margin-top:12px;">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-fin-payment-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const amount = document.getElementById('fin-payment-amount').value;
+    const paymentMethod = document.getElementById('fin-payment-method').value;
+    try {
+      await api(`/api/finance/${entry.id}/pagamento`, { method: 'POST', body: JSON.stringify({ amount, paymentMethod, dedupeKey: dedupeKey() }) });
+      root.innerHTML = '';
+      await loadFinance();
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+// ---------- Carreto ----------
+
+let deliveryCart = []; // { source, productId, name, unit, qty }
+let deliveries = [];
+
+function populateDeliveryCustomerSelect() {
+  const select = document.getElementById('delivery-customer-select');
+  const current = select.value;
+  select.innerHTML = '<option value="">— selecione o cliente —</option>' + customers.map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+  if (customers.some((c) => c.id === current)) select.value = current;
+}
+
+function populateDeliveryProductSelect() {
+  const select = document.getElementById('delivery-item-product-select');
+  const current = select.value;
+  select.innerHTML = products.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  if (products.some((p) => p.id === current)) select.value = current;
+}
+
+document.getElementById('add-delivery-item-btn').addEventListener('click', () => {
+  const productId = document.getElementById('delivery-item-product-select').value;
+  const product = products.find((p) => p.id === productId);
+  if (!product) { showError('Cadastre um produto no Estoque antes de montar o carreto.'); return; }
+  const qty = Number(document.getElementById('delivery-item-qty').value) || 0;
+  if (qty <= 0) { showError('Informe uma quantidade maior que zero.'); return; }
+  showError('');
+  deliveryCart.push({ source: 'estoque', productId, name: product.name, unit: product.unit || 'un', qty });
+  renderDeliveryCart();
+});
+
+function renderDeliveryCart() {
+  const tbody = document.getElementById('delivery-cart-tbody');
+  tbody.innerHTML = deliveryCart.map((l, idx) => `
+    <tr><td>${escapeHtml(l.name)}</td><td>${l.qty} ${escapeHtml(l.unit)}</td><td><button data-remove-delivery-item="${idx}">✕</button></td></tr>
+  `).join('');
+  tbody.querySelectorAll('[data-remove-delivery-item]').forEach((btn) => {
+    btn.addEventListener('click', () => { deliveryCart.splice(Number(btn.dataset.removeDeliveryItem), 1); renderDeliveryCart(); });
+  });
+}
+
+document.getElementById('create-delivery-btn').addEventListener('click', async () => {
+  showError('');
+  const customerId = document.getElementById('delivery-customer-select').value;
+  if (!customerId) { showError('Selecione o cliente do carreto.'); return; }
+  if (deliveryCart.length === 0) { showError('Adicione ao menos um item ao carreto.'); return; }
+  try {
+    const address = document.getElementById('delivery-address').value;
+    await api('/api/deliveries', { method: 'POST', body: JSON.stringify({ customerId, items: deliveryCart, address }) });
+    deliveryCart = [];
+    renderDeliveryCart();
+    document.getElementById('delivery-address').value = '';
+    await loadDeliveries();
+  } catch (err) { showError(err.message); }
+});
+
+const DELIVERY_STATUS_LABEL = { pendente: 'Pendente', entregue: 'Entregue', cancelado: 'Cancelado' };
+
+async function loadDeliveries() {
+  const res = await api('/api/deliveries');
+  deliveries = res.deliveries;
+  const tbody = document.getElementById('deliveries-tbody');
+  tbody.innerHTML = deliveries.map((d) => `
+    <tr>
+      <td>${escapeHtml(d.customerName)}</td>
+      <td>${escapeHtml(d.address || '—')}</td>
+      <td>${d.items.length}</td>
+      <td>${DELIVERY_STATUS_LABEL[d.status] || d.status}</td>
+      <td>
+        ${d.status === 'pendente' ? `<button data-deliver="${d.id}">Entregar</button><button data-cancel-delivery="${d.id}">Cancelar</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-deliver]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      showError('');
+      try { await api(`/api/deliveries/${btn.dataset.deliver}/entregar`, { method: 'POST' }); await loadDeliveries(); }
+      catch (err) { showError(err.message); }
+    });
+  });
+  tbody.querySelectorAll('[data-cancel-delivery]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      showError('');
+      try { await api(`/api/deliveries/${btn.dataset.cancelDelivery}/cancelar`, { method: 'POST' }); await loadDeliveries(); }
+      catch (err) { showError(err.message); }
+    });
+  });
+}
+
+// ---------- Usuários / permissões ----------
+
+let users = [];
+let permissionDefs = [];
+
+function permissionCheckboxesHtml(idPrefix, checkedMap) {
+  return permissionDefs.map((p) => `
+    <label style="font-size:12px;white-space:nowrap;">
+      <input type="checkbox" id="${idPrefix}-${p.key}" data-perm-key="${p.key}" ${checkedMap?.[p.key] ? 'checked' : ''}> ${escapeHtml(p.label)}
+    </label>
+  `).join('');
+}
+
+function readPermissionCheckboxes(idPrefix) {
+  const result = {};
+  permissionDefs.forEach((p) => { result[p.key] = document.getElementById(`${idPrefix}-${p.key}`).checked; });
+  return result;
+}
+
+async function loadUsers() {
+  if (permissionDefs.length === 0) {
+    const res = await api('/api/users/permission-defs');
+    permissionDefs = res.defs;
+    document.getElementById('new-user-permissions').innerHTML = permissionCheckboxesHtml('new-user-perm');
+  }
+  const res = await api('/api/users');
+  users = res.users;
+  renderUsersTable();
+}
+
+function renderUsersTable() {
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = users.map((u) => `
+    <tr>
+      <td>${escapeHtml(u.nome)}</td>
+      <td>${escapeHtml(u.username)}</td>
+      <td>${u.role === 'admin' ? 'Administrador' : 'Vendedor'}</td>
+      <td>${u.active ? 'Sim' : 'Não'}</td>
+      <td>
+        ${u.role !== 'admin' && u.id !== currentUser.id ? `
+          <button data-edit-user="${u.id}">Editar permissões</button>
+          <button data-toggle-active="${u.id}">${u.active ? 'Desativar' : 'Reativar'}</button>
+        ` : ''}
+        ${u.id !== currentUser.id ? `<button data-reset-password="${u.id}">Redefinir senha</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('[data-edit-user]').forEach((btn) => {
+    btn.addEventListener('click', () => openEditUserModal(users.find((u) => u.id === btn.dataset.editUser)));
+  });
+  tbody.querySelectorAll('[data-toggle-active]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      showError('');
+      const u = users.find((x) => x.id === btn.dataset.toggleActive);
+      try { await api(`/api/users/${u.id}/ativo`, { method: 'POST', body: JSON.stringify({ active: !u.active }) }); await loadUsers(); }
+      catch (err) { showError(err.message); }
+    });
+  });
+  tbody.querySelectorAll('[data-reset-password]').forEach((btn) => {
+    btn.addEventListener('click', () => openResetPasswordModal(btn.dataset.resetPassword));
+  });
+}
+
+document.getElementById('add-user-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const nome = document.getElementById('new-user-nome').value;
+    const username = document.getElementById('new-user-username').value;
+    const password = document.getElementById('new-user-password').value;
+    const permissions = readPermissionCheckboxes('new-user-perm');
+    await api('/api/users', { method: 'POST', body: JSON.stringify({ nome, username, password, permissions }) });
+    document.getElementById('new-user-nome').value = '';
+    document.getElementById('new-user-username').value = '';
+    document.getElementById('new-user-password').value = '';
+    await loadUsers();
+  } catch (err) { showError(err.message); }
+});
+
+function openEditUserModal(user) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Permissões — ${escapeHtml(user.nome)}</h2>
+        <div id="edit-user-permissions" class="row" style="flex-wrap:wrap;">${permissionCheckboxesHtml('edit-user-perm', user.permissions)}</div>
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <div class="row" style="margin-top:12px;">
+          <button id="confirm-edit-user-btn">Salvar</button>
+          <button id="close-modal-btn">Fechar</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-edit-user-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const permissions = readPermissionCheckboxes('edit-user-perm');
+    try {
+      await api(`/api/users/${user.id}`, { method: 'PUT', body: JSON.stringify({ permissions }) });
+      root.innerHTML = '';
+      await loadUsers();
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+function openResetPasswordModal(userId) {
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+    <div class="modal-back">
+      <div class="modal">
+        <h2>Redefinir senha</h2>
+        <div class="row">
+          <input id="new-password" type="password" placeholder="nova senha">
+          <button id="confirm-reset-password-btn">Confirmar</button>
+        </div>
+        <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
+        <button id="close-modal-btn" style="margin-top:12px;">Fechar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('close-modal-btn').addEventListener('click', () => { root.innerHTML = ''; });
+  document.getElementById('confirm-reset-password-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('modal-error');
+    const newPassword = document.getElementById('new-password').value;
+    try {
+      await api(`/api/users/${userId}/redefinir-senha`, { method: 'POST', body: JSON.stringify({ newPassword }) });
+      root.innerHTML = '';
+    } catch (err) { errBox.textContent = err.message; }
+  });
+}
+
+// ---------- Log de auditoria ----------
+
+async function loadAuditLog() {
+  const term = document.getElementById('audit-search').value;
+  const res = await api(`/api/audit${term ? `?term=${encodeURIComponent(term)}` : ''}`);
+  const tbody = document.getElementById('audit-tbody');
+  tbody.innerHTML = res.entries.map((e) => `
+    <tr>
+      <td>${new Date(e.timestamp).toLocaleString('pt-BR')}</td>
+      <td>${escapeHtml(e.userName || '—')}</td>
+      <td>${e.role === 'admin' ? 'Administrador' : 'Vendedor'}</td>
+      <td>${escapeHtml(e.action)}</td>
+      <td class="muted">${escapeHtml(e.details || '')}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('audit-refresh-btn').addEventListener('click', () => loadAuditLog());
+
+// ---------- Dados da loja ----------
+
+async function loadCompanyConfig() {
+  const { vendorMaxDiscountPercent } = await api('/api/company');
+  document.getElementById('company-max-discount').value = vendorMaxDiscountPercent;
+}
+
+document.getElementById('save-company-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const vendorMaxDiscountPercent = document.getElementById('company-max-discount').value;
+    await api('/api/company', { method: 'PUT', body: JSON.stringify({ vendorMaxDiscountPercent }) });
+  } catch (err) { showError(err.message); }
+});
+
+// ---------- Backup ----------
+
+document.getElementById('backup-export-btn').addEventListener('click', async () => {
+  showError('');
+  try {
+    const password = document.getElementById('backup-password').value;
+    const { envelope } = await api('/api/backup/export', { method: 'POST', body: JSON.stringify({ password }) });
+    const blob = new Blob([JSON.stringify(envelope)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-gestao-loja-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) { showError(err.message); }
+});
+
+let loadedBackupEnvelope = null;
+
+document.getElementById('backup-preview-btn').addEventListener('click', async () => {
+  showError('');
+  loadedBackupEnvelope = null;
+  document.getElementById('backup-import-btn').disabled = true;
+  document.getElementById('backup-preview-box').textContent = '';
+  const file = document.getElementById('backup-file').files[0];
+  const password = document.getElementById('backup-import-password').value;
+  if (!file) { showError('Escolha um arquivo de backup.'); return; }
+  try {
+    const envelope = JSON.parse(await file.text());
+    const res = await api('/api/backup/preview', { method: 'POST', body: JSON.stringify({ envelope, password }) });
+    loadedBackupEnvelope = envelope;
+    document.getElementById('backup-preview-box').textContent =
+      `Backup de ${new Date(res.exportedAt).toLocaleString('pt-BR')}. Produtos: ${res.currentCounts.products} → ${res.fileCounts.products} · `
+      + `Vendas: ${res.currentCounts.sales} → ${res.fileCounts.sales} · Usuários: ${res.currentCounts.users} → ${res.fileCounts.users}. `
+      + `Restaurar substitui TODOS os dados atuais pelos do arquivo.`;
+    document.getElementById('backup-import-btn').disabled = false;
+  } catch (err) { showError(err.message); }
+});
+
+document.getElementById('backup-import-btn').addEventListener('click', async () => {
+  showError('');
+  if (!loadedBackupEnvelope) { showError('Veja o conteúdo do backup antes de restaurar.'); return; }
+  if (!confirm('Isso vai APAGAR TUDO que existe hoje e substituir pelo conteúdo do backup. Não pode ser desfeito. Continuar?')) return;
+  const password = document.getElementById('backup-import-password').value;
+  try {
+    await api('/api/backup/import', { method: 'POST', body: JSON.stringify({ envelope: loadedBackupEnvelope, password }) });
+    document.getElementById('backup-preview-box').textContent = 'Backup restaurado. Recarregando...';
+    setTimeout(() => location.reload(), 1000);
+  } catch (err) { showError(err.message); }
+});
+
+function connectWs() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}/ws`);
+  const statusEl = document.getElementById('ws-status');
+  ws.addEventListener('open', () => { statusEl.textContent = 'conectado'; statusEl.className = 'connected'; });
+  ws.addEventListener('close', () => {
+    statusEl.textContent = 'desconectado'; statusEl.className = 'disconnected';
+    setTimeout(connectWs, 2000);
+  });
+  ws.addEventListener('message', async (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.topic === 'products-changed') await loadProducts();
+    if (msg.topic === 'sales-changed') await loadSales();
+    if (msg.topic === 'cash-changed') await loadCash();
+    if (msg.topic === 'cash-config-changed') { await loadCaixaConfig(); await loadCash(); }
+    if (msg.topic === 'customers-changed') {
+      await loadCustomers();
+      if (openCustomerModalId && msg.id === openCustomerModalId) await refreshCustomerModal();
+    }
+    if (msg.topic === 'suppliers-changed' && userCan('compras')) await loadSuppliers();
+    if (msg.topic === 'purchases-changed' && userCan('compras')) await loadPurchaseOrders();
+    if (msg.topic === 'finance-changed' && userCan('financeiro')) await loadFinance();
+    if (msg.topic === 'loyalty-config-changed') await loadLoyaltyConfig();
+    if (msg.topic === 'deliveries-changed') await loadDeliveries();
+    if (msg.topic === 'users-changed' && userCan('usuarios')) await loadUsers();
+    if (msg.topic === 'backup-restored') location.reload();
+  });
+}
+
+checkSession();
+</script>
+</body>
+</html>
