@@ -56,7 +56,7 @@ function showRedirectToPdvNotice(ctx) {
   const TOTAL_SECONDS = 5;
   let remaining = TOTAL_SECONDS;
   const { close, modalEl } = openModal({
-    title: 'Caixa aberto',
+    title: '<span style="text-transform:uppercase;">Caixa aberto</span>',
     submitLabel: 'Ir agora',
     singleButton: true,
     centerTitle: true,
@@ -65,8 +65,7 @@ function showRedirectToPdvNotice(ctx) {
       <div style="text-align:center;">
         ${icon('checkCircle', { size: 46 })}
         <p style="font-size:13.5px;color:var(--text-muted);margin:16px 0 18px;line-height:1.5;">
-          A loja exige caixa aberto pra registrar vendas — redirecionando pro PDV em
-          <strong id="redirect-count">${TOTAL_SECONDS}</strong>s…
+          Redirecionando para o PDV em <strong id="redirect-count">${TOTAL_SECONDS}</strong>s…
         </p>
         <div class="redirect-progress-track"><div class="redirect-progress-fill" id="redirect-progress-fill"></div></div>
       </div>
