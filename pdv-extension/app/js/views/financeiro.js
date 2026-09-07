@@ -187,7 +187,7 @@ export async function renderFinanceiro(container, ctx) {
       bodyHtml: `
         <div id="modal-error"></div>
         ${entry.notes ? `
-          <div class="notice"><strong>Observações da conta:</strong> ${escapeHtml(entry.notes)}</div>
+          <div class="notice"><strong>Observações:</strong> ${escapeHtml(entry.notes)}</div>
         ` : ''}
         ${already > 0.001 ? `
           <div class="notice">Já foram pagos ${formatMoney(already)} de ${formatMoney(entry.amount)}. Restam ${formatMoney(remaining)}.</div>
