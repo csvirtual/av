@@ -196,7 +196,7 @@ export async function renderFinanceiro(container, ctx) {
           <div class="field">
             <label>Valor pago agora *</label>
             <input id="f-amount" type="number" min="0.01" max="${remaining.toFixed(2)}" step="0.01" value="${remaining.toFixed(2)}">
-            <span class="hint">Pode ser menor que o restante — a conta fica "Pago parcialmente" até o valor bater.</span>
+            <span class="hint">Aceita pagamento parcial.</span>
           </div>
           <div class="field">
             <label>Forma de pagamento</label>
