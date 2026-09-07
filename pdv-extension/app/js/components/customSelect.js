@@ -185,7 +185,14 @@ export function enhanceSelect(select) {
    * cortada embaixo da janela. */
   function position() {
     const rect = trigger.getBoundingClientRect();
-    list.style.width = `${rect.width}px`;
+    // Achado do usuário: `width` fixo (em vez de `min-width`) cortava
+    // opção mais larga que o próprio gatilho — ex: gatilho mostrando
+    // "Todos os status" (curto) mas a lista tendo "Próximo da validade"
+    // (mais larga), sem `overflow-x` nenhum pra revelar o resto. `min-width`
+    // mantém a lista pelo menos tão larga quanto o gatilho, mas deixa
+    // crescer pra caber a opção mais larga — mesmo comportamento de antes
+    // desta lista virar position:fixed (era só `min-width:100%` no CSS).
+    list.style.minWidth = `${rect.width}px`;
     list.style.left = `${rect.left}px`;
     list.style.top = `${rect.bottom + 4}px`;
     if (list.getBoundingClientRect().bottom > window.innerHeight) {

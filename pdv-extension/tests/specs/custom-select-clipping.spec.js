@@ -56,4 +56,27 @@ test.describe('Dropdown de filtro — não deve cortar em tela com pouco conteú
     const selectedValue = await page.locator('#status-filter').inputValue();
     expect(selectedValue).toBe('vencido');
   });
+
+  test('opção mais larga que o gatilho (Estoque: "Próximo da validade") não fica cortada', async ({ appPage: page }) => {
+    // Achado do usuário: `list.style.width` fixo (= largura do gatilho)
+    // cortava horizontalmente qualquer opção mais larga que o texto atual
+    // do gatilho — "Todos os status" é bem mais curto que "Próximo da
+    // validade" ou "Fora da validade". Corrigido pra `min-width` (cresce
+    // pra caber o conteúdo, nunca menor que o gatilho).
+    await completeSetupWizard(page);
+    await goTo(page, '#/estoque');
+
+    await page.click('.custom-select:has(#status-filter) .custom-select-trigger');
+    await page.waitForTimeout(200);
+
+    const list = page.locator('.custom-select-list.is-open');
+    const overflowsHorizontally = await list.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    expect(overflowsHorizontally).toBe(false);
+
+    const longOption = page.locator('.custom-select-option', { hasText: 'Próximo da validade' });
+    await expect(longOption).toBeVisible();
+    const listBox = await list.boundingBox();
+    const optionBox = await longOption.boundingBox();
+    expect(optionBox.x + optionBox.width).toBeLessThanOrEqual(listBox.x + listBox.width + 1);
+  });
 });
