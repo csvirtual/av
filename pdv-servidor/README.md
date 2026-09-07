@@ -102,11 +102,34 @@ real (isso é a Fase 9).
 
 ## Próximo passo recomendado
 
-Fase 9 (interface real), começando por **uma tela só** como prova — mesmo
-espírito da Fase 1 original ("prova que a arquitetura funciona antes de
-continuar"). Candidata natural: Estoque, por já ter sido a primeira coisa
-provada na Fase 1 aqui do lado do servidor. Precisa de uma camada de dados
-nova no lado do cliente (ex: `data/productsRepo.js` alternativo, falando
-`fetch`/WebSocket em vez de IndexedDB) que a tela real (`views/products.js`)
-consiga usar sem reescrita, validando a promessa de reaproveitamento antes
-de investir nas 20+ telas restantes.
+**Achado de escopo (07/set, checado antes de começar a codar):** a ideia
+original de "uma tela só como prova" (ex: só Estoque) não se sustenta —
+`views/products.js` importa `views/sale.js` (pro fluxo de "código de barras
+desconhecido durante a venda") e vice-versa (`sale.js` chama
+`promptUnknownBarcode` de `products.js`), um import circular real entre as
+duas telas. `sale.js` sozinho já puxa 8 módulos de dados diferentes
+(`productsRepo`, `salesRepo`, `deliveriesRepo`, `auditRepo`, `companyRepo`,
+`cashRepo`, `customersRepo`, e `session.js` pro crédito de troca pendente).
+Ou seja: **Estoque e PDV não são fatiáveis um sem o outro** — o primeiro
+slice real da Fase 9 é maior do que "uma tela", é esse par acoplado mais uns
+8 repositórios reescritos pra falar com o servidor em vez de IndexedDB, e
+um `session.js` novo baseado em cookie de sessão em vez de
+`chrome.storage.session`.
+
+Isso não invalida a arquitetura (a promessa "a tela só fala com a camada de
+dados" continua valendo — nenhuma tela precisa saber IndexedDB vs HTTP) só
+avisa que o primeiro corte de validação é maior que o antecipado. Plano
+revisado pro início da Fase 9:
+1. `session.js` novo (cookie de sessão do servidor em vez de
+   `chrome.storage.session`) — pré-requisito de tudo, todas as telas usam.
+2. Camada de dados nova pros 4 repositórios que `products.js` usa direto
+   (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`) + os 4 a mais
+   que `sale.js` puxa (`salesRepo`, `deliveriesRepo`, `companyRepo`,
+   `cashRepo`, `customersRepo` — 5, não 4).
+3. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
+   mesmo rigor de teste das fases 1-8 (concorrência, dedupe, nada de
+   estoque ficando negativo com duas máquinas vendendo ao mesmo tempo).
+
+Não iniciado ainda — é trabalho de verdade (múltiplas sessões), não um
+ajuste, e mexe com dinheiro/estoque, então merece o mesmo cuidado de teste
+que o resto do projeto sempre teve antes de qualquer linha ir pra produção.
