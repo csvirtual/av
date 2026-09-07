@@ -29,6 +29,21 @@ function closeAll(exceptInstance = null) {
   });
 }
 
+/** Acionado de fora (ver app.js) nos mesmos dois pontos que já chamam
+ * closeAllModals() — bootImpl() e renderCurrentRoute(). Achado de auditoria:
+ * exatamente o mesmo motivo por trás de closeAllModals() (ver components/
+ * modal.js) também vale aqui, e por acidente não tinha sido replicado nesta
+ * refatoração — a lista de um dropdown aberto é reparentada pro `<body>`
+ * (ver enhanceSelect acima), fora de `#root`/`#main-content`, então
+ * `root.innerHTML`/`container.innerHTML` sendo reescritos NÃO a derrubam.
+ * Alcançável de verdade sem nenhum clique no meio do caminho: sessão
+ * expirando por inatividade (session.js) enquanto um filtro ficou aberto —
+ * a lista continuaria flutuando por cima da tela de login até o próximo
+ * clique em qualquer lugar. */
+export function closeAllCustomSelects() {
+  closeAll();
+}
+
 // Um único listener pra vida inteira do app (não por instância) — evita
 // vazar um listener de document a cada troca de tela, já que cada tela
 // recria seus próprios elementos de filtro do zero a cada visita.

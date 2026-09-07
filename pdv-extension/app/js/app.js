@@ -8,6 +8,7 @@ import { getSessionUserId, clearSession, onSessionUserIdChanged, touchActivity, 
 import { logAction } from './data/auditRepo.js';
 import { showToast } from './components/toast.js';
 import { openModal, confirmDialog, closeAllModals } from './components/modal.js';
+import { closeAllCustomSelects } from './components/customSelect.js';
 import { icon } from './components/icon.js';
 import { escapeHtml } from './utils/format.js';
 import { userCan, isAdmin } from './utils/permissions.js';
@@ -116,8 +117,12 @@ async function bootImpl() {
   // ao completar o setup/login, e — o caso mais fácil de reproduzir de
   // verdade — quando outra aba desloga (ver onSessionUserIdChanged mais
   // abaixo): se esta aba tiver um modal aberto no momento, ele ficaria
-  // flutuando por cima da tela de login sem essa chamada.
+  // flutuando por cima da tela de login sem essa chamada. Mesmo raciocínio
+  // pro dropdown de filtro (ver components/customSelect.js): a lista aberta
+  // também é reparentada pro <body>, fora de #root, então sobreviveria do
+  // mesmo jeito sem esta chamada.
   closeAllModals();
+  closeAllCustomSelects();
   // A tela de login pode deixar um intervalo do contador de bloqueio
   // rodando (ver views/login.js) — encerra antes de trocar de tela.
   if (unmountLogin) { unmountLogin(); unmountLogin = null; }
@@ -406,7 +411,11 @@ function renderShell(user, company) {
     // Isso é alcançável de verdade: a extensão abre numa aba cheia, então
     // o usuário tem o histórico do navegador disponível normalmente — dá
     // pra reproduzir com o botão "Voltar" enquanto um modal está aberto.
+    // Mesmo raciocínio pro dropdown de filtro (ver components/customSelect.js
+    // #closeAllCustomSelects) — a lista aberta também é reparentada pro
+    // <body>, fora de #main-content.
     closeAllModals();
+    closeAllCustomSelects();
 
     const freshUser = await getUser(user.id);
     if (!freshUser || !freshUser.active) {
