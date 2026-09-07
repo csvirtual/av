@@ -249,8 +249,10 @@ a { color: var(--primary); }
 
 .btn-sm { padding: 5px 10px; font-size: 13px; }
 
-/* Botão redondo só com ícone — hoje só usado nos atalhos de contato
- * (WhatsApp/e-mail) da tela de trial encerrado (ver app.js). */
+/* Botão redondo só com ícone — usado nos atalhos de contato (WhatsApp/
+ * e-mail), tanto na tela de trial encerrado (app.js) quanto no modal de
+ * escolha do atalho "Solicitar chave" em Dados da loja (ver
+ * components/supportContact.js). */
 .contact-icon-btn {
   width: 46px; height: 46px; border-radius: 50%; border: none; background: transparent;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
@@ -1026,7 +1028,35 @@ tbody tr:hover { background: var(--surface-alt); }
  * isto aqui é só a aparência. Existe porque a lista aberta de um <select>
  * comum, no Linux, é desenhada pelo sistema operacional e ignora o CSS da
  * página (fica sempre branca, mesmo no tema escuro). */
-.custom-select { position: relative; display: inline-flex; }
+.custom-select { position: relative; display: inline-flex; align-items: stretch; gap: 4px; }
+/* Botão "x" que aparece só quando o filtro não está no valor padrão (ver
+ * components/customSelect.js#syncFromSelect) — mesma altura/borda/raio do
+ * gatilho ao lado pra formar um par visual único, só que quadrado e sem
+ * texto, pra não competir com ele. */
+.custom-select-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  padding: 0;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+/* `display:flex` acima empata em especificidade com a regra nativa do
+ * navegador pro atributo `hidden` (as duas são (0,1,0)) — sem isto aqui,
+ * a regra de autor (esta folha de estilo) ganha do UA stylesheet mesmo
+ * empatada, e o botão continuava visível com `hidden` presente. */
+.custom-select-clear[hidden] { display: none; }
+.custom-select-clear:hover { background: var(--danger-light); color: var(--danger); border-color: var(--danger); }
+.custom-select-clear:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
 .custom-select-trigger {
   display: flex;
   align-items: center;
@@ -1049,11 +1079,12 @@ tbody tr:hover { background: var(--surface-alt); }
 }
 .custom-select-trigger .cs-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform 0.15s ease; }
 .custom-select.is-open .custom-select-trigger .cs-chevron { transform: rotate(180deg); }
+/* position:fixed, não absolute — a posição real (top/left/width) é
+ * calculada em JS na abertura (ver components/customSelect.js#position),
+ * porque a lista é reparentada pro <body> nesse momento, fugindo do
+ * overflow de `.main` (ver comentário no JS pro porquê). */
 .custom-select-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 100%;
+  position: fixed;
   max-height: 260px;
   overflow-y: auto;
   background: var(--surface);
@@ -1064,7 +1095,7 @@ tbody tr:hover { background: var(--surface-alt); }
   z-index: 40;
   display: none;
 }
-.custom-select.is-open .custom-select-list { display: block; }
+.custom-select-list.is-open { display: block; }
 .custom-select-option {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
@@ -1125,6 +1156,34 @@ tbody tr:hover { background: var(--surface-alt); }
 }
 .modal h2 { margin: 0; padding: 24px 26px 18px; font-size: 18px; flex-shrink: 0; }
 .modal-body { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding: 0 26px; }
+
+/* Aviso de "abriu o caixa, redirecionando pro PDV" (ver
+ * views/caixa.js#showRedirectToPdvNotice) — a barra nasce cheia e
+ * transiciona pra 0%, sincronizada com o número da contagem regressiva ao
+ * lado (os dois contam a mesma coisa, de dois jeitos: um exato/textual,
+ * outro contínuo/visual). Achado de auditoria: a duração da transição
+ * ficava fixa AQUI (5000ms), independente de TOTAL_SECONDS em caixa.js —
+ * quando TOTAL_SECONDS mudou pra 7 sem atualizar isto aqui junto, a barra
+ * passou a zerar visualmente aos 5s enquanto o número ainda contava até
+ * 7s. Corrigido pra nunca mais dessincronizar: a duração agora vem só do
+ * JS (fill.style.transitionDuration, calculada a partir do próprio
+ * TOTAL_SECONDS), não mais duplicada aqui — só a propriedade/curva ficam
+ * no CSS. */
+.redirect-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+.redirect-progress-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition-property: width;
+  transition-timing-function: linear;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 26px 24px; margin: 0; flex-shrink: 0; }
 /* Achado de auditoria: `wide: true` (openModal, ver components/modal.js) só
  * tinha efeito no breakpoint mobile (max-width:640px, mais abaixo) — no

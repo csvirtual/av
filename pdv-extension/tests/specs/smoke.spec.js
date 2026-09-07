@@ -13,7 +13,7 @@ test('setup do zero, login e navegação pelas telas principais', async ({ appPa
   // confirma que renderizou algo, sem travar em qual tela é.
   await expect(page.locator('#root')).not.toBeEmpty();
 
-  const screens = ['#/dashboard', '#/estoque', '#/venda', '#/clientes', '#/carreto', '#/caixa', '#/relatorios'];
+  const screens = ['#/dashboard', '#/estoque', '#/venda', '#/clientes', '#/carreto', '#/caixa', '#/relatorios', '#/ajuda'];
   for (const hash of screens) {
     await goTo(page, hash);
     // Cada tela deve renderizar algo visível no root, sem tela em branco.

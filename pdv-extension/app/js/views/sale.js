@@ -190,7 +190,7 @@ export async function renderSale(container, ctx) {
         <div id="credit-banner"></div>
 
         <p class="section-title" style="margin-top:16px;text-transform:uppercase;letter-spacing:0.3px;">
-          Cliente <span class="text-muted" style="font-weight:400;">(opcional — obrigatório pra vender fiado)</span>
+          Cliente <span class="text-muted" style="font-weight:400;">(opcional — obrigatório pra venda + carreto ou fiado)</span>
         </p>
         <div id="customer-box"></div>
         <div id="held-sales-box"></div>

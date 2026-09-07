@@ -186,6 +186,9 @@ export async function renderFinanceiro(container, ctx) {
       submitLabel: 'Confirmar',
       bodyHtml: `
         <div id="modal-error"></div>
+        ${entry.notes ? `
+          <div class="notice"><strong>Observações:</strong> ${escapeHtml(entry.notes)}</div>
+        ` : ''}
         ${already > 0.001 ? `
           <div class="notice">Já foram pagos ${formatMoney(already)} de ${formatMoney(entry.amount)}. Restam ${formatMoney(remaining)}.</div>
         ` : ''}
@@ -193,7 +196,7 @@ export async function renderFinanceiro(container, ctx) {
           <div class="field">
             <label>Valor pago agora *</label>
             <input id="f-amount" type="number" min="0.01" max="${remaining.toFixed(2)}" step="0.01" value="${remaining.toFixed(2)}">
-            <span class="hint">Pode ser menor que o restante — a conta fica "Pago parcialmente" até o valor bater.</span>
+            <span class="hint">Aceita pagamento parcial.</span>
           </div>
           <div class="field">
             <label>Forma de pagamento</label>
@@ -350,7 +353,15 @@ export async function renderFinanceiro(container, ctx) {
           await logAction({
             userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
             action: 'Cadastro de conta financeira',
-            details: `Conta "${entry.description}" (${entry.type === 'pagar' ? 'a pagar' : 'a receber'}, ${formatMoney(entry.amount)}, venc. ${formatDate(entry.dueDate)}) cadastrada.`,
+            // Achado do usuário: a observação era salva (ver
+            // data/financeRepo.js#createEntry) mas não aparecia em NENHUMA
+            // tela nem no log — o único jeito de recuperar o que foi
+            // escrito ali era abrindo o IndexedDB manualmente. O log é o
+            // registro permanente da conta (a tela em si só mostra o
+            // estado atual), então é aqui que a observação precisa ficar
+            // gravada de forma legível pra sempre, não só no banco.
+            details: `Conta "${entry.description}" (${entry.type === 'pagar' ? 'a pagar' : 'a receber'}, ${formatMoney(entry.amount)}, venc. ${formatDate(entry.dueDate)}) cadastrada.`
+              + (entry.notes ? ` Observações: "${entry.notes}".` : ''),
             entity: 'financialEntry', entityId: entry.id,
           });
           showToast('Conta cadastrada.', 'success');

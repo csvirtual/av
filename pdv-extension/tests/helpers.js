@@ -141,4 +141,16 @@ async function makeSimpleSale(page, productName) {
   });
 }
 
-module.exports = { completeSetupWizard, login, logout, goTo, seedProduct, seedCustomer, addProductToCart, makeSimpleSale, DEFAULT_ADMIN };
+/** Liga a política "loja exige caixa aberto pra vender" — reenvia o
+ * cadastro da loja inteiro (mesmo padrão que views/company.js segue,
+ * ver data/companyRepo.js#saveCompany: só `policies` faz merge parcial,
+ * o resto do registro precisa vir completo em toda chamada). */
+async function enableRequireOpenCashSession(page) {
+  await page.evaluate(async () => {
+    const { getCompany, saveCompany } = await import('./js/data/companyRepo.js');
+    const company = await getCompany();
+    await saveCompany({ ...company, policies: { ...company.policies, requireOpenCashSession: true } });
+  });
+}
+
+module.exports = { completeSetupWizard, login, logout, goTo, seedProduct, seedCustomer, addProductToCart, makeSimpleSale, enableRequireOpenCashSession, DEFAULT_ADMIN };

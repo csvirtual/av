@@ -288,6 +288,9 @@ const TOPICS = [
       <h3>Listas grandes (Estoque, Clientes, Caixa, Carreto, Compras, Financeiro)</h3>
       <p>Embaixo dessas listas tem uma barra de paginação: escolha quantos itens mostrar por vez em <strong>Mostrar</strong> (10, 25, 50, 75 ou 100 — o padrão é 10) e navegue entre as páginas com <strong>Anterior</strong>/<strong>Próxima</strong>, ou clicando direto no número de uma página. Trocar o "Mostrar" sempre volta pra primeira página.</p>
       <p class="text-muted" style="font-size:12.5px;">Histórico de vendas e Log do sistema funcionam diferente — veja "Carregar mais" no tópico "Histórico e log".</p>
+
+      <h3>Filtros no topo das telas de lista</h3>
+      <p>Assim que você escolhe qualquer valor diferente do padrão (ex: "Disponível" no lugar de "Todos os status"), aparece um <strong>x</strong> ao lado do filtro — clique nele pra voltar direto ao padrão, sem precisar abrir a lista de novo e catar a primeira opção manualmente. Vale pra todo filtro do sistema (Estoque, Financeiro, Carreto, Histórico de vendas, Log do sistema, Relatórios).</p>
     `,
   },
   {
@@ -306,6 +309,7 @@ const TOPICS = [
 
       <h3>Onde colar a chave</h3>
       <p>Se o teste encerrou, a própria tela de bloqueio tem um campo pra colar a chave, embaixo dos botões de contato. Se ainda estiver dentro do período de teste e já tiver recebido a chave, não precisa esperar — vá em <strong>Dados da loja → Ativação</strong>, no menu lateral, e cole lá a qualquer momento.</p>
+      <p>Não precisa esperar o teste acabar pra pedir a chave, também: o botão <strong>Solicitar chave</strong>, ao lado de "Ativar" na mesma tela de Ativação, abre o mesmo modal de contato (WhatsApp ou e-mail, já com o nome da loja e o CNPJ preenchidos) a qualquer momento — antes ele só existia na tela de bloqueio, quando o teste já tinha encerrado.</p>
       <p>Existem dois tipos de chave: uma <strong>demo</strong>, que estende o uso por um período combinado, e uma <strong>definitiva</strong>, que não expira. Depois de ativar com a definitiva, a tela de "Ativação" mostra "Definitiva — ativada" e o assunto não aparece mais.</p>
 
       <div class="tip"><strong>Errou o CNPJ no cadastro?</strong> Por segurança, o campo de CNPJ não pode ser editado sozinho depois de salvo (veja o aviso ao lado do campo, em Dados da loja). Se precisar corrigir, envie um e-mail para <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a> pedindo um código de liberação — ele destrava o campo uma única vez, só pra você corrigir.</div>
@@ -609,6 +613,7 @@ ${escapeHtml(linhaEncarregado)}</div>
 
       <h3>Caixa obrigatório (opcional, configurável)</h3>
       <p>O administrador pode ligar, em <strong>Dados da loja → Políticas de venda</strong>, a opção "Exigir caixa aberto para registrar vendas". Ligada essa opção, ninguém consegue finalizar uma venda sem abrir o caixa primeiro.</p>
+      <p>Com a política ligada, abrir o caixa mostra um aviso avisando que vai redirecionar pro PDV em alguns segundos, com contagem regressiva — o próximo lugar pra onde todo mundo vai de qualquer jeito. Quem não quer esperar clica em <strong>Ir agora</strong>; quem só abriu o caixa pra conferir o troco inicial antes de vender clica em <strong>Ficar aqui</strong> (ou aperta Esc, ou clica fora do aviso) pra cancelar o redirecionamento e continuar na tela de Caixa.</p>
 
       <div class="tip"><strong>Fiado não conta como dinheiro no caixa</strong> — uma venda fiada não entra na conferência, porque é uma promessa de pagamento, não dinheiro na gaveta. Só quando o cliente vem pagar o fiado (veja o tópico "Clientes e fiado") é que o valor entra no caixa, na hora do pagamento.</div>
 
@@ -714,6 +719,7 @@ ${escapeHtml(linhaEncarregado)}</div>
 
       <h3>Contas a pagar e a receber</h3>
       <p>Em <strong>Financeiro → + Nova conta</strong> (exige a permissão "Acessar Financeiro"), cadastre uma conta com descrição, valor e vencimento. Uma conta pendente vira <span class="badge badge-red">Vencida</span> sozinha quando passa da data — não precisa fazer nada pra isso acontecer.</p>
+      <p>O campo <strong>Observações</strong> é opcional e, uma vez preenchido, aparece no modal de <strong>Registrar pagamento</strong> dessa conta e fica registrado no log de auditoria no momento do cadastro — útil pra anotar um acordo de parcelamento, um combinado com o fornecedor, ou qualquer detalhe que não caiba na descrição curta.</p>
       <p>Quando alguém pagar (ou você receber), clique em <strong>Registrar pagamento</strong> e informe o valor e a forma de pagamento. O valor <strong>pode ser menor</strong> que o total da conta — nesse caso ela ganha a etiqueta <span class="badge badge-gold">Pago parcialmente</span>, com o quanto ainda falta em destaque, e continua contando no resumo de "a pagar/a receber" pelo saldo restante (nunca pelo valor cheio, que já daria a entender que nada foi pago). Volte quantas vezes precisar em <strong>Concluir pagamento</strong> pra ir registrando o resto — a conta só vira <span class="badge badge-green">Pago</span> de verdade quando a soma bater com o total.</p>
       <p>O botão <strong>Ver pagamentos</strong> mostra o histórico completo de uma conta (data, valor, forma, quem registrou) e permite <strong>excluir</strong> um pagamento lançado por engano — o valor volta sozinho pro saldo em aberto, e uma conta já "Pago" pode voltar a ficar parcial ou pendente se isso acontecer. Acesso a Financeiro já é restrito a quem tem a permissão, então essa correção não passa por mais burocracia — mas fica registrada no log de auditoria, com quem excluiu e o quê.</p>
       <div class="tip"><strong>Atenção:</strong> registrar um pagamento aqui não mexe automaticamente no caixa — são controles independentes nesta versão. Se o pagamento saiu/entrou em espécie da gaveta, registre a sangria ou suprimento correspondente na tela Caixa também.</div>
