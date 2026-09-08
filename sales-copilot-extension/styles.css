@@ -1,0 +1,787 @@
+/* Fraunces (títulos) e Manrope (corpo) — as mesmas fontes de sempre, mas
+ * agora EMBUTIDAS no pacote da extensão em vez de um @import pra
+ * fonts.googleapis.com. O @import antigo fazia uma chamada de rede real
+ * pra um domínio de terceiro toda vez que qualquer página da extensão
+ * abria, sem estar declarada em host_permissions (manifest.json) nem
+ * mencionada no aviso de privacidade das telas ("fica só no seu
+ * computador... não vai pra nenhum servidor", ver options.html) — foi
+ * removida numa auditoria anterior, mas isso trocou a tipografia real por
+ * serif/sans-serif do sistema, o que não devia ter sido o resultado final.
+ * A correção certa é esta: os dois arquivos .woff2 abaixo (só o subconjunto
+ * "latin" — cobre acentuação do português inteira, ex. ã/ç/é/õ — sem os
+ * subconjuntos cirílico/grego/vietnamita que o Google manda por padrão)
+ * ficam em fonts/, dentro do próprio pacote da extensão. Cada um é uma
+ * fonte VARIÁVEL (Fraunces cobre peso 400-700 + eixo de tamanho óptico
+ * inteiro; Manrope cobre peso 400-800) num arquivo só — mesma faixa de
+ * pesos que o @import antigo pedia, ~90KB no total. Caminho local (não
+ * chrome-extension://...): CSS de uma página da extensão carregando um
+ * recurso da própria extensão por caminho relativo não precisa de
+ * web_accessible_resources no manifest — isso só é exigido quando uma
+ * PÁGINA WEB comum (fora da extensão) tenta carregar o recurso. */
+@font-face{
+  font-family:'Fraunces';
+  font-style:normal;
+  font-weight:400 700;
+  font-display:swap;
+  src:url('fonts/fraunces-variable-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{
+  font-family:'Manrope';
+  font-style:normal;
+  font-weight:400 800;
+  font-display:swap;
+  src:url('fonts/manrope-variable-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root{
+  --ink:#132420;
+  --paper:#F4F7F5;
+  --panel:#FFFFFF;
+  --teal:#0F5C52;
+  --teal-dark:#0A423B;
+  --purple:#7C3AA8;
+  --purple-soft:#EEE0F5;
+  --line:#DCE5E1;
+  --muted:#5E6F6A;
+  --radius:14px;
+
+  /* ---------- Padrão de espaçamento: título/subtítulo/descrição ----------
+   * Duas medidas só, usadas em QUALQUER card/modal/seção que tenha um
+   * cabeçalho (título, com ou sem subtítulo/descrição) seguido de conteúdo
+   * de verdade (campos, lista, grade, botões):
+   *   --gap-titulo-subtitulo: entre um título e o subtítulo/descrição
+   *     logo abaixo dele (mesmo bloco de cabeçalho — pareamento próximo,
+   *     de propósito).
+   *   --gap-cabecalho-conteudo: entre o FIM do cabeçalho (o subtítulo/
+   *     descrição, ou o próprio título quando não há subtítulo) e o
+   *     conteúdo real da seção que vem em seguida — nunca menos que isso,
+   *     em nenhum lugar do projeto.
+   * Definidas uma vez aqui porque panel.html e options.html carregam este
+   * arquivo antes dos próprios <style> internos — variáveis de :root valem
+   * pro documento inteiro, não só pra quem as declarou.
+   */
+  --gap-titulo-subtitulo: 6px;
+  --gap-cabecalho-conteudo: 20px;
+  /* Entre o FIM de uma seção inteira (ex.: a lista de "Gerenciar perfis") e
+   * o TÍTULO da próxima seção dentro do mesmo modal/card — maior que
+   * --gap-cabecalho-conteudo de propósito, porque aqui são duas seções
+   * diferentes se separando, não um cabeçalho do próprio conteúdo dele. */
+  --gap-entre-secoes: 26px;
+
+  /* ---------- Escala de arredondamento (border-radius) ----------
+   * O projeto tinha um valor de raio quase pra cada componente (5, 6, 7, 9,
+   * 11, 13, 14px...) sem nenhum padrão — cada um "parecido" com o vizinho,
+   * mas nunca igual. Cinco degraus só, do menor pro maior (o antigo
+   * --radius, 14px, continua à parte — já era um token único reaproveitado
+   * em 2 lugares, não uma inconsistência). 50% (círculo) e 999px (pílula)
+   * continuam literais, por serem casos especiais, não parte da escala.
+   */
+  --radius-xs:6px;   /* chips pequenos, ícones-badge, tags inline */
+  --radius-sm:8px;   /* inputs, botões compactos */
+  --radius-md:10px;  /* botão padrão — degrau mais usado no projeto */
+  --radius-lg:12px;  /* ícones de seção maiores, clusters de ações */
+  --radius-xl:16px;  /* tiles selecionáveis, cards/modais maiores */
+}
+html{scroll-behavior:smooth;}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Manrope', sans-serif;
+}
+h1,h2{font-family:'Fraunces', serif; font-weight:600; font-optical-sizing:auto; margin:0 0 8px 0;}
+.brand{
+  font-family:'Fraunces', serif;
+  font-size:20px;
+  font-weight:600;
+}
+.brand span{color:var(--purple);}
+.card{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px;
+  margin-bottom:16px;
+  scroll-margin-top:20px; /* espaço acima ao pular direto pra um card via âncora (ver .settings-nav em options.html) */
+}
+label{
+  font-size:11.5px;
+  font-weight:700;
+  color:var(--teal-dark);
+  display:block;
+  margin-bottom:4px;
+  text-transform:uppercase;
+  letter-spacing:.02em;
+}
+.field{margin-bottom:12px;}
+input[type=text], input[type=email], input[type=password], input[type=date], textarea, select{
+  width:100%;
+  padding:9px 10px;
+  border-radius:var(--radius-md);
+  border:1px solid var(--line);
+  font-family:'Manrope',sans-serif;
+  font-size:13.5px;
+  background:#fff;
+  color:var(--ink);
+}
+textarea{resize:vertical; min-height:90px; line-height:1.45;}
+.btn{
+  background:var(--teal);
+  color:#fff;
+  border:none;
+  padding:10px 16px;
+  border-radius:10px;
+  font-weight:700;
+  font-size:13.5px;
+  cursor:pointer;
+  font-family:'Manrope',sans-serif;
+}
+.btn:hover{background:var(--teal-dark);}
+.btn:disabled{opacity:.55; cursor:default;}
+.btn.secondary{
+  background:transparent;
+  color:var(--teal-dark);
+  border:1px solid var(--teal);
+}
+.btn.danger{
+  background:transparent;
+  color:var(--purple);
+  border:1px solid var(--purple-soft);
+  font-size:12px;
+  padding:6px 10px;
+}
+.btn.purple{background:var(--purple);}
+.btn.purple:hover{background:#5F2C82;}
+.hint{font-size:11.5px; color:var(--muted); margin-top:6px;}
+/* Aviso de campo de chave de API bloqueado por ter vindo cifrado com o DEK
+   de OUTRO perfil/instalação (ex.: backup restaurado de outro lugar) — ver
+   preencherCampoChaveApi/liberarCampoChaveApi em options.js. O botão dentro
+   dele libera o campo pra digitar uma chave nova, substituindo a antiga
+   (inacessível de qualquer forma) ao salvar. */
+.chave-api-bloqueada-aviso{
+  margin-top:6px; padding:8px 10px; border-radius:8px;
+  background:#FBF3E7; border:1px solid #F0DBB8;
+  font-size:11.5px; color:#8a6100; line-height:1.5;
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+}
+.chave-api-liberar-btn{
+  background:none; border:1px solid #8a6100; color:#8a6100; border-radius:6px;
+  padding:3px 8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap;
+}
+.chave-api-liberar-btn:hover{ background:#8a6100; color:#fff; }
+.chip{
+  display:inline-block;
+  font-size:11px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:var(--purple-soft);
+  color:var(--purple);
+  font-weight:700;
+  margin:2px 4px 2px 0;
+}
+.chip.teal{background:#DCEEE9; color:var(--teal-dark);}
+.disclaimer{
+  font-size:11px;
+  color:var(--muted);
+  background:#F0EEE7;
+  border-radius:var(--radius-md);
+  padding:9px 11px;
+  margin-top:16px;
+  margin-bottom:16px;
+  line-height:1.5;
+}
+.toast{
+  position:fixed;
+  bottom:16px; right:16px;
+  background:var(--ink);
+  color:#fff;
+  padding:10px 14px;
+  border-radius:var(--radius-md);
+  font-size:12.5px;
+  opacity:0;
+  transform:translateY(8px);
+  transition:.25s;
+  pointer-events:none;
+  /* Sempre acima de QUALQUER overlay da tela (maior já usado é 3000, no
+     modal de revelação da palavra-chave) — o toast costuma ser a única
+     confirmação de ações feitas com um modal ainda aberto (excluir perfil
+     em Gerenciar perfis, zerar uso em Billing, copiar a palavra-chave),
+     então nunca pode renderizar escondido atrás do fundo escurecido. */
+  z-index:4000;
+}
+.toast.show{opacity:1; transform:translateY(0);}
+
+/* BACK TO TOP + CHAT FLUTUANTE (C&S - BOT) — mesmo botão base, os dois lado
+   a lado no canto inferior direito (chat 78px da borda, voltar-ao-topo
+   20px — 46px de largura + 12px de vão entre eles). Ambos escondidos no
+   topo da página, aparecem ao rolar pra baixo (classe .show, alternada
+   junto nos dois por backtotop.js).
+   O ÍCONE de cada um é SVG inline (ver o <svg> dentro do botão, em
+   panel.html/backtotop.js), não emoji nem caractere de texto — um emoji
+   (💬) ou glifo de fonte (↑) rendeiriza diferente dependendo do sistema
+   operacional/fonte instalada (às vezes até sem cor nenhuma), então o
+   contorno preto sobre preenchimento branco que os dois têm não ficava
+   consistente entre telas. Um SVG próprio é sempre o mesmo traço, em
+   qualquer lugar — por isso o botão em si não precisa mais de nenhuma
+   propriedade de texto (font-size, text-stroke etc.), só o SVG dentro dele. */
+.back-to-top, .chat-float-btn{
+  position:fixed; bottom:20px; z-index:500;
+  width:46px; height:46px; border-radius:50%; border:none;
+  background:linear-gradient(135deg, var(--purple), #5F2C82);
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(124,58,168,.35);
+  opacity:0; transform:translateY(10px); pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease, box-shadow .15s ease;
+}
+.back-to-top{ right:20px; }
+.chat-float-btn{ right:78px; }
+.back-to-top.show, .chat-float-btn.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+.back-to-top:hover, .chat-float-btn:hover{ box-shadow:0 6px 18px rgba(124,58,168,.45); transform:translateY(-2px); }
+.back-to-top:active, .chat-float-btn:active{ transform:translateY(0); }
+body.modal-open .back-to-top, body.modal-open .chat-float-btn{ opacity:0; pointer-events:none; }
+
+/* MODAL DO CHAT */
+.chat-modal-dialog{ display:flex; flex-direction:column; max-height:78vh; }
+.chat-context-bar{
+  padding:6px 20px; font-size:12px; color:var(--muted); border-bottom:1px solid #eee;
+  display:none;
+}
+.chat-context-bar.show{ display:block; }
+.chat-estagio-row{
+  display:flex; align-items:center; gap:8px; padding:6px 20px;
+  font-size:12px; color:var(--muted); border-bottom:1px solid #eee;
+}
+.chat-estagio-row label{ white-space:nowrap; }
+.chat-estagio-row select{
+  flex:1; font-size:12px; padding:4px 6px; border:1px solid #ddd; border-radius:6px;
+  font-family:'Manrope', sans-serif; color:var(--ink); background:#fff;
+}
+.chat-estagio-row select:focus{ outline:none; border-color:var(--purple); }
+.chat-messages{
+  flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px;
+  min-height:220px;
+}
+.chat-msg{
+  max-width:82%; padding:9px 13px; border-radius:12px; font-size:13.5px; line-height:1.45;
+  white-space:pre-wrap; word-break:break-word;
+}
+.chat-msg.user{ align-self:flex-end; background:var(--purple); color:#fff; border-bottom-right-radius:3px; }
+.chat-msg.ai{ align-self:flex-start; background:#f1eef7; color:var(--ink); border-bottom-left-radius:3px; }
+.chat-msg.ai.error{ background:#fdecea; color:#8a1f11; }
+.chat-msg.loading{ align-self:flex-start; color:var(--muted); font-style:italic; }
+/* Tipografia da resposta direta do guia "Como usar"/"Privacidade" (HTML
+   formatado, ver renderMensagem/opts.html e serializarHtmlSeguroAjuda em
+   chatbot.js) — o resto do chat (mensagem digitada, resposta da IA, erro)
+   continua texto puro e não usa nada disto. */
+.chat-msg.ai p{ margin:0 0 8px; }
+.chat-msg.ai p:last-child{ margin-bottom:0; }
+.chat-msg.ai ul, .chat-msg.ai ol{ margin:4px 0 8px; padding-left:20px; }
+.chat-msg.ai ul:last-child, .chat-msg.ai ol:last-child{ margin-bottom:0; }
+.chat-msg.ai li{ margin-bottom:4px; }
+.chat-msg.ai li:last-child{ margin-bottom:0; }
+.chat-msg.ai b, .chat-msg.ai strong{ font-weight:700; }
+.chat-msg.ai code{ background:rgba(0,0,0,.07); padding:1px 4px; border-radius:4px; font-size:12px; }
+.chat-input-row{
+  /* center, não flex-end: o botão de enviar fica sempre no centro vertical
+     da caixa de digitar, cresça ela o quanto crescer (ver .chat-input
+     abaixo e o auto-grow em chatbot.js). */
+  display:flex; gap:8px; padding:12px 16px; border-top:1px solid #eee; align-items:center;
+}
+.chat-input{
+  flex:1; resize:none; max-height:110px; border:1px solid #ddd; border-radius:10px;
+  padding:9px 12px; font-family:'Manrope', sans-serif; font-size:13.5px; line-height:1.4;
+  /* Sobrescreve o min-height:90px do seletor genérico "textarea" (styles.css,
+     bem mais acima) — aqui é pra começar compacta, de uma linha só, e
+     crescer sozinha ao digitar (ver o listener de 'input' em chatbot.js);
+     sem isto, a caixa nascia bem mais alta que o botão de enviar ao lado,
+     e os dois ficavam com centros bem diferentes, mesmo com align-items
+     certo. */
+  min-height:0;
+}
+.chat-input:focus{ outline:none; border-color:var(--purple); }
+.chat-input-row .btn{ flex-shrink:0; }
+.chat-copy-btn{
+  align-self:flex-start; margin-top:4px; font-size:11px; background:none; border:none;
+  color:var(--purple); cursor:pointer; padding:0; text-decoration:underline;
+}
+/* Duas .chat-copy-btn lado a lado (ver mostrarAvisoSemChave, chatbot.js:
+   "Ir agora"/"Permanecer nesta página") — sem isto, dois <button> seguidos
+   sem nenhum espaço em branco entre eles no DOM colam um no outro. O
+   margin-top que separa da mensagem acima migra pro wrapper (senão ficaria
+   dobrado, um de cada botão, empurrando a linha pra baixo à toa). */
+.chat-msg-botoes{ display:flex; gap:14px; margin-top:4px; align-self:flex-start; }
+.chat-msg-botoes .chat-copy-btn{ margin-top:0; }
+/* Legenda de qual chave/modelo respondeu (ver labelRoteamentoIA, panel.js). */
+.chat-roteamento-info{
+  align-self:flex-start; margin-top:2px; font-size:10.5px; color:var(--muted);
+}
+
+/* Cada resultado de "/find" (ver montarResultadoFindHtml, chatbot.js) — um
+   cartão por trecho encontrado, reaproveitando .hist-block/.hist-tag/
+   .hist-text (definidas em panel.html, já usadas na lista do "Histórico do
+   Bot" na tela principal) por dentro, só com uma borda própria pra separar
+   visualmente um resultado do outro dentro da mesma bolha do chat. */
+.chat-find-item{
+  border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  margin:8px 0; background:#fff;
+}
+.chat-find-item:last-child{ margin-bottom:0; }
+.chat-find-item .hist-date{ margin-bottom:4px; }
+.chat-find-item .chat-copy-btn{ display:block; margin-top:8px; }
+.chat-find-item .chat-copy-btn:disabled{ opacity:.55; cursor:default; text-decoration:none; }
+
+/* ÁREA RESTRITA - tela de usuário/senha (usada no modal Avançado e na página de Configurações) */
+.avancado-lock{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  padding:34px 18px 26px;
+}
+.avancado-lock-icon{
+  width:56px; height:56px; border-radius:50%;
+  background:linear-gradient(135deg, var(--purple), #5F2C82);
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; margin-bottom:16px;
+  box-shadow:0 6px 18px rgba(124,58,168,.35);
+}
+.avancado-lock-title{ font-size:16px; font-weight:800; color:var(--ink); margin-bottom:var(--gap-titulo-subtitulo); }
+.avancado-lock-sub{ font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:var(--gap-cabecalho-conteudo); max-width:320px; }
+/* text-align:left (não center) de propósito: o campo de senha reserva
+   padding-right pro botão de mostrar/ocultar (👁), então um texto centralizado
+   calcularia o centro sobre uma caixa assimétrica e ficaria visualmente torto
+   em relação ao campo de usuário logo acima, que não tem esse padding extra. */
+.avancado-lock-input{
+  width:100%; max-width:280px; text-align:left; letter-spacing:.06em;
+  padding:12px 14px; border-radius:10px; border:1.5px solid var(--line);
+  font-size:14px; font-family:'Manrope',sans-serif; background:var(--paper);
+  transition:border-color .15s, box-shadow .15s;
+}
+.avancado-lock-input:focus{
+  outline:none; border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft);
+  background:var(--panel);
+}
+.avancado-lock-btn{ width:100%; max-width:280px; margin-top:12px; }
+.avancado-lock-error{
+  color:#B3261E; font-size:12px; font-weight:700; margin-top:12px;
+}
+.avancado-lock-legal{
+  font-size:10.5px; color:var(--muted); line-height:1.5;
+  margin-top:24px; padding-top:16px; border-top:1px solid var(--line);
+  max-width:300px;
+}
+.avancado-lock.shake{ animation:avancadoShake .35s; }
+
+@keyframes avancadoShake{
+  10%,90%{ transform:translateX(-1px); }
+  20%,80%{ transform:translateX(2px); }
+  30%,50%,70%{ transform:translateX(-4px); }
+  40%,60%{ transform:translateX(4px); }
+}
+
+/* Aviso de LGPD dentro do modal "Privacidade e proteção de dados" — a
+   primeira coisa visível ao abrir o modal, de propósito (antes até do
+   resumo introdutório), em vez de um parágrafo perdido no meio do texto. */
+.privacidade-lgpd-destaque{
+  display:flex; align-items:flex-start; gap:10px;
+  background:var(--purple-soft); border:1px solid var(--purple);
+  border-radius:var(--radius-md); padding:14px 16px;
+  margin-bottom:20px;
+  font-size:13px; font-weight:700; color:var(--purple); line-height:1.5;
+}
+
+/* Tela cheia (usada na página de Configurações) */
+.avancado-lock-fullscreen{
+  position:fixed; inset:0; z-index:2000;
+  background:var(--paper);
+  display:flex; align-items:center; justify-content:center;
+}
+.avancado-lock-fullscreen .avancado-lock{
+  background:var(--panel); border-radius:16px; padding:44px 34px 34px;
+  box-shadow:0 20px 60px rgba(0,0,0,.15); border:1px solid var(--line);
+  max-width:360px; width:100%;
+}
+
+/* Faixa "modo administrador" — aparece no painel e em Configurações quando o
+   administrador geral está dentro do perfil de outro profissional, editando
+   os dados dele (ver perfis.js / copilotoSessaoEhAdmin). Compartilhada entre
+   panel.html e options.html. */
+.admin-impersonando-faixa{
+  display:none; align-items:center; gap:10px; background:linear-gradient(90deg, #3A2E12, #4A3814);
+  border:1px solid #C9862F; color:#F3D9A6; font-size:12.5px; font-weight:600;
+  padding:10px 16px; border-radius:12px; margin-bottom:18px;
+}
+.admin-impersonando-faixa.show{ display:flex; }
+.admin-impersonando-faixa .voltar-btn{
+  margin-left:auto; background:rgba(255,255,255,.12); border:none; color:#fff;
+  font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:var(--radius-sm); cursor:pointer;
+  font-family:'Manrope', sans-serif; flex-shrink:0;
+}
+.admin-impersonando-faixa .voltar-btn:hover{ background:rgba(255,255,255,.22); }
+
+/* Aviso de segurança: instalação ainda usando a credencial padrão de
+   fábrica da Área restrita (mesma senha embutida em toda cópia desta
+   extensão) — mesmo padrão visual da faixa de admin impersonando acima,
+   só que em tom de alerta (vermelho) em vez de dourado. Só visível pro
+   administrador geral. */
+.credenciais-padrao-faixa{
+  display:none; align-items:center; gap:10px; background:linear-gradient(90deg, #4A1414, #5A1A1A);
+  border:1px solid #D14343; color:#F6C6C6; font-size:12.5px; font-weight:600;
+  padding:10px 16px; border-radius:12px; margin-bottom:18px;
+}
+.credenciais-padrao-faixa.show{ display:flex; }
+.credenciais-padrao-faixa .resolver-btn{
+  margin-left:auto; background:rgba(255,255,255,.12); border:none; color:#fff;
+  font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:var(--radius-sm); cursor:pointer;
+  font-family:'Manrope', sans-serif; flex-shrink:0;
+}
+.credenciais-padrao-faixa .resolver-btn:hover{ background:rgba(255,255,255,.22); }
+
+/* Revelação da palavra-chave do administrador (compartilhada entre panel.html
+   e options.html — gerada na criação do admin, na troca normal de senha e na
+   recuperação). Fica por cima de tudo, inclusive de outros modais. */
+.palavra-chave-overlay{
+  position:fixed; inset:0; z-index:3000;
+  background:rgba(19,36,32,.55);
+  display:none; align-items:center; justify-content:center;
+  padding:24px;
+}
+.palavra-chave-overlay.show{ display:flex; }
+.palavra-chave-card{
+  background:var(--panel); border-radius:var(--radius-xl); padding:32px 30px;
+  box-shadow:0 24px 64px rgba(0,0,0,.35); max-width:380px; width:100%;
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+}
+.palavra-chave-icone{
+  width:52px; height:52px; border-radius:50%; background:var(--purple-soft); color:var(--purple);
+  display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:14px;
+}
+.palavra-chave-titulo{ font-size:17px; margin-bottom:var(--gap-titulo-subtitulo); }
+.palavra-chave-sub{ font-size:12.5px; color:var(--muted); line-height:1.6; margin-bottom:var(--gap-cabecalho-conteudo); }
+.palavra-chave-codigo{
+  font-family:'Manrope', monospace; font-size:20px; font-weight:800; letter-spacing:.06em;
+  color:var(--ink); background:var(--paper); border:1.5px dashed var(--purple);
+  border-radius:10px; padding:14px 12px; width:100%; margin-bottom:14px;
+}
+.palavra-chave-confirma{
+  display:flex; gap:10px; align-items:flex-start; cursor:pointer;
+  font-size:12px; color:var(--ink); line-height:1.5; text-align:left;
+  background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  padding:12px 14px; margin:14px 0 16px; width:100%;
+}
+.palavra-chave-confirma input[type=checkbox]{
+  margin-top:2px; flex-shrink:0; width:16px; height:16px; accent-color:var(--purple); cursor:pointer;
+}
+
+/* Credencial inicial da instalação — modal BLOQUEANTE (ver
+   copilotoAbrirModalCredencialInicial em auth.js). Fica acima do modal da
+   palavra-chave (3000) e abaixo do toast (4000), que precisa aparecer por
+   cima pra confirmar o "Copiado". Não tem X, não fecha no Esc nem no
+   clique fora: a única saída é copiar e confirmar. */
+.cred-inicial-overlay{
+  position:fixed; inset:0; z-index:3500;
+  background:rgba(19,36,32,.72);
+  backdrop-filter:blur(3px);
+  display:none; align-items:center; justify-content:center;
+  padding:24px;
+}
+.cred-inicial-overlay.show{ display:flex; animation:credInicialFundo .18s ease-out; }
+body.cred-inicial-aberto{ overflow:hidden; }
+@keyframes credInicialFundo{ from{ opacity:0; } to{ opacity:1; } }
+
+.cred-inicial-card{
+  background:var(--panel); border-radius:var(--radius-xl); padding:34px 30px 26px;
+  box-shadow:0 28px 70px rgba(0,0,0,.4);
+  max-width:420px; width:100%;
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  animation:credInicialEntrada .22s cubic-bezier(.2,.9,.3,1.1);
+  max-height:calc(100vh - 48px); overflow-y:auto;
+}
+@keyframes credInicialEntrada{
+  from{ opacity:0; transform:translateY(12px) scale(.97); }
+  to{ opacity:1; transform:none; }
+}
+
+.cred-inicial-icone{
+  width:56px; height:56px; border-radius:50%;
+  background:var(--purple-soft); color:var(--purple);
+  display:flex; align-items:center; justify-content:center;
+  font-size:24px; margin-bottom:16px; flex-shrink:0;
+}
+.cred-inicial-titulo{ font-size:18px; margin-bottom:var(--gap-titulo-subtitulo); }
+.cred-inicial-sub{
+  font-size:12.5px; color:var(--muted); line-height:1.6;
+  margin-bottom:var(--gap-cabecalho-conteudo);
+}
+
+/* Os dois valores ficam num bloco só, e é ESSE bloco que a seleção
+   automática pega quando a cópia falha — por isso rótulo e valor moram
+   juntos: o que a pessoa copia na mão sai identificado, não dois textos
+   soltos que ela não sabe qual é qual depois. */
+.cred-inicial-campos{
+  width:100%; background:var(--paper);
+  border:1.5px dashed var(--purple); border-radius:12px;
+  padding:14px 16px; margin-bottom:14px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.cred-inicial-campo{
+  display:flex; align-items:baseline; gap:10px; text-align:left;
+}
+.cred-inicial-rotulo{
+  font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); flex-shrink:0; min-width:58px;
+}
+.cred-inicial-valor{
+  font-family:'Manrope', monospace; font-size:16px; font-weight:800;
+  letter-spacing:.03em; color:var(--ink);
+  word-break:break-all; user-select:all;
+}
+
+.cred-inicial-alerta{
+  width:100%; text-align:left;
+  font-size:11.5px; line-height:1.55; color:var(--ink);
+  background:rgba(255,193,7,.14); border:1px solid rgba(255,193,7,.5);
+  border-radius:10px; padding:11px 13px; margin-bottom:16px;
+}
+
+.cred-inicial-btn{ width:100%; }
+.cred-inicial-btn + .cred-inicial-btn{ margin-top:9px; }
+.cred-inicial-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+.cred-inicial-dica{
+  font-size:11.5px; line-height:1.5; color:var(--muted);
+  margin-top:11px; min-height:17px;
+}
+.cred-inicial-dica.ok{ color:var(--purple); font-weight:700; }
+.cred-inicial-dica.aviso{ color:#8a6100; font-weight:700; }
+
+@media (max-width:420px){
+  .cred-inicial-card{ padding:26px 20px 20px; }
+  .cred-inicial-campo{ flex-direction:column; gap:2px; }
+}
+
+/* Confirmar/Avisar — substitui confirm()/alert() nativos do navegador (ver
+   copilotoConfirmar/copilotoAvisar em auth.js). Deliberadamente MENOR e
+   mais direto que o .modal-dialog padrão (que é pra telas com conteúdo,
+   não pra uma decisão de uma frase só) — mas na mesma família visual:
+   mesmo --panel, --radius-xl, mesma fonte de título. Acima dos modais
+   comuns (z-index 1000) e do modal de palavra-chave (3000), porque uma
+   confirmação pode nascer de DENTRO de qualquer um dos dois (ex.: excluir
+   perfil abre de dentro do modal Avançado). Abaixo do toast (4000, que
+   precisa aparecer por cima depois deste fechar) e do modal da credencial
+   inicial (3500, que é o único que não pode ser interrompido por nada). */
+.copiloto-decisao-overlay{
+  position:fixed; inset:0; z-index:3600;
+  background:rgba(19,36,32,.62);
+  display:none; align-items:center; justify-content:center;
+  padding:24px;
+}
+.copiloto-decisao-overlay.show{ display:flex; animation:copilotoDecisaoFundo .15s ease-out; }
+@keyframes copilotoDecisaoFundo{ from{ opacity:0; } to{ opacity:1; } }
+
+.copiloto-decisao-card{
+  background:var(--panel); border-radius:var(--radius-xl); padding:28px 26px 24px;
+  box-shadow:0 24px 64px rgba(0,0,0,.35); max-width:400px; width:100%;
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  animation:copilotoDecisaoEntrada .18s cubic-bezier(.2,.9,.3,1.1);
+}
+@keyframes copilotoDecisaoEntrada{
+  from{ opacity:0; transform:translateY(10px) scale(.97); }
+  to{ opacity:1; transform:none; }
+}
+
+.copiloto-decisao-icone{
+  width:50px; height:50px; border-radius:50%;
+  background:rgba(255,193,7,.16); color:#8a6100;
+  display:flex; align-items:center; justify-content:center;
+  font-size:21px; margin-bottom:14px; flex-shrink:0;
+}
+.copiloto-decisao-icone.perigo{ background:rgba(179,38,30,.12); color:#B3261E; }
+
+.copiloto-decisao-titulo{ font-size:16.5px; margin-bottom:var(--gap-titulo-subtitulo); }
+.copiloto-decisao-msg{
+  font-size:13px; color:var(--muted); line-height:1.6;
+  margin-bottom:20px; white-space:pre-line;
+}
+/* Parágrafo de verdade (ver ehParagrafoLongo em auth.js) alinha à esquerda
+   — texto longo centralizado vira parede ilegível de bordas irregulares —
+   e o card alarga um pouco (400px é ótimo pra frase curta, apertado
+   demais pra parágrafo de verdade quebrar bem). Ícone e título continuam
+   centralizados sempre: só o corpo muda. */
+.copiloto-decisao-msg.longa{ text-align:left; }
+.copiloto-decisao-card:has(.copiloto-decisao-msg.longa){ max-width:480px; }
+
+.copiloto-decisao-botoes{ display:flex; gap:10px; width:100%; }
+.copiloto-decisao-botoes .btn{ flex:1; }
+.copiloto-decisao-botoes.somente-ok .btn.purple,
+.copiloto-decisao-botoes.somente-ok .btn.danger-solid{ flex:1 1 100%; }
+
+/* AVANÇADO — blocos de ação do backup/restauração (visual tipo sistema profissional) */
+.backup-section-title{
+  font-family:'Fraunces', serif;
+  font-size:16px;
+  font-weight:600;
+  color:var(--ink);
+  margin-bottom:var(--gap-titulo-subtitulo);
+}
+.backup-section-sub{
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.5;
+  margin-bottom:var(--gap-cabecalho-conteudo);
+}
+.backup-action{
+  display:flex;
+  gap:14px;
+  padding:16px 0;
+  border-top:1px solid var(--line);
+}
+.backup-action:first-of-type{ border-top:none; padding-top:2px; }
+.backup-action-icon{
+  flex-shrink:0;
+  width:38px; height:38px;
+  border-radius:var(--radius-lg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px;
+  background:#DCEEE9;
+}
+.backup-action-icon.purple{ background:var(--purple-soft); }
+.backup-action-icon.warn{ background:#FBE7D6; }
+.backup-action-body{ flex:1; min-width:0; }
+.backup-action-title{
+  font-size:13.5px;
+  font-weight:700;
+  color:var(--ink);
+  margin-bottom:var(--gap-titulo-subtitulo);
+}
+.backup-action-desc{
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.5;
+  margin-bottom:var(--gap-cabecalho-conteudo);
+}
+.backup-action-controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.backup-status-pill{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:700; color:var(--teal-dark);
+  background:#DCEEE9; border-radius:999px; padding:5px 10px;
+  margin-top:10px;
+}
+.backup-status-pill .dot{
+  width:6px; height:6px; border-radius:50%; background:var(--teal-dark);
+}
+.backup-status-pill .dot.warn{ background:#C9862F; }
+.backup-danger-zone{
+  border:1px solid #F0C9A8;
+  background:#FFFBF6;
+  border-radius:var(--radius);
+  padding:16px;
+  margin-top:4px;
+}
+/* .backup-action:first-of-type (acima) reduz o padding-top pra 2px — bom
+   quando a ação é a primeira de uma lista solta (evita respiro dobrado antes
+   do título da seção). Aqui dentro da caixa isolada isso não vale: sem
+   nenhum título imediatamente acima dela, o padding-top precisa ficar igual
+   ao padding-bottom (16px) pra caixa não ficar com o conteúdo grudado no
+   topo e um vão vazio embaixo. */
+.backup-danger-zone .backup-action{ border-top:none; padding:0; }
+.backup-alert{
+  display:flex; gap:10px; align-items:flex-start;
+  font-size:11.5px; color:#7A4A1E;
+  background:#FBE7D6; border-radius:10px;
+  padding:11px 13px; margin-top:18px; line-height:1.5;
+}
+.backup-alert-icon{ flex-shrink:0; font-size:15px; line-height:1.4; }
+
+/* Seções inteiras dentro de Avançado que só aparecem pro admin (Gerenciar
+   perfis, Log de sessões) — precisam do mesmo respiro --gap-entre-secoes
+   que já separava a zona de reset das demais, senão ficam coladas na seção
+   anterior (ver .reset-section-title logo abaixo). */
+.backup-secao-admin{ margin-top:var(--gap-entre-secoes); }
+
+/* RESET TOTAL — zona separada da de restaurar backup, mais crítica (vermelha
+   em vez de laranja) por apagar tudo sem nenhum arquivo de backup envolvido. */
+.reset-section-title{ margin-top:var(--gap-entre-secoes); }
+.backup-danger-zone-critical{
+  border-color:#F3C6C0;
+  background:#FFF6F5;
+}
+.backup-action-icon.critical{ background:#FBE0DE; }
+.btn.danger-solid{ background:#B3261E; color:#fff; border:none; }
+.btn.danger-solid:hover{ background:#8C1D17; }
+.btn.danger-solid:disabled{ opacity:.5; cursor:default; }
+
+/* .modal-dialog-reset (modal "Confirmar reset total") e .modal-dialog-senha
+   (lixeira/Avançado, ver panel.js) — as duas em seletor combinado
+   (.modal-dialog.modal-dialog-X, não só .modal-dialog-X sozinha): o
+   .modal-dialog{max-width:680px} de panel.html vive num <style> embutido,
+   carregado DEPOIS deste arquivo — com a mesma especificidade de uma classe
+   só (0-1-0 nos dois), quem vier depois na cascata vence, então 680px
+   sempre "ganhava" mesmo com a classe mais estreita aplicada (achado ao
+   medir a largura renderizada de verdade, não só lendo o CSS — as duas
+   classes existiam há tempo sem nunca terem tido efeito nenhum). Duas
+   classes juntas (0-2-0) resolve o empate sem depender de onde cada regra
+   mora. */
+.modal-dialog.modal-dialog-reset{ max-width:440px; }
+/* Só pros dois modais que pedem a senha do PRÓPRIO PERFIL (lixeira e
+   Avançado, ver panel.js) — cada um é só um campo de senha e um botão, e o
+   .modal-dialog padrão (680px, feito pra telas com conteúdo de verdade)
+   deixava metade da tela vazia ao redor de um formulário desse tamanho.
+   Nada mais no projeto usa esta classe — o Avançado troca pra ela só
+   enquanto a tela de senha está visível (ver resetAvancadoLockScreen/
+   tentarDesbloquearAvancado), voltando pro .modal-dialog normal assim que
+   desbloqueado, já que o conteúdo de dentro (backup, perfis etc.) precisa
+   da largura cheia. */
+.modal-dialog.modal-dialog-senha{ max-width:400px; }
+.reset-warning-box{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  padding:20px 16px; border-radius:12px;
+  background:#FFF6F5; border:1px solid #F3C6C0;
+  margin-bottom:20px;
+}
+.reset-warning-icon{ font-size:26px; margin-bottom:8px; }
+.reset-warning-title{ font-size:15px; font-weight:800; color:#9C2A2A; margin-bottom:var(--gap-titulo-subtitulo); }
+.reset-warning-sub{ font-size:12.5px; color:var(--muted); line-height:1.5; max-width:360px; }
+.reset-agree-row{
+  display:flex; gap:10px; align-items:flex-start; cursor:pointer;
+  font-size:12.5px; color:var(--ink); line-height:1.5;
+  background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  padding:12px 14px; margin:16px 0 6px;
+}
+.reset-agree-row input[type=checkbox]{
+  margin-top:2px; flex-shrink:0; width:16px; height:16px; accent-color:#B3261E; cursor:pointer;
+}
+.reset-confirm-error{ color:#B3261E; font-size:12px; font-weight:700; margin-top:6px; }
+.reset-confirm-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+/* No modal de senha da lixeira (mais estreito, 400px — ver
+   .modal-dialog.modal-dialog-senha) só há dois botões e nenhum outro
+   elemento disputando a mesma linha, então alinhar à direita (padrão do
+   .reset-confirm-actions acima, pensado pro modal de 680px/440px com mais
+   contexto ao redor) sobra bastante vazio à esquerda e parece descentralizado.
+   Centralizado fica mais equilibrado especificamente aqui. */
+.modal-dialog-senha .reset-confirm-actions{ justify-content:center; }
+
+/* MINHA CONTA — resumo de uso/custo de tokens */
+.billing-summary-row{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.billing-summary-card{
+  flex:1; min-width:130px;
+  background:#DCEEE9; border-radius:12px; padding:14px 14px 12px;
+}
+.billing-summary-card.purple{ background:var(--purple-soft); }
+.billing-summary-num{
+  font-family:'Fraunces', serif; font-size:22px; font-weight:600; color:var(--ink); line-height:1.1;
+}
+.billing-summary-lbl{ font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.02em; margin-top:4px; }
+.billing-table{ width:100%; border-collapse:collapse; margin-bottom:6px; }
+.billing-table th{
+  text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.02em;
+  color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line);
+}
+.billing-table td{ font-size:12.5px; color:var(--ink); padding:9px 8px; border-bottom:1px solid var(--line); }
+.billing-table tr:last-child td{ border-bottom:none; }
+.billing-empty{ font-size:12.5px; color:var(--muted); padding:10px 0 18px; }
+.billing-note{
+  font-size:11.5px; color:var(--muted); line-height:1.5; margin-top:6px;
+}
+.billing-note a{ color:var(--teal-dark); }
