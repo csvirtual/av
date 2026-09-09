@@ -74,4 +74,48 @@ export const applyBackupPayload = db.transaction((payload) => {
   }
 });
 
+// ---------- Reiniciar operação (zerar dados de teste/transição) ----------
+// Portado de data/backupRepo.js#resetOperationalData da extensão: depois de
+// um período de teste ou de transição vindo de outro sistema de PDV, a loja
+// quer "zerar" pra começar a operar de verdade sem perder o CADASTRO que já
+// levou trabalho pra montar. Metade das tabelas de BACKUP_TABLES é
+// cadastro/config (não nasce de vender, só muda quando alguém edita de
+// propósito); a outra metade é MOVIMENTO (nasce de cada venda, cada
+// abertura de caixa, cada compra) — é só essa segunda metade que faz
+// sentido zerar aqui.
+//
+// De propósito fora da lista (fica tudo intacto): `products` — inclusive a
+// quantidade atual de cada um, é o motivo desta função existir — e
+// `stock_movements`, o histórico dela (não referencia o id de nenhuma venda
+// específica, então continua consistente mesmo com `sales` zerado);
+// `company`, `users`, `suppliers` e `customers` (cadastro, não movimento).
+// `financial_entries`, `customer_debts` e `loyalty_entries` não guardam
+// nenhum saldo "solto" em cache — são sempre somados a partir da própria
+// tabela na hora de mostrar (ver routes/finance.js, routes/customers.js,
+// routes/loyalty.js) — então limpar cada uma aqui já deixa saldo de fiado e
+// pontos de fidelidade voltando a zero sozinhos, sem precisar tocar em
+// `customers` pra isso. `store_credits` (crédito de troca cross-terminal,
+// sem equivalente na extensão) é MOVIMENTO no mesmo sentido de
+// `loyalty_entries` — entra na lista.
+export const RESET_TABLES = [
+  'sales', 'cash_sessions', 'cash_movements', 'customer_debts', 'deliveries',
+  'audit_log', 'purchase_orders', 'loyalty_entries', 'financial_entries', 'store_credits',
+];
+
+/** Apaga tudo que é MOVIMENTO (ver RESET_TABLES acima) — inclusive
+ * `idempotency_keys` (mesmo raciocínio da extensão: as chaves de
+ * deduplicação só fazem sentido junto da ação que as gerou, e ficariam
+ * bloqueando ações novas e legítimas por coincidência de id depois do
+ * reinício). Estoque (produtos + quantidade + histórico de movimentação),
+ * dados da loja, usuários, fornecedores e clientes continuam exatamente
+ * como estavam. Ação destrutiva e irreversível — quem chama isso já
+ * confirmou com o usuário e já gerou um backup de segurança antes (ver
+ * routes/backup.js). Tudo dentro de UMA ÚNICA transação, mesmo raciocínio
+ * de applyBackupPayload() acima: ou zera tudo da lista, ou (numa falha no
+ * meio do caminho) não muda nada — nunca fica pela metade. */
+export const resetOperationalData = db.transaction(() => {
+  for (const table of RESET_TABLES) db.prepare(`DELETE FROM ${table}`).run();
+  db.prepare('DELETE FROM idempotency_keys').run();
+});
+
 export { BACKUP_FORMAT_VERSION };

@@ -22,6 +22,7 @@ import { renderLogs } from './views/logs.js';
 import { renderRelatorios } from './views/relatorios.js';
 import { renderPersonalizacao } from './views/personalizacao.js';
 import { renderAjuda } from './views/ajuda.js';
+import { renderBackup } from './views/backup.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 import { getCompany } from './data/companyRepo.js';
@@ -58,6 +59,7 @@ const ROUTES = {
   relatorios: { label: 'Relatórios', render: renderRelatorios },
   personalizacao: { label: 'Personalização', render: renderPersonalizacao },
   ajuda: { label: 'Ajuda', render: renderAjuda },
+  backup: { label: 'Backup', render: renderBackup },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -102,7 +104,14 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // mudar (tema é por navegador; ajuda é conteúdo estático) — 'ajuda' tem
 // busca/acordeão abertos que um recarregamento sem motivo também
 // atrapalharia, mas o ponto principal é que não existe evento nenhum que
-// devesse disparar um.
+// devesse disparar um. 'backup' também fica de fora, mesmo raciocínio de
+// 'caixa'/'compras': os três formulários (exportar/restaurar/zerar) têm
+// senha e arquivo selecionado em andamento — um recarregamento no meio
+// apagaria isso à toa, e nenhum dos três topics abaixo (mudança de
+// produto, venda, etc.) é relevante pra esta tela mesmo. As duas ações
+// da PRÓPRIA tela que precisam de recarregamento total em TODO terminal
+// ('backup-restored'/'data-reset') são tratadas fora deste esquema por
+// tópico de tela — ver o listener logo abaixo.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
@@ -130,7 +139,28 @@ function scheduleLiveRefresh() {
   }, LIVE_DEBOUNCE_MS);
 }
 
+// Restaurar ou zerar um backup troca (ou apaga) dado que QUALQUER tela em
+// QUALQUER terminal pode estar mostrando agora — diferente dos tópicos por
+// tela acima (que só valem enquanto aquela tela específica está aberta),
+// os dois abaixo recarregam a PÁGINA INTEIRA em todo terminal conectado,
+// não só o container da tela ativa (mesmo raciocínio do comentário do
+// broadcast em routes/backup.js: é o jeito mais simples e seguro de todo
+// mundo voltar a mostrar dados corretos, mesmo com um modal aberto no meio
+// — perder o que estava sendo digitado é o mal menor depois que os dados
+// por trás dele deixaram de existir). 'backup-restored' também desloga
+// (clearSession) antes de recarregar, igual a extensão (a tabela de
+// usuários pode ter sido substituída inteira pela restauração) —
+// 'data-reset' não: usuários nunca fazem parte do que é zerado, a mesma
+// sessão continua válida depois.
 onLiveMessage((msg) => {
+  if (msg.topic === 'backup-restored') {
+    clearSession().finally(() => location.reload());
+    return;
+  }
+  if (msg.topic === 'data-reset') {
+    location.reload();
+    return;
+  }
   if (!activeRouteName) return;
   if (LIVE_TOPICS[activeRouteName]?.has(msg.topic)) scheduleLiveRefresh();
 });

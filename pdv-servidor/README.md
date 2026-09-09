@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+Ajuda completos, com atualização em tempo real, testados (09/set) — `session.js`, `theme.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs` e `test-personalizacao-ajuda.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta a última tela (`views/backup.js`) e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟢 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+Ajuda+Backup completos — todas as 15 telas do roteiro original —, com atualização em tempo real, testados (09/set) — `session.js`, `theme.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js`+`views/backup.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários/Backup(restaurar e zerar, em TODO terminal) em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs`, `test-personalizacao-ajuda.cjs` e `test-backup.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16); "Zerar dados e reiniciar a operação" ganhou rota nova (`POST /api/backup/reset`) e broadcast pra TODO terminal, feature sem equivalente único-terminal (ver passo 18). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta o `app.js` completo (menu lateral, navegação permission-aware, timeout de inatividade, trava de aba única) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -946,18 +946,114 @@ da loja (`nomeFantasia`, `encarregadoLgpd`, etc.) simplesmente não
 existem aqui, e o único lugar que os lê (`ajuda.js`, com fallback
 seguro) nunca quebra por causa disso.
 
-Com os passos 5 a 17 fechados, a Fase 9 está **substancialmente
-completa** pras catorze telas Estoque+PDV+Histórico+Clientes+Painel+
+18. ✅ **`views/backup.js` real ligada** (09/set) — décima quinta e
+    última tela real do roteiro original: exportar, restaurar (com
+    prévia de contagem antes/depois) e **"Zerar dados e reiniciar a
+    operação"**, **copiada sem nenhuma alteração** de
+    `pdv-extension/app/js/views/`.
+
+    Exportar/restaurar já tinham as rotas server-side prontas desde a
+    Fase 8 (`routes/backup.js`) — só faltava o cliente. Nova
+    `GET /api/backup/current-counts` (thin, só `getCurrentCounts()` de
+    `lib/backup.js`): a tela chama `getCurrentCounts()` e
+    `readBackupFile()` como duas operações INDEPENDENTES (mesmo contrato
+    da extensão), então não dava pra reaproveitar só o que `/preview` já
+    devolve. `public/js/data/backupRepo.js` ficou bem maior: traduz as
+    contagens por TABELA SQL (`snake_case`, o que o servidor fala) pra
+    "gaveta" `camelCase` (o que a tela espera, mesmas chaves de
+    `STORE_NAMES`/`STORE_LABELS` da extensão) — novo shim
+    `STORE_NAMES` em `public/js/db.js`, com um item a mais que a
+    extensão: `storeCredits` (crédito de troca cross-terminal, tabela
+    `store_credits`, sem equivalente lá). Diferença de arquitetura
+    assumida de propósito: a extensão decifra o arquivo de backup NO
+    NAVEGADOR (Web Crypto local); aqui quem decifra é o SERVIDOR (mesmo
+    raciocínio de todo o resto da Fase 9 — a senha nunca precisa virar
+    uma segunda cópia decifrada solta no cliente à toa) — `readBackupFile()`
+    guarda só `{envelope, password, exportedAt}` como "payload" (a tela
+    nunca olha dentro dele além de `exportedAt`), reenviado pra
+    `/api/backup/import` quando a restauração é confirmada.
+
+    **"Zerar dados e reiniciar a operação" é feature nova, sem
+    equivalente único-terminal** — a extensão zera o IndexedDB da
+    própria máquina; aqui vendas/caixa/financeiro/fiado/carreto/compras/
+    fidelidade/crédito de troca/log são dado COMPARTILHADO entre todos
+    os terminais, então zerar precisa avisar todo mundo, não só a aba
+    que apertou o botão. Novo `resetOperationalData()` em
+    `lib/backup.js` (transação atômica: `DELETE` nas tabelas de
+    movimento — mesma lista de `RESET_STORE_NAMES` da extensão, mais
+    `store_credits` — e em `idempotency_keys`, preservando
+    `products`/`stock_movements`/`company`/`users`/`suppliers`/
+    `customers`) e nova `POST /api/backup/reset`. Depois de zerar, a
+    rota manda um `broadcast('data-reset', {})` novo — mesmo raciocínio
+    de `broadcast('backup-restored', {})` que `/import` já mandava desde
+    a Fase 8 (o comentário de lá já dizia: "o jeito mais simples e
+    seguro de todo terminal conectado voltar a mostrar dados corretos é
+    recarregar a página inteira"), só que agora com um listener de
+    verdade do lado do cliente: `app.js` ganhou um tratamento GLOBAL (fora
+    do esquema por tópico de tela do `LIVE_TOPICS`) pros dois eventos —
+    `data-reset` recarrega a página em TODO terminal conectado (um caixa
+    aberto em outro terminal deixaria de existir se ninguém avisasse);
+    `backup-restored` faz o mesmo, mas também desloga
+    (`clearSession()`) antes, igual a extensão — a tabela de usuários
+    pode ter sido substituída inteira pela restauração, então a sessão
+    de qualquer terminal pode não bater mais com nada.
+
+    `backup` ficou de fora do `LIVE_TOPICS` por tópico de tela, mesmo
+    raciocínio de `caixa`/`compras`: os três formulários têm senha e
+    arquivo selecionado em andamento, que um recarregamento no meio
+    apagaria à toa — só os dois eventos GLOBAIS acima (que trocam TUDO,
+    não um dado específico desta tela) justificam recarregar aqui.
+
+    Achado de corrida no caminho: o broadcast de `backup-restored`
+    chega pelo WebSocket e já desloga a PRÓPRIA aba que disparou a
+    restauração antes do `logAction("Backup restaurado")` que a tela
+    chama logo depois de `applyBackup()` suceder — a chamada perde a
+    corrida e falha com 401. Sem problema nenhum: o servidor já grava
+    esse mesmo evento sozinho, incondicionalmente, dentro da própria
+    rota `/import` (`routes/backup.js`, desde a Fase 8) — a restauração
+    fica auditada de qualquer jeito — e o `try/catch` ao redor dessa
+    chamada do lado do cliente existe justamente pra tolerar exatamente
+    isto (comentário original da extensão: "log é só um extra, nunca
+    desfaz nem esconde o sucesso").
+
+    Testado em `test-backup.cjs` (35 asserções): exportar com senha
+    curta/senhas diferentes barrado no cliente antes de chamar o
+    servidor, backup baixado é um envelope cifrado (nunca o payload em
+    claro), exportação auditada; restaurar com senha errada mostra erro
+    amigável, prévia mostra contagem atual × no backup lado a lado (as
+    16 gavetas, incluindo `storeCredits`) com a data de geração, um
+    produto criado DEPOIS do backup some e um que já existia continua
+    depois de confirmar a restauração, a aba volta sozinha pra tela de
+    login (sessão derrubada), um SEGUNDO terminal conectado também
+    recarrega sozinho (broadcast multi-terminal); zerar com
+    usuário/senha vazios ou senha errada barrado antes de qualquer
+    coisa destrutiva, depois de confirmar: vendas/caixa zerados,
+    estoque/quantidade/usuários preservados, o próprio reinício
+    auditado, e o SEGUNDO terminal recarrega sozinho mas **continua
+    logado** (reset não força novo login, diferente de restaurar); e a
+    permissão `'backup'` nos dois sentidos — vendedor sem ela ainda VÊ a
+    tela (mesmo padrão de relatorios/logs/financeiro), mas é barrado com
+    403 em exportar/resetar/consultar contagem, inclusive tentando pela
+    UI de verdade (erro amigável, não trava).
+
+Com os passos 5 a 18 fechados, a Fase 9 está **substancialmente
+completa** pras quinze telas Estoque+PDV+Histórico+Clientes+Painel+
 Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+
-Ajuda: a hipótese central do roteiro (telas reais reaproveitáveis sem
-reescrita) segue provada na prática mesmo na tela que precisou de
-agregação nova no servidor, a promessa de tempo real já é verdade onde
-faz sentido, e o ciclo operacional inteiro da loja — vender, repor
+Ajuda+Backup: a hipótese central do roteiro (telas reais reaproveitáveis
+sem reescrita) segue provada na prática mesmo nas duas telas que
+precisaram de lógica nova no servidor (agregação de relatórios,
+reinício de operação), a promessa de tempo real já é verdade onde faz
+sentido — inclusive nos dois eventos "trocou tudo" (restaurar/zerar
+backup), que agora recarregam TODO terminal conectado, não só o que fez
+a ação —, e o ciclo operacional inteiro da loja — vender, repor
 estoque, fiado, fidelidade, visão geral, entregar, gerir vendedores,
 abrir/fechar caixa, comprar de fornecedor, controlar contas a
-pagar/receber, auditar tudo isso, enxergar o desempenho do negócio, e
-agora escolher tema e consultar ajuda — já roda pela UI real.
-O que falta da Fase 9 (a última tela restante — `views/backup.js`,
-exportar/restaurar/resetar dados —, o `app.js` completo com menu
-lateral, e a lacuna de crédito de troca cross-terminal documentada no
+pagar/receber, auditar tudo isso, enxergar o desempenho do negócio,
+escolher tema, consultar ajuda, e agora fazer backup/restaurar/reiniciar
+a operação — já roda pela UI real.
+O que falta da Fase 9 (o `app.js` completo com menu lateral e
+navegação permission-aware — hoje toda rota é visível pra qualquer
+logado, o gate real fica só no servidor, mesmo padrão usado por
+relatorios/logs/financeiro/backup — timeout de inatividade e trava de
+aba única, e a lacuna de crédito de troca cross-terminal documentada no
 passo 8) é trabalho real de mais fases, não risco em aberto.

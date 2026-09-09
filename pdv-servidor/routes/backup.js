@@ -6,11 +6,18 @@
 // verdade (ver public/test.html).
 import { Router } from 'express';
 import { encryptPayload, decryptPayload } from '../lib/backupCrypto.js';
-import { buildBackupPayload, applyBackupPayload, getCurrentCounts, BACKUP_FORMAT_VERSION, BACKUP_TABLES } from '../lib/backup.js';
+import { buildBackupPayload, applyBackupPayload, getCurrentCounts, resetOperationalData, BACKUP_FORMAT_VERSION, BACKUP_TABLES } from '../lib/backup.js';
 import { logAction } from '../lib/audit.js';
 import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
+
+/** Só a contagem atual de cada tabela — usado pela tela de Backup pra
+ * mostrar "o que existe hoje" mesmo fora do fluxo de restaurar (ver
+ * data/backupRepo.js#getCurrentCounts no cliente, chamada solta da tela). */
+router.get('/current-counts', (req, res) => {
+  res.json({ counts: getCurrentCounts() });
+});
 
 router.post('/export', async (req, res) => {
   try {
@@ -86,6 +93,37 @@ router.post('/import', async (req, res) => {
     // página inteira (ver public/test.html), em vez de tentar reconciliar
     // cada seção uma por uma.
     broadcast('backup-restored', {});
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** Zera tudo que é MOVIMENTO (vendas, caixa, financeiro, fiado, carreto,
+ * compras, fidelidade, crédito de troca, log de auditoria) preservando
+ * estoque/empresa/usuários/fornecedores/clientes — ver lib/backup.js#
+ * resetOperationalData. Quem chama já confirmou a identidade (senha) e já
+ * gerou um backup de segurança do lado do cliente antes (ver
+ * views/backup.js) — esta rota não pede senha de novo: a mesma permissão
+ * 'backup' do mount já protege, e a confirmação de identidade específica
+ * (usuário+senha) é só pra garantir que foi de propósito, não uma trava de
+ * autorização adicional (mesmo raciocínio do reset-form na extensão). */
+router.post('/reset', async (req, res) => {
+  try {
+    resetOperationalData();
+    logAction({
+      userId: req.userId, userName: req.userName, role: req.userRole,
+      action: 'Reinício de operação (zerar dados)',
+      details: 'Vendas, caixa, financeiro, fiado, carretos, compras, fidelidade, crédito de troca e log anteriores foram apagados — estoque, dados da loja, usuários, fornecedores e clientes preservados.',
+      entity: 'backup', entityId: 'reset',
+    });
+    // Mesmo raciocínio do broadcast de /import acima: um reinício de
+    // operação também troca dado que QUALQUER terminal pode estar
+    // mostrando na tela agora (um caixa aberto em outro terminal, por
+    // exemplo, deixa de existir) — recarregar a página inteira em todo
+    // terminal conectado é o jeito mais simples e seguro de todos
+    // voltarem a mostrar dados corretos.
+    broadcast('data-reset', {});
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
