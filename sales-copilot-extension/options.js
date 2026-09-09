@@ -11,6 +11,7 @@ function liberarConfig(){
   init();
   atualizarFaixaAdminImpersonando();
   atualizarMinhaContaForm();
+  atualizarLicencaCard();
   copilotoMonitorarAtividade();
   copilotoIniciarChecagemInatividade(bloquearConfigPorInatividade);
 
@@ -653,6 +654,132 @@ function renderContadorRespostas(usageStats){
   const total = Object.values(usageStats).reduce((a,b)=>a+b, 0);
   el.textContent = `🧮 ${thisMonth} resposta${thisMonth===1?'':'s'} geradas este mês · ${total} no total`;
 }
+
+// ---------- Fase 9: Licenciamento (CPF/CNPJ + chave de ativação assinada) ----------
+// Máscara/validação de dígito verificador — mesmo algoritmo do CPF que já
+// existe em panel.js (cpfEhValido), generalizado pra também aceitar CNPJ (14
+// dígitos). Não dá pra reaproveitar a função de panel.js: esta página não
+// carrega panel.js, e criar um arquivo compartilhado só por causa de duas
+// funções pequenas não compensa (mesmo raciocínio de dateKeyMesOptions acima).
+function maskDocLicenca(value){
+  const digits = (value || '').replace(/\D/g, '').slice(0, 14);
+  if(digits.length <= 11){
+    if(digits.length > 9) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+    if(digits.length > 6) return digits.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+    if(digits.length > 3) return digits.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+    return digits;
+  }
+  return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5');
+}
+
+function docLicencaEhValido(docFormatado){
+  const digits = (docFormatado || '').replace(/\D/g, '');
+  if(!digits) return true; // vazio não é "inválido", é "não preenchido ainda"
+  const calcDigito = (base, pesoInicial) => {
+    let soma = 0, peso = pesoInicial;
+    for(let i = 0; i < base.length; i++){ soma += parseInt(base[i], 10) * peso; peso--; if(peso < 2) peso = 9; }
+    const resto = soma % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+  if(digits.length === 11){
+    if(/^(\d)\1{10}$/.test(digits)) return false;
+    const base9 = digits.slice(0, 9);
+    const d1 = calcDigito(base9, 10);
+    const d2 = calcDigito(base9 + d1, 11);
+    return digits === base9 + String(d1) + String(d2);
+  }
+  if(digits.length === 14){
+    if(/^(\d)\1{13}$/.test(digits)) return false;
+    const base12 = digits.slice(0, 12);
+    const d1 = calcDigito(base12, 5);
+    const d2 = calcDigito(base12 + d1, 6);
+    return digits === base12 + String(d1) + String(d2);
+  }
+  return false;
+}
+
+function _copilotoFormatarDataHoraLicenca(timestampMs){
+  const d = new Date(timestampMs);
+  if(isNaN(d)) return '';
+  return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function licencaStatusInfo(status){
+  if(status.tipo === 'full') return { texto: 'Definitiva — ativada', classe: 'green' };
+  if(status.tipo === 'demo') return { texto: `Demo — expira em ${_copilotoFormatarDataHoraLicenca(status.expiraEm)}`, classe: 'gold' };
+  if(status.tipo === 'trial') return { texto: `Período de teste — expira em ${_copilotoFormatarDataHoraLicenca(status.expiraEm)}`, classe: 'gold' };
+  if(status.tipo === 'trial-expirado') return { texto: 'Período de teste expirado', classe: 'red' };
+  return { texto: 'Sem restrição de licença', classe: 'teal' }; // 'sem-trial' — instalação anterior a este recurso (grandfathered)
+}
+
+async function atualizarLicencaCard(){
+  const chip = document.getElementById('licencaStatusChip');
+  const detalhe = document.getElementById('licencaStatusDetalhe');
+  if(!chip) return;
+  const status = await copilotoLicencaObterStatus();
+  const info = licencaStatusInfo(status);
+  chip.textContent = info.texto;
+  chip.className = `chip ${info.classe}`;
+  detalhe.textContent = status.tipo === 'trial-expirado'
+    ? 'A geração de respostas por IA fica bloqueada até uma chave de ativação válida ser colada abaixo.'
+    : '';
+  const docSalvo = await copilotoLicencaObterDoc();
+  const docInput = document.getElementById('licencaDocInput');
+  if(docInput && !docInput.value) docInput.value = maskDocLicenca(docSalvo);
+}
+
+function ativarLicencaListeners(){
+  const docInput = document.getElementById('licencaDocInput');
+  const docMsg = document.getElementById('licencaDocMsg');
+  docInput.addEventListener('input', ()=>{
+    docInput.value = maskDocLicenca(docInput.value);
+    const digits = docInput.value.replace(/\D/g, '');
+    const completo = digits.length === 11 || digits.length === 14;
+    docMsg.style.display = (completo && !docLicencaEhValido(docInput.value)) ? 'block' : 'none';
+  });
+  docInput.addEventListener('blur', async ()=>{
+    if(docLicencaEhValido(docInput.value)) await copilotoLicencaSalvarDoc(docInput.value);
+  });
+
+  document.getElementById('licencaAtivarBtn').addEventListener('click', async ()=>{
+    const erroBox = document.getElementById('licencaAtivarErro');
+    erroBox.style.display = 'none';
+    const doc = docInput.value.replace(/\D/g, '');
+    if(!doc || !docLicencaEhValido(docInput.value)){
+      erroBox.textContent = 'Preencha um CPF ou CNPJ válido antes de ativar.';
+      erroBox.style.display = 'block';
+      return;
+    }
+    const chaveInput = document.getElementById('licencaChaveInput');
+    const btn = document.getElementById('licencaAtivarBtn');
+    btn.disabled = true;
+    const rotuloOriginal = btn.textContent;
+    btn.textContent = 'Verificando...';
+    try{
+      const resultado = await copilotoLicencaVerificar(chaveInput.value, doc);
+      // Mesmo cuidado do PDV (ver company.js#license-settings-btn): só
+      // 'full'/'demo' contam como chave de ATIVAÇÃO de verdade — um tipo
+      // desconhecido tem assinatura e doc válidos igual uma chave real, mas
+      // não é isso que este botão ativa.
+      if(!resultado.valido || (resultado.tipo !== 'full' && resultado.tipo !== 'demo')){
+        erroBox.textContent = resultado.valido
+          ? 'Essa chave não é uma chave de ativação válida.'
+          : resultado.motivo;
+        erroBox.style.display = 'block';
+        return;
+      }
+      await copilotoLicencaSalvarDoc(doc);
+      await copilotoLicencaSalvarChave(chaveInput.value);
+      chaveInput.value = '';
+      toast('Licença ativada ✓');
+      await atualizarLicencaCard();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = rotuloOriginal;
+    }
+  });
+}
+ativarLicencaListeners();
 
 async function init(){
   const data = await copilotoStorage.local.get([

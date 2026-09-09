@@ -180,6 +180,46 @@ que já existe:
     "já processada"). Trocado o sentinela pra `null`, com checagem explícita
     `=== null` nos três lugares que liam esse campo.
 
+  **Fase 9 — Licenciamento (CPF/CNPJ + chave de ativação assinada)**: não
+  inventado do zero — reaproveita o desenho já em produção em
+  `pdv-extension/app/js/license.js` (mesmo repositório), só generalizando
+  `cnpj` para `doc` (CPF de autônomo OU CNPJ de empresa). Arquivos novos em
+  `licensing/`:
+  - **`license-verifier.js`** — verifica uma chave de ativação
+    (`<payload_base64url>.<assinatura_base64url>`, ECDSA P-256 + SHA-256)
+    contra a chave PÚBLICA embutida no código. A privada correspondente
+    nunca entra na extensão — mora só em `licensing-tool/` (raiz do
+    repositório, fora de `sales-copilot-extension/`, nunca referenciada por
+    `manifest.json`), rodada localmente por quem emite licenças. Ver
+    `licensing-tool/README.md` pra emitir chaves de verdade.
+  - **`license-repo.js`** — estado de trial (14 dias, `chrome.storage.local`)
+    e chave de ativação salva. **Grandfathering deliberado**, mesma regra
+    do PDV: `copilotoLicencaMarcarInicioTrialSeNecessario()` só é chamada
+    uma vez, no exato momento em que uma instalação NOVA gera sua
+    credencial-raiz pela primeira vez (`copilotoGarantirCredencialInicial`,
+    `auth.js`) — qualquer instalação que já existisse antes deste recurso
+    nunca passa por ali de novo, então nunca ganha um trial retroativo e
+    nunca é bloqueada.
+  - **UI** (`options.html`, card "🔑 Licenciamento"): CPF/CNPJ do titular
+    (com máscara e conferência de dígito verificador) + campo pra colar a
+    chave de ativação + status atual (Definitiva / Demo / Período de teste
+    / Teste expirado / Sem restrição de licença).
+  - **Bloqueio** (`panel.js`): `analyzeAndSuggest`/`suggestFollowupApproach`
+    checam `copilotoLicencaObterStatus()` antes de chamar a IA — **fail-open,
+    nunca fail-closed** (qualquer erro na checagem libera a geração; um bug
+    de licenciamento nunca pode ser pior do que não ter licenciamento
+    nenhum). Só bloqueia com toast + redireciona pra Configurações quando o
+    status vem explicitamente `ativo:false`.
+
+  **Duas decisões de negócio tomadas sem confirmação prévia nesta sessão**
+  (o formato/algoritmo de assinatura reaproveita o desenho já validado do
+  PDV — isto aqui é só o que ainda não tinha precedente): a duração do
+  trial (14 dias, `COPILOTO_LICENCA_TRIAL_DURACAO_MS` em
+  `licensing/license-repo.js`) e o ponto de bloqueio (só a geração de IA é
+  travada — ver, editar e organizar leads nunca é bloqueado, mesmo sem
+  licença). Ajuste a constante ou o ponto de gate livremente; nenhum dos
+  dois afeta quem já tem uma chave definitiva ativada.
+
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
   conhecimento geral da estrutura do WhatsApp Web (que muda sem aviso, sem

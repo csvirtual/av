@@ -305,6 +305,15 @@ async function copilotoGarantirCredencialInicial(){
       [COPILOTO_CREDENCIAL_INICIAL_GERADA_KEY]: true,
       [COPILOTO_CREDENCIAL_INICIAL_KEY]: { usuario, senha }
     });
+    // Fase 9 (licensing/license-repo.js) — este é o único ponto do código
+    // que representa "instalação nova gerando sua credencial-raiz pela
+    // primeira vez". Instalações que já existiam antes deste recurso nunca
+    // passam por aqui de novo, então nunca ganham um trial retroativo (ver
+    // grandfathering em copilotoLicencaObterStatus). Nunca deixa uma falha
+    // de licenciamento quebrar a criação da credencial em si.
+    if(typeof copilotoLicencaMarcarInicioTrialSeNecessario === 'function'){
+      copilotoLicencaMarcarInicioTrialSeNecessario().catch(()=>{});
+    }
     return { usuario, senha };
   }catch(e){ return null; }
 }

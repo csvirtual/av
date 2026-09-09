@@ -4579,10 +4579,33 @@ function prepararGeracaoIA(){
 // continuam livres pra gerar ao mesmo tempo, cada um independente.
 const leadsComGeracaoEmAndamento = new Set();
 
+// ---------- Fase 9: bloqueio por licenciamento ----------
+// Só bloqueia quando copilotoLicencaObterStatus() (licensing/license-repo.js)
+// diz explicitamente que não está ativo — uma instalação sem NENHUM trial
+// registrado nunca cai aqui (grandfathering deliberado, ver comentário
+// completo em license-repo.js: instalações de antes deste recurso existir
+// nunca podem ser quebradas por ele). Fail-OPEN, nunca fail-closed: qualquer
+// erro na checagem (arquivo não carregado, storage indisponível) libera a
+// geração — um bug de licenciamento nunca pode ser pior do que não ter
+// licenciamento nenhum.
+async function _copilotoLicencaPermiteGerar(){
+  try{
+    if(typeof copilotoLicencaObterStatus !== 'function') return true;
+    const status = await copilotoLicencaObterStatus();
+    return !!status.ativo;
+  }catch(e){ return true; }
+}
+
 async function analyzeAndSuggest(){
   const prep = prepararGeracaoIA();
   if(!prep) return;
   const { lead, pasted, personName, extraContext, provider } = prep;
+
+  if(!(await _copilotoLicencaPermiteGerar())){
+    toast('Período de teste expirado — ative uma licença em Configurações → Licenciamento pra continuar gerando respostas.');
+    openOptions();
+    return;
+  }
 
   if(leadsComGeracaoEmAndamento.has(lead.id)){
     toast('Já tem uma geração em andamento pra este lead — aguarde terminar.');
@@ -4904,6 +4927,14 @@ async function suggestFollowupApproach(){
   const prep = prepararGeracaoIA();
   if(!prep) return;
   const { lead, pasted, personName, extraContext, provider } = prep;
+
+  // Mesmo bloqueio de licenciamento de analyzeAndSuggest (fase 9) —
+  // compartilhado de propósito, ver comentário lá.
+  if(!(await _copilotoLicencaPermiteGerar())){
+    toast('Período de teste expirado — ative uma licença em Configurações → Licenciamento pra continuar gerando respostas.');
+    openOptions();
+    return;
+  }
 
   // Mesmo guard de analyzeAndSuggest (fase 8) — compartilhado de propósito,
   // ver comentário lá.

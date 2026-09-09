@@ -483,6 +483,27 @@
 
       <button class="btn purple" id="saveFunilBtn">Salvar funil</button>
     </div>
+
+    <div class="card" id="cardLicenca">
+      <h2>🔑 Licenciamento</h2>
+      <p class="hint" style="margin-bottom:14px;">
+        Situação desta instalação: <span class="chip" id="licencaStatusChip">Carregando…</span>
+      </p>
+      <p class="hint" id="licencaStatusDetalhe" style="margin-bottom:16px;"></p>
+
+      <div class="field" style="margin-bottom:14px; max-width:340px;">
+        <label>CPF ou CNPJ do titular da licença</label>
+        <input type="text" id="licencaDocInput" placeholder="000.000.000-00" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <p class="hint" id="licencaDocMsg" style="color:#b3261e; display:none;">Dígitos verificadores não conferem — confira o número digitado.</p>
+      </div>
+
+      <div class="field" style="margin-bottom:14px; max-width:520px;">
+        <label>Chave de ativação</label>
+        <textarea id="licencaChaveInput" style="min-height:70px;" placeholder="Cole aqui a chave de ativação recebida"></textarea>
+      </div>
+      <div class="hint" id="licencaAtivarErro" style="color:#b3261e; margin-bottom:10px; display:none;"></div>
+      <button class="btn purple" id="licencaAtivarBtn">Ativar</button>
+    </div>
   </div>
 
   <div class="settings-col-right">
@@ -493,6 +514,7 @@
       <a href="#cardCustoToken" class="settings-nav-link" data-target="cardCustoToken"><span>🏷️</span>Custo por token</a>
       <a href="#cardContador" class="settings-nav-link" data-target="cardContador"><span>🧮</span>Respostas geradas</a>
       <a href="#cardFunil" class="settings-nav-link" data-target="cardFunil"><span>🗣️</span>Funil de vendas</a>
+      <a href="#cardLicenca" class="settings-nav-link" data-target="cardLicenca"><span>🔑</span>Licenciamento</a>
     </nav>
     <div class="settings-legal-note">🔒 Dados de clientes protegidos por criptografia. Acesso ou uso indevido de informação de terceiros pode configurar violação da LGPD (Lei 13.709/2018).</div>
   </div>
@@ -515,6 +537,8 @@
 
 <div class="toast" id="toast"></div>
 <script src="aba-unica.js"></script>
+<script src="licensing/license-verifier.js"></script>
+<script src="licensing/license-repo.js"></script>
 <script src="funil-padrao.js"></script>
 <script src="auth.js"></script>
 <script src="perfis.js"></script>

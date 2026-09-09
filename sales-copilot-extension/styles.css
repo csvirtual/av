@@ -183,6 +183,9 @@ textarea{resize:vertical; min-height:90px; line-height:1.45;}
   margin:2px 4px 2px 0;
 }
 .chip.teal{background:#DCEEE9; color:var(--teal-dark);}
+.chip.green{background:#DDF3E4; color:#1a7a3d;}
+.chip.gold{background:#FBEED0; color:#8a6100;}
+.chip.red{background:#FBE0DE; color:#b3261e;}
 .disclaimer{
   font-size:11px;
   color:var(--muted);
