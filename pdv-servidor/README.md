@@ -23,15 +23,20 @@ scratchpad efêmero antes de ser recuperado e trazido pro repositório em
 node seed.js && node server.js` sobe em segundos, `/api/status` responde
 `{"ok":true}`.
 
-**Suíte completa (19 arquivos `test-*.cjs`, incluindo `test-real-ui.cjs`)
-roda 100% verde neste ambiente hoje** (confirmado de novo em 09/set, banco
-e servidor recém-subidos pra cada teste, depois de ligar a interface real —
-ver Fase 9 abaixo). Um achado anterior (09/set, ainda de manhã) tinha
-registrado 4 testes "-multiterminal" falhando por timeout neste sandbox
-específico — não reproduziu na rodada mais recente, então parece ter sido
-flutuação de timing pontual, não uma falha persistente do ambiente. Se
-voltar a acontecer, vale registrar de novo aqui com mais detalhe antes de
-investigar a fundo.
+**Suíte completa (22 arquivos `test-*.cjs`) roda 100% verde neste ambiente
+hoje** — cada teste isolado, banco e servidor recém-subidos, é sempre a
+fonte de verdade. Rodar todos em SEQUÊNCIA numa única bateria, porém,
+segue mostrando flutuação de timing pontual neste sandbox específico
+(confirmado de novo em 09/set, à tarde: `test-security-multiterminal`,
+`test-multi-terminal` e `test-live-updates` "falharam" numa bateria
+completa, os três em cliques/esperas do Playwright — nunca em asserção de
+dado incorreto — e os três passaram limpos ao rodar de novo sozinhos,
+banco fresco, logo em seguida). Continua parecendo timing/recursos deste
+sandbox especificamente sob a carga de rodar tudo em sequência, não uma
+falha real do código — mas registrado aqui de novo, com mais detalhe,
+porque já se repetiu mais de uma vez e não deveria ser esquecido. Se
+alguma dessas falhas voltar a acontecer isolada (não só numa bateria
+completa), é hora de investigar a fundo.
 
 ## Roteiro — 10 fases
 
@@ -45,7 +50,7 @@ investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV completos, com atualização em tempo real, testados (09/set) — `session.js`, os 9 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`), `views/products.js`+`views/sale.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo os terminais em sincronia via WebSocket — `test-real-ui.cjs` e `test-live-updates.cjs` verdes. Falta só as ~11 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas completos, com atualização em tempo real, testados (09/set) — `session.js`, 11 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js` reais rodando contra o servidor sem reescrita (estorno incluído), e `public/js/live.js` mantendo Estoque/PDV em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs` e `test-sales-history.cjs` verdes. Faltam as ~10 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -372,10 +377,55 @@ revisado pro início da Fase 9:
    política da loja (`company-changed`, novo — `routes/company.js` nunca
    avisava ninguém quando desconto/juro mudavam, corrigido no mesmo passo).
 
-Com os passos 5 e 6 fechados, a Fase 9 está **substancialmente completa**
-pro par Estoque+PDV: a hipótese central do roteiro (telas reais
-reaproveitáveis sem reescrita) está provada na prática, e a promessa
-central do produto (todo terminal vê o mesmo estado em tempo real) também
-já é verdade na interface de produção, não só nos testes de API. O que
-falta da Fase 9 (as ~11 telas restantes, o `app.js` completo) é trabalho
-real de mais fases, não um risco em aberto.
+7. ✅ **`views/salesHistory.js` real ligada** (09/set) — terceira tela real
+   (Estoque, PDV, agora Histórico de vendas), **copiada sem nenhuma
+   alteração** de `pdv-extension/app/js/views/`, incluindo o fluxo completo
+   de estorno (total ou por item). Novo em `public/js/data/`:
+   `salesRepo.js#listSalesPage`/`summarizeSales`/`refundSaleItems`/
+   `saleStatus` (as 4 funções que a extensão reservava "pra quando essa
+   tela for a vez"), `usersRepo.js#listUsers` (filtro de vendedor) e
+   `customersRepo.js#listCustomers` (busca de cliente do filtro). Toda a
+   lógica pesada do estorno (atomicidade, crédito de estoque, redução
+   proporcional de dívida fiada e de pontos de fidelidade, geração de
+   crédito de troca) **já existia pronta em `routes/sales.js` desde a Fase
+   2** — só faltava a UI real e o wrapper de cliente; nenhuma mudança
+   nessa lógica foi necessária. Testado em `test-sales-history.cjs` (13
+   asserções): listagem, filtro por vendedor, resumo (contagem + total
+   líquido), detalhe de uma venda, estorno de ponta a ponta pela UI
+   (crédito de volta ao estoque confirmado), e as adversárias que fecham o
+   círculo — o servidor rejeita estornar mais do que foi vendido mesmo
+   atacando a API direto (não só o campo `max` do formulário), e reenviar
+   a MESMA chave de estorno (dedupeKey) é rejeitado com 409 em vez de
+   estornar duas vezes.
+
+   **Achado (pequeno, de forma):** a rota `POST /:id/refund` devolvia só
+   `{ sale }` — mas o contrato de `refundSaleItems()` da extensão espera
+   `{ sale, refund, debtReduced }` de volta (usado pro toast de
+   confirmação: "Estorno de RS confirmado. Dívida do cliente reduzida em
+   R$X"). Corrigido devolvendo os três — `refund` é sempre o último item
+   de `sale.refunds` (a transação acabou de dar `push` nele), e
+   `debtReduced` (calculado internamente pra gravar o lançamento de
+   dívida, mas nunca retornado) agora sai da transação também. Achado de
+   teste (não de app): `formatMoney()` usa `Intl.NumberFormat('pt-BR',
+   ...)`, que separa "R$" do valor com um **espaço não-quebrável**
+   (U+00A0), não um espaço comum — uma asserção com `.includes('R$
+   20,00')` (espaço literal) nunca bate; corrigido pra regex com `\s`
+   (que casa os dois), mesmo padrão que as outras asserções deste arquivo
+   já usavam.
+
+   **Decisão de UI, documentada em `public/js/app.js`:** a rota
+   `historico` de propósito NÃO entra no `LIVE_TOPICS` da atualização em
+   tempo real (passo 6) — filtro (vendedor/cliente/datas) e paginação
+   ("Carregar mais") são estado só de tela, perdido a cada recarregamento;
+   recarregar a lista inteira debaixo de quem está no meio de uma
+   conferência de vendas, só porque outro terminal vendeu algo, custaria
+   mais do que ajuda. Mesmo raciocínio já aplicado à tela de PDV no passo
+   6.
+
+Com os passos 5, 6 e 7 fechados, a Fase 9 está **substancialmente
+completa** pro trio Estoque+PDV+Histórico: a hipótese central do roteiro
+(telas reais reaproveitáveis sem reescrita) segue provada na prática, a
+promessa de tempo real já é verdade na interface de produção onde faz
+sentido, e agora também dá pra auditar/estornar uma venda sem sair da UI
+de produção. O que falta da Fase 9 (as ~10 telas restantes, o `app.js`
+completo) é trabalho real de mais fases, não um risco em aberto.

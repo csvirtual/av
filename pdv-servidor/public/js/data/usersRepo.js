@@ -1,8 +1,18 @@
-// Usuários — versão multi-terminal. Escopo desta primeira fatia: só
-// `verifyLogin`, o que components/passwordConfirm.js chama (confirmação
-// pontual de senha de admin, sem criar sessão — aprovação de desconto em
-// sale.js). `listUsers`/`createUser`/permissões (usados por uma futura
-// views/users.js portada) ficam pra quando essa tela for a vez.
+// Usuários — versão multi-terminal. `verifyLogin` (Fase 9, passo 3) é o
+// que components/passwordConfirm.js chama (confirmação pontual de senha
+// de admin, sem criar sessão — aprovação de desconto em sale.js);
+// `listUsers` (passo 7) é o que o filtro de vendedor de
+// views/salesHistory.js precisa. `createUser`/permissões (usados por uma
+// futura views/users.js portada) ficam pra quando essa tela for a vez.
+import { api } from './apiClient.js';
+
+/** Lista de vendedores/admins pra exibição — mesmo contrato de
+ * app/js/data/usersRepo.js#listUsers() da extensão. */
+export async function listUsers() {
+  const { users } = await api('/api/users');
+  return users;
+}
+
 /** Confirma usuário+senha sem logar como essa pessoa (ver
  * routes/auth.js#POST /verify) — devolve o usuário ou `null` pra
  * credencial inválida, mas LANÇA pra qualquer outra falha (rede,

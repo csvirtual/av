@@ -1,10 +1,20 @@
-// Clientes — versão multi-terminal. Escopo desta fatia: `getCustomerBalance`
-// (views/sale.js, saldo devedor antes de vender fiado) e
-// `searchCustomers`/`createCustomer` (components/customerPicker.js,
-// compartilhado por sale.js pro seletor de cliente da venda).
+// Clientes — versão multi-terminal. `getCustomerBalance` (views/sale.js,
+// saldo devedor antes de vender fiado) e `searchCustomers`/`createCustomer`
+// (components/customerPicker.js, compartilhado por sale.js pro seletor de
+// cliente da venda) são da Fase 9 passo 4; `listCustomers` (passo 7) é o
+// que o filtro de cliente de views/salesHistory.js precisa (busca em
+// memória sobre a lista inteira, mesmo padrão já usado em sale.js/
+// carreto.js — só a seleção final vira filtro de verdade no servidor).
 // `recordPayment`/extrato/edição (usados por uma futura views/clientes.js
 // portada) ficam pra quando essa tela for a vez.
 import { api } from './apiClient.js';
+
+/** Lista completa de clientes — mesmo contrato de
+ * app/js/data/customersRepo.js#listCustomers() da extensão. */
+export async function listCustomers() {
+  const { customers } = await api('/api/customers');
+  return customers;
+}
 
 /** Busca por nome ou telefone (só dígitos, ignora pontuação) — mesmo
  * contrato de app/js/data/customersRepo.js#searchCustomers() da extensão.

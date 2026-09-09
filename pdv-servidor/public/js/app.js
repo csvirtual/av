@@ -10,6 +10,7 @@
 import { getSessionUserId, setSessionUserId, onSessionUserIdChanged, clearSession } from './session.js';
 import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
+import { renderSalesHistory } from './views/salesHistory.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -18,6 +19,7 @@ const root = document.getElementById('root');
 const ROUTES = {
   estoque: { label: 'Estoque', render: renderProducts },
   venda: { label: 'Nova venda', render: renderSale },
+  historico: { label: 'Histórico de vendas', render: renderSalesHistory },
 };
 const DEFAULT_ROUTE = 'venda';
 
@@ -30,7 +32,13 @@ const DEFAULT_ROUTE = 'venda';
 // test-sale-repos.cjs), e recarregar a tela inteira no meio de uma venda
 // destruiria o foco de quem está digitando. 'estoque' já é seguro
 // recarregar por completo (é só uma lista + modais, que vivem fora do
-// container — ver components/modal.js).
+// container — ver components/modal.js). 'historico' também fica de fora
+// de propósito, mesmo raciocínio de 'venda': filtro (vendedor/cliente/
+// datas) e paginação ("Carregar mais") são estado só de tela, perdido a
+// cada recarregamento — um vendedor no meio de uma conferência de vendas
+// não deveria ter a lista trocada debaixo dele por causa de uma venda em
+// OUTRO terminal; quem quiser ver o mais recente já tem os filtros (que
+// já recarregam) e um F5.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),

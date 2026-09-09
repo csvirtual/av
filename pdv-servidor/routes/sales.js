@@ -384,10 +384,11 @@ const commitRefund = db.transaction((input) => {
   // original) — não é 'pagamento' de propósito: não é dinheiro recebido,
   // então não deve inflar o "esperado em caixa" de nenhuma sessão (ver
   // routes/cash.js#computeExpectedAmounts, que só soma 'pagamento').
+  let debtReduced = 0;
   if (sale.customerId && sale.total > 0) {
     const fiadoTotal = sale.payments.filter((p) => p.method === FIADO_METHOD).reduce((s, p) => s + p.amount, 0);
     if (fiadoTotal > 0) {
-      const debtReduced = fiadoTotal * (totalRefunded / sale.total);
+      debtReduced = fiadoTotal * (totalRefunded / sale.total);
       const debtEntry = {
         id: crypto.randomUUID(), customerId: sale.customerId, type: 'estorno', amount: debtReduced,
         saleId: sale.id, refundId: refund.id, paymentMethod: null, cashSessionId: null,
@@ -431,16 +432,22 @@ const commitRefund = db.transaction((input) => {
       }
     }
   }
-  return sale;
+  return { sale, debtReduced };
 });
 
 router.post('/:id/refund', (req, res) => {
   try {
-    const sale = commitRefund({ ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId });
+    const { sale, debtReduced } = commitRefund({ ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId });
     broadcast('sales-changed', { reason: 'refunded', id: sale.id });
     broadcast('products-changed', { reason: 'refund' });
     if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId });
-    res.json({ sale });
+    // `refund` não vem separado do estado interno da transação — é sempre o
+    // último item de sale.refunds (foi acabado de dar push nele ali em
+    // cima), então derivar daqui é seguro e evita duplicar o objeto na
+    // resposta. views/salesHistory.js#openRefundModal usa refund.id e
+    // refund.totalRefunded pro toast de confirmação; debtReduced, quando >
+    // 0, também entra na mesma mensagem.
+    res.json({ sale, refund: sale.refunds[sale.refunds.length - 1], debtReduced });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este estorno já foi registrado — evite reenviar.' });
