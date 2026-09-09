@@ -1,6 +1,6 @@
 // Ao clicar no ícone, abrimos (ou focamos) uma ABA normal do Chrome com o Copiloto,
 // em vez de janela flutuante ou side panel. Ela não encolhe nem afeta nenhuma outra aba.
-importScripts('perfis.js');
+importScripts('perfis.js', 'shared/logger.js', 'shared/messaging.js');
 
 const PANEL_TAB_KEY = 'panelTabInfo'; // { id, windowId } — guardado em chrome.storage.session
 const OPTIONS_TAB_KEY = 'optionsTabInfo'; // mesma ideia, só que pra options.html (ver copilotoRegistrarOuChecarAba)
@@ -168,6 +168,63 @@ async function copilotoReivindicarGeracaoCredencialInicial(){
   });
 }
 
+// ---------- Repasse do WhatsApp Adapter (fase 3) ----------
+//
+// content/whatsapp-adapter.js roda numa aba de web.whatsapp.com — não tem
+// como falar direto com a aba do painel (content scripts só conversam com
+// o próprio background). Este service worker é o único ponto que os dois
+// lados compartilham, então é ele quem repassa.
+//
+// Escopo desta fase: só REPASSAR pro painel, se uma aba de painel estiver
+// registrada agora (ver PANEL_TAB_KEY acima). panel.js ainda não tem
+// nenhum listener pra estas mensagens (isso é a fase 4) — chrome.tabs.sendMessage
+// pra uma aba sem listener não lança erro nem afeta o WhatsApp de jeito
+// nenhum, só não tem efeito visível ainda. Nunca guarda/enfileira a
+// mensagem quando não há painel aberto: perder um evento de "chegou
+// mensagem nova" enquanto o painel está fechado é aceitável (a pessoa só
+// vai gerar resposta quando abrir o painel de qualquer forma, e nesse
+// momento a leitura do WhatsApp roda de novo do zero).
+async function repassarParaPainel(mensagem) {
+  const stored = await chrome.storage.session.get(PANEL_TAB_KEY);
+  const info = stored[PANEL_TAB_KEY];
+  if (!info) return; // nenhum painel aberto agora — nada a fazer
+  chrome.tabs.sendMessage(info.id, mensagem, () => {
+    // Lê lastError só pra ele não virar um "Unchecked runtime.lastError"
+    // barulhento no console — é esperado e sem problema nenhum enquanto
+    // panel.js não tiver o listener da fase 4 (ou se a aba do painel
+    // tiver fechado bem entre o get() acima e este sendMessage).
+    void chrome.runtime.lastError;
+  });
+}
+
+// Confere se uma mensagem recebida via chrome.runtime.onMessage veio
+// mesmo de uma aba de https://web.whatsapp.com/ — extraída como função
+// pura (só olha `tab`, nunca chama chrome.*) pra poder ser testada isolada,
+// sem precisar de uma aba real do WhatsApp (ver teste desta fase).
+//
+// Chrome preenche sender.tab.url de verdade pro content script (não exige
+// a permissão sensível "tabs" pra isso — essa exigência é só pra
+// chrome.tabs.query/get lendo a URL de uma aba QUALQUER; aqui é o content
+// script informando a URL da PRÓPRIA aba onde ele roda, coisa que o
+// content_scripts.matches do manifest já autoriza).
+function _copilotoOrigemEhWhatsApp(tab) {
+  return !!(tab && typeof tab.url === 'string' && tab.url.startsWith('https://web.whatsapp.com/'));
+}
+
+// AVISO IMPORTANTE PRA FASE 4 (achado ao testar esta fase, não escondido):
+// chrome.runtime.sendMessage transmite pra TODO listener vivo da extensão
+// ao mesmo tempo — background (aqui), qualquer aba de panel.html/options.html
+// que também tenha chrome.runtime.onMessage.addListener, etc. Não existe
+// "só o background recebe primeiro" — o repasse via repassarParaPainel()
+// abaixo (chrome.tabs.sendMessage) é uma ENTREGA A MAIS, não a ÚNICA
+// entrega. Ou seja: o filtro de origem AQUI protege contra o background
+// agir sobre uma mensagem forjada (repassar lixo, por exemplo) — mas se a
+// fase 4 adicionar um chrome.runtime.onMessage.addListener direto em
+// panel.js pra estas mensagens, ELE RECEBE A TRANSMISSÃO BRUTA TAMBÉM,
+// sem passar por este filtro. A fase 4 precisa repetir a MESMA checagem
+// (usando o `sender` que o próprio listener dela recebe) antes de confiar
+// no conteúdo — este filtro aqui não é, sozinho, a fronteira de segurança
+// completa.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.tipo === 'copilotoRegistrarAbaPainel') {
     const chave = message.pagina === 'options' ? OPTIONS_TAB_KEY : PANEL_TAB_KEY;
@@ -179,6 +236,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.tipo === 'copilotoReivindicarGeracaoCredencialInicial') {
     copilotoReivindicarGeracaoCredencialInicial().then(sendResponse);
     return true; // resposta assíncrona
+  }
+  if (_copilotoOrigemEhWhatsApp(sender.tab) && copilotoEhMensagemValida(message)) {
+    copilotoLog('DEBUG', 'background', { evento: 'mensagem_do_adapter_recebida', tipo: message.tipo });
+    repassarParaPainel(message);
   }
   return undefined;
 });

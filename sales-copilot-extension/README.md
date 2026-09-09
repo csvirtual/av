@@ -55,9 +55,23 @@ que já existe:
   validador de resposta de IA.
 - **`content/whatsapp-adapter.js`** + **`content/selectors.js`** — content
   script injetado em `https://web.whatsapp.com/*` (declarado em
-  `manifest.json`). **Fase 2** (escopo atual): só observa e loga no console
-  — nunca envia nada pro painel, nunca dispara chamada de IA, nunca escreve
-  no DOM do WhatsApp nem intercepta envio de mensagem.
+  `manifest.json`). **Fases 2+3** (escopo atual): observa, loga, e repassa
+  (via `background.js`) conversa ativa/mensagens novas pra aba do painel,
+  **se ela estiver aberta** — `panel.js` ainda não faz nada com isso (fase
+  4). Nunca dispara chamada de IA, nunca escreve no DOM do WhatsApp nem
+  intercepta envio de mensagem. Inclui um health-check periódico (5s) que
+  reconecta o `MutationObserver` se o WhatsApp Web substituir o container
+  do painel inteiro (comum em apps React) — sem isso a extensão ficaria
+  "cega" silenciosamente até a página recarregar.
+
+  **Importante pra fase 4 (segurança)**: `chrome.runtime.sendMessage`
+  transmite pra todo listener vivo da extensão ao mesmo tempo — não existe
+  "só o background recebe e decide". `background.js` já valida que a
+  mensagem veio de uma aba `https://web.whatsapp.com/` antes de repassar
+  (`_copilotoOrigemEhWhatsApp`), mas quando `panel.js` (fase 4) registrar o
+  próprio listener pra estas mensagens, ele recebe a transmissão bruta
+  também — precisa repetir a mesma validação de `sender.tab.url` antes de
+  confiar no conteúdo. Ver aviso completo em `shared/messaging.js`.
 
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em

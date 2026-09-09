@@ -12,6 +12,17 @@
 //
 // Toda mensagem trocada entre os três contextos segue o mesmo envelope:
 // { tipo: <uma das constantes abaixo>, dados: {...}, quando: <timestamp> }
+//
+// AVISO DE SEGURANÇA (achado testando a fase 3, documentado aqui pra fase
+// 4 não pular): chrome.runtime.sendMessage transmite pra TODO listener
+// vivo da extensão ao mesmo tempo — não existe "só o background recebe
+// primeiro, e ele decide se repassa". Quando panel.js (fase 4) registrar
+// seu próprio chrome.runtime.onMessage.addListener pra estas mensagens,
+// ele vai receber a transmissão BRUTA de qualquer chamador (não só a
+// repassada por background.js#repassarParaPainel) — precisa validar
+// `sender.tab.url` ele mesmo (mesma checagem de
+// background.js#_copilotoOrigemEhWhatsApp) antes de tratar o conteúdo como
+// vindo de verdade do WhatsApp.
 const COPILOTO_MSG = {
   // Adapter -> background -> painel: a aba do WhatsApp mudou de conversa
   // (outro contato/grupo ficou em primeiro plano). dados: { contato }.

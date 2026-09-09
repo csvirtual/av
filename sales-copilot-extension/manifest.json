@@ -26,6 +26,7 @@
       "matches": ["https://web.whatsapp.com/*"],
       "js": [
         "shared/logger.js",
+        "shared/messaging.js",
         "core/conversation-normalizer.js",
         "content/selectors.js",
         "content/whatsapp-adapter.js"
