@@ -15,6 +15,7 @@ import { renderSalesHistory } from './views/salesHistory.js';
 import { renderClientes } from './views/clientes.js';
 import { renderCarreto } from './views/carreto.js';
 import { renderUsers } from './views/users.js';
+import { renderCaixa } from './views/caixa.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -34,6 +35,7 @@ const ROUTES = {
   clientes: { label: 'Clientes', render: renderClientes },
   carreto: { label: 'Carreto', render: renderCarreto },
   usuarios: { label: 'Usuários', render: renderUsers },
+  caixa: { label: 'Caixa', render: renderCaixa },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -58,7 +60,13 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // zero a cada render), então escuta de tudo que pode mudar um dos
 // cartões — é literalmente o propósito da tela. 'usuarios' também não
 // tem filtro nem paginação (a lista de vendedores de uma loja é sempre
-// pequena) — seguro escutar 'users-changed' e recarregar sozinho.
+// pequena) — seguro escutar 'users-changed' e recarregar sozinho. 'caixa'
+// fica de fora pelo mesmo motivo de 'vendas'/'clientes'/'carreto': o
+// estado fechado tem paginação no histórico E um campo de valor inicial
+// que pode estar sendo digitado; o estado aberto tem formulários abertos
+// nos modais de sangria/suprimento/retificação/fechamento — um
+// recarregamento no meio de qualquer um desses perderia o que a pessoa
+// já tinha preenchido.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),

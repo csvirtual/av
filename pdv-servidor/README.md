@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs` e `test-users.cjs` verdes. Achado de segurança real corrigido no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11). Faltam as ~6 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa completos, com atualização em tempo real, testados (09/set) — `session.js`, 13 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs` e `test-caixa.cjs` verdes. Achados de segurança reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12). Faltam as ~5 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -634,15 +634,89 @@ revisado pro início da Fase 9:
     pra refletir o comportamento correto (bloqueado), com um novo alvo sem
     poder a mais pro caso "normal" de verdade.
 
-Com os passos 5 a 11 fechados, a Fase 9 está **substancialmente
-completa** pro septeto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
-Usuários: a hipótese central do roteiro (telas reais reaproveitáveis sem
-reescrita) segue provada na prática, a promessa de tempo real já é
-verdade onde faz sentido, e o ciclo operacional inteiro da loja — vender,
-repor estoque, fiado, fidelidade, visão geral, entregar, e agora gerir
-vendedores — já roda pela UI real.
-O que falta da Fase 9 (as ~6 telas restantes — caixa, compras,
-financeiro, logs, relatórios, personalização/backup/ajuda —, o `app.js`
-completo com menu lateral, e a lacuna de crédito de troca cross-terminal
-documentada no passo 8) é trabalho real de mais fases, não risco em
-aberto.
+12. ✅ **`views/caixa.js` real ligada** (09/set) — oitava tela real
+    (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários, agora
+    Caixa), **copiada sem nenhuma alteração** de
+    `pdv-extension/app/js/views/`. Abertura com troco inicial, sangria/
+    suprimento, retificação de lançamento errado, fechamento com
+    conferência por forma de pagamento, confirmação por senha de QUALQUER
+    conta ativa (não precisa ser admin) e backup automático gerado e
+    baixado sozinho nessa hora, histórico paginado de caixas, e o aviso de
+    redirecionamento pro PDV quando a política "exigir caixa aberto pra
+    vender" está ligada.
+
+    A mais pesada das oito telas em lógica de negócio nova no servidor —
+    diferente das anteriores, que só precisavam de wrappers HTTP sobre
+    rotas já prontas, faltavam DUAS peças inteiras:
+
+    - **Retificação (`POST /sessions/:id/retificar`, nova em
+      `routes/cash.js`):** a extensão fecha um erro de digitação no troco
+      inicial/sangria/suprimento com um lançamento tipo `'ajuste'` por
+      cima (nunca edita o original), e reconfere a CONCORRÊNCIA dentro da
+      própria transação — se duas pessoas abrirem "Retificar" sobre o
+      MESMO lançamento quase juntas, a segunda a confirmar é rejeitada se
+      o valor efetivo mudou desde que ela abriu o modal (em vez de aplicar
+      sua correção sobre uma base já desatualizada pela primeira). Essa
+      rota não existia no servidor até agora — `computeExpectedAmounts()`
+      nem tratava `'ajuste'` no cálculo de Dinheiro esperado. Portado
+      byte-a-byte: a mesma função pura `effectiveAmount()` (também copiada
+      pro cliente, `public/js/data/cashRepo.js`, pra alimentar a prévia do
+      modal sem round-trip) e a mesma reconferência de concorrência dentro
+      da transação SQLite.
+    - **Backup automático ao fechar caixa (`POST
+      /api/cash/backup-fechamento`, nova, montada sob `/api/cash` e não
+      sob `/api/backup`):** a extensão gera esse backup DE PROPÓSITO sem
+      exigir a permissão `'backup'` (`data/backupRepo.js#
+      buildAutomaticCashCloseBackup`) — fechar caixa é ação de qualquer
+      vendedor (`roles: ['admin', 'vendedor']` em `app.js` da extensão,
+      sem permissão própria; mesmo `requireAuth` sem permissão adicional
+      que `/api/cash` já tinha no servidor), então exigir `'backup'` só
+      pra esse backup automático não impediria nada — o mesmo vendedor já
+      gera o mesmo dump completo fechando um caixa de verdade pela rota
+      normal. Montar a rota nova sob `/api/backup` (que EXIGE `'backup'`
+      no mount, ver `server.js`) teria introduzido justamente essa
+      diferença indevida em relação à extensão — daí a rota nova, com o
+      mesmo núcleo (`buildBackupPayload` + `encryptPayload`) mas fora
+      daquele gate.
+
+    Novo em `public/js/data/cashRepo.js`: `listSessions`, `openSession`,
+    `listSessionMovements`, `computeExpectedAmounts`, `recordCashMovement`,
+    `effectiveAmount`, `recordCashAdjustment`, `closeSession` (só
+    `getOpenSession` já existia, da Fase 9 passo 4). Novo
+    `public/js/data/backupRepo.js` (`buildAutomaticCashCloseBackup`) e uma
+    extração PARCIAL de `public/js/views/backup.js` — só as duas funções
+    utilitárias puras que `caixa.js` precisa (`downloadBlob`,
+    `timestampForFilename`), sem IndexedDB nenhum envolvido; quando a tela
+    de Backup real for portada, este arquivo vira a cópia verbatim
+    completa (mesmo padrão incremental já usado em `cashRepo.js` desde a
+    Fase 9 passo 4). `caixa` ficou de fora do `LIVE_TOPICS`: o estado
+    fechado tem paginação no histórico e um campo de valor inicial que
+    pode estar sendo digitado, e o estado aberto tem formulários de
+    sangria/suprimento/retificação/fechamento abertos em modais — um
+    recarregamento automático no meio de qualquer um desses perderia o
+    que a pessoa já tinha preenchido.
+
+    Testado em `test-caixa.cjs` (25 asserções): fluxo completo real
+    (abrir, sangria, suprimento, retificar, conferir o Dinheiro esperado
+    recalculado certo a cada passo, fechar com confirmação de um VENDEDOR
+    sem nenhuma permissão especial), zero erros JS/rede durante todo esse
+    fluxo (prova indireta de que o backup automático completou sem
+    exceção), retificação concorrente com base desatualizada rejeitada,
+    reenvio duplicado (mesma `dedupeKey`) rejeitado tanto pra movimento
+    quanto pra retificação, sessão fechada recusa novo movimento/
+    retificação/fechamento repetido, backup automático rejeita senha curta
+    mas funciona sem a permissão `'backup'`, e o aviso de redirecionamento
+    pro PDV aparece e navega quando a política correspondente está ligada.
+
+Com os passos 5 a 12 fechados, a Fase 9 está **substancialmente
+completa** pro octeto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
+Usuários+Caixa: a hipótese central do roteiro (telas reais reaproveitáveis
+sem reescrita) segue provada na prática mesmo na tela com mais lógica de
+negócio nova a portar no servidor, a promessa de tempo real já é verdade
+onde faz sentido, e o ciclo operacional inteiro da loja — vender, repor
+estoque, fiado, fidelidade, visão geral, entregar, gerir vendedores, e
+agora abrir/fechar caixa — já roda pela UI real.
+O que falta da Fase 9 (as ~5 telas restantes — compras, financeiro, logs,
+relatórios, personalização/backup/ajuda —, o `app.js` completo com menu
+lateral, e a lacuna de crédito de troca cross-terminal documentada no
+passo 8) é trabalho real de mais fases, não risco em aberto.

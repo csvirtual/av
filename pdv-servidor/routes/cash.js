@@ -10,6 +10,8 @@ import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getCaixaMode, resolveOpenSession } from '../lib/cashSession.js';
 import { updateConfig } from '../lib/companyConfig.js';
+import { buildBackupPayload } from '../lib/backup.js';
+import { encryptPayload } from '../lib/backupCrypto.js';
 
 const router = Router();
 
@@ -162,6 +164,80 @@ router.post('/sessions/:id/movimento', (req, res) => {
   }
 });
 
+/** Retificação de um erro em lançamento já feito no caixa aberto — troco
+ * inicial, uma sangria ou um suprimento específico. NUNCA edita ou apaga o
+ * lançamento original — grava um movimento tipo 'ajuste' por cima, com a
+ * DIFERENÇA entre o valor efetivo atual e o valor corrigido. Mesma lógica
+ * de cashRepo.js#recordCashAdjustment da extensão, incluindo a
+ * reconferência de concorrência: `originalAmount` vem do NAVEGADOR
+ * (calculado com a lista de movimentos que a tela tinha em memória quando
+ * o modal abriu) — se outra retificação for lançada nesse meio-tempo
+ * sobre o MESMO lançamento, o valor efetivo lido de novo AQUI DENTRO da
+ * transação (dado mais fresco possível) não vai mais bater com o que o
+ * navegador achava, e a retificação é rejeitada em vez de aplicada sobre
+ * base desatualizada. */
+const commitAdjustment = db.transaction((input) => {
+  if (input.dedupeKey) {
+    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
+  }
+  if (!['abertura', 'sangria', 'suprimento'].includes(input.targetType)) {
+    throw new Error('Tipo de retificação inválido.');
+  }
+  if (input.targetType !== 'abertura' && !input.targetMovementId) {
+    throw new Error('Selecione qual lançamento está sendo corrigido.');
+  }
+  if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo da retificação.');
+  const original = Number(input.originalAmount);
+  const corrected = Number(input.correctedAmount);
+  if (!Number.isFinite(original) || !Number.isFinite(corrected) || corrected < 0) {
+    throw new Error('Informe um valor corrigido válido.');
+  }
+  if (corrected === original) throw new Error('O valor corrigido é igual ao valor atual — nada a retificar.');
+
+  const row = getSessionByIdStmt.get(input.sessionId);
+  if (!row) throw new Error('Caixa não encontrado.');
+  const session = rowToSession(row);
+  if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
+
+  const currentMovements = listMovementsStmt.all(session.id).map((r) => JSON.parse(r.data));
+  const currentEffective = input.targetType === 'abertura'
+    ? effectiveAmount('abertura', session.openingAmount, currentMovements)
+    : (() => {
+        const base = currentMovements.find((m) => m.id === input.targetMovementId && (m.type === 'sangria' || m.type === 'suprimento'));
+        if (!base) return null;
+        return effectiveAmount(input.targetType, base.amount, currentMovements, input.targetMovementId);
+      })();
+  if (currentEffective === null) {
+    throw new Error('O lançamento que você está corrigindo não foi encontrado — pode já ter sido retificado por outra pessoa. Atualize a tela e tente de novo.');
+  }
+  if (Math.abs(currentEffective - original) > 0.005) {
+    throw new Error('O valor mudou desde que essa correção foi aberta (outra retificação pode ter sido lançada nesse meio-tempo). Atualize a tela e tente de novo.');
+  }
+
+  const dinheiroDelta = input.targetType === 'sangria' ? -(corrected - original) : (corrected - original);
+  const movement = {
+    id: crypto.randomUUID(), sessionId: session.id, type: 'ajuste', amount: dinheiroDelta,
+    targetType: input.targetType, targetMovementId: input.targetType === 'abertura' ? null : input.targetMovementId,
+    originalAmount: original, correctedAmount: corrected, reason: input.reason.trim(),
+    userId: input.userId, userName: input.userName, timestamp: Date.now(),
+  };
+  insertMovementStmt.run({ id: movement.id, sessionId: session.id, timestamp: movement.timestamp, data: JSON.stringify(movement) });
+  return movement;
+});
+
+router.post('/sessions/:id/retificar', (req, res) => {
+  try {
+    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName });
+    broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId });
+    res.status(201).json({ movement });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
+      return res.status(409).json({ error: 'Esta retificação já foi registrada — evite reenviar.' });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
 /** Quanto DEVERIA ter em caixa por forma de pagamento, a partir da abertura +
  * vendas da sessão + sangria/suprimento - estornos em espécie feitos durante
  * a sessão (de qualquer venda, não só das de hoje — ver nota no estorno em
@@ -206,9 +282,29 @@ function computeExpectedAmounts(session) {
   for (const m of movements) {
     if (m.type === 'suprimento') expected.Dinheiro += m.amount;
     if (m.type === 'sangria') expected.Dinheiro -= m.amount;
+    // 'ajuste' (retificação, ver POST /sessions/:id/retificar abaixo) já
+    // guarda a DIFERENÇA pronta em `amount`, sinal incluído — soma direto,
+    // sem repetir a lógica de sinal de sangria/suprimento aqui. Mesma
+    // lógica de cashRepo.js#computeExpectedAmounts da extensão.
+    if (m.type === 'ajuste') expected.Dinheiro += m.amount;
   }
 
   return expected;
+}
+
+/** Valor "efetivo" atual do troco inicial ou de uma sangria/suprimento
+ * específico, depois de aplicar toda retificação ('ajuste') já lançada em
+ * cima dele — mesma função pura de cashRepo.js#effectiveAmount da
+ * extensão (também copiada pro cliente, ver public/js/data/cashRepo.js,
+ * pra alimentar a prévia da tela sem round-trip). Usada aqui só pra
+ * RECONFERIR, dentro da transação de retificação, que o valor que o
+ * navegador achava que era "o atual" ainda bate com o que realmente é. */
+function effectiveAmount(targetType, baseAmount, movements, targetMovementId = null) {
+  const totalDelta = movements
+    .filter((m) => m.type === 'ajuste' && m.targetType === targetType
+      && (targetType === 'abertura' || m.targetMovementId === targetMovementId))
+    .reduce((sum, m) => sum + m.amount, 0);
+  return targetType === 'sangria' ? baseAmount - totalDelta : baseAmount + totalDelta;
 }
 
 router.post('/sessions/:id/fechar', (req, res) => {
@@ -249,6 +345,33 @@ router.post('/sessions/:id/fechar', (req, res) => {
     const closed = closeCashSession();
     broadcast('cash-changed', { reason: 'closed', id: closed.id });
     res.json({ session: closed });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/** Backup de segurança automático gerado ao fechar caixa (ver
+ * views/caixa.js#openCloseModal, chamado logo depois de um fechamento bem-
+ * sucedido, com a MESMA senha que acabou de confirmar o fechamento) — mesmo
+ * núcleo de POST /api/backup/export (buildBackupPayload + encryptPayload),
+ * mas DE PROPÓSITO fora daquele router (que exige a permissão 'backup' no
+ * mount, ver server.js): montado só sob /api/cash, que como o resto deste
+ * router só exige estar logado (mesmo `roles: ['admin', 'vendedor']`, sem
+ * permissão própria, que a extensão já usa pra rota Caixa — ver app.js
+ * dela). Mesmo raciocínio da extensão (data/backupRepo.js#
+ * buildAutomaticCashCloseBackup): exigir 'backup' aqui não impediria nada —
+ * qualquer vendedor já pode gerar o mesmo backup completo fechando um caixa
+ * de verdade pela rota normal (POST /sessions/:id/fechar, sem gate de
+ * permissão nenhum) — só quebraria essa rede de segurança de fim de turno
+ * pra toda loja que não marcou 'backup' pro vendedor que fecha a caixa
+ * todo dia, que é a maioria. */
+router.post('/backup-fechamento', async (req, res) => {
+  try {
+    const password = req.body.password;
+    if (!password || password.length < 4) throw new Error('Informe uma senha com pelo menos 4 caracteres pra proteger o backup.');
+    const payload = buildBackupPayload();
+    const envelope = await encryptPayload(payload, password);
+    res.json({ envelope });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
