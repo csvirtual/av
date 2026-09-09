@@ -38,6 +38,40 @@ Não é necessário build nem npm install — é JavaScript puro, HTML e CSS.
 - `chatbot.js` — lógica de chat com o provedor de IA configurado.
 - `aba-unica.js` / `backtotop.js` — utilitários de UI compartilhados entre
   `panel.html` e `options.html`.
+- `shared/`, `core/`, `content/` — evolução em andamento pra ler o WhatsApp
+  Web automaticamente (ver seção **Evolução: leitura do WhatsApp Web**
+  abaixo). Nada aqui ainda é usado pelo painel principal.
+
+## Evolução: leitura do WhatsApp Web (em andamento, por fases)
+
+Documento de arquitetura completo na sessão que iniciou isto — resumo do
+que já existe:
+
+- **`shared/logger.js`** — log estruturado por nível (DEBUG/INFO/WARN/ERROR).
+- **`shared/messaging.js`** — contrato de mensagens entre o content script do
+  WhatsApp, o `background.js` e o painel.
+- **`core/`** — lógica pura (sem DOM, sem `chrome.*`), testável isoladamente:
+  normalização de mensagens, contexto/janela por lead, funil como dado,
+  validador de resposta de IA.
+- **`content/whatsapp-adapter.js`** + **`content/selectors.js`** — content
+  script injetado em `https://web.whatsapp.com/*` (declarado em
+  `manifest.json`). **Fase 2** (escopo atual): só observa e loga no console
+  — nunca envia nada pro painel, nunca dispara chamada de IA, nunca escreve
+  no DOM do WhatsApp nem intercepta envio de mensagem.
+
+  **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
+  os seletores em `content/selectors.js` foram escritos com base em
+  conhecimento geral da estrutura do WhatsApp Web (que muda sem aviso, sem
+  API pública). Depois de carregar a extensão com o WhatsApp Web aberto e
+  logado, rode no console **da aba do WhatsApp** (não do painel):
+  ```js
+  copilotoWhatsAppDiagnostico()
+  ```
+  Isso mostra uma tabela com qual seletor bateu (e em que posição da lista
+  de fallback) para cada conceito — painel de mensagens, bolha de mensagem,
+  nome do contato etc. — ou `"MISS"` se nenhum bateu. Qualquer `MISS`, ou
+  "bateu só no último fallback", é sinal de que `content/selectors.js`
+  precisa de ajuste para a versão atual do WhatsApp Web.
 
 ## Dados e IA
 
