@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs` e `test-dashboard.cjs` verdes. Faltam as ~8 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs` e `test-carreto.cjs` verdes. Faltam as ~7 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -539,15 +539,45 @@ revisado pro início da Fase 9:
    Máquina A atualiza sozinho (2→3 vendas hoje) quando a Máquina B vende
    algo, sem F5 nenhum.
 
-Com os passos 5 a 9 fechados, a Fase 9 está **substancialmente completa**
-pro quinteto Estoque+PDV+Histórico+Clientes+Painel: a hipótese central do
-roteiro (telas reais reaproveitáveis sem reescrita) segue provada na
-prática — inclusive a tela que mais junta domínios de uma vez, sem
-nenhuma linha de `views/dashboard.js` precisar mudar —, a promessa de
-tempo real já é verdade onde faz sentido (agora incluindo a tela de
-entrada do sistema), e o dia a dia inteiro (vender, ver estoque, fiado,
-fidelidade, e agora ter uma visão geral com deep-links) já roda pela UI
-real. O que falta da Fase 9 (as ~8 telas restantes, o `app.js` completo
-com menu lateral, e a lacuna de crédito de troca cross-terminal
-documentada no passo 8) é trabalho real de mais fases, não risco em
-aberto.
+10. ✅ **`views/carreto.js` real ligada** (09/set) — sexta tela real
+    (Estoque, PDV, Histórico, Clientes, Painel, agora Carreto), **copiada
+    sem nenhuma alteração** de `pdv-extension/app/js/views/`. Fecha o
+    ciclo de vida completo de uma entrega: cadastro (item do estoque via
+    busca + item avulso, na mesma lista), detalhe, marcar como entregue,
+    cancelar — com o mesmo cliente/servidor que o Painel (passo 9) e
+    `sale.js` (passo 4, "Finalizar venda + carreto") já usavam de leitura/
+    escrita parcial.
+
+    Novo em `public/js/data/deliveriesRepo.js`: `markDelivered` e
+    `cancelDelivery`, sobre `POST /:id/entregar`/`POST /:id/cancelar` que
+    já existiam prontos desde a Fase 6 (mesma transação atômica —
+    conferir "ainda pendente?" e gravar a transição juntos, pra duas
+    máquinas nunca conseguirem entregar E cancelar o mesmo carreto ao
+    mesmo tempo). Também copiado `components/productPicker.js` (busca de
+    produto do estoque compartilhada entre Carreto e, um dia, Pedido de
+    compra) — pequeno, só precisa de `searchProducts` (já existia).
+    `carreto` ficou de fora do `LIVE_TOPICS`, mesmo raciocínio de
+    `vendas`/`clientes`: tem filtro de status e paginação, estado só de
+    tela que um recarregamento automático perderia.
+
+    Testado em `test-carreto.cjs` (11 asserções): cadastro com os dois
+    tipos de item (estoque buscado + avulso descrito) na mesma lista,
+    detalhe mostrando os itens certos, marcar como entregue (some do
+    filtro "Pendentes", aparece em "Entregues"), cancelar (via
+    `confirmDialog`, não confirmação nativa do navegador), e duas
+    adversárias que fecham o círculo de atomicidade: o servidor rejeita
+    marcar como entregue um carreto já cancelado, e rejeita cancelar um
+    carreto já entregue — nunca dá pra empurrar um carreto de um estado
+    terminal pra outro.
+
+Com os passos 5 a 10 fechados, a Fase 9 está **substancialmente
+completa** pro sexteto Estoque+PDV+Histórico+Clientes+Painel+Carreto: a
+hipótese central do roteiro (telas reais reaproveitáveis sem reescrita)
+segue provada na prática, a promessa de tempo real já é verdade onde faz
+sentido, e o ciclo operacional inteiro da loja — vender, repor estoque,
+fiado, fidelidade, visão geral, e agora entregar — já roda pela UI real.
+O que falta da Fase 9 (as ~7 telas restantes — caixa, compras,
+financeiro, usuários, logs, relatórios, personalização/backup/ajuda —, o
+`app.js` completo com menu lateral, e a lacuna de crédito de troca
+cross-terminal documentada no passo 8) é trabalho real de mais fases, não
+risco em aberto.

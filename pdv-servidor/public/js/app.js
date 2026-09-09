@@ -13,6 +13,7 @@ import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
 import { renderClientes } from './views/clientes.js';
+import { renderCarreto } from './views/carreto.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -30,6 +31,7 @@ const ROUTES = {
   venda: { label: 'Nova venda', render: renderSale },
   vendas: { label: 'Histórico de vendas', render: renderSalesHistory },
   clientes: { label: 'Clientes', render: renderClientes },
+  carreto: { label: 'Carreto', render: renderCarreto },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -42,12 +44,12 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // test-sale-repos.cjs), e recarregar a tela inteira no meio de uma venda
 // destruiria o foco de quem está digitando. 'estoque' já é seguro
 // recarregar por completo (é só uma lista + modais, que vivem fora do
-// container — ver components/modal.js). 'vendas' e 'clientes' também
-// ficam de fora de propósito, mesmo raciocínio de 'venda': filtro
-// (vendedor/cliente/datas em vendas; busca/paginação em clientes) e
-// paginação ("Carregar mais") são estado só de tela, perdido a
-// cada recarregamento — um vendedor no meio de uma conferência de vendas
-// não deveria ter a lista trocada debaixo dele por causa de uma venda em
+// container — ver components/modal.js). 'vendas', 'clientes' e 'carreto'
+// também ficam de fora de propósito, mesmo raciocínio de 'venda': filtro
+// (vendedor/cliente/datas em vendas; busca/paginação em clientes; status
+// em carreto) e paginação ("Carregar mais") são estado só de tela,
+// perdido a cada recarregamento — um vendedor no meio de uma conferência
+// não deveria ter a lista trocada debaixo dele por causa de uma ação em
 // OUTRO terminal; quem quiser ver o mais recente já tem os filtros (que
 // já recarregam) e um F5. 'dashboard' é o oposto: não tem filtro nem
 // estado nenhum pra perder (é só um retrato do momento, recalculado do
