@@ -173,6 +173,19 @@ function escapeHtml(s){
 // (analyzeAndSuggest) quanto ao restaurar o rascunho salvo de um lead
 // (selectLead). `texto` vazio/undefined esconde o bloco em vez de mostrar
 // uma caixa vazia sem sentido.
+// ---------- Fase 7: editar a sugestão antes de copiar ----------
+// Sempre volta pro estado "só leitura" (nunca editável por padrão) — quem
+// chama isto é qualquer ponto que troca o CONTEÚDO da sugestão (nova
+// geração, restaurar rascunho de outro lead, trocar de lead): continuar em
+// modo de edição depois de uma dessas trocas editaria, por engano, o texto
+// do lead/geração ERRADO.
+function desativarEdicaoSugestao(){
+  const box = document.getElementById('suggestionText');
+  if(box){ box.contentEditable = 'false'; box.classList.remove('editando'); }
+  const btn = document.getElementById('editSuggestionBtn');
+  if(btn) btn.textContent = '✏️ Editar';
+}
+
 function renderProximaAcaoBox(texto){
   const box = document.getElementById('proximaAcaoBox');
   if(!box) return;
@@ -338,7 +351,10 @@ async function cifrarLeadsParaSalvar(listaLeads, dek){
 // fora "pessoa"/"categoria"/"estagio"/"quando"/"id": são só metadados
 // usados pra filtrar/ordenar/mostrar chips — então cifrar isso não quebra
 // nenhuma função existente.
-const CAMPOS_HISTORICO_CIFRADOS = ['pergunta', 'resposta', 'proximaPergunta'];
+// respostaFinal (fase 7): o texto de fato copiado, depois de qualquer
+// edição manual do atendente — mesma sensibilidade de `resposta` (é
+// conteúdo de conversa com o lead), cifrado do mesmo jeito.
+const CAMPOS_HISTORICO_CIFRADOS = ['pergunta', 'resposta', 'proximaPergunta', 'respostaFinal'];
 
 async function decifrarHistoricoEmMemoria(listaHistorico, dek){
   if(!dek) return listaHistorico;
@@ -1651,6 +1667,7 @@ async function selectLead(id){
   // (se houver) — cada lead guarda o seu próprio rascunho.
   document.getElementById('pasteBox').value = lead.draftMensagem || '';
   document.getElementById('extraContextInput').value = lead.draftContexto || '';
+  desativarEdicaoSugestao();
   if(lead.draftSugestaoTexto){
     document.getElementById('resultCard').style.display = 'block';
     document.getElementById('resultChips').innerHTML = construirChipsHtml(lead);
@@ -1737,6 +1754,31 @@ async function saveHistoryEntry(leadId, entry){
   return copilotoSerializarPorChave(historyKey(leadId), async () => {
     const arr = await loadHistory(leadId);
     arr.push(entry);
+    const dek = await obterDekAtivo();
+    const paraSalvar = await cifrarHistoricoParaSalvar(arr, dek);
+    await copilotoStorage.local.set({ [historyKey(leadId)]: paraSalvar });
+    return arr;
+  });
+}
+
+// ---------- Fase 7: rastro de edição humana (AI_SUGGESTION vs FINAL_MESSAGE) ----------
+//
+// Achado do pedido original (seção "Aprendizado com o humano"): preparar a
+// estrutura pra, no futuro, comparar o que a IA sugeriu com o que o
+// atendente de fato copiou/enviou — sem implementar nenhum treinamento
+// agora, só guardar os dois textos quando divergem. `resposta` (já
+// existente) continua sendo a sugestão ORIGINAL da IA, nunca mais tocada
+// depois de criada; `respostaFinal` só é gravado quando o atendente edita
+// a caixa antes de copiar (ver copySuggestion) — ausente/undefined
+// significa "copiou exatamente o que a IA sugeriu", nunca confundido com
+// "editou para ficar igual", que grava os dois iguais mesmo.
+async function atualizarRespostaFinalHistorico(leadId, entryId, respostaFinal, respostaOriginal){
+  return copilotoSerializarPorChave(historyKey(leadId), async () => {
+    const arr = await loadHistory(leadId);
+    const entrada = arr.find(h => h.id === entryId);
+    if(!entrada) return arr;
+    entrada.respostaFinal = respostaFinal;
+    entrada.editadoPeloHumano = respostaFinal !== respostaOriginal;
     const dek = await obterDekAtivo();
     const paraSalvar = await cifrarHistoricoParaSalvar(arr, dek);
     await copilotoStorage.local.set({ [historyKey(leadId)]: paraSalvar });
@@ -4568,6 +4610,7 @@ async function analyzeAndSuggest(){
   btn.disabled = true;
   document.getElementById('loadingIndicator').style.display = 'inline';
   document.getElementById('resultCard').style.display = 'block';
+  desativarEdicaoSugestao();
   document.getElementById('suggestionText').textContent = '';
   document.getElementById('resultChips').innerHTML = '';
   document.getElementById('nextQuestion').textContent = '';
@@ -4687,12 +4730,22 @@ async function analyzeAndSuggest(){
     // roda sempre — mesmo se não estiver mais olhando pra este lead — pra
     // ele aparecer certinho quando a pessoa voltar a selecioná-lo.
     leadAtual.draftSugestaoTexto = textoDaIA(parsed.resposta_sugerida);
+    // Nunca mais tocado depois de criado — é a sugestão ORIGINAL da IA,
+    // base de comparação pra saber se o atendente editou antes de copiar
+    // (ver copySuggestion). draftSugestaoTexto continua sendo "o texto
+    // atual da caixa" (pode divergir do original após uma edição).
+    leadAtual.draftSugestaoTextoOriginal = leadAtual.draftSugestaoTexto;
     leadAtual.draftProximaPergunta = proximaPerguntaTexto;
     leadAtual.draftProximaAcaoTipo = proximaAcaoTipo;
     leadAtual.draftProximaAcaoTexto = proximaAcaoTexto;
+    // Guardado ANTES de limparCamposAposGerar apagar os campos — é o que o
+    // botão "🔄 Regenerar" usa pra repopular a tela e chamar
+    // analyzeAndSuggest() de novo com a mesma entrada.
+    leadAtual.draftUltimoInputTexto = pasted;
+    leadAtual.draftUltimoInputContexto = extraContext;
+    leadAtual.draftUltimoInputPessoa = leadAtual.fixo ? personName : '';
     leadAtual.draftMensagem = '';
     leadAtual.draftContexto = '';
-    await persistLeads();
 
     const novaEntradaHistorico = {
       id: 'h_' + Date.now(),
@@ -4709,6 +4762,12 @@ async function analyzeAndSuggest(){
       proximaPergunta: proximaPerguntaCrua,
       pessoa: leadAtual.fixo ? personName : ''
     };
+    // Guardado no lead (não só em lastGeneratedHistoryId, que só é setado
+    // quando aindaNesteLead) — copySuggestion precisa saber qual entrada
+    // atualizar com o texto final mesmo que a pessoa já tenha trocado de
+    // lead antes de copiar.
+    leadAtual.draftUltimoHistoryId = novaEntradaHistorico.id;
+    await persistLeads();
     const novoHistorico = await saveHistoryEntry(leadId, novaEntradaHistorico);
     if(aindaNesteLead){
       currentHistory = novoHistorico;
@@ -4761,6 +4820,42 @@ function viewLeadMessage(){
   item.classList.add('hist-highlight');
 }
 
+// Liga/desliga o modo de edição da caixa de sugestão (botão "✏️ Editar" /
+// "✓ Concluir edição"). Não precisa salvar nada ao entrar/sair: o texto já
+// fica gravado no próprio DOM enquanto a pessoa digita, e copySuggestion
+// sempre lê o `.textContent` atual (editado ou não) na hora de copiar.
+function toggleEdicaoSugestao(){
+  const box = document.getElementById('suggestionText');
+  const btn = document.getElementById('editSuggestionBtn');
+  if(!box || !btn) return;
+  const entrandoEmEdicao = box.contentEditable !== 'true';
+  box.contentEditable = entrandoEmEdicao ? 'true' : 'false';
+  box.classList.toggle('editando', entrandoEmEdicao);
+  btn.textContent = entrandoEmEdicao ? '✓ Concluir edição' : '✏️ Editar';
+  if(entrandoEmEdicao) box.focus();
+}
+
+// Botão "🔄 Regenerar" — repopula os campos com a MESMA entrada usada na
+// última geração deste lead (guardada em draftUltimoInput*, ver
+// analyzeAndSuggest) e chama analyzeAndSuggest() de novo, reaproveitando
+// 100% do fluxo normal — inclusive a confirmação de "já gerei uma resposta
+// pra essa exata mensagem" (detecção de duplicata em analyzeAndSuggest),
+// que aqui é o comportamento CERTO: regenerar de propósito é exatamente o
+// caso que essa confirmação existe pra permitir, não pra bloquear.
+async function regenerarSugestao(){
+  const lead = getCurrentLead();
+  if(!lead || !lead.draftUltimoInputTexto){
+    toast('Nada pra regenerar ainda — gere uma resposta primeiro.');
+    return;
+  }
+  document.getElementById('pasteBox').value = lead.draftUltimoInputTexto;
+  document.getElementById('extraContextInput').value = lead.draftUltimoInputContexto || '';
+  if(lead.fixo){
+    document.getElementById('personNameInput').value = lead.draftUltimoInputPessoa || '';
+  }
+  await analyzeAndSuggest();
+}
+
 function copySuggestion(){
   const text = document.getElementById('suggestionText').textContent;
   if(!text) return;
@@ -4770,6 +4865,18 @@ function copySuggestion(){
       toast('Não consegui copiar automaticamente — selecione e copie o texto manualmente');
       console.error(err);
     });
+
+  // Fase 7: se o texto copiado difere do que a IA sugeriu originalmente
+  // (a pessoa editou a caixa antes de copiar), grava o rastro no histórico
+  // — ver atualizarRespostaFinalHistorico. Nunca bloqueia a cópia em si:
+  // roda depois, silenciosamente; falhar aqui não pode impedir a pessoa de
+  // colar no WhatsApp, que já aconteceu.
+  const lead = getCurrentLead();
+  if(lead && lead.draftUltimoHistoryId && lead.draftSugestaoTextoOriginal !== undefined){
+    atualizarRespostaFinalHistorico(lead.id, lead.draftUltimoHistoryId, text, lead.draftSugestaoTextoOriginal)
+      .then((novoHistorico) => { if(currentLeadId === lead.id) currentHistory = novoHistorico; })
+      .catch((err) => console.error(err));
+  }
 }
 
 // Ação do botão "🧭 Sugerir abordagem de follow-up". Assim como
@@ -4908,6 +5015,8 @@ function bindEvents(){
   document.getElementById('analyzeBtn').addEventListener('click', analyzeAndSuggest);
   document.getElementById('copyBtn').addEventListener('click', copySuggestion);
   document.getElementById('viewLeadMessageBtn').addEventListener('click', viewLeadMessage);
+  document.getElementById('editSuggestionBtn').addEventListener('click', toggleEdicaoSugestao);
+  document.getElementById('regenerateBtn').addEventListener('click', regenerarSugestao);
   document.getElementById('followupBtn').addEventListener('click', suggestFollowupApproach);
   document.getElementById('copyFollowupBtn').addEventListener('click', copyFollowupApproach);
   document.getElementById('campanhaAtivaCheckbox').addEventListener('change', onCampanhaAtivaChange);

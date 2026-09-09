@@ -114,6 +114,27 @@ que já existe:
   resposta antiga (ou de um modelo que ignore o campo) simplesmente não
   tem `proxima_acao`, e o bloco fica escondido, sem quebrar nada.
 
+  **Fase 7 — UI do Copiloto (Editar / Regenerar / rastro de edição)**:
+  mantida a aba separada de sempre (decisão do usuário — sem migração pra
+  `chrome.sidePanel`). Dois botões novos no card de resultado:
+  - **✏️ Editar** — liga `contentEditable` na caixa de sugestão (borda
+    sólida quando ativo); `copySuggestion` sempre copia o texto ATUAL da
+    caixa, editado ou não.
+  - **🔄 Regenerar** — repopula `pasteBox`/`extraContextInput`/
+    `personNameInput` com a mesma entrada da última geração deste lead
+    (`draftUltimoInputTexto` etc.) e chama `analyzeAndSuggest()` de novo —
+    reaproveita 100% do fluxo normal, inclusive a confirmação de "já gerei
+    uma resposta pra essa mensagem" que já existia (aqui é o caso
+    esperado, não um bloqueio).
+
+  **Aprendizado com o humano (seção 9 do pedido original)** — estrutura
+  pronta, sem nenhum treinamento implementado: `resposta` no histórico
+  continua sendo a sugestão ORIGINAL da IA, nunca mais tocada; ao clicar
+  "Copiar", se o texto da caixa foi editado, `atualizarRespostaFinalHistorico`
+  grava `respostaFinal` (o texto de fato copiado) e `editadoPeloHumano:true`
+  na mesma entrada — cifrados do mesmo jeito que `resposta`
+  (`CAMPOS_HISTORICO_CIFRADOS`). Copiar sem editar não marca nada.
+
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
   conhecimento geral da estrutura do WhatsApp Web (que muda sem aviso, sem

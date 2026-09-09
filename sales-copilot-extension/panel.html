@@ -727,6 +727,13 @@
     background:#FBF9F5; border:1px dashed var(--line); border-radius:10px;
     padding:16px; font-size:14.5px; line-height:1.55; white-space:pre-wrap; margin:12px 0;
   }
+  /* Estado de edição (fase 7 — botão "✏️ Editar") — borda sólida em vez de
+     tracejada, pra ficar óbvio visualmente que agora dá pra digitar em
+     cima do texto, não só selecionar pra copiar. */
+  .suggestion-box.editando{
+    border-style:solid; border-color:var(--purple); background:#fff;
+    outline:2px solid var(--purple-soft);
+  }
   .next-q{ font-size:13.5px; color:var(--muted); border-left:3px solid var(--purple); padding-left:10px; margin-top:8px; }
   .proxima-acao{
     font-size:13.5px; font-weight:700; color:var(--teal-dark);
@@ -1516,7 +1523,9 @@
              tabela de custo por modelo, em Configurações. -->
         <div class="hint" id="roteamentoInfo"></div>
         <div class="actions-row">
-          <button class="btn secondary" id="copyBtn">Copiar resposta</button>
+          <button class="btn secondary" id="editSuggestionBtn" title="Ajustar o texto antes de copiar">✏️ Editar</button>
+          <button class="btn secondary" id="regenerateBtn" title="Gerar de novo com a mesma mensagem">🔄 Regenerar</button>
+          <button class="btn secondary" id="copyBtn">📋 Copiar resposta</button>
           <button class="btn secondary" id="viewLeadMessageBtn">Ver mensagem do lead</button>
         </div>
       </div>
