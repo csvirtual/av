@@ -11,6 +11,19 @@ let currentHistory = [];
 // "Ver mensagem do lead" pra rolar/destacar o item certo sem precisar
 // procurar manualmente na lista (que fica em ordem decrescente).
 let lastGeneratedHistoryId = null;
+
+// ---------- Fase 4: contexto vindo do WhatsApp Adapter ----------
+// Ver core/conversation-context.js (fase 1) e content/whatsapp-adapter.js
+// (fases 2/3). Por ora um contexto AMBIENTE só, não ligado a nenhum lead
+// específico — só preenche pasteBox automaticamente, no lugar do botão
+// "Colar" manual. Associar isto a um lead de verdade (por nome/telefone) é
+// trabalho da fase 5 (Integração com Sales Engine).
+let contextoWhatsAppAtual = null;
+// true enquanto o CONTEÚDO ATUAL de pasteBox ainda é exatamente o que este
+// contexto escreveu da última vez — falso assim que a pessoa edita o campo
+// por cima. Sem isto, uma mensagem nova chegando reescreveria por cima de
+// uma edição manual do atendente (perda de trabalho silenciosa).
+let pasteBoxPreenchidoPeloAdapter = false;
 // Extrai só os dígitos — usado pra comparar telefone na busca (que agora
 // fica formatado com parênteses/traço) sem depender da pontuação digitada.
 function apenasDigitos(valor){
@@ -3821,6 +3834,14 @@ function textoDaIA(valor, limite){
 // estiver olhando pra ESTE lead: a chamada leva segundos, e apagar o que ela
 // já começou a digitar em OUTRO lead seria perder trabalho dela.
 function limparCamposAposGerar(leadAtual, aindaNesteLead){
+  // O contexto do WhatsApp (fase 4) que alimentou esta geração já foi
+  // consumido — marca como processado sempre, mesmo se a pessoa trocou de
+  // lead enquanto a IA gerava (aindaNesteLead=false): o texto já foi usado
+  // de verdade, não pode voltar a aparecer como "pendente" depois.
+  if(pasteBoxPreenchidoPeloAdapter && contextoWhatsAppAtual){
+    copilotoContextoMarcarProcessado(contextoWhatsAppAtual);
+    pasteBoxPreenchidoPeloAdapter = false;
+  }
   if(!aindaNesteLead) return;
   document.getElementById('pasteBox').value = '';
   document.getElementById('extraContextInput').value = '';
@@ -6426,6 +6447,83 @@ document.getElementById('perfilSairBtn').addEventListener('click', sairDaTelaPer
 document.getElementById('trocarPerfilBtn').addEventListener('click', trocarPerfilClick);
 document.getElementById('perfilAtivoBadge').addEventListener('click', trocarPerfilClick);
 document.getElementById('adminImpersonandoVoltarBtn').addEventListener('click', voltarAoMeuPerfilAdmin);
+
+// ---------- Fase 4: consumo das mensagens do WhatsApp Adapter ----------
+//
+// content/whatsapp-adapter.js (fases 2/3) manda, via background.js, as
+// mensagens detectadas na conversa ativa do WhatsApp Web. Este listener só
+// preenche pasteBox automaticamente — no lugar do botão "Colar" manual
+// (pasteFromClipboard, mais acima) — NUNCA dispara "Gerar resposta"
+// sozinho. Continua sendo o humano quem clica pra chamar a IA, sempre.
+//
+// Sem WhatsApp aberto/detectando nada, pasteBox continua funcionando
+// exatamente como hoje (colar manual) — este listener nunca é a única
+// forma de preencher o campo, só um atalho a mais quando disponível.
+
+// AVISO DE SEGURANÇA (ver shared/messaging.js): chrome.runtime.sendMessage
+// transmite pra TODO listener vivo da extensão, não só pro background —
+// este listener PODE receber tanto a transmissão bruta do content script
+// quanto a cópia repassada por background.js#repassarParaPainel. Nunca
+// confia cegamente: valida a origem aqui de novo, do mesmo jeito que
+// background.js#_copilotoOrigemEhWhatsApp faz.
+function _copilotoWaMensagemConfiavel(sender) {
+  const deAbaWhatsApp = !!(sender && sender.tab && typeof sender.tab.url === 'string' && sender.tab.url.startsWith('https://web.whatsapp.com/'));
+  // Mensagem repassada por background.js (chrome.tabs.sendMessage a partir
+  // do service worker) chega aqui SEM sender.tab (o remetente não é uma
+  // aba, é o próprio service worker da extensão) — já foi validada lá
+  // antes de ser repassada, então é confiável por transição.
+  const doProprioServiceWorker = !!(sender && !sender.tab && sender.id === chrome.runtime.id);
+  return deAbaWhatsApp || doProprioServiceWorker;
+}
+
+// Escreve o texto pendente do contexto no campo — só quando o campo está
+// vazio, ou quando ainda só contém o que ESTE MESMO mecanismo escreveu da
+// última vez (nunca por cima de uma edição manual do atendente, ver
+// pasteBoxPreenchidoPeloAdapter).
+function atualizarPasteBoxComContextoWhatsApp() {
+  if (!contextoWhatsAppAtual) return;
+  const box = document.getElementById('pasteBox');
+  if (!box) return;
+  if (box.value.trim() !== '' && !pasteBoxPreenchidoPeloAdapter) return;
+  const pendente = copilotoContextoTextoPendente(contextoWhatsAppAtual);
+  if (pendente === null) return;
+  box.value = pendente;
+  pasteBoxPreenchidoPeloAdapter = true;
+  saveMensagemDraftNow();
+}
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (!copilotoEhMensagemValida(message) || !_copilotoWaMensagemConfiavel(sender)) return;
+
+  if (message.tipo === COPILOTO_MSG.CONVERSA_MUDOU) {
+    // TODO fase 5: decidir automaticamente qual LEAD corresponde a este
+    // contato (por nome/telefone) — por ora só reseta o contexto ambiente,
+    // sem tocar em currentLeadId nem criar/selecionar lead nenhum.
+    contextoWhatsAppAtual = copilotoContextoCriar(message.dados && message.dados.contato);
+    pasteBoxPreenchidoPeloAdapter = false;
+    return;
+  }
+  if (message.tipo === COPILOTO_MSG.MENSAGENS_NOVAS) {
+    if (!contextoWhatsAppAtual) contextoWhatsAppAtual = copilotoContextoCriar(null);
+    copilotoContextoAdicionarMensagens(contextoWhatsAppAtual, (message.dados && message.dados.mensagens) || []);
+    atualizarPasteBoxComContextoWhatsApp();
+    return;
+  }
+  if (message.tipo === COPILOTO_MSG.ADAPTER_DEGRADADO) {
+    // Fase 4: só loga — a UI continua funcionando 100% no fluxo manual
+    // (colar), que nunca deixou de existir e nunca depende do Adapter.
+    copilotoLog('WARN', 'panel', { evento: 'adapter_degradado', motivo: message.dados && message.dados.motivo });
+  }
+});
+
+// Assim que a pessoa EDITA pasteBox manualmente (evento 'input' só dispara
+// por interação real — nunca por atribuição via JS, como a que
+// atualizarPasteBoxComContextoWhatsApp faz), o conteúdo deixa de ser
+// "só o que o adapter escreveu" — próxima mensagem detectada não deve mais
+// sobrescrever o que a pessoa está digitando.
+document.getElementById('pasteBox').addEventListener('input', () => {
+  pasteBoxPreenchidoPeloAdapter = false;
+});
 
 (async ()=>{
   await copilotoChecagemAbaDuplicada;

@@ -40,7 +40,9 @@ Não é necessário build nem npm install — é JavaScript puro, HTML e CSS.
   `panel.html` e `options.html`.
 - `shared/`, `core/`, `content/` — evolução em andamento pra ler o WhatsApp
   Web automaticamente (ver seção **Evolução: leitura do WhatsApp Web**
-  abaixo). Nada aqui ainda é usado pelo painel principal.
+  abaixo). `panel.js` já consome `core/conversation-context.js` (fase 4)
+  pra auto-preencher `pasteBox` — o resto (funil como dado, validador de
+  resposta) ainda não é usado pelo painel principal.
 
 ## Evolução: leitura do WhatsApp Web (em andamento, por fases)
 
@@ -64,14 +66,23 @@ que já existe:
   do painel inteiro (comum em apps React) — sem isso a extensão ficaria
   "cega" silenciosamente até a página recarregar.
 
-  **Importante pra fase 4 (segurança)**: `chrome.runtime.sendMessage`
-  transmite pra todo listener vivo da extensão ao mesmo tempo — não existe
-  "só o background recebe e decide". `background.js` já valida que a
-  mensagem veio de uma aba `https://web.whatsapp.com/` antes de repassar
-  (`_copilotoOrigemEhWhatsApp`), mas quando `panel.js` (fase 4) registrar o
-  próprio listener pra estas mensagens, ele recebe a transmissão bruta
-  também — precisa repetir a mesma validação de `sender.tab.url` antes de
-  confiar no conteúdo. Ver aviso completo em `shared/messaging.js`.
+  **Segurança**: `chrome.runtime.sendMessage` transmite pra todo listener
+  vivo da extensão ao mesmo tempo — não existe "só o background recebe e
+  decide". `background.js` valida a origem antes de repassar
+  (`_copilotoOrigemEhWhatsApp`) e `panel.js` (fase 4) repete a mesma
+  validação no próprio listener (`_copilotoWaMensagemConfiavel`), já que
+  ele também pode receber a transmissão bruta diretamente. Ver aviso
+  completo em `shared/messaging.js`.
+
+- **`panel.js` (fase 4)** — escuta `CONVERSA_MUDOU`/`MENSAGENS_NOVAS` e
+  preenche `pasteBox` automaticamente, no lugar do botão "Colar" manual —
+  **nunca chama a IA sozinho**, isso continua exigindo clique humano em
+  "Gerar resposta", como sempre. Nunca sobrescreve uma edição manual do
+  atendente no campo (só reescreve enquanto o conteúdo ainda é exatamente o
+  que o próprio mecanismo escreveu da última vez). Sem WhatsApp
+  aberto/detectando nada, o fluxo manual de colar continua funcionando
+  exatamente como hoje — o Adapter é só um atalho a mais, nunca a única
+  forma de preencher o campo.
 
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
