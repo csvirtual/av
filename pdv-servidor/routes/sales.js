@@ -17,6 +17,7 @@ import { pointsBalance, creditBalance, listLoyaltyLedger, insertLoyaltyStmt, ins
 import { getConfig } from '../lib/companyConfig.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
 import { userCan } from '../lib/permissions.js';
+import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS } from '../lib/pricing.js';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ const insertDebtEntryStmt = db.prepare('INSERT INTO customer_debts (id, customer
 
 const FIADO_METHOD = 'Fiado';
 const CREDIT_METHOD = 'Crédito de troca';
+const CREDIT_CARD_METHOD = 'Cartão de crédito';
 const CREDIT_TOLERANCE = 0.01;
 
 function rowToSale(row) {
@@ -72,9 +74,25 @@ const commitSale = db.transaction((input) => {
     if (!product.active) throw new Error(`Produto inativo: ${product.name}`);
     const qty = Number(rawItem.qty);
     if (!Number.isFinite(qty) || qty <= 0) throw new Error(`Quantidade inválida para ${product.name}.`);
-    if (product.quantity < qty) throw new Error(`Estoque insuficiente para "${product.name}" (disponível: ${product.quantity}).`);
 
-    const unitPrice = Number.isFinite(Number(rawItem.unitPrice)) ? Number(rawItem.unitPrice) : product.price;
+    // Achado de auditoria (venda não pode confiar no cliente pra dizer o
+    // preço): a versão anterior aceitava `rawItem.unitPrice` quase sem
+    // reconferir — só checava que era um número finito, nunca que batia
+    // com o catálogo. Um cliente malicioso (ou um bug de UI) podia vender
+    // qualquer produto por R$0,01 sem cair em NENHUMA das checagens de
+    // desconto (que olham `discountType`/`discountValue`, não o preço
+    // base em si) — diferente de um desconto de verdade, isso nunca
+    // aparecia como desconto nenhum pro totalDiscountPercent, então nunca
+    // acionava a exigência de senha de admin. Igual a
+    // data/salesRepo.js#resolveSaleItemPricing da extensão: preço/custo/
+    // fator sempre vêm de novo do PRODUTO lido agora, nunca do que o
+    // pedido mandou — pra produto 'personalizado', da forma de venda
+    // escolhida (`rawItem.formName`), reconferida no catálogo atual.
+    const pricing = resolveSaleItemPricing(product, rawItem);
+    const stockQty = qty * (pricing.formFator || 1);
+    if (product.quantity < stockQty) throw new Error(`Estoque insuficiente para "${product.name}" (disponível: ${product.quantity}).`);
+
+    const unitPrice = pricing.unitPrice;
     const lineSubtotal = unitPrice * qty;
     let discountAmount = 0;
     if (rawItem.discountType === 'percent') discountAmount = lineSubtotal * (Number(rawItem.discountValue) || 0) / 100;
@@ -85,13 +103,15 @@ const commitSale = db.transaction((input) => {
     subtotal += lineSubtotal;
     itemsDiscountTotal += discountAmount;
     items.push({
-      productId: product.id, name: product.name, unit: product.unit,
+      productId: product.id, name: product.name, unit: pricing.unitLabel,
       qty, qtyRefunded: 0, unitPrice,
+      ...(pricing.costPrice !== undefined ? { costPrice: pricing.costPrice } : {}),
+      ...(pricing.formFator !== undefined ? { formFator: pricing.formFator } : {}),
       discountType: rawItem.discountType || null, discountValue: Number(rawItem.discountValue) || 0,
       lineTotal,
     });
 
-    product.quantity -= qty;
+    product.quantity -= stockQty;
     saveProduct(product);
   }
 
@@ -122,11 +142,25 @@ const commitSale = db.transaction((input) => {
     }
   }
 
-  const payments = (input.payments || []).map((p) => ({
-    method: p.method, amount: Number(p.amount) || 0,
-    installments: p.installments || undefined,
-    interestAmount: Number(p.interestAmount) || 0,
-  }));
+  // Achado de auditoria (mesma classe do unitPrice acima): a versão
+  // anterior aceitava `p.interestAmount` direto do pedido, sem recalcular
+  // nada — um cliente malicioso podia zerar o juro de um parcelamento
+  // (perda de receita) ou inflar (cobrando mais do cliente do que a
+  // política da loja manda) só mudando o número enviado. Igual a
+  // utils/pricing.js#computeCreditInterest da extensão, o juro é sempre
+  // recalculado aqui a partir da política gravada agora em Dados da loja
+  // (getConfig(), nunca de nada que o pedido tenha mandado) — o valor que
+  // a tela mostrou antes de finalizar era só uma prévia usando a mesma
+  // fórmula, quem decide de verdade é sempre o servidor.
+  const companyPolicies = getConfig();
+  const payments = (input.payments || []).map((p) => {
+    const amount = Number(p.amount) || 0;
+    const installments = Math.max(1, Math.min(MAX_INSTALLMENTS, Math.floor(Number(p.installments)) || 1));
+    const interestAmount = p.method === CREDIT_CARD_METHOD
+      ? computeCreditInterest(amount, installments, companyPolicies).interestAmount
+      : 0;
+    return { method: p.method, amount, installments: installments > 1 ? installments : undefined, interestAmount };
+  });
   const paymentsSum = payments.reduce((s, p) => s + p.amount, 0);
   if (Math.abs(paymentsSum - total) > PAYMENT_TOLERANCE) {
     throw new Error(`Pagamento (${paymentsSum.toFixed(2)}) não bate com o total da venda (${total.toFixed(2)}).`);

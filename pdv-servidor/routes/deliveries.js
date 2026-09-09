@@ -16,6 +16,7 @@ const updateDeliveryStmt = db.prepare('UPDATE deliveries SET status = @status, d
 const getDeliveryStmt = db.prepare('SELECT * FROM deliveries WHERE id = ?');
 const listDeliveriesStmt = db.prepare('SELECT data FROM deliveries ORDER BY created_at DESC');
 const getCustomerStmt = db.prepare('SELECT data FROM customers WHERE id = ?');
+const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
 
 function rowToDelivery(row) { return JSON.parse(row.data); }
 
@@ -24,6 +25,23 @@ router.get('/', (req, res) => {
   let deliveries = listDeliveriesStmt.all().map(rowToDelivery);
   if (status) deliveries = deliveries.filter((d) => d.status === status);
   res.json({ deliveries });
+});
+
+// Achado de auditoria (mesma classe já corrigida em products/stock/sales):
+// a versão anterior não tinha proteção nenhuma contra reenvio — um duplo
+// clique em "Criar carreto" (ou o clique automático de "Finalizar venda +
+// carreto" em sale.js, que cria a venda E o carreto numa sequência) criava
+// dois registros idênticos. deliveriesRepo.js#createDelivery da extensão
+// já reivindica um dedupeKey pra isso — porta o mesmo aqui.
+const commitDelivery = db.transaction((input) => {
+  if (input.dedupeKey) {
+    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
+  }
+  insertDeliveryStmt.run({
+    id: input.delivery.id, customerId: input.delivery.customerId, status: input.delivery.status,
+    createdAt: input.delivery.createdAt, data: JSON.stringify(input.delivery),
+  });
+  return input.delivery;
 });
 
 router.post('/', (req, res) => {
@@ -58,10 +76,13 @@ router.post('/', (req, res) => {
       deliveredBy: null,
       deliveredAt: null,
     };
-    insertDeliveryStmt.run({ id: delivery.id, customerId: delivery.customerId, status: delivery.status, createdAt: delivery.createdAt, data: JSON.stringify(delivery) });
+    commitDelivery({ delivery, dedupeKey: req.body.dedupeKey || null });
     broadcast('deliveries-changed', { reason: 'created', id: delivery.id });
     res.status(201).json({ delivery });
   } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
+      return res.status(409).json({ error: 'Este carreto já foi registrado — evite reenviar.' });
+    }
     res.status(400).json({ error: err.message });
   }
 });

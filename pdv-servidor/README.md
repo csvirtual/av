@@ -50,7 +50,7 @@ entrega, mas não deveria ser esquecido como os problemas anteriores.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js`, `productsRepo.js`, `stockRepo.js`, `suppliersRepo.js` e `auditRepo.js` prontos e testados (09/set); todos os 4 repositórios que `views/products.js` (Estoque) usa direto estão prontos. Faltam os 5 que `views/sale.js` (PDV) puxa (ver abaixo) |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js` + os 9 repositórios que Estoque+PDV precisam (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`) prontos e testados (09/set), incluindo 2 achados de segurança sérios corrigidos em `routes/sales.js` (preço e juro de parcelamento que a rota confiava do cliente). Falta só ligar a UI real nelas (ver abaixo) |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -221,13 +221,70 @@ revisado pro início da Fase 9:
      corpo do pedido, confirmando que o servidor ignora e usa a sessão de
      verdade (não só que o módulo cliente "se comporta bem" e nunca manda
      esses campos).
-4. Faltam ainda `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`,
-   `customersRepo` (que `sale.js` puxa) — não iniciado.
-5. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
-   mesmo rigor de teste das fases 1-8 (concorrência, dedupe, nada de
-   estoque ficando negativo com duas máquinas vendendo ao mesmo tempo).
+4. ✅ **`salesRepo.js`, `deliveriesRepo.js`, `companyRepo.js`, `cashRepo.js`,
+   `customersRepo.js` novos** (09/set) — com este commit, os 9
+   repositórios que `views/products.js` + `views/sale.js` juntos precisam
+   estão todos prontos. Escopo desta primeira fatia: só as funções que
+   `sale.js` de fato chama (`createSale`, `createDelivery`, `getCompany`,
+   `getOpenSession`, `getCustomerBalance`) — o resto de cada repo
+   (`listSales`/`refundSaleItems`, `markDelivered`, `saveCompany`,
+   `openSession`/`closeSession`, `createCustomer`/extrato) fica pra quando
+   a view DONA de cada um (`salesHistory.js`, `carreto.js`, `company.js`,
+   `caixa.js`, `clientes.js`) for a vez. Testado em `test-sale-repos.cjs`
+   (23 asserções contra um servidor real, harness em
+   `public/test-sale-repos.html`).
 
-Passos 4-5 não iniciados ainda — é trabalho de verdade (múltiplas
-sessões), não um ajuste, e mexe com dinheiro/estoque, então merece o
-mesmo cuidado de teste que o resto do projeto sempre teve antes de
-qualquer linha ir pra produção.
+   **Dois achados de segurança sérios, não só de forma — dinheiro de
+   verdade em risco**, encontrados ao comparar `routes/sales.js` (Fase 2,
+   escrito antes de existir unidade "personalizado" ou preço promocional)
+   contra o contrato real de `salesRepo.js#createSale` da extensão:
+   - **Preço confiado do cliente.** A rota aceitava `item.unitPrice`
+     do pedido quase sem reconferir (só checava que era um número finito).
+     Um cliente malicioso (ou um bug de UI futuro) podia vender qualquer
+     produto pelo preço que quisesse — e como isso nunca passa pelas
+     checagens de `discountType`/`discountValue`, nunca aparecia como
+     desconto nenhum, então nunca acionava a exigência de autorização de
+     admin (que só olha desconto declarado, não o preço-base em si).
+     Corrigido: preço agora SEMPRE vem de nova leitura do produto
+     (`lib/pricing.js#resolveSaleItemPricing`, porta fiel de
+     `resolveSaleItemPricing`/`effectivePrice`/`isNearExpiry` da
+     extensão) — preço promocional automático se perto de vencer, ou o
+     valor da forma de venda escolhida pra um produto "personalizado",
+     nunca o que o pedido mandou. Provado: revertendo a correção, a venda
+     de um produto de R$32 por R$0,01 forjado passava — com a correção,
+     rejeitada (pagamento não bate com o preço real).
+   - **Juro de parcelamento confiado do cliente.** Mesma classe: a rota
+     aceitava `payment.interestAmount` do pedido sem recalcular nada — um
+     cliente podia zerar o juro (perda de receita) ou inflar (cobrando
+     mais do que a política da loja manda) só mudando o número. Corrigido:
+     juro sempre recalculado no servidor via
+     `lib/pricing.js#computeCreditInterest` (porta fiel, incluindo os
+     tetos de sanidade de 100%/1200%), a partir da política gravada em
+     Dados da loja — nunca do que o pedido mandou. Também suportado nesse
+     mesmo passo: **produto "personalizado"** na venda (preço/custo/fator
+     de estoque da forma escolhida, com o mesmo erro se a forma não
+     existir mais) e **preço promocional por validade**, nenhum dos dois
+     existia na rota antes.
+
+   Achado de permissão, mesmo padrão já corrigido em suppliers/audit: o
+   mount de `/api/company` exigia `'empresa'` pra TUDO, inclusive ler —
+   mas `getCompany()` da extensão não tem permissão nenhuma (é a base do
+   cálculo de desconto/juro que TODA venda precisa, não só quem administra
+   a loja). Corrigido: só `PUT` (escrever a política) exige `'empresa'`
+   agora; `GET` ficou aberto a qualquer usuário autenticado.
+
+   Achado menor: `routes/deliveries.js` não tinha proteção nenhuma contra
+   reenvio (duplo clique em "Criar carreto") — `deliveriesRepo.js#createDelivery`
+   da extensão já reivindica um `dedupeKey` pra isso; portado aqui também,
+   testado com o mesmo padrão de "primeira chamada aceita, reenvio com a
+   mesma chave rejeitado" do resto do sistema.
+5. Falta só testar Estoque + PDV **juntos**, multi-terminal, com a UI real
+   (`views/products.js` + `views/sale.js` portadas de verdade, não mais
+   `public/test.html`) — mesmo rigor de teste das fases 1-8 (concorrência,
+   dedupe, nada de estoque ficando negativo com duas máquinas vendendo ao
+   mesmo tempo). Esse é o próximo passo.
+
+Passo 5 não iniciado ainda — é trabalho de verdade, mexe com a interface
+de verdade (não só a camada de dados), então merece o mesmo cuidado de
+teste que o resto do projeto sempre teve antes de qualquer linha ir pra
+produção.

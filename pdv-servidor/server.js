@@ -96,7 +96,13 @@ app.use('/api/users', requireAuth, requirePermission('usuarios'), usersRoutes);
 // repositório) — só a LEITURA (Log do sistema, ver views/logs.js) exige
 // 'logs'. Gate fica por rota, dentro de routes/audit.js.
 app.use('/api/audit', requireAuth, auditRoutes);
-app.use('/api/company', requireAuth, requirePermission('empresa'), companyRoutes);
+// Achado de auditoria (Fase 9, mesmo padrão já corrigido em suppliers e
+// audit): SEM requirePermission('empresa') aqui no mount — getCompany()
+// da extensão não tem permissão nenhuma (qualquer vendedor lê a política
+// de desconto/juro pra saber se uma venda precisa de aprovação, ver
+// sale.js), só saveCompany() (escrita) exige 'empresa'. Gate fica por
+// rota, dentro de routes/company.js.
+app.use('/api/company', requireAuth, companyRoutes);
 app.use('/api/backup', requireAuth, requirePermission('backup'), backupRoutes);
 
 app.get('/api/status', (req, res) => {
