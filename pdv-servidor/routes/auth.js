@@ -17,41 +17,55 @@ function publicUser(row) {
 }
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body || {};
-  if (!String(username || '').trim() || !password) {
-    return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
-  }
-  // Achado de auditoria (Fase 8): checa o bloqueio ANTES de tentar a senha —
-  // dá uma mensagem melhor (quanto falta) sem gastar mais uma tentativa.
-  // verifyLogin também confere isto por dentro (nunca confia só na tela),
-  // então mesmo pulando esta checagem aqui o resultado seria o mesmo, só
-  // com uma mensagem genérica em vez da contagem regressiva.
-  const preLock = getLoginLockState(username);
-  if (preLock.remainingMs > 0) {
-    return res.status(429).json({
-      error: `Muitas tentativas incorretas — aguarde ${Math.ceil(preLock.remainingMs / 1000)}s antes de tentar de novo.`,
-      remainingMs: preLock.remainingMs,
-    });
-  }
-  // Nunca revela se a conta existe, está inativa, ou a senha está errada —
-  // sempre a mesma mensagem genérica pras três (mesmo raciocínio de
-  // usersRepo.js#verifyLogin da extensão: diferenciar isso por fora
-  // permitiria enumerar quais contas existem só pelo comportamento do
-  // login).
-  const user = await verifyLogin(username, password);
-  if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-  const row = findById.get(user.id);
+  try {
+    const { username, password } = req.body || {};
+    if (!String(username || '').trim() || !password) {
+      return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+    }
+    // Achado de auditoria (Fase 8): checa o bloqueio ANTES de tentar a senha —
+    // dá uma mensagem melhor (quanto falta) sem gastar mais uma tentativa.
+    // verifyLogin também confere isto por dentro (nunca confia só na tela),
+    // então mesmo pulando esta checagem aqui o resultado seria o mesmo, só
+    // com uma mensagem genérica em vez da contagem regressiva.
+    const preLock = getLoginLockState(username);
+    if (preLock.remainingMs > 0) {
+      return res.status(429).json({
+        error: `Muitas tentativas incorretas — aguarde ${Math.ceil(preLock.remainingMs / 1000)}s antes de tentar de novo.`,
+        remainingMs: preLock.remainingMs,
+      });
+    }
+    // Nunca revela se a conta existe, está inativa, ou a senha está errada —
+    // sempre a mesma mensagem genérica pras três (mesmo raciocínio de
+    // usersRepo.js#verifyLogin da extensão: diferenciar isso por fora
+    // permitiria enumerar quais contas existem só pelo comportamento do
+    // login).
+    const user = await verifyLogin(username, password);
+    if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    const row = findById.get(user.id);
 
-  const token = createSession(user.id);
-  res.cookie('session', token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    // Sem `secure`: o servidor roda em HTTP puro na rede local (sem
-    // certificado — é só a rede interna da loja, não a internet aberta).
-    maxAge: 12 * 60 * 60 * 1000,
-  });
-  logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id });
-  res.json({ user: publicUser(row) });
+    const token = createSession(user.id);
+    res.cookie('session', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      // Sem `secure`: o servidor roda em HTTP puro na rede local (sem
+      // certificado — é só a rede interna da loja, não a internet aberta).
+      maxAge: 12 * 60 * 60 * 1000,
+    });
+    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id });
+    res.json({ user: publicUser(row) });
+  } catch (err) {
+    // Achado de auditoria (auditoria de prontidão pra produção): esta rota
+    // é, de longe, a mais chamada do sistema inteiro (todo login) — era a
+    // única (junto de /verify, logo abaixo) sem try/catch entre os 10
+    // handlers assíncronos do servidor. Numa falha inesperada aqui (ex: um
+    // registro de usuário corrompido quebrando o JSON.parse dentro de
+    // verifyLogin), a Promise rejeitada NUNCA seria pega pelo Express 4
+    // (que só captura throw síncrono) — em versões modernas do Node, uma
+    // rejeição não tratada DERRUBA O PROCESSO inteiro, tirando do ar TODOS
+    // os terminais conectados de uma vez, não só quem tentou logar.
+    console.error('[erro inesperado] POST /api/auth/login:', err);
+    res.status(500).json({ error: 'Erro inesperado ao entrar. Tente novamente.' });
+  }
 });
 
 // Confirma usuário+senha SEM criar sessão nem cookie — usado pra
@@ -62,13 +76,19 @@ router.post('/login', async (req, res) => {
 // `namespace` próprio (nunca o namespace do login real) — ver achado de
 // auditoria em lib/loginLockout.js.
 router.post('/verify', async (req, res) => {
-  const { username, password, namespace } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+  try {
+    const { username, password, namespace } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+    }
+    const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' });
+    if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+    res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
+  } catch (err) {
+    // Mesmo achado de auditoria do handler /login acima.
+    console.error('[erro inesperado] POST /api/auth/verify:', err);
+    res.status(500).json({ error: 'Erro inesperado ao confirmar. Tente novamente.' });
   }
-  const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' });
-  if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
-  res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
 });
 
 router.post('/logout', (req, res) => {

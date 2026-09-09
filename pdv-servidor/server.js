@@ -26,6 +26,24 @@ import backupRoutes from './routes/backup.js';
 import reportsRoutes from './routes/reports.js';
 import { requirePermission } from './lib/permissions.js';
 
+// Achado de auditoria (auditoria de prontidão pra produção): rede de
+// segurança de último recurso. O Express 4 NÃO captura sozinho uma
+// Promise rejeitada dentro de um handler assíncrono (diferente do
+// Express 5) — e, desde o Node 15, uma rejeição não tratada por padrão
+// DERRUBA o processo inteiro. Sem isto, um bug inesperado em QUALQUER
+// rota tira do ar a loja inteira (todos os terminais, todas as sessões)
+// até alguém perceber e reiniciar `node server.js` na mão. Loga o erro e
+// mantém o processo de pé. Cada rota continua com seu próprio try/catch
+// (ver routes/*.js) como primeira linha de defesa — isto aqui só evita o
+// pior caso se algum ponto escapar dele (ex: um `setInterval` como
+// `sweepExpiredSessions` abaixo, que não passa por rota nenhuma).
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection] erro inesperado não tratado:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException] erro inesperado não tratado:', err);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3131;
 const getUserByIdStmt = db.prepare('SELECT data FROM users WHERE id = ?');

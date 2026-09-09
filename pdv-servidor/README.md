@@ -1279,3 +1279,95 @@ lacuna de arquitetura documentada ao longo do caminho — crédito de
 troca preso a um terminal — foi fechada, extensível a qualquer venda
 futura que gere ou consuma crédito, sem exigir nenhuma rota nova no
 servidor.
+
+## Auditoria de prontidão pra produção (09/set) — veredito: GO
+
+Com a Fase 9 fechada, revisão dedicada a "isto aguenta rodar numa loja
+de verdade, sem alguém observando o terminal o dia inteiro?" — não uma
+tela nova, então fora da tabela de fases acima. Cobriu: injeção SQL,
+XSS, segredos versionados, configuração do SQLite, resiliência a
+falha inesperada e o que falta documentar pra ligar isto pela primeira
+vez numa loja.
+
+**Confirmado limpo (nenhuma mudança precisou):**
+- **Injeção SQL** — todo SQL com valor vindo de fora usa
+  `?`/prepared statement do `better-sqlite3`; a única interpolação de
+  template literal em SQL (`lib/backup.js`, nomes de tabela dos loops
+  de export/reset) só usa as constantes fixas `BACKUP_TABLES`/
+  `RESET_TABLES`, nunca nada vindo de `req`.
+- **XSS** — `escapeHtml()` (`public/js/utils/format.js`) é aplicado na
+  string final, na hora de jogar em `innerHTML`, não em cada pedaço
+  isolado — conferido inclusive no texto do banner de crédito escrito
+  no passo 20 acima (`selectedCustomer.nome` entra sem escapar numa
+  string intermediária, mas passa por `escapeHtml()` antes de virar
+  HTML de verdade).
+- **Segredos** — nenhuma senha/chave/token hardcoded no código-fonte;
+  `.gitignore` já cobre `*.sqlite3(-shm|-wal)` e `server.log` — nenhum
+  banco de dados real chegou a ser versionado.
+- **SQLite** — `journal_mode = WAL` e `foreign_keys = ON` (ver
+  `db/index.js`) já ligados desde o início: um `kill -9` no processo
+  não corrompe o banco.
+- **Rede** — `httpServer.listen(PORT, '0.0.0.0', ...)` (ver
+  `server.js`): já ouve em todo endereço IPv4 da máquina, alcançável
+  pelos outros terminais da loja, não só `localhost`. Sem HTTPS e sem
+  o atributo `secure` no cookie de sessão — risco aceito e já
+  documentado (rede interna da loja, não a internet aberta).
+
+**Achados corrigidos nesta auditoria:**
+1. **`routes/auth.js` sem rede de segurança no login** — `POST
+   /login` e `POST /verify` eram os únicos 2 dos 10 handlers
+   assíncronos do servidor sem `try/catch` (os outros 8, em
+   `routes/backup.js`, `cash.js`, `sales.js`, `users.js`, já seguiam
+   esse padrão). No Express 4 (diferente do Express 5), uma Promise
+   rejeitada dentro de `async (req, res) => {...}` NÃO é capturada
+   sozinha pelo framework — e desde o Node 15 uma rejeição não tratada
+   **derruba o processo inteiro** por padrão. Como login é, disparado,
+   a rota mais chamada do sistema, um erro inesperado ali (ex: um
+   registro de usuário com `data` corrompido quebrando o
+   `JSON.parse`) tiraria a loja inteira do ar, não só quem tentou
+   logar. Corrigido envolvendo os dois handlers em `try/catch`,
+   preservando os status code/mensagem já existentes pros caminhos
+   esperados (400 campo vazio, 429 bloqueio, 401 credencial errada —
+   nenhum deles é `throw`, então continuam fora do `catch`) e só
+   capturando exceção genuinamente inesperada, devolvendo 500 com
+   mensagem genérica (nunca `err.message` cru — evita vazar detalhe
+   interno numa rota que roda antes/sem sessão).
+2. **Sem rede de segurança global no processo** — nenhum
+   `process.on('unhandledRejection'|'uncaughtException')` existia em
+   lugar nenhum do servidor. `try/catch` em cada rota é a primeira
+   linha de defesa (achado 1 acima), mas não cobre tudo — o
+   `setInterval(sweepExpiredSessions, ...)` em `server.js`, por
+   exemplo, não passa por rota nenhuma. Adicionado um handler global
+   em `server.js` que só loga o erro e mantém o processo de pé, em vez
+   de deixar o comportamento padrão do Node (derrubar tudo) valer.
+3. **`npm audit`: 3 vulnerabilidades moderadas (`qs`, classe DoS)** —
+   `express@4.22.2` fixa `qs: ~6.15.1` (não sobe sozinho até `6.16.0`,
+   a versão corrigida, mesmo com `npm audit fix`). Corrigido com
+   `"overrides": { "qs": "6.16.0" }` em `package.json`, forçando a
+   versão corrigida pra toda a árvore (inclusive a cópia interna do
+   Express) — `npm audit` volta a **0 vulnerabilidades**. Suíte de
+   regressão (`test-security.cjs`, `test-cross-terminal-credit.cjs`,
+   `test-backup.cjs`, 87 asserções ao todo) roda verde depois da troca,
+   confirmando que o bump de patch do `qs` não quebrou nada.
+
+**Risco aceito, não corrigido nesta auditoria (decisão de operação, não
+de código):** não há supervisor de processo (systemd/pm2/Docker
+restart-policy) nem auto-reinício documentado — `README.md` ainda
+descreve só `node server.js` rodando manualmente. A rede de segurança
+do achado 2 acima cobre o caso de uma exceção não tratada, mas não
+cobre uma queda "de verdade" (energia, `kill -9`, crash do runtime): se
+o processo cair, a loja fica sem PDV até alguém notar e rodar `node
+server.js` de novo na mão. Recomendação pra quem for ligar isto numa
+loja real: rodar atrás de um supervisor com reinício automático (por
+exemplo `pm2 start server.js --name pdv` ou uma unit do `systemd` com
+`Restart=always`) — decisão de infraestrutura de quem hospeda, fora do
+escopo do código deste repositório.
+
+**Veredito: GO.** Nenhum achado de segurança (injeção, XSS, segredo
+vazado) sobreviveu à auditoria; o único risco de disponibilidade real
+identificado (todo o servidor caindo por uma exceção não tratada) foi
+fechado com rede de segurança em duas camadas (por rota + global); a
+única lacuna restante é puramente operacional (auto-reinício do
+processo), documentada acima com uma recomendação concreta, e não
+bloqueia ligar o sistema — só reduz o tempo de recuperação de uma
+queda rara até "alguém reiniciar na mão" em vez de "automático".
