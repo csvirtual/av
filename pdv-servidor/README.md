@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs completos, com atualização em tempo real, testados (09/set) — `session.js`, 15 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs` e `test-logs.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15). Faltam as ~2 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios completos, com atualização em tempo real, testados (09/set) — `session.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs` e `test-relatorios.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16). Falta a última tela e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -840,16 +840,63 @@ revisado pro início da Fase 9:
     ainda consegue GRAVAR uma entrada (`POST` continua sem gate próprio,
     igual a extensão).
 
-Com os passos 5 a 15 fechados, a Fase 9 está **substancialmente
-completa** pro undeceto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
-Usuários+Caixa+Compras+Financeiro+Logs: a hipótese central do roteiro
-(telas reais reaproveitáveis sem reescrita) segue provada na prática, a
+16. ✅ **`views/relatorios.js` real ligada** (09/set) — décima segunda tela
+    real (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários,
+    Caixa, Compras, Financeiro, Logs, agora Relatórios), **copiada sem
+    nenhuma alteração** de `pdv-extension/app/js/views/`. Faturamento,
+    ticket médio, margem estimada, vendas por vendedor/categoria e curva
+    ABC de produtos, com filtro de período (presets + personalizado) e
+    exportação em PDF via impressão nativa do navegador.
+
+    Diferente do resto da Fase 9 (repositórios que só traduzem chamada
+    pra HTTP sobre lógica já pronta no servidor), esta tela precisou de
+    lógica de agregação NOVA no servidor — `data/reportsRepo.js#
+    computeSalesReport` da extensão nunca tinha equivalente aqui. A
+    decisão de propósito: a agregação roda no SERVIDOR
+    (`routes/reports.js`, novo), não no navegador — trazer todas as
+    vendas cruas do período pro cliente reduzir em JS jogaria fora
+    exatamente a otimização que a própria extensão já fez (varrer só o
+    intervalo pelo índice de timestamp, nunca a tabela inteira, ver
+    comentário dela em `reportsRepo.js`); o servidor já tem a tabela
+    local, faz a mesma varredura indexada, e devolve só o relatório
+    pronto (poucos KB) — nunca as vendas em si. A fórmula de agregação
+    (rateio do desconto geral por item via `ratio`, custo do item de
+    produto `'personalizado'` gravado na própria venda em vez do
+    `costPrice` atual do produto, curva ABC por percentual cumulativo de
+    faturamento) foi portada byte-a-byte.
+
+    Novo em `public/js/data/reportsRepo.js`: `computeSalesReport` (agora
+    um wrapper fino sobre a rota nova). Também copiados
+    `components/reportPrint.js` (exportação em PDF, reaproveita
+    `printRoot.js` compartilhado com o recibo de venda, já pronto desde
+    o passo 4) e a tela em si. `relatorios` ficou de fora do
+    `LIVE_TOPICS`: o período selecionado é estado só de tela.
+
+    Testado em `test-relatorios.cjs` (20 asserções): faturamento/margem
+    corretos com duas vendas de dois vendedores diferentes, estorno
+    parcial refletido corretamente tanto na receita por vendedor (total
+    líquido cheio da venda) quanto na receita por produto (rateada pela
+    proporção da venda, um cálculo genuinamente diferente para o mesmo
+    dado — a mesma venda estornada gera R$ 100 líquidos pro vendedor mas
+    só R$ 50 atribuídos ao produto específico, matematicamente correto
+    pela fórmula da extensão), curva ABC calculada certo via API (sem
+    ambiguidade de regex sobre texto de tabela), filtro de período
+    personalizado exclui vendas fora do intervalo, exportar PDF preenche
+    o `print-report-root` com o relatório certo, e o gate de permissão
+    nos dois sentidos (vendedor com `'relatorios'` delegado lê
+    normalmente, sem toma 403).
+
+Com os passos 5 a 16 fechados, a Fase 9 está **substancialmente
+completa** pro dodeceto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios: a hipótese central do
+roteiro (telas reais reaproveitáveis sem reescrita) segue provada na
+prática mesmo na tela que precisou de agregação nova no servidor, a
 promessa de tempo real já é verdade onde faz sentido, e o ciclo
 operacional inteiro da loja — vender, repor estoque, fiado, fidelidade,
 visão geral, entregar, gerir vendedores, abrir/fechar caixa, comprar de
-fornecedor, controlar contas a pagar/receber, e agora auditar tudo isso —
-já roda pela UI real.
-O que falta da Fase 9 (as ~2 telas restantes — relatórios,
-personalização/backup/ajuda —, o `app.js` completo com menu lateral, e a
-lacuna de crédito de troca cross-terminal documentada no passo 8) é
+fornecedor, controlar contas a pagar/receber, auditar tudo isso, e agora
+enxergar o desempenho do negócio — já roda pela UI real.
+O que falta da Fase 9 (a última tela restante — personalização/backup/
+ajuda —, o `app.js` completo com menu lateral, e a lacuna de crédito de
+troca cross-terminal documentada no passo 8) é
 trabalho real de mais fases, não risco em aberto.

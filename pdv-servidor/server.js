@@ -23,6 +23,7 @@ import usersRoutes from './routes/users.js';
 import auditRoutes from './routes/audit.js';
 import companyRoutes from './routes/company.js';
 import backupRoutes from './routes/backup.js';
+import reportsRoutes from './routes/reports.js';
 import { requirePermission } from './lib/permissions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,7 @@ app.use('/api/audit', requireAuth, auditRoutes);
 // rota, dentro de routes/company.js.
 app.use('/api/company', requireAuth, companyRoutes);
 app.use('/api/backup', requireAuth, requirePermission('backup'), backupRoutes);
+app.use('/api/reports', requireAuth, requirePermission('relatorios'), reportsRoutes);
 
 app.get('/api/status', (req, res) => {
   res.json({ ok: true, autenticado: !!req.userId });

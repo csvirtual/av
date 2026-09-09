@@ -19,6 +19,7 @@ import { renderCaixa } from './views/caixa.js';
 import { renderCompras } from './views/compras.js';
 import { renderFinanceiro } from './views/financeiro.js';
 import { renderLogs } from './views/logs.js';
+import { renderRelatorios } from './views/relatorios.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -42,6 +43,7 @@ const ROUTES = {
   compras: { label: 'Compras', render: renderCompras },
   financeiro: { label: 'Financeiro', render: renderFinanceiro },
   logs: { label: 'Log do sistema', render: renderLogs },
+  relatorios: { label: 'Relatórios', render: renderRelatorios },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -80,6 +82,8 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // raciocínio de 'vendas'/'clientes'/'carreto'/'compras'. 'logs' também:
 // filtro (perfil/usuário/termo/data) e "Carregar mais" (cursor de
 // timestamp+id) são estado só de tela, mesmo raciocínio das outras.
+// 'relatorios' também: o período selecionado (preset ou datas
+// personalizadas) é estado só de tela.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
