@@ -63,7 +63,7 @@ function api(cookie) {
 
   await callAdmin('/api/products', { method: 'POST', body: JSON.stringify({ barcode: 'DESC-TEST-01', name: 'Item desconto', price: 100 }) });
   const product = (await callAdmin('/api/products')).body.products.find((p) => p.barcode === 'DESC-TEST-01');
-  await callAdmin(`/api/products/${product.id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 100 }) });
+  await callAdmin(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 100 }) });
 
   // 30% de desconto (bem acima do limite de 10%) sem aprovação nenhuma
   const saleNoApproval = await callSeller('/api/sales', {

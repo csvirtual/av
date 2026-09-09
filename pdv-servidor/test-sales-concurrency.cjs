@@ -36,7 +36,7 @@ async function api(cookie, path, opts = {}) {
   });
   check('produto de teste criado', createStatus === 201, createStatus);
   const productId = createBody.product.id;
-  await api(cookie, `/api/products/${productId}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 5 }) });
+  await api(cookie, `/api/products/${productId}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 5 }) });
 
   // 10 tentativas de venda simultâneas, 1 unidade cada, só 5 podem passar
   const ATTEMPTS = 10;
@@ -59,7 +59,7 @@ async function api(cookie, path, opts = {}) {
   check('estoque final é exatamente 0 (nunca negativo)', p.quantity === 0, p.quantity);
 
   // ---------- Venda normal + estorno parcial ----------
-  await api(cookie, `/api/products/${productId}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 10 }) });
+  await api(cookie, `/api/products/${productId}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 10 }) });
   const { status: saleStatus, body: saleBody2 } = await api(cookie, '/api/sales', {
     method: 'POST',
     body: JSON.stringify({

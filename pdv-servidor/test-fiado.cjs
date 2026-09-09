@@ -41,7 +41,7 @@ function api(jar) {
   await call('/api/products', { method: 'POST', body: JSON.stringify({ barcode: 'FIADO-TEST-01', name: 'Item fiado', price: 20 }) });
   const productsRes = await call('/api/products');
   const product = productsRes.body.products.find((p) => p.barcode === 'FIADO-TEST-01');
-  await call(`/api/products/${product.id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 100 }) });
+  await call(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 100 }) });
 
   // (1) venda fiada sem cliente é rejeitada
   const noCustomer = await call('/api/sales', {

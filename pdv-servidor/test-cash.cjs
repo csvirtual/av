@@ -82,7 +82,7 @@ function api(cookieJar, terminalId) {
   await call('/api/products', { method: 'POST', body: JSON.stringify({ barcode: 'CASH-TEST-01', name: 'Item teste caixa', price: 50 }) });
   const productsRes = await call('/api/products');
   const product = productsRes.body.products.find((p) => p.barcode === 'CASH-TEST-01');
-  await call(`/api/products/${product.id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 5 }) });
+  await call(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 5 }) });
   const sale = await call('/api/sales', {
     method: 'POST',
     body: JSON.stringify({

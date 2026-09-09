@@ -44,7 +44,7 @@ function api(jar) {
 
   await call('/api/products', { method: 'POST', body: JSON.stringify({ barcode: 'LOYALTY-TEST-01', name: 'Item fidelidade', price: 25 }) });
   const product = (await call('/api/products')).body.products.find((p) => p.barcode === 'LOYALTY-TEST-01');
-  await call(`/api/products/${product.id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta: 20 }) });
+  await call(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 20 }) });
 
   // --- Ganho de pontos ---
   const sale1 = await call('/api/sales', {

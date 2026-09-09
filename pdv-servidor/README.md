@@ -23,6 +23,21 @@ scratchpad efêmero antes de ser recuperado e trazido pro repositório em
 node seed.js && node server.js` sobe em segundos, `/api/status` responde
 `{"ok":true}`.
 
+**Achado (09/set, ao portar productsRepo/stockRepo — ver Fase 9 abaixo):**
+rodando a suíte `test-*.cjs` completa NESTE ambiente sandboxed específico,
+4 dos testes "-multiterminal" das fases 2, 5, 6 e 8 (`test-sales-multiterminal`,
+`test-purchases-finance-multiterminal`, `test-loyalty-carreto-multiterminal`,
+`test-security-multiterminal`) falham por timeout — confirmado que já
+falhavam do MESMO jeito no código original, sem nenhuma mudança desta
+sessão (testado revertendo routes/products.js pro estado do commit
+anterior e rodando de novo). Não é regressão de nada feito aqui, e a
+versão sem "-multiterminal" de cada um desses 4 passa normalmente — mas é
+uma falha real neste ambiente, provavelmente timing de WebSocket/Playwright
+específico deste sandbox (o resto da suíte, incluindo outros testes
+"-multiterminal" como cash/users, passa). Fica registrado como gap
+conhecido a investigar — não interfere no que este passo da Fase 9
+entrega, mas não deveria ser esquecido como os problemas anteriores.
+
 ## Roteiro — 10 fases
 
 | # | Fase | Status |
@@ -35,7 +50,7 @@ node seed.js && node server.js` sobe em segundos, `/api/status` responde
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js` pronto e testado (09/set), faltam os ~9 repositórios (ver abaixo) |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js`, `productsRepo.js` e `stockRepo.js` prontos e testados (09/set), faltam ~7 repositórios (ver abaixo) |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -135,14 +150,51 @@ revisado pro início da Fase 9:
    pararia de re-renderizar a própria aba depois do login. Provado: o
    teste falha exatamente nessa asserção se o pub/sub local for removido
    (checado manualmente antes de commitar), passa com ele.
-2. Camada de dados nova pros 4 repositórios que `products.js` usa direto
-   (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`) + os 5 a mais
-   que `sale.js` puxa (`salesRepo`, `deliveriesRepo`, `companyRepo`,
-   `cashRepo`, `customersRepo`) — não iniciado.
-3. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
+2. ✅ **`productsRepo.js` + `stockRepo.js` novos** (09/set) —
+   `public/js/data/productsRepo.js` e `public/js/data/stockRepo.js`, mesmo
+   contrato dos repositórios da extensão (`listProducts`, `getProduct`,
+   `getByBarcode`, `searchProducts`, `createProduct`, `updateProduct`,
+   `setProductActive`, `deleteProduct` / `recordMovement`,
+   `listMovementsByProduct`, `recordManualAdjustment`), sobre um
+   `apiClient.js` novo compartilhado (fetch + terminal id + dedupeKey,
+   extraído do protótipo em `test.html`, reaproveitável pelos próximos
+   repositórios). `routes/products.js` deixou de ser o CRUD simplificado
+   da Fase 1 e virou o repo de verdade: permissão granular re-conferida
+   no servidor por rota (`manageProducts`/`toggleProduct`/`deleteProduct`/
+   `adjustStock`, os 4 já previstos em `lib/permissions.js` desde a Fase 7
+   mas nunca antes aplicados aqui), suporte a unidade "personalizado"
+   (múltiplas formas de venda, mesma validação da extensão), e
+   movimentação de estoque de verdade — baixa/alta de `quantity` +
+   registro em `stock_movements` na MESMA transação SQLite, com
+   `dedupeKey` contra reenvio (mesmo padrão já usado em `sales.js` desde a
+   Fase 2). Testado em `test-products-repo.cjs` (42 asserções, harness em
+   `public/test-products-repo.html`), cobrindo validação na fonte,
+   permissão negada/concedida pra um vendedor real (não só admin),
+   atomicidade (tentativa de deixar estoque negativo não muda nada),
+   dedupe, e consistência entre duas sessões/máquinas diferentes.
+   Achado real corrigido no processo: `getProduct(id)` da extensão
+   devolve `null`/`undefined` pra um id inexistente e NUNCA lança erro —
+   `salesRepo.js#pricePreview` depende exatamente disso
+   (`if (!product) {...}`); a rota GET `/api/products/:id` inicialmente
+   devolvia 404, o que viraria uma exceção não tratada quando `sale.js`
+   for portado — corrigido pra sempre `200` com `product: null`. Achado
+   secundário: reescrever `routes/products.js` quebrou 6 chamadas em
+   testes de fases ANTERIORES (`test-cash`, `test-fiado`,
+   `test-loyalty-carreto`, `test-sales-concurrency`, `test-security`, e
+   `public/test.html`) que usavam o endpoint antigo
+   `/ajustar-estoque` — atualizadas pro novo `/movimentos` antes de
+   considerar este passo pronto (a suíte inteira das fases 1-8 foi
+   rerrodada depois, ver achado no topo deste README sobre 4 testes
+   "-multiterminal" que já falhavam antes desta mudança, confirmado por
+   comparação direta).
+3. Faltam ainda `suppliersRepo`, `auditRepo` (que `products.js` também usa
+   direto) + `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`,
+   `customersRepo` (que `sale.js` puxa) — não iniciado.
+4. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
    mesmo rigor de teste das fases 1-8 (concorrência, dedupe, nada de
    estoque ficando negativo com duas máquinas vendendo ao mesmo tempo).
 
-Não iniciado ainda — é trabalho de verdade (múltiplas sessões), não um
-ajuste, e mexe com dinheiro/estoque, então merece o mesmo cuidado de teste
-que o resto do projeto sempre teve antes de qualquer linha ir pra produção.
+Passos 3-4 não iniciados ainda — é trabalho de verdade (múltiplas
+sessões), não um ajuste, e mexe com dinheiro/estoque, então merece o
+mesmo cuidado de teste que o resto do projeto sempre teve antes de
+qualquer linha ir pra produção.

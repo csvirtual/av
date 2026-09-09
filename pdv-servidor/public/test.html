@@ -398,7 +398,7 @@ async function loadProducts() {
 async function ajustarEstoque(id, delta) {
   showError('');
   try {
-    await api(`/api/products/${id}/ajustar-estoque`, { method: 'POST', body: JSON.stringify({ delta }) });
+    await api(`/api/products/${id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: delta, dedupeKey: dedupeKey() }) });
     await loadProducts();
   } catch (err) { showError(err.message); }
 }
