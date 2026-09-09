@@ -74,13 +74,28 @@ app.use('/api/products', requireAuth, productsRoutes);
 app.use('/api/sales', requireAuth, salesRoutes);
 app.use('/api/cash', requireAuth, cashRoutes);
 app.use('/api/customers', requireAuth, customersRoutes);
-app.use('/api/suppliers', requireAuth, requirePermission('compras'), suppliersRoutes);
+// Achado de auditoria (ao portar suppliersRepo.js pra cá): SEM
+// requirePermission('compras') aqui no mount, diferente de purchases —
+// a extensão deixa listSuppliers/getSupplier propositalmente sem
+// permissão (ver comentário em app/js/data/suppliersRepo.js): Estoque
+// (aberto a qualquer vendedor com 'manageProducts', não precisa de
+// 'compras') lê a lista pra preencher o fornecedor padrão de um
+// produto — só CRIAR/EDITAR/EXCLUIR fornecedor é gestão sensível. Gate
+// fica por rota, dentro de routes/suppliers.js, igual ao padrão já usado
+// em routes/products.js.
+app.use('/api/suppliers', requireAuth, suppliersRoutes);
 app.use('/api/purchases', requireAuth, requirePermission('compras'), purchasesRoutes);
 app.use('/api/finance', requireAuth, requirePermission('financeiro'), financeRoutes);
 app.use('/api/loyalty', requireAuth, loyaltyRoutes);
 app.use('/api/deliveries', requireAuth, deliveriesRoutes);
 app.use('/api/users', requireAuth, requirePermission('usuarios'), usersRoutes);
-app.use('/api/audit', requireAuth, requirePermission('logs'), auditRoutes);
+// Achado de auditoria (Fase 9, ao portar auditRepo.js): SEM
+// requirePermission('logs') aqui no mount — logAction() da extensão não
+// tem permissão própria de propósito (não é uma "ação do usuário", é só
+// o registro de uma ação que já passou pelo gate certo em outro
+// repositório) — só a LEITURA (Log do sistema, ver views/logs.js) exige
+// 'logs'. Gate fica por rota, dentro de routes/audit.js.
+app.use('/api/audit', requireAuth, auditRoutes);
 app.use('/api/company', requireAuth, requirePermission('empresa'), companyRoutes);
 app.use('/api/backup', requireAuth, requirePermission('backup'), backupRoutes);
 

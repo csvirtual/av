@@ -50,7 +50,7 @@ entrega, mas não deveria ser esquecido como os problemas anteriores.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js`, `productsRepo.js` e `stockRepo.js` prontos e testados (09/set), faltam ~7 repositórios (ver abaixo) |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js`, `productsRepo.js`, `stockRepo.js`, `suppliersRepo.js` e `auditRepo.js` prontos e testados (09/set); todos os 4 repositórios que `views/products.js` (Estoque) usa direto estão prontos. Faltam os 5 que `views/sale.js` (PDV) puxa (ver abaixo) |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -187,14 +187,47 @@ revisado pro início da Fase 9:
    rerrodada depois, ver achado no topo deste README sobre 4 testes
    "-multiterminal" que já falhavam antes desta mudança, confirmado por
    comparação direta).
-3. Faltam ainda `suppliersRepo`, `auditRepo` (que `products.js` também usa
-   direto) + `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`,
+3. ✅ **`suppliersRepo.js` + `auditRepo.js` novos** (09/set) —
+   `public/js/data/suppliersRepo.js` e `public/js/data/auditRepo.js`,
+   mesmo contrato dos repositórios da extensão (`listSuppliers`,
+   `getSupplier`, `createSupplier`, `updateSupplier`,
+   `setSupplierActive`, `deleteSupplier` / `logAction`). Testado em
+   `test-suppliers-audit-repo.cjs` (24 asserções, harness em
+   `public/test-suppliers-audit-repo.html`).
+   Dois achados de permissão corrigidos no processo, ambos do mesmo
+   formato "leitura/escrita de um recurso precisam de gates diferentes,
+   não dá pra usar UM `requirePermission` fixo no mount inteiro" (mesma
+   classe do achado da Fase 9 anterior sobre `getProduct`, mas agora do
+   lado de acesso, não de forma de resposta):
+   - **Fornecedores**: o mount de `/api/suppliers` em `server.js` exigia
+     `'compras'` pra TUDO, inclusive listar/ver — mas
+     `app/js/data/suppliersRepo.js` da extensão deixa
+     `listSuppliers`/`getSupplier` propositalmente sem permissão, porque
+     Estoque (`manageProducts`, não `compras`) precisa ler a lista pra
+     preencher o fornecedor padrão de um produto. Com o gate antigo, um
+     vendedor sem `'compras'` não conseguiria nem abrir o formulário de
+     produto direito. Corrigido: gate saiu do mount, foi pra dentro de
+     `routes/suppliers.js`, só em POST/PUT/DELETE.
+   - **Log de auditoria**: o mount de `/api/audit` exigia `'logs'` pra
+     TUDO — mas não existia rota de ESCREVER (POST) até este passo; toda
+     escrita de log até agora era feita só de dentro de outras rotas
+     (`login`, gestão de usuários, backup). `logAction()` da extensão não
+     tem permissão própria (loga a PRÓPRIA ação de quem chama, depois que
+     ela já passou pelo gate certo no repositório de origem) — só a
+     LEITURA (`views/logs.js`) exige `'logs'`. Adicionado `POST
+     /api/audit` sem gate de permissão (só `requireAuth`), com
+     `userId`/`userName`/`role` sempre resolvidos da sessão real do
+     servidor — testado com `fetch` cru mandando identidade forjada no
+     corpo do pedido, confirmando que o servidor ignora e usa a sessão de
+     verdade (não só que o módulo cliente "se comporta bem" e nunca manda
+     esses campos).
+4. Faltam ainda `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`,
    `customersRepo` (que `sale.js` puxa) — não iniciado.
-4. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
+5. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
    mesmo rigor de teste das fases 1-8 (concorrência, dedupe, nada de
    estoque ficando negativo com duas máquinas vendendo ao mesmo tempo).
 
-Passos 3-4 não iniciados ainda — é trabalho de verdade (múltiplas
+Passos 4-5 não iniciados ainda — é trabalho de verdade (múltiplas
 sessões), não um ajuste, e mexe com dinheiro/estoque, então merece o
 mesmo cuidado de teste que o resto do projeto sempre teve antes de
 qualquer linha ir pra produção.

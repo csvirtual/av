@@ -1,9 +1,18 @@
 // Fase 5 (compras/financeiro): fornecedores — CRUD simples, mesmo padrão de
 // routes/customers.js só que sem extrato (fornecedor não tem "saldo", quem
 // tem é a conta a pagar vinculada a ele em routes/finance.js).
+//
+// Achado de auditoria (Fase 9, ao portar suppliersRepo.js): leitura
+// (GET) fica ABERTA a qualquer usuário autenticado, só escrita exige
+// 'compras' — mesmo contrato de app/js/data/suppliersRepo.js da extensão
+// (listSuppliers/getSupplier sem checagem de propósito, porque Estoque
+// também lê a lista pra preencher o fornecedor padrão de um produto, sem
+// precisar da permissão de Compras). Por isso o gate fica aqui, rota a
+// rota, em vez de no mount de server.js (que so tem requireAuth agora).
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { requirePermission } from '../lib/permissions.js';
 
 const router = Router();
 
@@ -20,13 +29,18 @@ router.get('/', (req, res) => {
   res.json({ suppliers });
 });
 
+// 200 com `supplier: null` quando não existe, NUNCA 404 — espelha
+// getSupplier(id) da extensão (nunca lança), do qual
+// purchasesRepo.js#createPurchaseOrder depende (`if (!supplier) throw
+// ...`) pra dar uma mensagem de negócio amigável em vez de deixar
+// estourar uma exceção de rede não tratada — mesmo achado já corrigido
+// em routes/products.js#getProduct.
 router.get('/:id', (req, res) => {
   const row = getStmt.get(req.params.id);
-  if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
-  res.json({ supplier: rowToSupplier(row) });
+  res.json({ supplier: row ? rowToSupplier(row) : null });
 });
 
-router.post('/', (req, res) => {
+router.post('/', requirePermission('compras'), (req, res) => {
   try {
     const nome = (req.body.nome || '').trim();
     if (!nome) throw new Error('Nome do fornecedor é obrigatório.');
@@ -51,7 +65,7 @@ router.post('/', (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', requirePermission('compras'), (req, res) => {
   const row = getStmt.get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
   try {
@@ -78,7 +92,7 @@ router.put('/:id', (req, res) => {
   }
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requirePermission('compras'), (req, res) => {
   const row = getStmt.get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
   deleteStmt.run(req.params.id);
