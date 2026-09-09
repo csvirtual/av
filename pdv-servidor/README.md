@@ -35,7 +35,7 @@ node seed.js && node server.js` sobe em segundos, `/api/status` responde
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | ⚪ não iniciada |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js` pronto e testado (09/set), faltam os ~9 repositórios (ver abaixo) |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -120,12 +120,25 @@ Isso não invalida a arquitetura (a promessa "a tela só fala com a camada de
 dados" continua valendo — nenhuma tela precisa saber IndexedDB vs HTTP) só
 avisa que o primeiro corte de validação é maior que o antecipado. Plano
 revisado pro início da Fase 9:
-1. `session.js` novo (cookie de sessão do servidor em vez de
-   `chrome.storage.session`) — pré-requisito de tudo, todas as telas usam.
+1. ✅ **`session.js` novo** (09/set) — `public/js/session.js`, mesmo
+   contrato do `session.js` da extensão (`getSessionUserId`,
+   `setSessionUserId`, `onSessionUserIdChanged`, `clearSession`,
+   `getPendingCredit`/`setPendingCredit`/`clearPendingCredit`/
+   `addPendingCredit`, `touchActivity`/`getIdleMs`/`IDLE_LIMIT_MS`),
+   backed pelo cookie de sessão do servidor (`/api/auth/*`, que já
+   existia desde a Fase 8) em vez de `chrome.storage.session`. Testado em
+   `test-session.cjs` (15 asserções, harness em `public/test-session.html`) —
+   inclusive o ponto mais frágil do porte: o evento nativo `storage` do
+   navegador **não** dispara na aba que fez a mudança (diferente de
+   `chrome.storage.onChanged`, que dispara em todas, inclusive a
+   escritora) — sem compensar isso com um pub/sub local, `login.js`
+   pararia de re-renderizar a própria aba depois do login. Provado: o
+   teste falha exatamente nessa asserção se o pub/sub local for removido
+   (checado manualmente antes de commitar), passa com ele.
 2. Camada de dados nova pros 4 repositórios que `products.js` usa direto
-   (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`) + os 4 a mais
+   (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`) + os 5 a mais
    que `sale.js` puxa (`salesRepo`, `deliveriesRepo`, `companyRepo`,
-   `cashRepo`, `customersRepo` — 5, não 4).
+   `cashRepo`, `customersRepo`) — não iniciado.
 3. Só então testar Estoque + PDV juntos, multi-terminal, com a UI real —
    mesmo rigor de teste das fases 1-8 (concorrência, dedupe, nada de
    estoque ficando negativo com duas máquinas vendendo ao mesmo tempo).
