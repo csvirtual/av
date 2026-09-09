@@ -60,8 +60,14 @@ async function login(page) {
   check('Máquina A: produto aparece na própria lista de Estoque depois de cadastrar', (await machineA.locator('#view-root').innerText()).includes('Cimento Multi-Terminal (UI real)'));
 
   // ---------- Máquina B: vê o produto criado pela A (server real, não WS — recarrega) ----------
+  // 800ms (não 400ms) de propósito: o login de B logo acima já disparou
+  // seu próprio render do Painel (redundante — hash setado vazio dispara
+  // hashchange sozinho, ver comentário em app.js#renderShell) que ainda
+  // pode estar em voo (fetch de verdade, não IndexedDB) quando este goto
+  // roda — dá folga suficiente pra essa navegação de Estoque também
+  // terminar seus próprios awaits antes da checagem.
   await machineB.goto(`${BASE}/#/estoque`);
-  await machineB.waitForTimeout(400);
+  await machineB.waitForTimeout(800);
   check('Máquina B: vê o produto cadastrado pela Máquina A (mesmo catálogo no servidor)', (await machineB.locator('#view-root').innerText()).includes('Cimento Multi-Terminal (UI real)'));
 
   // ---------- Máquina B: vende o produto pela tela REAL de PDV ----------

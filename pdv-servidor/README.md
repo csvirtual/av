@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟢 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+Ajuda+Backup completos — todas as 15 telas do roteiro original —, com atualização em tempo real, testados (09/set) — `session.js`, `theme.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js`+`views/backup.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários/Backup(restaurar e zerar, em TODO terminal) em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs`, `test-personalizacao-ajuda.cjs` e `test-backup.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16); "Zerar dados e reiniciar a operação" ganhou rota nova (`POST /api/backup/reset`) e broadcast pra TODO terminal, feature sem equivalente único-terminal (ver passo 18). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta o `app.js` completo (menu lateral, navegação permission-aware, timeout de inatividade, trava de aba única) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟢 **Completa** (09/set) — as 15 telas do roteiro original (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários, Caixa, Compras, Financeiro, Logs, Relatórios, Personalização, Ajuda, Backup), com atualização em tempo real, testados — `session.js`, `theme.js`, `tabPresence.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js`+`views/backup.js` reais rodando contra o servidor sem reescrita, `public/js/app.js` completo (menu lateral com gate por permissão, timeout de inatividade, trava de aba única) hospedando todas elas, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários/Backup(restaurar e zerar, em TODO terminal) em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs`, `test-personalizacao-ajuda.cjs`, `test-backup.cjs` e `test-app-shell.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16); "Zerar dados e reiniciar a operação" ganhou rota nova (`POST /api/backup/reset`) e broadcast pra TODO terminal, feature sem equivalente único-terminal (ver passo 18); o middleware global de sessão nunca checava se a conta continuava ativa — uma sessão criada antes de uma desativação continuava com escrita plena até o cookie expirar sozinho (12h), corrigido tratando conta inativa como sessão inválida (ver passo 19). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta só a lacuna de crédito de troca cross-terminal (ver passo 8) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -1036,24 +1036,180 @@ seguro) nunca quebra por causa disso.
     403 em exportar/resetar/consultar contagem, inclusive tentando pela
     UI de verdade (erro amigável, não trava).
 
-Com os passos 5 a 18 fechados, a Fase 9 está **substancialmente
-completa** pras quinze telas Estoque+PDV+Histórico+Clientes+Painel+
-Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+
-Ajuda+Backup: a hipótese central do roteiro (telas reais reaproveitáveis
-sem reescrita) segue provada na prática mesmo nas duas telas que
-precisaram de lógica nova no servidor (agregação de relatórios,
-reinício de operação), a promessa de tempo real já é verdade onde faz
-sentido — inclusive nos dois eventos "trocou tudo" (restaurar/zerar
-backup), que agora recarregam TODO terminal conectado, não só o que fez
-a ação —, e o ciclo operacional inteiro da loja — vender, repor
-estoque, fiado, fidelidade, visão geral, entregar, gerir vendedores,
-abrir/fechar caixa, comprar de fornecedor, controlar contas a
-pagar/receber, auditar tudo isso, enxergar o desempenho do negócio,
-escolher tema, consultar ajuda, e agora fazer backup/restaurar/reiniciar
-a operação — já roda pela UI real.
-O que falta da Fase 9 (o `app.js` completo com menu lateral e
-navegação permission-aware — hoje toda rota é visível pra qualquer
-logado, o gate real fica só no servidor, mesmo padrão usado por
-relatorios/logs/financeiro/backup — timeout de inatividade e trava de
-aba única, e a lacuna de crédito de troca cross-terminal documentada no
+19. ✅ **`app.js` completo** (09/set) — último passo do roteiro da Fase
+    9: menu lateral com as 15 rotas reais (ícone + gate por permissão,
+    igual ao `ROUTES` da extensão), timeout de inatividade (30min) e
+    trava de aba única — as três peças que faltavam da "casca" pra
+    fechar o roteiro original.
+
+    **Reestruturação de arquitetura.** A casca mínima de antes
+    recriava a tela INTEIRA (topo + conteúdo) a cada navegação — sem
+    problema com só 2 rotas, mas custoso e do jeito errado pra montar
+    menu lateral, idle-watch e trava de aba (cada um precisaria se
+    desmontar/remontar a cada clique). Reestruturado pro mesmo desenho
+    da extensão: `renderShell(user)` monta a casca (menu, rodapé,
+    idle-watch) **uma vez** por login; `renderCurrentRoute()` troca só
+    o conteúdo (`#view-root`, mantido com esse nome — não o
+    `#main-content` da extensão — de propósito: é o seletor que todos
+    os 33 arquivos de teste já existentes usam pra ler a tela renderizada,
+    trocar o nome quebraria a suíte inteira sem ganho nenhum) a cada
+    `#hash`, preservando o resto. `ROUTES` ganhou `icon` e `permission`
+    por rota, copiados da extensão — só o campo `roles` ficou de fora:
+    lá ele existe pra restringir uma rota só a admin, mas TODA rota da
+    extensão hoje lista `roles: ['admin', 'vendedor']` (nunca usado de
+    verdade pra filtrar nada aqui, já que só existem esses dois papéis)
+    — sem sentido reproduzir um campo morto.
+
+    **Menu lateral**: gaveta em tela estreita (breakpoint 900px, CSS já
+    existia desde uma fase de polimento visual anterior), com botão de
+    abrir/véu, setas de rolagem quando a lista não cabe inteira, e os
+    links filtrados por `canAccessRoute()` — mesma função da extensão
+    (`userCan()` já deixa admin passar sempre), só sem o campo `roles`
+    morto. A lista do menu só é recalculada num login novo (não a cada
+    navegação) — mesmo comportamento da extensão: se um admin conceder
+    uma permissão nova a um vendedor com a aba dele já aberta, o LINK
+    só aparece no próximo login. **Diferente da extensão de propósito**:
+    `renderCurrentRoute()` NÃO tem gate de permissão nenhum — um
+    deep-link direto pra uma rota gated (ex: `#/backup` sem a permissão
+    `'backup'`, digitado direto ou favoritado) renderiza a tela
+    NORMALMENTE, mesmo padrão já testado e estabelecido desde
+    relatorios.js/logs.js/financeiro.js/backup.js (ver seus próprios
+    testes): a proteção de verdade é sempre no SERVIDOR
+    (`requirePermission()`), nunca escondendo a tela — um vendedor sem
+    a permissão vê o formulário normalmente, e qualquer ação de
+    escrita/leitura sensível volta 403, mostrado como erro amigável
+    pela própria tela. A primeira versão deste passo replicava o gate
+    de renderização da extensão aqui também — quebrou justamente essas
+    4 telas já testadas (a tela de Backup simplesmente parava de
+    renderizar pra quem não tem a permissão, contradizendo o próprio
+    `test-backup.cjs`) — revertido antes de fechar o passo.
+
+    **Timeout de inatividade** e **trava de aba única** portados quase
+    byte-a-byte de `app.js`/`tabPresence.js` da extensão, só trocando
+    o backend de armazenamento compartilhado entre abas: `localStorage`
+    no lugar de `chrome.storage.session` (mesmo raciocínio já usado em
+    `session.js`/`theme.js` — é uma trava "deste terminal", não da
+    loja: dois TERMINAIS diferentes continuam rodando ao mesmo tempo o
+    dia inteiro sem problema nenhum, isso só impede duas ABAS do MESMO
+    terminal). Novo `public/js/tabPresence.js`: mesmo algoritmo de
+    "eleição por batimento" (cada aba registra um id com timestamp;
+    só a mais antiga viva por terminal roda o app de verdade; uma
+    rival aparentemente mais velha é CONFIRMADA — espera `PROBE_MS`
+    e reconfere se ela ainda está batendo — antes de ser aceita, pra
+    não bloquear uma aba original só em segundo plano) — como
+    `localStorage` é síncrono, a versão daqui até elimina uma classe de
+    corrida por I/O assíncrono que a extensão precisava tolerar com
+    `chrome.storage.session`.
+
+    **Achado de segurança real no caminho (P1)**: o middleware global
+    de sessão (`server.js`) resolvia o cookie e liberava acesso total a
+    toda rota protegida SEM NUNCA checar se a conta continuava ativa —
+    só o LOGIN em si já bloqueava (`lib/verifyLogin.js`), mas uma
+    sessão criada ANTES de um admin desativar um vendedor continuava
+    com escrita plena (vendas, caixa, tudo) até o cookie expirar
+    sozinho (12h) ou alguém derrubar manualmente. A extensão nunca teve
+    esse buraco porque lá o IndexedDB local É a própria fonte de
+    verdade de cada chamada — aqui, sem essa checagem, nem o SERVIDOR
+    reforçava, só a re-checagem client-side que este mesmo passo estava
+    prestes a adicionar (`renderCurrentRoute` reconferindo a sessão a
+    cada navegação) — que sozinha nunca seria suficiente (nunca confiar
+    só na tela pra decidir algo sensível, o mesmo princípio repetido em
+    quase todo achado desta Fase). Corrigido na raiz: o middleware
+    agora trata uma conta desativada exatamente como sessão inválida
+    (`req.userId = null`) — próxima chamada de QUALQUER rota (inclusive
+    `GET /api/auth/me`) já cai em 401 sozinha, sem precisar de nenhuma
+    checagem extra em cada rota individual. `renderCurrentRoute()` só
+    precisou reaproveitar `GET /api/auth/me` (já existente) pra
+    reconferir sessão/permissões a cada navegação — não foi preciso
+    nenhum endpoint novo de "buscar usuário por id", que abriria a
+    pergunta de quem mais poderia consultar o cadastro de quem.
+
+    **Duas corridas reais no caminho, achadas pela suíte de regressão
+    completa** (não pelo teste novo desta tela — pelos 5 arquivos já
+    existentes que passaram a rodar contra a casca nova). As duas têm a
+    mesma raiz: telas reais fazem chamada de REDE de verdade
+    (`fetch`), não uma leitura instantânea de IndexedDB local como a
+    extensão — abrindo uma janela real onde duas renderizações
+    concorrentes podem terminar fora de ordem.
+
+    1. `bootImpl()` chamava `renderShell(user)` sem `await`, que por
+       sua vez chamava `renderCurrentRoute(user)` também sem `await` —
+       a fila `bootQueue` (que devia serializar dois `boot()` quase
+       simultâneos) considerava o boot "terminado" assim que
+       `renderShell` era só CHAMADO, não quando a renderização de
+       verdade (que tem um `await getCompany()` de rede no meio)
+       realmente acabava. Um segundo `boot()` enfileirado logo depois
+       (ex: o próprio duplo-disparo redundante e "inofensivo" de hash
+       vazio, já tolerado desde a extensão) começava cedo demais,
+       criava um `#view-root` NOVO, e a primeira renderização — ainda
+       presa no `await` — retomava mexendo num container já órfão.
+       Reproduzido de verdade com `test-personalizacao-ajuda.cjs`
+       (`page.reload()` seguido de trocar de tema): `TypeError: Cannot
+       set properties of null (setting 'innerHTML')` dentro de
+       `views/personalizacao.js`. Corrigido tornando `renderShell`
+       `async` e SEMPRE aguardada por quem chama, de ponta a ponta
+       (`bootImpl` → `renderShell` → `renderCurrentRoute`) — a fila só
+       libera o próximo boot depois que a tela de verdade terminou.
+    2. Mesmo problema, versão navegação-a-navegação: `scheduleLiveRefresh()`
+       (o mecanismo de recarregar uma tela sozinha ao receber um aviso
+       do WebSocket, ver `LIVE_TOPICS`) sempre chamou `view.render()`
+       DIRETO, fora de `renderCurrentRoute()` — sem nenhuma proteção
+       contra ficar pra trás. Um aviso `'products-changed'` chegando
+       enquanto o Painel está ativo agenda um recarregamento dali a
+       `LIVE_DEBOUNCE_MS` (500ms); se o usuário navegar pra Estoque
+       ANTES desse timer disparar, e a navegação de Estoque (que
+       também tem awaits de rede reais) ainda não tiver terminado
+       quando o timer do Painel finalmente dispara, o Painel
+       reaparecia por cima do Estoque. Reproduzido de verdade em
+       `test-real-ui.cjs` (máquina B ainda no Painel quando a venda da
+       máquina A dispara `'products-changed'`, navega pra Estoque logo
+       em seguida). Corrigido com o mesmo remédio padrão pra essa
+       classe de corrida ("stale render"): um contador `renderGeneration`
+       compartilhado — toda chamada de `renderCurrentRoute()` marca sua
+       própria geração; `scheduleLiveRefresh()` tira um retrato dela no
+       momento em que É AGENDADO e confere de novo quando o timer
+       DISPARA — se uma navegação de verdade aconteceu nesse meio-tempo,
+       abandona em silêncio em vez de escrever a tela antiga por cima
+       da nova. `renderCurrentRoute()` ganhou o mesmo contador nos seus
+       próprios pontos de espera, pela mesma razão.
+
+    Testado em `test-app-shell.cjs` (19 asserções): admin vê as 15
+    rotas no menu, vendedor sem permissão nenhuma vê só as 9 sem gate
+    e nenhuma das 6 gated, deep-link direto pra `#/backup` sem
+    permissão renderiza a tela normalmente (mesmo padrão das 4 telas
+    já testadas) mas a ação de verdade continua 403, conceder/revogar
+    uma permissão em outro terminal não muda o link do menu (só no
+    próximo login, comportamento esperado), desativar a conta derruba
+    a sessão já aberta — tanto `GET /api/auth/me` (401) quanto uma
+    escrita de verdade (`POST /api/products`, também 401) — e a aba
+    volta sozinha pro login; sessão expira sozinha simulando 30min de
+    inatividade (manipulando o timestamp em `localStorage` em vez de
+    esperar 30min de verdade) e fica registrada no log; segunda aba do
+    MESMO terminal fica bloqueada (sem montar o app), libera sozinha
+    ao fechar a primeira; navegação repetida não quebra o shell; zero
+    erros JS/rede — mais os dois achados de corrida acima, que só
+    apareceram rodando a SUÍTE INTEIRA (32 arquivos já existentes,
+    todos rodando de novo contra a casca nova) em cima deste teste
+    novo, não nele sozinho.
+
+Com os passos 5 a 19 fechados, a Fase 9 está **completa**: as quinze
+telas do roteiro original — Estoque, PDV, Histórico, Clientes, Painel,
+Carreto, Usuários, Caixa, Compras, Financeiro, Logs, Relatórios,
+Personalização, Ajuda e Backup — rodam pela UI real, com o `app.js`
+completo (menu lateral, navegação permission-aware, timeout de
+inatividade, trava de aba única) hospedando todas elas; a hipótese
+central do roteiro (telas reais reaproveitáveis sem reescrita) segue
+provada na prática mesmo nas telas que precisaram de lógica nova no
+servidor (agregação de relatórios, reinício de operação), a promessa
+de tempo real já é verdade onde faz sentido — inclusive nos dois
+eventos "trocou tudo" (restaurar/zerar backup), que recarregam TODO
+terminal conectado, não só o que fez a ação —, e o ciclo operacional
+inteiro da loja — vender, repor estoque, fiado, fidelidade, visão
+geral, entregar, gerir vendedores, abrir/fechar caixa, comprar de
+fornecedor, controlar contas a pagar/receber, auditar tudo isso,
+enxergar o desempenho do negócio, escolher tema, consultar ajuda,
+fazer backup/restaurar/reiniciar a operação — já roda pela UI real,
+com o menu certo mostrando só o que cada vendedor pode acessar.
+O que falta da Fase 9 (a lacuna de crédito de troca cross-terminal
+documentada no
 passo 8) é trabalho real de mais fases, não risco em aberto.

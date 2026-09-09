@@ -41,6 +41,22 @@ app.use(express.static(path.join(__dirname, 'public')));
 // userName/userRole (não só o id) já ficam prontos aqui pra toda rota que
 // precisa gravar "quem fez" (ex: vendas, estornos) sem ter que buscar de
 // novo em cada uma.
+//
+// Achado de auditoria (Fase 9, passo do app.js completo): esta checagem
+// nunca olhava `u.active` — resolveSession() só confere se o TOKEN ainda é
+// válido (não expirou por TTL), nunca se a CONTA continua ativa. Login em
+// si já bloqueia (lib/verifyLogin.js), mas uma sessão criada ANTES de um
+// admin desativar o vendedor continuava com acesso total a toda rota
+// protegida (vendas, caixa, tudo) até o cookie expirar sozinho (12h) — o
+// mesmo raciocínio de "reconferir se o usuário continua ativo a cada
+// navegação" que a extensão já tinha em app.js#renderCurrentRoute, só que
+// aqui, sem isso, nem o SERVIDOR reforçava (a extensão nunca dependeu só
+// da tela pra isso — o IndexedDB local dela é a fonte de verdade de cada
+// chamada; aqui a fonte de verdade é este middleware, e ele deixava
+// passar). Uma conta desativada agora é tratada exatamente como uma
+// sessão inválida — próxima chamada de qualquer rota (inclusive
+// GET /api/auth/me, ver routes/auth.js) já cai em 401 sozinha, sem
+// precisar de nenhuma checagem extra em cada rota individual.
 app.use((req, res, next) => {
   req.userId = resolveSession(req.cookies?.session) || null;
   req.userName = null;
@@ -48,11 +64,13 @@ app.use((req, res, next) => {
   req.userPermissions = null;
   if (req.userId) {
     const row = getUserByIdStmt.get(req.userId);
-    if (row) {
-      const u = JSON.parse(row.data);
+    const u = row ? JSON.parse(row.data) : null;
+    if (u && u.active) {
       req.userName = u.nome;
       req.userRole = u.role;
       req.userPermissions = u.permissions || {};
+    } else {
+      req.userId = null;
     }
   }
   // Identidade do TERMINAL (a máquina física), separada da identidade do
