@@ -16,3 +16,23 @@ export async function logAction({ userId, userName, role, action, details = '', 
   const { entry } = await api('/api/audit', { method: 'POST', body: JSON.stringify({ action, details, entity, entityId }) });
   return entry;
 }
+
+/** Lista paginada, pro Log do sistema (Fase 9, ao ligar views/logs.js) —
+ * mesmo contrato de listAuditLogPage() da extensão (`{ items, hasMore,
+ * nextKey, nextId }`, `afterKey`/`afterId` vindos da página anterior). A
+ * paginação de verdade (não carregar a tabela inteira) já é feita pelo
+ * servidor (ver routes/audit.js), mesmo espírito de
+ * salesRepo.js#listSalesPage. */
+export async function listAuditLogPage({ role, userId, term, fromTs, toTs, limit = 50, afterKey, afterId } = {}) {
+  const params = new URLSearchParams();
+  if (role) params.set('role', role);
+  if (userId) params.set('userId', userId);
+  if (term) params.set('term', term);
+  if (fromTs != null) params.set('fromTs', fromTs);
+  if (toTs != null) params.set('toTs', toTs);
+  if (limit != null) params.set('limit', limit);
+  if (afterKey != null) params.set('afterKey', afterKey);
+  if (afterId != null) params.set('afterId', afterId);
+  const { items, hasMore, nextKey, nextId } = await api(`/api/audit?${params.toString()}`);
+  return { items, hasMore, nextKey, nextId };
+}

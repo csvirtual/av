@@ -16,8 +16,6 @@ import { logAction } from '../lib/audit.js';
 
 const router = Router();
 
-const listStmt = db.prepare('SELECT data FROM audit_log ORDER BY timestamp DESC');
-
 // userId/userName/role NUNCA vêm do corpo do pedido — sempre resolvidos
 // da sessão de verdade (req.userId/req.userName/req.userRole, ver
 // server.js), mesmo princípio de "nunca confiar em quem está chamando"
@@ -35,19 +33,57 @@ router.post('/', (req, res) => {
   res.status(201).json({ entry: record });
 });
 
+/** Achado de auditoria (Fase 9, ao ligar views/logs.js): a versão anterior
+ * desta rota sempre carregava a tabela `audit_log` INTEIRA na memória
+ * (`listStmt.all()`) pra filtrar/paginar em JS — mesmo bug de performance
+ * já corrigido antes em Vendas/Relatórios/Painel (ver dbScanByIndex em
+ * db.js da extensão), só que este log NUNCA é apagado (só cresce com o
+ * tempo de operação da loja), então seria a tela que mais sofreria disso.
+ * Agora faz um scan em ORDEM via cursor de chave (timestamp, id) — os
+ * filtros que o schema indexa de verdade (user_id, intervalo de
+ * timestamp) entram direto no WHERE do SQL; `role` e `term` (sem coluna
+ * própria, só dentro do JSON) continuam conferidos registro a registro
+ * durante a varredura, mas parando assim que encontra `limit + 1`
+ * combinações, nunca precisando materializar a tabela inteira — mesmo
+ * espírito de app/js/data/auditRepo.js#listAuditLogPage da extensão
+ * (dbScanByIndex: range no índice + predicado por linha + corte cedo). */
+const scanStmt = db.prepare(`
+  SELECT id, timestamp, data FROM audit_log
+  WHERE (@userId IS NULL OR user_id = @userId)
+    AND (@fromTs IS NULL OR timestamp >= @fromTs)
+    AND (@toTs IS NULL OR timestamp <= @toTs)
+    AND (@afterTs IS NULL OR timestamp < @afterTs OR (timestamp = @afterTs AND id < @afterId))
+  ORDER BY timestamp DESC, id DESC
+`);
+
 router.get('/', requirePermission('logs'), (req, res) => {
-  const { role, userId, term, fromTs, toTs, limit = 100 } = req.query;
-  const lim = Math.min(500, Number(limit) || 100);
+  const { role, userId, term, fromTs, toTs, limit = 50, afterKey, afterId } = req.query;
+  const lim = Math.min(200, Number(limit) || 50);
   const termLower = term ? String(term).toLowerCase() : null;
 
-  let entries = listStmt.all().map((r) => JSON.parse(r.data));
-  if (role) entries = entries.filter((e) => e.role === role);
-  if (userId) entries = entries.filter((e) => e.userId === userId);
-  if (fromTs) entries = entries.filter((e) => e.timestamp >= Number(fromTs));
-  if (toTs) entries = entries.filter((e) => e.timestamp <= Number(toTs));
-  if (termLower) entries = entries.filter((e) => `${e.action} ${e.details}`.toLowerCase().includes(termLower));
+  const params = {
+    userId: userId || null,
+    fromTs: fromTs != null ? Number(fromTs) : null,
+    toTs: toTs != null ? Number(toTs) : null,
+    afterTs: afterKey != null ? Number(afterKey) : null,
+    afterId: afterId || null,
+  };
 
-  res.json({ entries: entries.slice(0, lim), total: entries.length });
+  const items = [];
+  let hasMore = false;
+  for (const row of scanStmt.iterate(params)) {
+    const entry = JSON.parse(row.data);
+    if (role && entry.role !== role) continue;
+    if (termLower && !`${entry.action} ${entry.details}`.toLowerCase().includes(termLower)) continue;
+    if (items.length >= lim) { hasMore = true; break; }
+    items.push(entry);
+  }
+
+  const last = items[items.length - 1];
+  res.json({
+    items, entries: items, hasMore,
+    nextKey: last ? last.timestamp : null, nextId: last ? last.id : null,
+  });
 });
 
 export default router;
