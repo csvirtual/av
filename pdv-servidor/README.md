@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras completos, com atualização em tempo real, testados (09/set) — `session.js`, 14 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs` e `test-compras.cjs` verdes. Achados de segurança/correção reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13). Faltam as ~4 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro completos, com atualização em tempo real, testados (09/set) — `session.js`, 15 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs` e `test-financeiro.cjs` verdes. Achados de segurança/correção reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13). Faltam as ~3 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -762,15 +762,49 @@ revisado pro início da Fase 9:
     ler pedidos de compra (rota inteira atrás da permissão, igual a
     extensão).
 
-Com os passos 5 a 13 fechados, a Fase 9 está **substancialmente
-completa** pro noneto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
-Usuários+Caixa+Compras: a hipótese central do roteiro (telas reais
-reaproveitáveis sem reescrita) segue provada na prática, a promessa de
-tempo real já é verdade onde faz sentido, e o ciclo operacional inteiro da
-loja — vender, repor estoque, fiado, fidelidade, visão geral, entregar,
-gerir vendedores, abrir/fechar caixa, e agora comprar de fornecedor — já
-roda pela UI real.
-O que falta da Fase 9 (as ~4 telas restantes — financeiro, logs,
-relatórios, personalização/backup/ajuda —, o `app.js` completo com menu
-lateral, e a lacuna de crédito de troca cross-terminal documentada no
-passo 8) é trabalho real de mais fases, não risco em aberto.
+14. ✅ **`views/financeiro.js` real ligada** (09/set) — décima tela real
+    (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários, Caixa,
+    Compras, agora Financeiro), **copiada sem nenhuma alteração** de
+    `pdv-extension/app/js/views/`. Contas a pagar/receber com pagamento
+    parcial de verdade — uma conta só fecha como "Pago" quando a soma de
+    tudo que foi registrado bate o valor total; enquanto sobrar saldo,
+    fica etiquetada "Pago parcialmente" com o restante em destaque, nunca
+    escondida como se já estivesse quitada. Extrato de pagamentos por
+    conta, cada um excluível individualmente (reabre a conta sozinha se
+    tirar ela de "paga"), cancelamento só antes de qualquer pagamento,
+    filtro por tipo/status, resumo com "a pagar"/"a receber" (somando o
+    SALDO restante de uma conta parcial, nunca o valor cheio) e contagem
+    de vencidas.
+
+    Mesmo padrão do passo 13 (compras.js): toda a lógica de negócio já
+    existia pronta no servidor desde a **Fase 5**
+    (`routes/finance.js` — reconferência atômica do restante antes de
+    cada pagamento, `dedupeKey` contra reenvio, conta reabrindo sozinha ao
+    excluir um pagamento) — este passo só precisou da camada de tradução
+    HTTP nova (`public/js/data/financeRepo.js`), reaproveitando
+    `suppliersRepo.js` e `components/customSelect.js` que já existiam
+    prontos.
+
+    Testado em `test-financeiro.cjs` (19 asserções): fluxo completo real
+    (cadastro, pagamento parcial refletindo no resumo pelo saldo restante,
+    conclusão do pagamento fechando a conta, exclusão de um pagamento
+    reabrindo a conta sozinha), pagar além do restante rejeitado, reenvio
+    duplicado (`dedupeKey`) rejeitado, cancelamento bloqueado tanto por
+    "tem pagamento parcial" quanto por "já está totalmente paga",
+    cancelamento sem pagamento nenhum funcionando normalmente, conta
+    vencida calculada e contada certo no resumo, e o gate de permissão
+    (`'financeiro'` exigido na rota inteira, leitura incluída, igual a
+    extensão).
+
+Com os passos 5 a 14 fechados, a Fase 9 está **substancialmente
+completa** pro deceto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
+Usuários+Caixa+Compras+Financeiro: a hipótese central do roteiro (telas
+reais reaproveitáveis sem reescrita) segue provada na prática, a promessa
+de tempo real já é verdade onde faz sentido, e o ciclo operacional inteiro
+da loja — vender, repor estoque, fiado, fidelidade, visão geral, entregar,
+gerir vendedores, abrir/fechar caixa, comprar de fornecedor, e agora
+controlar contas a pagar/receber — já roda pela UI real.
+O que falta da Fase 9 (as ~3 telas restantes — logs, relatórios,
+personalização/backup/ajuda —, o `app.js` completo com menu lateral, e a
+lacuna de crédito de troca cross-terminal documentada no passo 8) é
+trabalho real de mais fases, não risco em aberto.

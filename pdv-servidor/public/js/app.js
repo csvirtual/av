@@ -17,6 +17,7 @@ import { renderCarreto } from './views/carreto.js';
 import { renderUsers } from './views/users.js';
 import { renderCaixa } from './views/caixa.js';
 import { renderCompras } from './views/compras.js';
+import { renderFinanceiro } from './views/financeiro.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -38,6 +39,7 @@ const ROUTES = {
   usuarios: { label: 'Usuários', render: renderUsers },
   caixa: { label: 'Caixa', render: renderCaixa },
   compras: { label: 'Compras', render: renderCompras },
+  financeiro: { label: 'Financeiro', render: renderFinanceiro },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -71,7 +73,9 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // já tinha preenchido. 'compras' também fica de fora, mesmo raciocínio:
 // duas abas (fornecedores/pedidos) com paginação própria, e o modal de
 // novo pedido tem linhas de busca de produto sendo preenchidas — nada
-// que um recarregamento no meio devesse apagar.
+// que um recarregamento no meio devesse apagar. 'financeiro' também:
+// filtro de tipo/status e paginação são estado só de tela, mesmo
+// raciocínio de 'vendas'/'clientes'/'carreto'/'compras'.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
