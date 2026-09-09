@@ -20,8 +20,20 @@ import { renderCompras } from './views/compras.js';
 import { renderFinanceiro } from './views/financeiro.js';
 import { renderLogs } from './views/logs.js';
 import { renderRelatorios } from './views/relatorios.js';
+import { renderPersonalizacao } from './views/personalizacao.js';
+import { renderAjuda } from './views/ajuda.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
+import { getCompany } from './data/companyRepo.js';
+import { getThemePreference, applyTheme } from './theme.js';
+
+// A aparência (claro/escuro/automático) é escolhida na tela Personalização
+// (ver views/personalizacao.js) — só precisa ser aplicada aqui, uma vez,
+// antes do primeiro render, pra abrir direto no tema certo sem piscar.
+// Mesmo ponto de app.js da extensão.
+(async () => {
+  applyTheme(await getThemePreference());
+})();
 
 const root = document.getElementById('root');
 
@@ -44,6 +56,8 @@ const ROUTES = {
   financeiro: { label: 'Financeiro', render: renderFinanceiro },
   logs: { label: 'Log do sistema', render: renderLogs },
   relatorios: { label: 'Relatórios', render: renderRelatorios },
+  personalizacao: { label: 'Personalização', render: renderPersonalizacao },
+  ajuda: { label: 'Ajuda', render: renderAjuda },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -83,7 +97,12 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // filtro (perfil/usuário/termo/data) e "Carregar mais" (cursor de
 // timestamp+id) são estado só de tela, mesmo raciocínio das outras.
 // 'relatorios' também: o período selecionado (preset ou datas
-// personalizadas) é estado só de tela.
+// personalizadas) é estado só de tela. 'personalizacao' e 'ajuda' nem
+// entram aqui: nenhuma delas lê dado nenhum que outro terminal possa
+// mudar (tema é por navegador; ajuda é conteúdo estático) — 'ajuda' tem
+// busca/acordeão abertos que um recarregamento sem motivo também
+// atrapalharia, mas o ponto principal é que não existe evento nenhum que
+// devesse disparar um.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
@@ -172,8 +191,19 @@ function renderLogin() {
   });
 }
 
-function renderShell(user) {
+async function renderShell(user) {
   const routeName = currentRouteName();
+  // ctx.company só é lido hoje por views/ajuda.js (o aviso de LGPD do
+  // tópico de privacidade lê nomeFantasia/encarregadoLgpd), sempre com
+  // fallback seguro (`company?.nomeFantasia || '[nome da loja]'`) — o
+  // servidor ainda não tem uma tela "Dados da loja" portada (views/
+  // company.js da extensão está fora de escopo por enquanto: entrelaçada
+  // com o sistema de licenciamento comercial da extensão, que não existe
+  // aqui, ver README), só a política de venda (`company.policies`, já
+  // usada por sale.js/dashboard.js/caixa.js). getCompany() aqui devolve só
+  // isso — os campos de perfil da loja continuam undefined, mostrando o
+  // fallback, nunca quebrando.
+  const company = await getCompany();
   root.innerHTML = `
     <div class="app-shell">
       <header class="topbar" style="display:flex;align-items:center;gap:16px;padding:10px 18px;border-bottom:1px solid var(--border);">
@@ -196,7 +226,7 @@ function renderShell(user) {
 
   const view = ROUTES[routeName];
   const container = document.getElementById('view-root');
-  const ctx = { user, navigate: (name) => { location.hash = `#/${name}`; } };
+  const ctx = { user, company, navigate: (name) => { location.hash = `#/${name}`; } };
   activeRouteName = routeName;
   activeCtx = ctx;
   if (view) {
@@ -231,7 +261,7 @@ async function boot() {
       renderLogin();
       return;
     }
-    renderShell(user);
+    await renderShell(user);
   } finally {
     booting = false;
   }

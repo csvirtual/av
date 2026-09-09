@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios completos, com atualização em tempo real, testados (09/set) — `session.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs` e `test-relatorios.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16). Falta a última tela e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+Ajuda completos, com atualização em tempo real, testados (09/set) — `session.js`, `theme.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs` e `test-personalizacao-ajuda.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta a última tela (`views/backup.js`) e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -886,17 +886,78 @@ revisado pro início da Fase 9:
     nos dois sentidos (vendedor com `'relatorios'` delegado lê
     normalmente, sem toma 403).
 
-Com os passos 5 a 16 fechados, a Fase 9 está **substancialmente
-completa** pro dodeceto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
-Usuários+Caixa+Compras+Financeiro+Logs+Relatórios: a hipótese central do
-roteiro (telas reais reaproveitáveis sem reescrita) segue provada na
-prática mesmo na tela que precisou de agregação nova no servidor, a
-promessa de tempo real já é verdade onde faz sentido, e o ciclo
-operacional inteiro da loja — vender, repor estoque, fiado, fidelidade,
-visão geral, entregar, gerir vendedores, abrir/fechar caixa, comprar de
-fornecedor, controlar contas a pagar/receber, auditar tudo isso, e agora
-enxergar o desempenho do negócio — já roda pela UI real.
-O que falta da Fase 9 (a última tela restante — personalização/backup/
-ajuda —, o `app.js` completo com menu lateral, e a lacuna de crédito de
-troca cross-terminal documentada no passo 8) é
-trabalho real de mais fases, não risco em aberto.
+17. ✅ **`views/personalizacao.js` e `views/ajuda.js` reais ligadas**
+    (09/set) — décima terceira e décima quarta telas reais, **copiadas
+    sem nenhuma alteração** de `pdv-extension/app/js/views/`. Sem
+    achados — as duas telas praticamente não têm lógica de servidor por
+    trás.
+
+    Personalização é só a preferência de tema (claro/escuro/automático).
+    Novo `public/js/theme.js`: mesmo contrato de `app/js/theme.js` da
+    extensão, mas grava em `localStorage` em vez de
+    `chrome.storage.local` — é uma escolha "deste computador", não da
+    loja (mesmo raciocínio do `terminalId` de `apiClient.js`), então não
+    faz sentido nenhum ir pro servidor: cada terminal decide seu próprio
+    tema, sem sincronizar entre eles. `app.js` aplica a preferência salva
+    uma vez no boot (antes do primeiro render, pra abrir direto no tema
+    certo sem piscar) e a tela troca o atributo `data-theme` da `<html>`
+    na hora ao selecionar.
+
+    Ajuda é conteúdo estático (guias por tópico + F.A.Q. com busca), sem
+    nenhuma chamada de rede própria. A única pegadinha: ela lê
+    `ctx.company` (o aviso de LGPD do tópico de privacidade, mostrando
+    `nomeFantasia`/`encarregadoLgpd`), então `renderShell()` em `app.js`
+    passou a buscar `getCompany()` e passar no `ctx` — sempre com
+    fallback seguro (`company?.nomeFantasia || '[nome da loja]'`), já
+    que o servidor ainda não tem uma tela "Dados da loja" (ver exclusão
+    de escopo abaixo) — nunca quebra, só mostra o placeholder genérico
+    onde a extensão mostraria o nome real da loja.
+
+    Nenhuma das duas entrou no `LIVE_TOPICS`: personalização não reage a
+    nada do servidor (o tema é só do navegador) e ajuda não tem dado de
+    servidor nenhum (e ainda tem estado de busca/acordeão em tela que um
+    re-render por WebSocket destruiria à toa).
+
+    Testado em `test-personalizacao-ajuda.cjs` (16 asserções): tema
+    padrão "Automático" sem atributo `data-theme`, selecionar
+    claro/escuro/automático aplica o atributo certo na hora, grava em
+    `localStorage` (não em cookie nem servidor), persiste depois de
+    `page.reload()`, tela de Ajuda carrega os tópicos, busca por "fiado"
+    acha a pergunta certa do F.A.Q., busca sem resultado mostra aviso
+    (não trava), zero erros JS/rede, e as duas telas continuam acessíveis
+    por um vendedor com `permissions: {}` (zero permissões) — igual a
+    extensão, cujo `ROUTES` não exige nenhuma `permission` própria pra
+    elas, só `roles: ['admin', 'vendedor']`.
+
+**Fora de escopo, por decisão de propósito: `views/company.js` e
+`views/setup.js`.** Essas duas telas da extensão (`empresa` no `ROUTES`,
+e o assistente de primeira execução) não vão ser portadas nesta fase.
+Ambas estão profundamente entrelaçadas com o sistema de licenciamento
+comercial por instalação da extensão — `licenseRepo.js`, `license.js`,
+`verifyLicenseKey`, `components/supportContact.js` — que não tem
+equivalente nenhum aqui: este é um servidor interno multi-terminal de
+uma loja só, não um produto vendido/licenciado por instalação. Portar
+essas telas sem reescrita significaria arrastar (ou simular) todo esse
+aparato de licença pra dentro do servidor, o que não faz sentido nenhum
+pro caso de uso. Consequência prática, já documentada no passo acima:
+`getCompany()` no servidor devolve só `{policies}` (a política de venda,
+já usada por `sale.js`/`dashboard.js`/`caixa.js`) — os campos de perfil
+da loja (`nomeFantasia`, `encarregadoLgpd`, etc.) simplesmente não
+existem aqui, e o único lugar que os lê (`ajuda.js`, com fallback
+seguro) nunca quebra por causa disso.
+
+Com os passos 5 a 17 fechados, a Fase 9 está **substancialmente
+completa** pras catorze telas Estoque+PDV+Histórico+Clientes+Painel+
+Carreto+Usuários+Caixa+Compras+Financeiro+Logs+Relatórios+Personalização+
+Ajuda: a hipótese central do roteiro (telas reais reaproveitáveis sem
+reescrita) segue provada na prática mesmo na tela que precisou de
+agregação nova no servidor, a promessa de tempo real já é verdade onde
+faz sentido, e o ciclo operacional inteiro da loja — vender, repor
+estoque, fiado, fidelidade, visão geral, entregar, gerir vendedores,
+abrir/fechar caixa, comprar de fornecedor, controlar contas a
+pagar/receber, auditar tudo isso, enxergar o desempenho do negócio, e
+agora escolher tema e consultar ajuda — já roda pela UI real.
+O que falta da Fase 9 (a última tela restante — `views/backup.js`,
+exportar/restaurar/resetar dados —, o `app.js` completo com menu
+lateral, e a lacuna de crédito de troca cross-terminal documentada no
+passo 8) é trabalho real de mais fases, não risco em aberto.
