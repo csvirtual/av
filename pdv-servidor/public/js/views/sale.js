@@ -6,7 +6,21 @@
 // Além do carrinho básico, esta tela cobre: desconto por item e geral (com
 // teto para vendedores — acima disso precisa da senha de um admin),
 // pagamento misto (mais de uma forma na mesma venda) e uso de crédito de
-// troca gerado por um estorno anterior (ver session.js).
+// troca gerado por um estorno/resgate anterior.
+//
+// Achado de arquitetura FECHADO aqui, único desvio deliberado do princípio
+// "portar sem reescrever" de toda a Fase 9 (documentado no README): a
+// extensão guarda "crédito de troca pendente" só em `session.js`
+// (`chrome.storage.session`/aqui `localStorage`) — vale só NESTE terminal,
+// pra QUALQUER cliente que vier a seguir, não pro cliente específico que
+// gerou o crédito. Esta versão consulta o saldo REAL e por CLIENTE
+// (`data/loyaltyRepo.js#getCustomerCredit`, lido de `store_credits` no
+// servidor) sempre que um cliente é selecionado — o crédito gerado num
+// estorno na máquina 1 aparece certinho quando o mesmo cliente for pago na
+// máquina 2. `pendingCredit` continua existindo como NOME de variável (pra
+// manter o resto da tela idêntico à extensão) mas passa a guardar o saldo
+// do SERVIDOR pro cliente selecionado, nunca mais o que sobrou solto no
+// `localStorage` — ver `refreshCustomerCredit()` logo abaixo.
 import { getByBarcode, searchProducts } from '../data/productsRepo.js';
 import { createSale } from '../data/salesRepo.js';
 import { newId } from '../db.js';
@@ -17,7 +31,7 @@ import { confirmUserPassword } from '../components/passwordConfirm.js';
 import { getOpenSession } from '../data/cashRepo.js';
 import { getCustomerBalance } from '../data/customersRepo.js';
 import { renderCustomerPicker } from '../components/customerPicker.js';
-import { getPendingCredit, setPendingCredit, clearPendingCredit } from '../session.js';
+import { getCustomerCredit } from '../data/loyaltyRepo.js';
 import { bindBarcodeInput, installGlobalScannerListener } from '../utils/barcode.js';
 import { formatMoney, escapeHtml, displayUnit, formatQty, BASE_PAYMENT_METHODS } from '../utils/format.js';
 import { applyDiscount, computeCartTotals, computeCreditInterest, effectivePrice, isNearExpiry, isExpired, MAX_INSTALLMENTS } from '../utils/pricing.js';
@@ -148,7 +162,10 @@ export async function renderSale(container, ctx) {
   stopGlobalScanner?.();
   stopGlobalScanner = null;
 
-  let pendingCredit = await getPendingCredit();
+  // Nunca começa com um valor "solto" — crédito de troca é sempre do
+  // CLIENTE selecionado (ver comentário no topo do arquivo), populado por
+  // refreshCustomerCredit() assim que alguém for escolhido.
+  let pendingCredit = null;
 
   const company = await getCompany();
   const vendorMaxDiscountPercent = company?.policies?.vendorMaxDiscountPercent ?? 10;
@@ -262,9 +279,31 @@ export async function renderSale(container, ctx) {
   async function renderCustomerBox() {
     await renderCustomerPicker(customerBox, {
       getSelected: () => selectedCustomer,
-      setSelected: (c) => { selectedCustomer = c; },
+      setSelected: (c) => { selectedCustomer = c; refreshCustomerCredit(); },
       showBalance: true,
     });
+  }
+
+  // Busca o saldo de crédito de troca REAL do cliente selecionado
+  // (`store_credits` no servidor — ver comentário no topo do arquivo), não
+  // mais o que sobrou em `localStorage`. Chamada toda vez que
+  // `selectedCustomer` muda — pelo picker (setSelected acima) ou por
+  // qualquer troca direta de carrinho (congelar/retomar/finalizar, ver os
+  // outros pontos que chamam isto junto de renderCustomerBox()). Falha de
+  // rede aqui não trava a venda — só não mostra o crédito (o pagamento em
+  // si, se tentado sem crédito confirmado, seria recusado pelo servidor
+  // do mesmo jeito de sempre).
+  async function refreshCustomerCredit() {
+    if (!selectedCustomer) {
+      pendingCredit = null;
+    } else {
+      let credit = 0;
+      try {
+        credit = await getCustomerCredit(selectedCustomer.id);
+      } catch { /* sem crédito visível por enquanto — não impede vender normalmente */ }
+      pendingCredit = credit > 0 ? { amount: credit, reason: `Saldo de "${selectedCustomer.nome}" — vale em qualquer terminal` } : null;
+    }
+    renderCreditBanner();
   }
 
   function paymentsSum() {
@@ -284,7 +323,7 @@ export async function renderSale(container, ctx) {
         <button class="btn btn-ghost btn-sm" id="discard-credit-btn" type="button">Descartar</button>
       </div>
     `;
-    document.getElementById('use-credit-btn').addEventListener('click', async () => {
+    document.getElementById('use-credit-btn').addEventListener('click', () => {
       const { total } = currentTotals();
       const remaining = Math.max(0, total - paymentsSum());
       if (remaining <= 0) {
@@ -294,19 +333,17 @@ export async function renderSale(container, ctx) {
       const applied = Math.min(pendingCredit.amount, remaining);
       payments.push({ method: CREDIT_METHOD, amount: applied });
       const leftover = pendingCredit.amount - applied;
-      if (leftover > 0.01) {
-        pendingCredit = { ...pendingCredit, amount: leftover };
-        await setPendingCredit(pendingCredit);
-      } else {
-        pendingCredit = null;
-        await clearPendingCredit();
-      }
+      // Só ajusta o valor mostrado NESTA tela — o saldo real no servidor
+      // só muda de verdade quando a venda for finalizada com sucesso (ver
+      // routes/sales.js#commitSale, que reconfere e deduz na hora).
+      pendingCredit = leftover > 0.01 ? { ...pendingCredit, amount: leftover } : null;
       renderCreditBanner();
       renderPayments();
     });
-    document.getElementById('discard-credit-btn').addEventListener('click', async () => {
+    document.getElementById('discard-credit-btn').addEventListener('click', () => {
+      // Só oculta o banner NESTA venda — o saldo real do cliente continua
+      // intacto no servidor, disponível de novo na próxima venda dele.
       pendingCredit = null;
-      await clearPendingCredit();
       renderCreditBanner();
     });
   }
@@ -617,15 +654,15 @@ export async function renderSale(container, ctx) {
       });
     });
     paymentsBox.querySelectorAll('[data-pay-remove]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const idx = Number(btn.dataset.payRemove);
         if (payments[idx].method === CREDIT_METHOD) {
-          // Devolve o crédito removido de volta pro saldo pendente, em vez
-          // de simplesmente descartar o valor.
+          // Devolve o crédito removido de volta pro saldo mostrado nesta
+          // tela, em vez de simplesmente descartar o valor — o saldo real
+          // no servidor nunca chegou a ser tocado (só muda ao finalizar a
+          // venda com sucesso), então não há nada pra desfazer lá.
           const refund = payments[idx].amount;
-          const current = await getPendingCredit();
-          pendingCredit = { ...(current || { reason: 'Gerado por estorno' }), amount: (current?.amount || 0) + refund };
-          await setPendingCredit(pendingCredit);
+          pendingCredit = { ...(pendingCredit || { reason: `Saldo de "${selectedCustomer?.nome || 'cliente'}" — vale em qualquer terminal` }), amount: (pendingCredit?.amount || 0) + refund };
           renderCreditBanner();
         }
         payments.splice(idx, 1);
@@ -774,6 +811,7 @@ export async function renderSale(container, ctx) {
     selectedCustomer = null;
     renderAll();
     renderCustomerBox();
+    refreshCustomerCredit();
     renderHeldSales();
     resultsBox.innerHTML = '';
     scanInput.value = '';
@@ -808,6 +846,7 @@ export async function renderSale(container, ctx) {
     selectedCustomer = held.selectedCustomer;
     renderAll();
     renderCustomerBox();
+    refreshCustomerCredit();
     renderHeldSales();
     resultsBox.innerHTML = '';
     scanInput.value = '';
@@ -1244,24 +1283,23 @@ export async function renderSale(container, ctx) {
     } catch (err) {
       // Achado de auditoria: um crédito de troca aplicado (botão "Usar
       // nesta venda" — ver renderCreditBanner) já é deduzido do saldo
-      // pendente da SESSÃO na hora do clique, antes de a venda ser
-      // confirmada de verdade. Se a venda falhar por qualquer motivo
-      // depois disso (ex: uma validação que só o servidor pega), sem essa
+      // MOSTRADO NESTA TELA na hora do clique, antes de a venda ser
+      // confirmada de verdade — o servidor só deduz de `store_credits` de
+      // verdade dentro de commitSale, se a venda for concluída (ver
+      // routes/sales.js). Se a venda falhar por qualquer motivo depois
+      // disso (ex: uma validação que só o servidor pega), sem essa
       // devolução o crédito ficava só "preso" na linha de pagamento desta
-      // tentativa — se o vendedor desistisse da venda em vez de tentar de
-      // novo, o cliente perdia parte do crédito sem NENHUMA venda
-      // concluída com ele. Devolve automaticamente e tira a linha do
-      // carrinho de pagamentos — mesmo efeito do botão "Remover" (ver
-      // acima), só que automático — assim o estado nunca fica em dois
-      // lugares ao mesmo tempo: ou está disponível em pendingCredit, ou
-      // está de verdade numa venda concluída, nunca os dois, nunca nenhum.
+      // tentativa, sumido da tela — o vendedor podia achar que o cliente
+      // já não tinha mais aquele crédito. Devolve automaticamente e tira a
+      // linha do carrinho de pagamentos — mesmo efeito do botão "Remover"
+      // (ver acima), só que automático. O saldo real no servidor nunca foi
+      // tocado por essa tentativa que falhou, então não há nada pra
+      // desfazer lá — só a exibição local precisa voltar ao que era.
       const creditPaymentIdx = payments.findIndex((p) => p.method === CREDIT_METHOD);
       if (creditPaymentIdx !== -1) {
         const refund = payments[creditPaymentIdx].amount;
         payments.splice(creditPaymentIdx, 1);
-        const current = await getPendingCredit();
-        pendingCredit = { ...(current || { reason: 'Gerado por estorno' }), amount: (current?.amount || 0) + refund };
-        await setPendingCredit(pendingCredit);
+        pendingCredit = { ...(pendingCredit || { reason: `Saldo de "${selectedCustomer?.nome || 'cliente'}" — vale em qualquer terminal` }), amount: (pendingCredit?.amount || 0) + refund };
         renderCreditBanner();
         showToast(`${err.message} O crédito de troca aplicado foi devolvido — use "Usar nesta venda" de novo se quiser tentar outra vez.`, 'error');
       } else {
@@ -1330,6 +1368,7 @@ export async function renderSale(container, ctx) {
     selectedCustomer = null;
     renderAll();
     renderCustomerBox();
+    refreshCustomerCredit();
     resultsBox.innerHTML = '';
     scanInput.value = '';
     scanInput.focus();
@@ -1382,7 +1421,12 @@ export async function renderSale(container, ctx) {
     await commitSale(pre.discountApproval, pre.fiadoAmount, deliveryPlan);
   });
 
-  renderCreditBanner();
+  // Não só renderCreditBanner() — o carrinho é um rascunho persistido
+  // entre re-renders desta tela (ver comentário de `selectedCustomer` no
+  // topo do arquivo), então já pode existir um cliente selecionado de uma
+  // visita anterior a esta função: refreshCustomerCredit() busca o saldo
+  // dele de novo (se houver) antes de desenhar o banner.
+  refreshCustomerCredit();
   renderCustomerBox();
   renderAll();
   renderHeldSales();

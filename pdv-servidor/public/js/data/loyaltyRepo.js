@@ -1,20 +1,22 @@
 // Pontos de fidelidade — versão multi-terminal, Fase 9 passo 8 (o que
 // views/clientes.js precisa pro resgate de pontos).
 //
-// Achado de arquitetura (não corrigido aqui, documentado no README): o
-// resgate aqui já persiste o crédito gerado direto em `store_credits`
+// Achado de arquitetura, FECHADO num passo posterior à Fase 9
+// (`getCustomerCredit` abaixo + `views/sale.js`): o resgate aqui sempre
+// persistiu o crédito gerado direto em `store_credits`
 // (ver routes/loyalty.js#commitRedemption) — diferente de
 // data/loyaltyRepo.js#recordRedemption da extensão, que só devolve o
 // valor e deixa a TELA chamar session.js#addPendingCredit() separado
-// (crédito fica só na sessão/aba de quem resgatou). views/clientes.js é
-// copiada sem alteração, então ainda chama addPendingCredit() depois —
-// nesta versão isso vira um atalho local redundante (o crédito real já
-// está gravado, correto e auditável, no servidor), não um bug de dinheiro
-// duplicado: nada em sale.js ainda LÊ o saldo persistido de
-// store_credits, só o pendingCredit local. Sale.js só aplica automático
-// no MESMO terminal/sessão que gerou o crédito — resgatar numa máquina e
-// usar em outra ainda exige conferir o extrato manualmente. Mesma lacuna
-// já existe desde o passo 7 (estorno com "gerar crédito de troca").
+// (crédito fica só na sessão/aba de quem resgatou). views/clientes.js
+// continua copiada sem alteração, então ainda chama addPendingCredit()
+// depois — isso virou um atalho local inerte (nada mais lê o que ele
+// escreve; o crédito real já está gravado, correto e auditável, no
+// servidor desde sempre). `views/sale.js` (a única mudança de verdade
+// desta correção, fora do princípio "portar sem reescrever" da Fase 9 de
+// propósito) agora consulta `getCustomerCredit()` sempre que um cliente é
+// selecionado — o saldo mostrado e aplicável como pagamento passa a ser o
+// SALDO REAL do cliente, sempre igual em qualquer terminal, não mais o
+// que sobrou no `localStorage` de quem gerou o crédito.
 import { api, newDedupeKey } from './apiClient.js';
 
 /** Extrato de pontos (ganho/resgate) do cliente — mesmo contrato de
@@ -31,6 +33,17 @@ export async function listCustomerLoyaltyLedger(customerId) {
 export async function getCustomerPoints(customerId) {
   const { points } = await api(`/api/loyalty/${encodeURIComponent(customerId)}`);
   return points;
+}
+
+/** Saldo de CRÉDITO DE TROCA do cliente — sem equivalente na extensão
+ * (lá, o crédito nunca é persistido por cliente num servidor central, só
+ * fica na sessão/aba de quem gerou; ver comentário no topo do arquivo).
+ * Mesma consulta de `getCustomerPoints`, só o campo `credit` — usado por
+ * `views/sale.js` sempre que um cliente é selecionado, pra oferecer o
+ * saldo real como forma de pagamento, gerado em QUALQUER terminal. */
+export async function getCustomerCredit(customerId) {
+  const { credit } = await api(`/api/loyalty/${encodeURIComponent(customerId)}`);
+  return credit;
 }
 
 /** Resgate de pontos — mesmo contrato de recordRedemption() da extensão

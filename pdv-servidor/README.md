@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟢 **Completa** (09/set) — as 15 telas do roteiro original (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários, Caixa, Compras, Financeiro, Logs, Relatórios, Personalização, Ajuda, Backup), com atualização em tempo real, testados — `session.js`, `theme.js`, `tabPresence.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js`+`views/backup.js` reais rodando contra o servidor sem reescrita, `public/js/app.js` completo (menu lateral com gate por permissão, timeout de inatividade, trava de aba única) hospedando todas elas, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários/Backup(restaurar e zerar, em TODO terminal) em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs`, `test-personalizacao-ajuda.cjs`, `test-backup.cjs` e `test-app-shell.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16); "Zerar dados e reiniciar a operação" ganhou rota nova (`POST /api/backup/reset`) e broadcast pra TODO terminal, feature sem equivalente único-terminal (ver passo 18); o middleware global de sessão nunca checava se a conta continuava ativa — uma sessão criada antes de uma desativação continuava com escrita plena até o cookie expirar sozinho (12h), corrigido tratando conta inativa como sessão inválida (ver passo 19). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). Falta só a lacuna de crédito de troca cross-terminal (ver passo 8) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟢 **Completa** (09/set) — as 15 telas do roteiro original (Estoque, PDV, Histórico, Clientes, Painel, Carreto, Usuários, Caixa, Compras, Financeiro, Logs, Relatórios, Personalização, Ajuda, Backup), com atualização em tempo real, testados — `session.js`, `theme.js`, `tabPresence.js`, 16 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `purchasesRepo`, `financeRepo`, `reportsRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`, `backupRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js`+`views/caixa.js`+`views/compras.js`+`views/financeiro.js`+`views/logs.js`+`views/relatorios.js`+`views/personalizacao.js`+`views/ajuda.js`+`views/backup.js` reais rodando contra o servidor sem reescrita, `public/js/app.js` completo (menu lateral com gate por permissão, timeout de inatividade, trava de aba única) hospedando todas elas, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários/Backup(restaurar e zerar, em TODO terminal) em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs`, `test-users.cjs`, `test-caixa.cjs`, `test-compras.cjs`, `test-financeiro.cjs`, `test-logs.cjs`, `test-relatorios.cjs`, `test-personalizacao-ajuda.cjs`, `test-backup.cjs`, `test-app-shell.cjs` e `test-cross-terminal-credit.cjs` verdes. Achados de segurança/correção/performance reais corrigidos no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11); duas rotas novas no Caixa (retificação e backup automático de fechamento) precisaram ser escritas do zero no servidor (ver passo 12); recebimento de pedido de compra corrompia o `costPrice` de produto `'personalizado'`, travado em 0 de propósito (ver passo 13); `GET /api/audit` carregava a tabela de log inteira na memória a cada leitura, corrigido pra scan por cursor (ver passo 15); relatórios ganharam agregação nova no servidor (`routes/reports.js`), nunca trazendo vendas cruas pro cliente (ver passo 16); "Zerar dados e reiniciar a operação" ganhou rota nova (`POST /api/backup/reset`) e broadcast pra TODO terminal, feature sem equivalente único-terminal (ver passo 18); o middleware global de sessão nunca checava se a conta continuava ativa — uma sessão criada antes de uma desativação continuava com escrita plena até o cookie expirar sozinho (12h), corrigido tratando conta inativa como sessão inválida (ver passo 19); crédito de troca ficava preso ao terminal que o gerou (`views/sale.js` só lia `localStorage`, nunca o saldo real por cliente do servidor), fechado consultando `store_credits` direto — único desvio deliberado de "portar sem reescrever" de toda a fase (ver passo 20). `views/company.js` e `views/setup.js` ficam fora de escopo, entrelaçadas com o licenciamento comercial da extensão (ver passo 17). **Nenhuma lacuna conhecida em aberto.** |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -452,8 +452,9 @@ revisado pro início da Fase 9:
    API (403) — não só escondido atrás de um botão que a tela poderia ou
    não mostrar.
 
-   **Achado de arquitetura, não corrigido aqui — documentado em
-   `public/js/data/loyaltyRepo.js`:** "crédito de troca" (gerado por um
+   **Achado de arquitetura, FECHADO no passo 20 (mais adiante) — na
+   hora, só documentado em `public/js/data/loyaltyRepo.js`:** "crédito
+   de troca" (gerado por um
    estorno com a opção marcada, ou por um resgate de pontos) tem DOIS
    destinos hoje, e eles não se falam. O servidor sempre grava o crédito
    de verdade, persistido e auditável, na tabela `store_credits` (mesmo
@@ -472,10 +473,11 @@ revisado pro início da Fase 9:
    crédito duas vezes — o servidor nunca LÊ o pendingCredit pra decidir
    nada) nem uma perda de dinheiro (o lançamento real nunca desaparece) —
    é uma lacuna de UX entre dois mecanismos válidos que ainda não foram
-   unificados. Corrigir de verdade (ex: `sale.js` também consultar o saldo
-   de `store_credits` do cliente) provavelmente exige mexer em `sale.js`
-   — fora do princípio "portar sem reescrever" desta fase; fica anotado
-   como candidato a uma fase futura dedicada a fechar essa lacuna.
+   unificados. Corrigir de verdade (`sale.js` também consultar o saldo
+   de `store_credits` do cliente) exige mexer em `sale.js` — fora do
+   princípio "portar sem reescrever" desta fase — por isso ficou
+   anotado aqui como candidato, em vez de corrigido na hora. Fechado no
+   passo 20, mais adiante nesta lista.
 
 9. ✅ **`views/dashboard.js` real ligada** (09/set) — quinta tela real
    (Estoque, PDV, Histórico, Clientes, agora Painel), **copiada sem
@@ -1210,6 +1212,70 @@ fornecedor, controlar contas a pagar/receber, auditar tudo isso,
 enxergar o desempenho do negócio, escolher tema, consultar ajuda,
 fazer backup/restaurar/reiniciar a operação — já roda pela UI real,
 com o menu certo mostrando só o que cada vendedor pode acessar.
-O que falta da Fase 9 (a lacuna de crédito de troca cross-terminal
-documentada no
-passo 8) é trabalho real de mais fases, não risco em aberto.
+20. ✅ **Lacuna de crédito de troca cross-terminal FECHADA** (09/set) —
+    a última pendência documentada da Fase 9 (achado do passo 8):
+    crédito de troca (gerado por um estorno com a opção marcada, ou por
+    um resgate de pontos) tinha DOIS destinos que não se falavam — o
+    servidor sempre gravou o valor real, persistido e auditável, em
+    `store_credits`; mas `views/sale.js` (copiada sem alteração da
+    extensão) só lia `session.js#pendingCredit`, um valor solto em
+    `localStorage` DESTE terminal, nem sequer ligado a um cliente
+    específico. Na prática: o crédito gerado na máquina 1 só aparecia
+    como forma de pagamento automática NAQUELA MESMA máquina — noutro
+    terminal, só dava pra ver conferindo o extrato manualmente.
+
+    **Único desvio deliberado do princípio "portar sem reescrever" de
+    toda a Fase 9**, documentado exatamente onde o próprio achado já
+    apontava a solução (`public/js/data/loyaltyRepo.js`, comentário
+    escrito no passo 8): `views/sale.js` passou a consultar
+    `getCustomerCredit(customerId)` (novo, thin wrapper sobre
+    `GET /api/loyalty/:customerId`, que já devolvia `credit` desde a
+    Fase 6 — nenhuma rota nova precisou ser escrita) sempre que um
+    cliente é selecionado no PDV — via `refreshCustomerCredit()`, nova
+    função interna chamada em todo ponto onde `selectedCustomer` muda
+    (escolher/trocar cliente no picker, congelar/retomar carrinho,
+    finalizar venda). O nome da variável `pendingCredit` foi mantido
+    (resto da tela idêntico à extensão) mas ela deixou de vir do
+    `localStorage` — agora guarda sempre o saldo REAL e por CLIENTE
+    vindo do servidor, nunca mais o que sobrou solto de quem gerou.
+
+    Isso também fechou, de graça, um bug menor que já existia mesmo
+    single-terminal: o banner antigo aparecia pra QUALQUER cliente que
+    viesse a seguir (nunca checava de quem era o crédito) — agora ele
+    só aparece com um cliente selecionado, e troca (ou some) na hora
+    certa ao trocar de cliente no meio do atendimento.
+
+    `session.js#getPendingCredit/setPendingCredit/clearPendingCredit/
+    addPendingCredit` continuam existindo, intocados — `salesHistory.js`
+    (estorno) e `clientes.js` (resgate) continuam chamando
+    `addPendingCredit()` sem alteração nenhuma (as duas continuam
+    verbatim da extensão); a escrita em `localStorage` que isso faz
+    virou um atalho local inerte, sem efeito prático — nada mais lê o
+    que ele escreve, já que `sale.js` agora sempre confere o servidor.
+    Nenhuma mudança de segurança foi necessária: o servidor já validava
+    (desde a Fase 2/6, sem alteração) qualquer pagamento "Crédito de
+    troca" contra o saldo REAL de `store_credits` na hora de finalizar
+    a venda, nunca confiando em nada que o cliente mandasse — a lacuna
+    sempre foi só de EXIBIÇÃO, nunca de integridade de dinheiro (ver
+    achado original do passo 8).
+
+    Testado em `test-cross-terminal-credit.cjs` (17 asserções): estorno
+    com crédito gerado no Terminal A aparece certinho no Terminal B ao
+    selecionar o mesmo cliente; sem cliente selecionado, nenhum banner
+    aparece; trocar de cliente troca o saldo mostrado (nunca mistura
+    saldo de clientes diferentes); aplicar o crédito como pagamento e
+    finalizar a venda no Terminal B deduz de verdade o saldo real no
+    servidor (conferido direto pela API, não só pela tela); gastar mais
+    crédito do que o saldo real continua recusado pelo servidor mesmo
+    atacando a API direto; resgate de pontos de fidelidade (gerado em
+    Clientes) também aparece cross-terminal em Nova Venda; remover um
+    pagamento de crédito já aplicado devolve o valor pro banner sem
+    perder; zero erros JS/rede nos dois terminais.
+
+Com o passo 20 fechado, a Fase 9 está **completa sem nenhuma lacuna
+conhecida em aberto**: as quinze telas do roteiro original rodam pela
+UI real, com o `app.js` completo hospedando todas elas, e a única
+lacuna de arquitetura documentada ao longo do caminho — crédito de
+troca preso a um terminal — foi fechada, extensível a qualquer venda
+futura que gere ou consuma crédito, sem exigir nenhuma rota nova no
+servidor.
