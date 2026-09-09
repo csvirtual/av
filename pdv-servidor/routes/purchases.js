@@ -13,6 +13,8 @@ import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
 
+const CUSTOM_UNIT_VALUE = 'personalizado';
+
 const insertOrderStmt = db.prepare(`
   INSERT INTO purchase_orders (id, supplier_id, status, created_at, data) VALUES (@id, @supplierId, @status, @createdAt, @data)
 `);
@@ -129,7 +131,18 @@ const commitReceive = db.transaction((input) => {
     if (!productRow) throw new Error(`Produto de "${ri.name}" não existe mais no catálogo — não foi possível creditar o estoque recebido.`);
     const product = rowToProduct(productRow);
     product.quantity += ri.qty;
-    if (ri.unitCost > 0) product.costPrice = ri.unitCost;
+    // Achado de auditoria (Fase 9, ao ligar views/compras.js): faltava
+    // aqui a mesma trava que purchasesRepo.js#receivePurchaseOrder da
+    // extensão já tem — produto 'personalizado' não tem UM costPrice (cada
+    // forma de venda tem o seu próprio custo, ver
+    // routes/products.js#resolveCustomUnitFields), e o campo costPrice do
+    // registro do produto fica travado em 0 pra sempre por esse motivo.
+    // Sem este `unit !== CUSTOM_UNIT_VALUE`, receber um pedido desse tipo
+    // de produto com um custo unitário digitado corrompia esse 0 pra um
+    // valor solto, sem onde exibi-lo de propósito — mas sobrevivendo ao
+    // recebimento. Furo pré-existente desde a Fase 5, só nunca alcançável
+    // por UI nenhuma até esta tela ser ligada.
+    if (product.unit !== CUSTOM_UNIT_VALUE && ri.unitCost > 0) product.costPrice = ri.unitCost;
     saveProduct(product);
   }
 
