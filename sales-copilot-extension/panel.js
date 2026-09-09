@@ -12,17 +12,16 @@ let currentHistory = [];
 // procurar manualmente na lista (que fica em ordem decrescente).
 let lastGeneratedHistoryId = null;
 
-// ---------- Fase 4: contexto vindo do WhatsApp Adapter ----------
-// Ver core/conversation-context.js (fase 1) e content/whatsapp-adapter.js
-// (fases 2/3). Por ora um contexto AMBIENTE só, não ligado a nenhum lead
-// específico — só preenche pasteBox automaticamente, no lugar do botão
-// "Colar" manual. Associar isto a um lead de verdade (por nome/telefone) é
-// trabalho da fase 5 (Integração com Sales Engine).
-let contextoWhatsAppAtual = null;
+// ---------- Fases 4+5: contexto vindo do WhatsApp Adapter ----------
+// Ver core/conversation-context.js (fase 1), content/whatsapp-adapter.js
+// (fases 2/3) e o bloco "Fases 4+5" perto do fim deste arquivo (onde
+// contextosWhatsAppPorContato/contatoWhatsAppAtivo são de fato usados) —
+// só preenche pasteBox automaticamente, no lugar do botão "Colar" manual,
+// e só quando o lead selecionado combina com o contato detectado.
 // true enquanto o CONTEÚDO ATUAL de pasteBox ainda é exatamente o que este
-// contexto escreveu da última vez — falso assim que a pessoa edita o campo
-// por cima. Sem isto, uma mensagem nova chegando reescreveria por cima de
-// uma edição manual do atendente (perda de trabalho silenciosa).
+// mecanismo escreveu da última vez — falso assim que a pessoa edita o
+// campo por cima. Sem isto, uma mensagem nova chegando reescreveria por
+// cima de uma edição manual do atendente (perda de trabalho silenciosa).
 let pasteBoxPreenchidoPeloAdapter = false;
 // Extrai só os dígitos — usado pra comparar telefone na busca (que agora
 // fica formatado com parênteses/traço) sem depender da pontuação digitada.
@@ -3834,12 +3833,15 @@ function textoDaIA(valor, limite){
 // estiver olhando pra ESTE lead: a chamada leva segundos, e apagar o que ela
 // já começou a digitar em OUTRO lead seria perder trabalho dela.
 function limparCamposAposGerar(leadAtual, aindaNesteLead){
-  // O contexto do WhatsApp (fase 4) que alimentou esta geração já foi
+  // O contexto do WhatsApp (fases 4/5) que alimentou esta geração já foi
   // consumido — marca como processado sempre, mesmo se a pessoa trocou de
   // lead enquanto a IA gerava (aindaNesteLead=false): o texto já foi usado
-  // de verdade, não pode voltar a aparecer como "pendente" depois.
-  if(pasteBoxPreenchidoPeloAdapter && contextoWhatsAppAtual){
-    copilotoContextoMarcarProcessado(contextoWhatsAppAtual);
+  // de verdade, não pode voltar a aparecer como "pendente" depois. Marca o
+  // contexto do CONTATO ativo no momento (não necessariamente o do lead
+  // exibido agora — ver contextosWhatsAppPorContato).
+  if(pasteBoxPreenchidoPeloAdapter){
+    const contextoConsumido = contextosWhatsAppPorContato.get(contatoWhatsAppAtivo || '(contato desconhecido)');
+    if(contextoConsumido) copilotoContextoMarcarProcessado(contextoConsumido);
     pasteBoxPreenchidoPeloAdapter = false;
   }
   if(!aindaNesteLead) return;
@@ -6448,7 +6450,7 @@ document.getElementById('trocarPerfilBtn').addEventListener('click', trocarPerfi
 document.getElementById('perfilAtivoBadge').addEventListener('click', trocarPerfilClick);
 document.getElementById('adminImpersonandoVoltarBtn').addEventListener('click', voltarAoMeuPerfilAdmin);
 
-// ---------- Fase 4: consumo das mensagens do WhatsApp Adapter ----------
+// ---------- Fases 4+5: consumo das mensagens do WhatsApp Adapter ----------
 //
 // content/whatsapp-adapter.js (fases 2/3) manda, via background.js, as
 // mensagens detectadas na conversa ativa do WhatsApp Web. Este listener só
@@ -6476,16 +6478,51 @@ function _copilotoWaMensagemConfiavel(sender) {
   return deAbaWhatsApp || doProprioServiceWorker;
 }
 
+// ---------- Fase 5: a qual lead esta conversa pertence ----------
+//
+// Um Conversation Context POR CONTATO detectado no WhatsApp (nunca um
+// único contexto ambiente global, como a fase 4 tinha) — troca de
+// conversa no WhatsApp Web sem trocar de lead no painel (ou vice-versa)
+// nunca mistura o texto de uma pessoa com o cadastro de outra.
+let contextosWhatsAppPorContato = new Map();
+let contatoWhatsAppAtivo = null; // nome cru vindo do Adapter — pode ser null (Adapter não conseguiu ler)
+
+// Decide se a conversa detectada agora deve preencher o LEAD ATUALMENTE
+// SELECIONADO no painel:
+// - Central de mensagens (lead.fixo): a MENSAGEM sempre pode entrar — é
+//   literalmente pra isto que a Central existe (várias pessoas reais na
+//   mesma caixa). O NOME da pessoa nunca é tocado por este mecanismo —
+//   continua 100% manual (personNameInput), porque é o campo que decide
+//   casamento de histórico/estágio (ver preencherEstagioPorNomeConhecido)
+//   e um erro de leitura do DOM aí teria consequência real.
+// - Lead normal: só preenche se o lead ainda não tem nome definido (lead
+//   novo, sem identidade ainda — pode adotar a do WhatsApp) OU se o nome
+//   já bate com o contato detectado. Nunca escreve a conversa de uma
+//   pessoa dentro da ficha de outra.
+function _copilotoWaLeadCombinaComContato(lead, nomeContato) {
+  if (!lead) return false;
+  if (lead.fixo) return true;
+  if (!nomeContato) return true; // Adapter não conseguiu ler o nome — não bloqueia por falta de dado
+  const nomeLead = ((!pareceCifrado(lead.nome) && lead.nome) || '').trim().toLowerCase();
+  if (!nomeLead) return true;
+  return nomeLead === nomeContato.trim().toLowerCase();
+}
+
 // Escreve o texto pendente do contexto no campo — só quando o campo está
 // vazio, ou quando ainda só contém o que ESTE MESMO mecanismo escreveu da
 // última vez (nunca por cima de uma edição manual do atendente, ver
-// pasteBoxPreenchidoPeloAdapter).
-function atualizarPasteBoxComContextoWhatsApp() {
-  if (!contextoWhatsAppAtual) return;
+// pasteBoxPreenchidoPeloAdapter), e só quando o lead selecionado combina
+// com o contato detectado (ver _copilotoWaLeadCombinaComContato).
+function atualizarPasteBoxComContextoWhatsApp(contexto, nomeContato) {
   const box = document.getElementById('pasteBox');
   if (!box) return;
+  const lead = getCurrentLead();
+  if (!_copilotoWaLeadCombinaComContato(lead, nomeContato)) {
+    toast(`WhatsApp detectou uma mensagem de "${nomeContato || 'contato desconhecido'}", mas o lead aberto aqui é outro — abra o lead certo (ou a Central de mensagens) pra ver essa conversa.`);
+    return;
+  }
   if (box.value.trim() !== '' && !pasteBoxPreenchidoPeloAdapter) return;
-  const pendente = copilotoContextoTextoPendente(contextoWhatsAppAtual);
+  const pendente = copilotoContextoTextoPendente(contexto);
   if (pendente === null) return;
   box.value = pendente;
   pasteBoxPreenchidoPeloAdapter = true;
@@ -6496,22 +6533,30 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (!copilotoEhMensagemValida(message) || !_copilotoWaMensagemConfiavel(sender)) return;
 
   if (message.tipo === COPILOTO_MSG.CONVERSA_MUDOU) {
-    // TODO fase 5: decidir automaticamente qual LEAD corresponde a este
-    // contato (por nome/telefone) — por ora só reseta o contexto ambiente,
-    // sem tocar em currentLeadId nem criar/selecionar lead nenhum.
-    contextoWhatsAppAtual = copilotoContextoCriar(message.dados && message.dados.contato);
-    pasteBoxPreenchidoPeloAdapter = false;
+    // NÃO mexe em pasteBoxPreenchidoPeloAdapter aqui — essa flag só
+    // responde "o conteúdo ATUAL do campo ainda é exatamente o que este
+    // mecanismo escreveu?", nunca "isso é da conversa certa?" (quem decide
+    // isso é _copilotoWaLeadCombinaComContato, por mensagem). Zerá-la numa
+    // troca de conversa quebrava o caso de ida-e-volta: sair de uma
+    // conversa e voltar pra ela fazia o auto-preenchimento parar de
+    // funcionar mesmo sem nenhuma edição manual ter acontecido (achado
+    // testando esta fase).
+    contatoWhatsAppAtivo = (message.dados && message.dados.contato) || null;
     return;
   }
   if (message.tipo === COPILOTO_MSG.MENSAGENS_NOVAS) {
-    if (!contextoWhatsAppAtual) contextoWhatsAppAtual = copilotoContextoCriar(null);
-    copilotoContextoAdicionarMensagens(contextoWhatsAppAtual, (message.dados && message.dados.mensagens) || []);
-    atualizarPasteBoxComContextoWhatsApp();
+    const chaveContato = contatoWhatsAppAtivo || '(contato desconhecido)';
+    if (!contextosWhatsAppPorContato.has(chaveContato)) {
+      contextosWhatsAppPorContato.set(chaveContato, copilotoContextoCriar(chaveContato));
+    }
+    const contexto = contextosWhatsAppPorContato.get(chaveContato);
+    copilotoContextoAdicionarMensagens(contexto, (message.dados && message.dados.mensagens) || []);
+    atualizarPasteBoxComContextoWhatsApp(contexto, contatoWhatsAppAtivo);
     return;
   }
   if (message.tipo === COPILOTO_MSG.ADAPTER_DEGRADADO) {
-    // Fase 4: só loga — a UI continua funcionando 100% no fluxo manual
-    // (colar), que nunca deixou de existir e nunca depende do Adapter.
+    // Só loga — a UI continua funcionando 100% no fluxo manual (colar),
+    // que nunca deixou de existir e nunca depende do Adapter.
     copilotoLog('WARN', 'panel', { evento: 'adapter_degradado', motivo: message.dados && message.dados.motivo });
   }
 });

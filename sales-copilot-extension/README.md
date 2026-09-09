@@ -74,7 +74,7 @@ que já existe:
   ele também pode receber a transmissão bruta diretamente. Ver aviso
   completo em `shared/messaging.js`.
 
-- **`panel.js` (fase 4)** — escuta `CONVERSA_MUDOU`/`MENSAGENS_NOVAS` e
+- **`panel.js` (fases 4+5)** — escuta `CONVERSA_MUDOU`/`MENSAGENS_NOVAS` e
   preenche `pasteBox` automaticamente, no lugar do botão "Colar" manual —
   **nunca chama a IA sozinho**, isso continua exigindo clique humano em
   "Gerar resposta", como sempre. Nunca sobrescreve uma edição manual do
@@ -83,6 +83,24 @@ que já existe:
   aberto/detectando nada, o fluxo manual de colar continua funcionando
   exatamente como hoje — o Adapter é só um atalho a mais, nunca a única
   forma de preencher o campo.
+
+  **Fase 5 — a qual lead a conversa pertence**: um `Conversation Context`
+  (`core/conversation-context.js`) **por contato** detectado no WhatsApp,
+  nunca um único contexto ambiente global — troca de conversa no WhatsApp
+  Web sem trocar de lead no painel (ou vice-versa) nunca mistura o texto de
+  uma pessoa com o cadastro de outra (`_copilotoWaLeadCombinaComContato`):
+  - Lead normal sem nome ainda: adota a identidade do contato detectado.
+  - Lead normal já com nome: só auto-preenche se o nome bater
+    (case-insensitive); se não bater, **não mexe no campo** e avisa por
+    toast — nunca risca a hipótese de colar a conversa de um cliente na
+    ficha de outro.
+  - Central de mensagens (`lead.fixo`, `@csvirtual`): a mensagem sempre
+    pode entrar (é pra isso que a Central existe), mas o **nome da pessoa**
+    (`personNameInput`) nunca é preenchido por este mecanismo — continua
+    100% manual, porque é o campo que decide casamento de
+    histórico/estágio (ver `preencherEstagioPorNomeConhecido` em
+    `panel.js`), e esse é justamente o tipo de erro que não pode acontecer
+    por uma leitura errada do DOM.
 
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
