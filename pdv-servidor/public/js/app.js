@@ -8,6 +8,7 @@
 // public/test.html), do mesmo jeito que a Fase 1 provou com Estoque
 // sozinho numa telinha de teste.
 import { getSessionUserId, setSessionUserId, onSessionUserIdChanged, clearSession } from './session.js';
+import { renderDashboard } from './views/dashboard.js';
 import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
@@ -17,13 +18,20 @@ import { connectLive, onLiveMessage } from './live.js';
 
 const root = document.getElementById('root');
 
+// Nomes de rota iguais aos da extensão de propósito (ver app.js dela,
+// const ROUTES) — várias telas navegam entre si chamando
+// ctx.navigate('vendas')/('caixa')/('carreto')/etc. direto, sem
+// reescrita nenhuma; um nome diferente aqui faria esses links silenciosamente
+// caírem no DEFAULT_ROUTE em vez da tela certa (só um `history.pushState`
+// muda; ctx.navigate nunca lança erro pra rota desconhecida).
 const ROUTES = {
+  dashboard: { label: 'Painel', render: renderDashboard },
   estoque: { label: 'Estoque', render: renderProducts },
   venda: { label: 'Nova venda', render: renderSale },
-  historico: { label: 'Histórico de vendas', render: renderSalesHistory },
+  vendas: { label: 'Histórico de vendas', render: renderSalesHistory },
   clientes: { label: 'Clientes', render: renderClientes },
 };
-const DEFAULT_ROUTE = 'venda';
+const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
 // Assuntos que fazem cada tela valer a pena recarregar sozinha — ver
 // lib/broadcast.js pros nomes que cada rota manda depois de gravar.
@@ -34,17 +42,21 @@ const DEFAULT_ROUTE = 'venda';
 // test-sale-repos.cjs), e recarregar a tela inteira no meio de uma venda
 // destruiria o foco de quem está digitando. 'estoque' já é seguro
 // recarregar por completo (é só uma lista + modais, que vivem fora do
-// container — ver components/modal.js). 'historico' e 'clientes' também
+// container — ver components/modal.js). 'vendas' e 'clientes' também
 // ficam de fora de propósito, mesmo raciocínio de 'venda': filtro
-// (vendedor/cliente/datas em historico; busca/paginação em clientes) e
+// (vendedor/cliente/datas em vendas; busca/paginação em clientes) e
 // paginação ("Carregar mais") são estado só de tela, perdido a
 // cada recarregamento — um vendedor no meio de uma conferência de vendas
 // não deveria ter a lista trocada debaixo dele por causa de uma venda em
 // OUTRO terminal; quem quiser ver o mais recente já tem os filtros (que
-// já recarregam) e um F5.
+// já recarregam) e um F5. 'dashboard' é o oposto: não tem filtro nem
+// estado nenhum pra perder (é só um retrato do momento, recalculado do
+// zero a cada render), então escuta de tudo que pode mudar um dos
+// cartões — é literalmente o propósito da tela.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
+  dashboard: new Set(['products-changed', 'sales-changed', 'customers-changed', 'deliveries-changed', 'cash-changed', 'cash-config-changed', 'company-changed', 'loyalty-config-changed']),
 };
 const LIVE_DEBOUNCE_MS = 500;
 

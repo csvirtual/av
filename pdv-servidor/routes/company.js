@@ -6,6 +6,7 @@
 // pode desativar um teto de segurança ou virar dinheiro de graça.
 import { Router } from 'express';
 import { getConfig, updateConfig } from '../lib/companyConfig.js';
+import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { MAX_INSTALLMENTS } from '../lib/pricing.js';
 import { requirePermission } from '../lib/permissions.js';
 import { broadcast } from '../lib/broadcast.js';
@@ -29,6 +30,17 @@ function readPolicies(cfg) {
       monthlyPercent: Math.max(0, Math.min(100, Number(ci.monthlyPercent) || 0)),
       fixedPercent: Math.max(0, Math.min(100, Number(ci.fixedPercent) || 0)),
     },
+    // Achado (Fase 9, ao ligar dashboard.js): na extensão,
+    // loyaltyPointsPerReal mora dentro de company.policies (mesmo blob
+    // único de config — ver data/companyRepo.js#buildCompanyRecord); aqui
+    // ele é escrito por routes/loyalty.js (PUT /api/loyalty/config) na
+    // MESMA linha 'config' de company (lib/loyaltyConfig.js), só que essa
+    // rota nunca devolvia o valor de volta — dashboard.js#loyaltyOn lê
+    // `company.policies.loyaltyPointsPerReal` direto, sem tela própria de
+    // "Dados da loja" ainda pra notar a falta. Read-only aqui de propósito
+    // (escrita continua só em routes/loyalty.js, fonte única da regra de
+    // negócio de fidelidade).
+    loyaltyPointsPerReal: getLoyaltyConfig().pointsPerReal,
   };
 }
 

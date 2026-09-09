@@ -66,7 +66,7 @@ async function sellOneUnit(page, productName) {
   await createProduct(page, { name: 'Produto Histórico A', barcode: 'HIST-A-1111', price: 20, cost: 10, qty: 5 });
   await sellOneUnit(page, 'Produto Histórico A');
 
-  await page.goto(`${BASE}/#/historico`);
+  await page.goto(`${BASE}/#/vendas`);
   await page.waitForTimeout(700);
   const listText = await page.locator('#view-root').innerText();
   check('Venda recém-feita aparece no Histórico', listText.includes('Produto Histórico A') || /1 venda/.test(listText));
@@ -124,7 +124,7 @@ async function sellOneUnit(page, productName) {
   check('Zero erros JS/rede durante o fluxo real de venda/histórico/estorno pela UI', errors.length === 0, JSON.stringify(errors));
 
   // ---------- Adversário: não dá pra estornar de novo o que já foi estornado ----------
-  await page.goto(`${BASE}/#/historico`);
+  await page.goto(`${BASE}/#/vendas`);
   await page.waitForTimeout(700);
   await page.click('[data-detail]');
   await page.waitForTimeout(400);
@@ -138,7 +138,7 @@ async function sellOneUnit(page, productName) {
   // max=disponível) — prova que a defesa é do SERVIDOR, não só da UI.
   await createProduct(page, { name: 'Produto Histórico B', barcode: 'HIST-B-2222', price: 30, cost: 15, qty: 3 });
   await sellOneUnit(page, 'Produto Histórico B');
-  await page.goto(`${BASE}/#/historico`);
+  await page.goto(`${BASE}/#/vendas`);
   await page.waitForTimeout(700);
   const overRefundResult = await page.evaluate(async () => {
     const listRes = await fetch('/api/sales?limit=5', { credentials: 'include' });

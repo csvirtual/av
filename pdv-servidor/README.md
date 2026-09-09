@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js` reais rodando contra o servidor sem reescrita (estorno e fidelidade incluídos), e `public/js/live.js` mantendo Estoque/PDV em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs` e `test-clientes.cjs` verdes. Faltam as ~9 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs` e `test-dashboard.cjs` verdes. Faltam as ~8 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -477,13 +477,77 @@ revisado pro início da Fase 9:
    — fora do princípio "portar sem reescrever" desta fase; fica anotado
    como candidato a uma fase futura dedicada a fechar essa lacuna.
 
-Com os passos 5 a 8 fechados, a Fase 9 está **substancialmente completa**
-pro quarteto Estoque+PDV+Histórico+Clientes: a hipótese central do
+9. ✅ **`views/dashboard.js` real ligada** (09/set) — quinta tela real
+   (Estoque, PDV, Histórico, Clientes, agora Painel), **copiada sem
+   nenhuma alteração** de `pdv-extension/app/js/views/`. É a tela mais
+   visitada do sistema (rota padrão ao logar) e a que mais domínios junta
+   de uma vez: produtos, vendas, caixa, clientes/fiado, fidelidade,
+   empresa e carreto, todos num retrato só, com cartões clicáveis que
+   levam pra cada tela (`ctx.navigate('vendas')`, `('caixa')`,
+   `('carreto')` etc. — nomes de rota que o `views/dashboard.js` já
+   chamava fixos, sem reescrita).
+
+   **Achado real, corrigido antes de qualquer teste — nomes de rota
+   divergentes:** ao portar o Histórico de vendas (passo 7), dei o nome
+   `historico` à rota no `public/js/app.js` — mas a extensão usa `vendas`
+   (conferido no `app.js` dela, `const ROUTES`). `views/dashboard.js`
+   (sem alteração nenhuma) chama `ctx.navigate('vendas')` direto — com o
+   nome antigo, esse cartão cairia silenciosamente na rota padrão em vez
+   de abrir o Histórico (`ctx.navigate` nunca lança erro pra rota
+   desconhecida, só não navega pra lugar nenhum útil). Corrigido
+   renomeando a rota pra `vendas` (mesmo nome da extensão) antes mesmo do
+   primeiro teste — pego só comparando o `app.js` da extensão com o
+   daqui, não por um teste falhando. `DEFAULT_ROUTE` também virou
+   `dashboard` (era `venda`), igual ao `if (!location.hash) location.hash
+   = '#/dashboard'` da extensão.
+
+   **Achado real, corrigido no servidor — campo de fidelidade faltando em
+   `company.policies`:** na extensão, `loyaltyPointsPerReal` mora dentro
+   do MESMO blob de `company.policies` que `vendorMaxDiscountPercent`
+   etc. (ver `data/companyRepo.js#buildCompanyRecord`). Aqui, Fase 6
+   (fidelidade) e Fase 8 (`routes/company.js`) evoluíram separadas — os
+   dois gravam na mesma linha `config` da tabela `company`
+   (`lib/companyConfig.js`), mas `GET /api/company` nunca devolvia o
+   campo de fidelidade de volta. `dashboard.js#loyaltyOn` lê
+   `company.policies.loyaltyPointsPerReal` pra decidir se mostra o cartão
+   de pontos mesmo com 0 pontos ainda ganhos — sem o campo, ficava sempre
+   `false` até o primeiro ponto existir (falha silenciosa, sem crash,
+   pega revisando os dois `app.js` lado a lado, não por um teste
+   falhando). Corrigido acrescentando `loyaltyPointsPerReal` (lido de
+   `lib/loyaltyConfig.js#getLoyaltyConfig()`, mesma fonte que
+   `routes/loyalty.js` já usa) na resposta de `GET /api/company` —
+   só leitura; a escrita continua toda em `routes/loyalty.js`, única fonte
+   da regra de negócio de fidelidade.
+
+   Novo em `public/js/data/`: `loyaltyRepo.js#getAllPointsBalances` e
+   `deliveriesRepo.js#listDeliveries` (ambos sobre rotas que já existiam
+   desde as Fases 6, sem mudança de servidor). `dashboard` também entrou
+   no `LIVE_TOPICS` da atualização em tempo real (passo 6) — ao contrário
+   de `vendas`/`clientes`, o Painel não tem filtro nem estado nenhum pra
+   perder num recarregamento (é só um retrato do momento, recalculado do
+   zero a cada render), então é seguro — e é literalmente o propósito da
+   tela — atualizar sozinho quando qualquer terminal muda algo relevante.
+
+   Testado em `test-dashboard.cjs` (20 asserções): rota padrão ao logar,
+   os 8 cartões numéricos com valores reais (estoque baixo, vendas
+   hoje/faturado, fiado, carretos pendentes, perto/fora da validade sem
+   contar em dobro, pontos de fidelidade), as tabelas de últimas
+   vendas/carretos pendentes, os deep-links de 3 cartões pra suas telas
+   (incluindo confirmar que "Estoque baixo" já chega em Estoque
+   PRÉ-FILTRADO), um clique no cartão "Caixa" (tela ainda não portada)
+   não quebra a página, e — a checagem mais nova do lote — o Painel da
+   Máquina A atualiza sozinho (2→3 vendas hoje) quando a Máquina B vende
+   algo, sem F5 nenhum.
+
+Com os passos 5 a 9 fechados, a Fase 9 está **substancialmente completa**
+pro quinteto Estoque+PDV+Histórico+Clientes+Painel: a hipótese central do
 roteiro (telas reais reaproveitáveis sem reescrita) segue provada na
-prática — inclusive juntando 3-4 domínios de dados numa mesma tela sem
-nenhuma linha de `views/clientes.js` precisar mudar —, a promessa de
-tempo real já é verdade na interface de produção onde faz sentido, e
-agora dá pra rodar o dia a dia de vendas, estoque, fiado e fidelidade
-inteiro pela UI real. O que falta da Fase 9 (as ~9 telas restantes, o
-`app.js` completo, e a lacuna de crédito de troca cross-terminal
-documentada acima) é trabalho real de mais fases, não risco em aberto.
+prática — inclusive a tela que mais junta domínios de uma vez, sem
+nenhuma linha de `views/dashboard.js` precisar mudar —, a promessa de
+tempo real já é verdade onde faz sentido (agora incluindo a tela de
+entrada do sistema), e o dia a dia inteiro (vender, ver estoque, fiado,
+fidelidade, e agora ter uma visão geral com deep-links) já roda pela UI
+real. O que falta da Fase 9 (as ~8 telas restantes, o `app.js` completo
+com menu lateral, e a lacuna de crédito de troca cross-terminal
+documentada no passo 8) é trabalho real de mais fases, não risco em
+aberto.

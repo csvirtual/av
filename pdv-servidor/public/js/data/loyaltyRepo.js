@@ -44,3 +44,14 @@ export async function recordRedemption({ customerId, points, note = '', userId, 
     body: JSON.stringify({ points, dedupeKey: dedupeKey || newDedupeKey() }),
   });
 }
+
+/** Saldo de pontos de TODOS os clientes de uma vez (evita N consultas
+ * separadas — usado pelo Painel pra somar "pontos em aberto" na loja
+ * inteira) — mesmo contrato de getAllPointsBalances() da extensão: um
+ * objeto {customerId: pontos}, não o {points, credit} bruto que o
+ * servidor devolve (ver routes/loyalty.js GET /balances, que também traz
+ * o crédito de troca de todo mundo — aqui só a parte de pontos importa). */
+export async function getAllPointsBalances() {
+  const { points } = await api('/api/loyalty/balances');
+  return points;
+}
