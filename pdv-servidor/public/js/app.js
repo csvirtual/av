@@ -11,6 +11,7 @@ import { getSessionUserId, setSessionUserId, onSessionUserIdChanged, clearSessio
 import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
+import { renderClientes } from './views/clientes.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -20,6 +21,7 @@ const ROUTES = {
   estoque: { label: 'Estoque', render: renderProducts },
   venda: { label: 'Nova venda', render: renderSale },
   historico: { label: 'Histórico de vendas', render: renderSalesHistory },
+  clientes: { label: 'Clientes', render: renderClientes },
 };
 const DEFAULT_ROUTE = 'venda';
 
@@ -32,9 +34,10 @@ const DEFAULT_ROUTE = 'venda';
 // test-sale-repos.cjs), e recarregar a tela inteira no meio de uma venda
 // destruiria o foco de quem está digitando. 'estoque' já é seguro
 // recarregar por completo (é só uma lista + modais, que vivem fora do
-// container — ver components/modal.js). 'historico' também fica de fora
-// de propósito, mesmo raciocínio de 'venda': filtro (vendedor/cliente/
-// datas) e paginação ("Carregar mais") são estado só de tela, perdido a
+// container — ver components/modal.js). 'historico' e 'clientes' também
+// ficam de fora de propósito, mesmo raciocínio de 'venda': filtro
+// (vendedor/cliente/datas em historico; busca/paginação em clientes) e
+// paginação ("Carregar mais") são estado só de tela, perdido a
 // cada recarregamento — um vendedor no meio de uma conferência de vendas
 // não deveria ter a lista trocada debaixo dele por causa de uma venda em
 // OUTRO terminal; quem quiser ver o mais recente já tem os filtros (que

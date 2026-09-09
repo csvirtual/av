@@ -2,12 +2,11 @@
 // saldo devedor antes de vender fiado) e `searchCustomers`/`createCustomer`
 // (components/customerPicker.js, compartilhado por sale.js pro seletor de
 // cliente da venda) são da Fase 9 passo 4; `listCustomers` (passo 7) é o
-// que o filtro de cliente de views/salesHistory.js precisa (busca em
-// memória sobre a lista inteira, mesmo padrão já usado em sale.js/
-// carreto.js — só a seleção final vira filtro de verdade no servidor).
-// `recordPayment`/extrato/edição (usados por uma futura views/clientes.js
-// portada) ficam pra quando essa tela for a vez.
-import { api } from './apiClient.js';
+// que o filtro de cliente de views/salesHistory.js precisa. O resto
+// (`updateCustomer`, `setCustomerActive`, `deleteCustomer`,
+// `listCustomerLedger`, `getAllBalances`, `recordPayment`) é da Fase 9
+// passo 8 — o que views/clientes.js precisa.
+import { api, newDedupeKey } from './apiClient.js';
 
 /** Lista completa de clientes — mesmo contrato de
  * app/js/data/customersRepo.js#listCustomers() da extensão. */
@@ -33,6 +32,16 @@ export async function createCustomer(data) {
   return customer;
 }
 
+/** true quando o cliente tem lembrete de vencimento definido, já passou da
+ * data e ainda tem saldo devedor de verdade — cópia fiel de
+ * app/js/data/customersRepo.js#isDebtOverdue(): puro, não toca rede. */
+export function isDebtOverdue(customer, balance) {
+  if (!customer?.debtDueDate || balance <= 0.01) return false;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return customer.debtDueDate < startOfToday.getTime();
+}
+
 /** Saldo devedor (fiado) do cliente — mesmo contrato de
  * app/js/data/customersRepo.js#getCustomerBalance() da extensão: devolve
  * 0 pra um cliente inexistente, NUNCA lança erro (lá, o cálculo é feito
@@ -47,4 +56,56 @@ export async function getCustomerBalance(customerId) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Erro ${res.status}`);
   return body.balance;
+}
+
+/** Mesmo contrato de updateCustomer() da extensão — envia só os campos
+ * presentes em `data`, o servidor mantém os demais (ver routes/customers.js
+ * PUT /:id). */
+export async function updateCustomer(id, data) {
+  const { customer } = await api(`/api/customers/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) });
+  return customer;
+}
+
+/** Ativar/desativar não é uma rota própria aqui (diferente de
+ * productsRepo.js#setProductActive) — o servidor já trata `active` como
+ * mais um campo de PUT /:id (ver routes/customers.js), então o contrato
+ * de setCustomerActive() da extensão fecha só reaproveitando
+ * updateCustomer(). */
+export async function setCustomerActive(id, active) {
+  return updateCustomer(id, { active });
+}
+
+/** Achado de auditoria já corrigido na FONTE (routes/customers.js DELETE
+ * /:id reconfere a permissão 'deleteCustomer' contra a sessão real) —
+ * este wrapper não duplica a checagem, só deixa o erro do servidor subir
+ * (mesmo padrão do resto desta camada: nunca confiar em quem chama). */
+export async function deleteCustomer(id) {
+  await api(`/api/customers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/** Extrato de fiado (dívidas e pagamentos) do cliente — mesmo contrato de
+ * listCustomerLedger() da extensão. */
+export async function listCustomerLedger(customerId) {
+  const { entries } = await api(`/api/customers/${encodeURIComponent(customerId)}/ledger`);
+  return entries;
+}
+
+/** Saldo devedor de todos os clientes de uma vez — mesmo contrato de
+ * getAllBalances() da extensão. */
+export async function getAllBalances() {
+  const { balances } = await api('/api/customers/balances');
+  return balances;
+}
+
+/** Mesmo contrato de recordPayment() da extensão — a checagem "valor não
+ * pode passar da dívida" e a trava contra reenvio (dedupeKey) já vivem no
+ * servidor (routes/customers.js#commitPayment, mesma transação atômica),
+ * nunca confiadas do cliente. */
+export async function recordPayment({ customerId, amount, paymentMethod, cashSessionId = null, note = '', userId, userName, dedupeKey = null }) {
+  void cashSessionId; void userId; void userName; // servidor resolve sessão de caixa/identidade sozinho — aceitos só pra bater a assinatura
+  const { entry } = await api(`/api/customers/${encodeURIComponent(customerId)}/pagamento`, {
+    method: 'POST',
+    body: JSON.stringify({ amount, paymentMethod, note, dedupeKey: dedupeKey || newDedupeKey() }),
+  });
+  return entry;
 }

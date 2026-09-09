@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas completos, com atualização em tempo real, testados (09/set) — `session.js`, 11 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js` reais rodando contra o servidor sem reescrita (estorno incluído), e `public/js/live.js` mantendo Estoque/PDV em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs` e `test-sales-history.cjs` verdes. Faltam as ~10 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js` reais rodando contra o servidor sem reescrita (estorno e fidelidade incluídos), e `public/js/live.js` mantendo Estoque/PDV em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs` e `test-clientes.cjs` verdes. Faltam as ~9 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -422,10 +422,68 @@ revisado pro início da Fase 9:
    mais do que ajuda. Mesmo raciocínio já aplicado à tela de PDV no passo
    6.
 
-Com os passos 5, 6 e 7 fechados, a Fase 9 está **substancialmente
-completa** pro trio Estoque+PDV+Histórico: a hipótese central do roteiro
-(telas reais reaproveitáveis sem reescrita) segue provada na prática, a
-promessa de tempo real já é verdade na interface de produção onde faz
-sentido, e agora também dá pra auditar/estornar uma venda sem sair da UI
-de produção. O que falta da Fase 9 (as ~10 telas restantes, o `app.js`
-completo) é trabalho real de mais fases, não um risco em aberto.
+8. ✅ **`views/clientes.js` real ligada** (09/set) — quarta tela real
+   (Estoque, PDV, Histórico, agora Clientes), **copiada sem nenhuma
+   alteração** de `pdv-extension/app/js/views/`. Junta 3 domínios: cadastro
+   de cliente, extrato de fiado (com registro de pagamento), e fidelidade
+   (extrato de pontos + resgate) — o primeiro contato desta fase com
+   `loyaltyRepo.js` (novo) e uma leva grande de novas funções em
+   `customersRepo.js` (`updateCustomer`, `setCustomerActive`,
+   `deleteCustomer`, `listCustomerLedger`, `getAllBalances`,
+   `recordPayment`, `isDebtOverdue`). Igual ao passo 7, toda a lógica
+   pesada (atomicidade do pagamento/resgate, permissão de exclusão
+   reconferida na fonte) já existia pronta em `routes/customers.js` e
+   `routes/loyalty.js` desde as Fases 4 e 6 — nenhuma mudança de servidor
+   foi necessária, só os wrappers de cliente e os 3 arquivos pequenos que
+   faltavam (`components/saleDetail.js`, `components/maskedInput.js`,
+   `utils/document.js` — este último com uma dependência escondida,
+   `utils/cpf.js`/`utils/cnpj.js`, que não tinham vindo junto e quebravam
+   o carregamento do módulo inteiro em produção, mesmo com a tela nunca
+   aberta ainda — pego antes de qualquer teste, só checando os imports
+   transitivos). Testado em `test-clientes.cjs` (15 asserções): cadastro,
+   edição, inativar/reativar, venda fiada gerando dívida visível no
+   extrato, pagamento parcial, extrato de pontos ganhos numa venda à
+   vista, resgate de pontos, exclusão (com saldo zerado — a tela já
+   bloqueia exclusão com dívida em aberto, herdado da extensão sem
+   mudança nenhuma), e 4 adversárias: pagamento maior que a dívida
+   rejeitado pelo servidor, reenvio da mesma chave de pagamento rejeitado
+   (409), resgatar mais pontos do que o cliente tem rejeitado, e um
+   vendedor sem a permissão `deleteCustomer` tentando excluir direto pela
+   API (403) — não só escondido atrás de um botão que a tela poderia ou
+   não mostrar.
+
+   **Achado de arquitetura, não corrigido aqui — documentado em
+   `public/js/data/loyaltyRepo.js`:** "crédito de troca" (gerado por um
+   estorno com a opção marcada, ou por um resgate de pontos) tem DOIS
+   destinos hoje, e eles não se falam. O servidor sempre grava o crédito
+   de verdade, persistido e auditável, na tabela `store_credits` (mesmo
+   nas rotas herdadas da Fase 2/6, sem mudança nenhuma). Mas
+   `session.js#addPendingCredit()` — chamado pelas telas (`salesHistory.js`
+   no estorno, `clientes.js` no resgate), sem alteração nenhuma vinda da
+   extensão — grava esse mesmo valor só no `localStorage` DESTE terminal
+   específico. `sale.js` (também sem alteração) só lê e aplica esse
+   `pendingCredit` local como forma de pagamento "Crédito de troca" —
+   nunca consulta o saldo persistido do servidor. Resultado prático: o
+   crédito gerado num terminal só aparece pra gastar automaticamente
+   NAQUELE MESMO terminal/sessão; noutro terminal, fica só no extrato
+   (auditável, correto, nunca perdido ou duplicado — não é uma falha de
+   integridade de dinheiro), mas sem aparecer como opção de pagamento
+   sozinho. Não é um problema de segurança (nada permite gastar o mesmo
+   crédito duas vezes — o servidor nunca LÊ o pendingCredit pra decidir
+   nada) nem uma perda de dinheiro (o lançamento real nunca desaparece) —
+   é uma lacuna de UX entre dois mecanismos válidos que ainda não foram
+   unificados. Corrigir de verdade (ex: `sale.js` também consultar o saldo
+   de `store_credits` do cliente) provavelmente exige mexer em `sale.js`
+   — fora do princípio "portar sem reescrever" desta fase; fica anotado
+   como candidato a uma fase futura dedicada a fechar essa lacuna.
+
+Com os passos 5 a 8 fechados, a Fase 9 está **substancialmente completa**
+pro quarteto Estoque+PDV+Histórico+Clientes: a hipótese central do
+roteiro (telas reais reaproveitáveis sem reescrita) segue provada na
+prática — inclusive juntando 3-4 domínios de dados numa mesma tela sem
+nenhuma linha de `views/clientes.js` precisar mudar —, a promessa de
+tempo real já é verdade na interface de produção onde faz sentido, e
+agora dá pra rodar o dia a dia de vendas, estoque, fiado e fidelidade
+inteiro pela UI real. O que falta da Fase 9 (as ~9 telas restantes, o
+`app.js` completo, e a lacuna de crédito de troca cross-terminal
+documentada acima) é trabalho real de mais fases, não risco em aberto.
