@@ -4,10 +4,11 @@
 // seção "Estratégia do funil"). Espelha, por ora, os mesmos 9 estágios e o
 // mesmo critério de tier caro que já existem hardcoded em panel.js
 // (ESTAGIO_ORDER via <select id="leadEstagio"> em panel.html, e
-// ESTAGIOS_TIER_PAGO) — a fase 6 do plano é que efetivamente troca
-// panel.js pra ler DAQUI em vez dos próprios consts; até lá, os dois
-// convivem sem conflito, porque nada em panel.js importa este arquivo
-// ainda. Zero efeito no comportamento atual da extensão.
+// ESTAGIOS_TIER_PAGO) — panel.js continua com os próprios consts (nunca
+// migrados pra ler daqui; risco desnecessário pra um dado que já
+// funcionava). O que a fase 6 efetivamente usa deste arquivo é
+// `acoesComerciais` + `copilotoFunilAcaoValida`, no schema de "próxima
+// ação comercial" pedido à IA (ver buildSystemPrompt, panel.js).
 //
 // Decisão de produto preservada de propósito (já é assim no código atual,
 // documentado em vários comentários de panel.js): o ESTÁGIO continua
@@ -69,6 +70,21 @@ const COPILOTO_FUNIL_PADRAO = {
     Objeção: 'avancado',
     Fechamento: 'avancado',
   },
+
+  // Vocabulário de "próxima ação comercial" (fase 6 — Next Best Action).
+  // Rótulo de MÁQUINA, sempre acompanhado de um texto livre gerado pela IA
+  // (nunca exibido sozinho pro usuário) — dá à UI um valor estável pra
+  // decidir ícone/estilo sem depender de casar string livre.
+  acoesComerciais: [
+    'investigar_dor',
+    'apresentar_solucao',
+    'conduzir_valor',
+    'quebrar_objecao',
+    'fechar',
+    'retomar_contato',
+    'aguardar',
+    'nenhuma',
+  ],
 };
 
 function copilotoFunilTier(estagio, config) {
@@ -85,4 +101,13 @@ function copilotoFunilTransicaoEsperada(estagioAtual, estagioSugerido, config) {
   if (estagioAtual === estagioSugerido) return true;
   const permitidas = cfg.transicoes[estagioAtual];
   return Array.isArray(permitidas) && permitidas.includes(estagioSugerido);
+}
+
+// Confere se `tipo` é um dos valores de acoesComerciais configurados —
+// usado pra nunca exibir/gravar um rótulo de máquina inventado pela IA
+// (ela devolve JSON livre; nada garante que respeitou o enum pedido no
+// prompt).
+function copilotoFunilAcaoValida(tipo, config) {
+  const cfg = config || COPILOTO_FUNIL_PADRAO;
+  return cfg.acoesComerciais.includes(tipo);
 }

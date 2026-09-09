@@ -102,6 +102,18 @@ que já existe:
     `panel.js`), e esse é justamente o tipo de erro que não pode acontecer
     por uma leitura errada do DOM.
 
+  **Fase 6 — Próxima ação comercial (Next Best Action)**: o schema JSON
+  pedido à IA em `buildSystemPrompt` (`panel.js`) ganhou um campo novo,
+  aditivo, `proxima_acao: { tipo, texto }` — `tipo` é validado contra
+  `core/funnel-state-machine.js#acoesComerciais` (`copilotoFunilAcaoValida`)
+  antes de ser aceito (qualquer valor fora do vocabulário vira `null`,
+  nunca é exibido/gravado cru); `texto` é sempre exibido, mesmo quando o
+  tipo não bate. Aparece separado da resposta sugerida, num bloco próprio
+  (`#proximaAcaoBox`, "🎯 ..."), persistido no rascunho do lead
+  (`draftProximaAcaoTipo`/`draftProximaAcaoTexto`) e no histórico — uma
+  resposta antiga (ou de um modelo que ignore o campo) simplesmente não
+  tem `proxima_acao`, e o bloco fica escondido, sem quebrar nada.
+
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
   conhecimento geral da estrutura do WhatsApp Web (que muda sem aviso, sem

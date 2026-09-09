@@ -167,6 +167,23 @@ function escapeHtml(s){
 // backup adulterado poderia plantar HTML arbitrário num campo do lead e
 // ele seria reinjetado sem escapar da próxima vez que o lead fosse aberto.
 // Guardando só texto cru, todo valor sempre passa por escapeHtml() aqui.
+// ---------- Fase 6: Próxima ação comercial (Next Best Action) ----------
+// Mostra/esconde o bloco "🎯 Próxima ação" separado da resposta sugerida
+// (ver panel.html#proximaAcaoBox) — usada tanto ao gerar uma resposta nova
+// (analyzeAndSuggest) quanto ao restaurar o rascunho salvo de um lead
+// (selectLead). `texto` vazio/undefined esconde o bloco em vez de mostrar
+// uma caixa vazia sem sentido.
+function renderProximaAcaoBox(texto){
+  const box = document.getElementById('proximaAcaoBox');
+  if(!box) return;
+  if(texto){
+    document.getElementById('proximaAcaoTexto').textContent = texto;
+    box.style.display = 'block';
+  }else{
+    box.style.display = 'none';
+  }
+}
+
 function construirChipsHtml(lead){
   let html = '';
   if(lead.draftChipsPersonName){
@@ -1639,11 +1656,13 @@ async function selectLead(id){
     document.getElementById('resultChips').innerHTML = construirChipsHtml(lead);
     document.getElementById('suggestionText').textContent = lead.draftSugestaoTexto;
     document.getElementById('nextQuestion').textContent = lead.draftProximaPergunta || '';
+    renderProximaAcaoBox(lead.draftProximaAcaoTexto || '');
   }else{
     document.getElementById('resultCard').style.display = 'none';
     document.getElementById('resultChips').innerHTML = '';
     document.getElementById('suggestionText').textContent = '';
     document.getElementById('nextQuestion').textContent = '';
+    renderProximaAcaoBox('');
   }
 
   // Restaura a última abordagem de follow-up sugerida pra este lead (se
@@ -3782,7 +3801,11 @@ Você vai receber a última mensagem que o lead mandou no WhatsApp, junto com o 
   "objetivo_detectado": "objetivo/dor identificado, ou null se não mudou",
   "emocao_cliente": "1 a 3 palavras descrevendo a emoção predominante do cliente nesta mensagem (ex: animado, hesitante, frustrado, confiante, ansioso, neutro), ou null se não der pra perceber nenhuma",
   "resposta_sugerida": "a mensagem pronta para copiar e colar no WhatsApp, seguindo as INSTRUÇÕES GERAIS DE COMO USAR O FUNIL definidas acima, calibrada pro estágio atual deste lead${campanhaAtiva && campanhaTexto && campanhaTexto.trim() ? '. Se houver campanha ativa, incorpore-a nesta resposta com a mesma naturalidade e tom das instruções gerais — reescreva as condições da campanha na voz do negócio, nunca cole o texto da campanha como propaganda solta' : ''}",
-  "proxima_pergunta_poderosa": "uma pergunta poderosa recomendada, ou null se a resposta já resolve"
+  "proxima_pergunta_poderosa": "uma pergunta poderosa recomendada, ou null se a resposta já resolve",
+  "proxima_acao": {
+    "tipo": "uma exatamente destas opções: ${COPILOTO_FUNIL_PADRAO.acoesComerciais.join(' | ')}",
+    "texto": "1 frase objetiva com a próxima ação comercial recomendada pra este lead (ex: 'Investigar a principal dificuldade do lead', 'Lead demonstrou interesse — avançar para apresentação da solução', 'Objeção de preço detectada — trabalhar percepção de valor antes de oferecer condição', 'Lead pronto para fechamento')"
+  }
 }`;
 
   return { cached, dynamic: buildContextoDinamicoBloco(lead, personName, extraContext, continuidade) };
@@ -4548,6 +4571,8 @@ async function analyzeAndSuggest(){
   document.getElementById('suggestionText').textContent = '';
   document.getElementById('resultChips').innerHTML = '';
   document.getElementById('nextQuestion').textContent = '';
+  const proximaAcaoBoxInicio = document.getElementById('proximaAcaoBox');
+  if(proximaAcaoBoxInicio) proximaAcaoBoxInicio.style.display = 'none';
   const roteamentoElInicio = document.getElementById('roteamentoInfo');
   if(roteamentoElInicio) roteamentoElInicio.textContent = '';
   document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4637,10 +4662,22 @@ async function analyzeAndSuggest(){
     const proximaPerguntaCrua = textoDaIA(parsed.proxima_pergunta_poderosa);
     const proximaPerguntaTexto = proximaPerguntaCrua ? '💡 ' + proximaPerguntaCrua : '';
 
+    // Fase 6 (Next Best Action) — schema novo, aditivo (parsed.proxima_acao
+    // pode vir undefined em respostas de instalações/caches antigos, ou se
+    // o modelo simplesmente ignorar o campo — nunca quebra por isso).
+    // copilotoFunilAcaoValida (core/funnel-state-machine.js) garante que só
+    // um rótulo de máquina conhecido é aceito; qualquer outra coisa vira
+    // null (o TEXTO continua exibido normalmente, só o tipo fica sem
+    // rótulo pra uso interno futuro).
+    const proximaAcaoBruta = parsed.proxima_acao || {};
+    const proximaAcaoTipo = copilotoFunilAcaoValida(proximaAcaoBruta.tipo) ? proximaAcaoBruta.tipo : null;
+    const proximaAcaoTexto = textoDaIA(proximaAcaoBruta.texto, 160);
+
     if(aindaNesteLead){
       document.getElementById('resultChips').innerHTML = chipsHtml;
       document.getElementById('suggestionText').textContent = textoDaIA(parsed.resposta_sugerida);
       document.getElementById('nextQuestion').textContent = proximaPerguntaTexto;
+      renderProximaAcaoBox(proximaAcaoTexto);
       const roteamentoEl = document.getElementById('roteamentoInfo');
       if(roteamentoEl) roteamentoEl.textContent = labelRoteamentoIA(parsed._roteamento);
     }
@@ -4651,6 +4688,8 @@ async function analyzeAndSuggest(){
     // ele aparecer certinho quando a pessoa voltar a selecioná-lo.
     leadAtual.draftSugestaoTexto = textoDaIA(parsed.resposta_sugerida);
     leadAtual.draftProximaPergunta = proximaPerguntaTexto;
+    leadAtual.draftProximaAcaoTipo = proximaAcaoTipo;
+    leadAtual.draftProximaAcaoTexto = proximaAcaoTexto;
     leadAtual.draftMensagem = '';
     leadAtual.draftContexto = '';
     await persistLeads();
@@ -4661,6 +4700,8 @@ async function analyzeAndSuggest(){
       pergunta: pasted,
       resposta: textoDaIA(parsed.resposta_sugerida),
       categoria: leadAtual.draftChipsCategoria || '',
+      proximaAcaoTipo: proximaAcaoTipo || '',
+      proximaAcaoTexto: proximaAcaoTexto,
       // Igual ao chip acima: cada entrada já leva "pessoa" (logo abaixo)
       // junto, então gravar o estágio não confunde — cada registro do
       // histórico já deixa claro de quem e de qual etapa ele é.

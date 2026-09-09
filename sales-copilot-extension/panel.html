@@ -728,6 +728,11 @@
     padding:16px; font-size:14.5px; line-height:1.55; white-space:pre-wrap; margin:12px 0;
   }
   .next-q{ font-size:13.5px; color:var(--muted); border-left:3px solid var(--purple); padding-left:10px; margin-top:8px; }
+  .proxima-acao{
+    font-size:13.5px; font-weight:700; color:var(--teal-dark);
+    background:#E9F5F2; border-left:3px solid var(--teal);
+    padding:10px 12px; border-radius:8px; margin:0 0 12px;
+  }
   .empty-state{
     text-align:center; padding:52px 32px 40px; color:var(--muted); position:relative; overflow:hidden;
   }
@@ -1500,6 +1505,10 @@
 
       <div class="card" id="resultCard" style="display:none;">
         <div id="resultChips"></div>
+        <!-- Próxima ação comercial (fase 6 — Next Best Action), separada da
+             resposta sugerida logo abaixo — só um resumo do que fazer a
+             seguir, nunca o texto pronto pra copiar (isso é suggestionText). -->
+        <div class="proxima-acao" id="proximaAcaoBox" style="display:none;">🎯 <span id="proximaAcaoTexto"></span></div>
         <div class="suggestion-box" id="suggestionText"></div>
         <div class="next-q" id="nextQuestion"></div>
         <!-- Qual chave/modelo respondeu esta geração (ver labelRoteamentoIA,
@@ -2516,6 +2525,7 @@ Nascimento: 20/01/1992"></textarea>
 <script src="shared/messaging.js"></script>
 <script src="core/conversation-normalizer.js"></script>
 <script src="core/conversation-context.js"></script>
+<script src="core/funnel-state-machine.js"></script>
 <script src="funil-padrao.js"></script>
 <script src="auth.js"></script>
 <script src="perfis.js"></script>
