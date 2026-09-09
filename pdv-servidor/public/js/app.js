@@ -11,6 +11,7 @@ import { getSessionUserId, setSessionUserId, onSessionUserIdChanged, clearSessio
 import { renderProducts } from './views/products.js';
 import { renderSale } from './views/sale.js';
 import { escapeHtml } from './utils/format.js';
+import { connectLive, onLiveMessage } from './live.js';
 
 const root = document.getElementById('root');
 
@@ -19,6 +20,46 @@ const ROUTES = {
   venda: { label: 'Nova venda', render: renderSale },
 };
 const DEFAULT_ROUTE = 'venda';
+
+// Assuntos que fazem cada tela valer a pena recarregar sozinha — ver
+// lib/broadcast.js pros nomes que cada rota manda depois de gravar.
+// 'venda' de propósito NÃO escuta 'products-changed': sale.js já busca o
+// produto de novo no servidor a cada busca/adição ao carrinho (preço e
+// estoque nunca ficam desatualizados no que importa — o servidor
+// revalida tudo de novo no fechamento da venda, provado em
+// test-sale-repos.cjs), e recarregar a tela inteira no meio de uma venda
+// destruiria o foco de quem está digitando. 'estoque' já é seguro
+// recarregar por completo (é só uma lista + modais, que vivem fora do
+// container — ver components/modal.js).
+const LIVE_TOPICS = {
+  estoque: new Set(['products-changed', 'suppliers-changed']),
+  venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
+};
+const LIVE_DEBOUNCE_MS = 500;
+
+let activeRouteName = null;
+let activeCtx = null;
+let liveRefreshTimer = null;
+
+function scheduleLiveRefresh() {
+  clearTimeout(liveRefreshTimer);
+  liveRefreshTimer = setTimeout(() => {
+    // Se um modal estiver aberto (novo produto, ajuste de estoque, aprovação
+    // de desconto...), não puxa o tapete da tela debaixo dele agora — o
+    // próximo aviso relevante, depois que o modal fechar, tenta de novo.
+    if (document.querySelector('.modal')) return;
+    if (!activeRouteName || !activeCtx) return;
+    const view = ROUTES[activeRouteName];
+    const container = document.getElementById('view-root');
+    if (!view || !container) return;
+    view.render(container, activeCtx);
+  }, LIVE_DEBOUNCE_MS);
+}
+
+onLiveMessage((msg) => {
+  if (!activeRouteName) return;
+  if (LIVE_TOPICS[activeRouteName]?.has(msg.topic)) scheduleLiveRefresh();
+});
 
 function currentRouteName() {
   const hash = (location.hash || '').replace(/^#\/?/, '');
@@ -101,11 +142,14 @@ function renderShell(user) {
   const view = ROUTES[routeName];
   const container = document.getElementById('view-root');
   const ctx = { user, navigate: (name) => { location.hash = `#/${name}`; } };
+  activeRouteName = routeName;
+  activeCtx = ctx;
   if (view) {
     view.render(container, ctx);
   } else {
     container.innerHTML = `<div class="card">Tela "${escapeHtml(routeName)}" ainda não foi portada pra este modo multi-terminal.</div>`;
   }
+  connectLive();
 }
 
 let booting = false;
@@ -115,6 +159,8 @@ async function boot() {
   try {
     const userId = await getSessionUserId();
     if (!userId) {
+      activeRouteName = null;
+      activeCtx = null;
       renderLogin();
       return;
     }
@@ -125,6 +171,8 @@ async function boot() {
       // mesmo tratamento de "sessão inválida" em qualquer um dos dois
       // casos: volta pro login.
       await clearSession();
+      activeRouteName = null;
+      activeCtx = null;
       renderLogin();
       return;
     }

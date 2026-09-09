@@ -45,7 +45,7 @@ investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV completos e testados (09/set) — `session.js`, os 9 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`) e `views/products.js`+`views/sale.js` reais rodando contra o servidor, sem reescrita, `test-real-ui.cjs` verde. Faltam as ~11 telas restantes, o `app.js` completo (menu lateral, todas as rotas) e atualização em tempo real via WebSocket nas telas (ver "Próximo passo recomendado") |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV completos, com atualização em tempo real, testados (09/set) — `session.js`, os 9 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`), `views/products.js`+`views/sale.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo os terminais em sincronia via WebSocket — `test-real-ui.cjs` e `test-live-updates.cjs` verdes. Falta só as ~11 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -335,20 +335,47 @@ revisado pro início da Fase 9:
    **Nota de escopo, documentada no topo de `public/js/app.js`:** esta
    casca é deliberadamente mínima — só login, `#/estoque` e `#/venda`, sem
    menu lateral completo, sem as ~15 rotas da extensão, sem timeout de
-   inatividade, sem trava de aba única, e **sem atualização em tempo real
-   via WebSocket** nas telas (o servidor já transmite `broadcast.js` a cada
-   mutação, mas nada ainda escuta do lado do shell/telas) — cada terminal
-   só vê o estado mais novo depois de um F5 de verdade, não
-   automaticamente. Nenhuma dessas lacunas é bug: é o corte certo pra
-   provar que a arquitetura funciona com as telas REAIS antes de investir
-   no resto. Fica pra uma fase futura: casca completa, as demais telas
-   (`salesHistory.js`, `caixa.js`, `clientes.js`, `company.js`, `users.js`,
-   `compras.js`, `financeiro.js`, `carreto.js`, `logs.js`, `backup.js`,
-   `dashboard.js`, `ajuda.js` — nenhuma ainda portada) e o WebSocket
-   ligando as telas de verdade.
+   inatividade, sem trava de aba única. Fica pra uma fase futura: casca
+   completa e as demais telas (`salesHistory.js`, `caixa.js`, `clientes.js`,
+   `company.js`, `users.js`, `compras.js`, `financeiro.js`, `carreto.js`,
+   `logs.js`, `backup.js`, `dashboard.js`, `ajuda.js` — nenhuma ainda
+   portada).
+6. ✅ **Atualização em tempo real via WebSocket** (09/set) — fecha o gap
+   que o passo 5 tinha deixado documentado (cada terminal só via o estado
+   novo depois de um F5 manual). `public/js/live.js` novo (conexão ao
+   `/ws` que já existe desde a Fase 1 — mesmo canal que `public/test.html`
+   usa — com pub/sub simples e reconexão com backoff) mais um pedaço em
+   `public/js/app.js`: cada rota escuta só os assuntos relevantes pra ela
+   (`LIVE_TOPICS`), com um debounce de 500ms (várias mudanças em sequência,
+   ex: uma venda que mexe em produto+cliente ao mesmo tempo, viram um só
+   recarregamento) e um guarda simples — não recarrega a tela por baixo de
+   um modal aberto (novo produto, ajuste de estoque, aprovação de desconto)
+   até ele fechar. Testado em `test-live-updates.cjs` (4 asserções, duas
+   máquinas reais): Estoque se atualiza sozinho quando outro terminal
+   cadastra um produto ou vende (baixa de estoque aparece sem F5/navegação
+   nenhuma), um modal aberto sobrevive a um recarregamento chegando ao
+   mesmo tempo, e — a checagem mais importante do lote — o PDV **não** se
+   recarrega sozinho.
 
-Com o passo 5 fechado, a Fase 9 está **substancialmente completa** pro par
-Estoque+PDV: a hipótese central do roteiro (telas reais reaproveitáveis
-sem reescrita) está provada na prática, não só na teoria. O que falta da
-Fase 9 (as ~11 telas restantes, o `app.js` completo, WebSocket) é trabalho
+   **Decisão de design, não bug:** a tela de PDV (`venda`) de propósito
+   NÃO escuta `products-changed`. `sale.js` já busca o produto de novo no
+   servidor a cada busca/adição ao carrinho — preço e estoque nunca ficam
+   desatualizados no que importa, e o servidor revalida tudo de novo no
+   fechamento da venda de qualquer jeito (achado de segurança do passo 4).
+   Recarregar a tela inteira no meio de uma venda, por causa de uma
+   mudança em QUALQUER produto da loja (não necessariamente um que está no
+   carrinho), destruiria o foco de quem está digitando e arriscaria perder
+   trabalho em andamento — um custo real sem ganho de correção nenhum.
+   `venda` escuta só o que legitimamente muda sob os pés de uma venda em
+   andamento sem estar no controle do vendedor: cliente (`customers-changed`,
+   pro saldo de fiado), caixa (`cash-changed`/`cash-config-changed`) e
+   política da loja (`company-changed`, novo — `routes/company.js` nunca
+   avisava ninguém quando desconto/juro mudavam, corrigido no mesmo passo).
+
+Com os passos 5 e 6 fechados, a Fase 9 está **substancialmente completa**
+pro par Estoque+PDV: a hipótese central do roteiro (telas reais
+reaproveitáveis sem reescrita) está provada na prática, e a promessa
+central do produto (todo terminal vê o mesmo estado em tempo real) também
+já é verdade na interface de produção, não só nos testes de API. O que
+falta da Fase 9 (as ~11 telas restantes, o `app.js` completo) é trabalho
 real de mais fases, não um risco em aberto.

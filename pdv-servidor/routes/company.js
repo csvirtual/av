@@ -8,6 +8,7 @@ import { Router } from 'express';
 import { getConfig, updateConfig } from '../lib/companyConfig.js';
 import { MAX_INSTALLMENTS } from '../lib/pricing.js';
 import { requirePermission } from '../lib/permissions.js';
+import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
 
@@ -70,6 +71,13 @@ router.put('/', requirePermission('empresa'), (req, res) => {
   }
 
   const updated = updateConfig(patch);
+  // Achado (Fase 9, ao ligar atualização em tempo real no PDV): política
+  // de desconto/juro nunca avisava ninguém quando mudava — um vendedor com
+  // o PDV aberto só veria o valor novo depois de um F5 manual, mesmo que a
+  // venda em si já respeitasse a política nova a partir da próxima chamada
+  // (o servidor nunca confia em política antiga vinda do cliente, ver
+  // achado de segurança da Fase 9 anterior). Avisado agora igual ao resto.
+  broadcast('company-changed', {});
   res.json(readPolicies(updated));
 });
 
