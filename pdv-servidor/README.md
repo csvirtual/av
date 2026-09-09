@@ -50,7 +50,7 @@ completa), é hora de investigar a fundo.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs` e `test-carreto.cjs` verdes. Faltam as ~7 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV+Histórico de vendas+Clientes+Painel+Carreto+Usuários completos, com atualização em tempo real, testados (09/set) — `session.js`, 12 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`, `usersRepo`, `loyaltyRepo`), `views/products.js`+`views/sale.js`+`views/salesHistory.js`+`views/clientes.js`+`views/dashboard.js`+`views/carreto.js`+`views/users.js` reais rodando contra o servidor sem reescrita, e `public/js/live.js` mantendo Estoque/PDV/Painel/Usuários em sincronia via WebSocket — `test-real-ui.cjs`, `test-live-updates.cjs`, `test-sales-history.cjs`, `test-clientes.cjs`, `test-dashboard.cjs`, `test-carreto.cjs` e `test-users.cjs` verdes. Achado de segurança real corrigido no caminho: `POST /:id/redefinir-senha` não tinha a trava contra escalonamento de privilégio que a extensão já tem (ver passo 11). Faltam as ~6 telas restantes e o `app.js` completo (menu lateral, todas as rotas) — ver "Próximo passo recomendado" |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -570,14 +570,79 @@ revisado pro início da Fase 9:
     carreto já entregue — nunca dá pra empurrar um carreto de um estado
     terminal pra outro.
 
-Com os passos 5 a 10 fechados, a Fase 9 está **substancialmente
-completa** pro sexteto Estoque+PDV+Histórico+Clientes+Painel+Carreto: a
-hipótese central do roteiro (telas reais reaproveitáveis sem reescrita)
-segue provada na prática, a promessa de tempo real já é verdade onde faz
-sentido, e o ciclo operacional inteiro da loja — vender, repor estoque,
-fiado, fidelidade, visão geral, e agora entregar — já roda pela UI real.
-O que falta da Fase 9 (as ~7 telas restantes — caixa, compras,
-financeiro, usuários, logs, relatórios, personalização/backup/ajuda —, o
-`app.js` completo com menu lateral, e a lacuna de crédito de troca
-cross-terminal documentada no passo 8) é trabalho real de mais fases, não
-risco em aberto.
+11. ✅ **`views/users.js` real ligada** (09/set) — sétima tela real
+    (Estoque, PDV, Histórico, Clientes, Painel, Carreto, agora Usuários),
+    **copiada sem nenhuma alteração** de `pdv-extension/app/js/views/`.
+    Cadastro/edição de vendedor com os checkboxes das 13 permissões
+    granulares, ativar/desativar acesso, redefinir senha — tudo contra o
+    mesmo `routes/users.js` que já existia desde a Fase 7 (gating de
+    permissões, log de auditoria, clamp de delegação).
+
+    Novo em `public/js/data/usersRepo.js`: `findByUsername` (checagem
+    otimista client-side sobre `listUsers()`, mesmo espírito de
+    `productsRepo.js#searchProducts` — "catálogo pequeno o bastante"),
+    `createUser`, `updateUser`, `setUserActive`, `resetUserPassword`.
+    Também copiados `components/maskedInput.js` (reaproveitado, sem
+    mudança) e a tela em si. `usuarios` entrou no `LIVE_TOPICS`: a lista
+    de vendedores de uma loja é sempre pequena e não tem filtro nem
+    paginação — nada de estado de tela pra perder recarregando sozinho.
+
+    **Achado de segurança real, não só de forma — escalonamento de
+    privilégio faltando em `POST /:id/redefinir-senha`:** a extensão
+    fecha, em `data/usersRepo.js#resetUserPassword`, um caminho lateral de
+    escalonamento de privilégio: se um vendedor comum tem a permissão
+    `usuarios` (delegável, ver passo de auditoria "Achado de auditoria
+    (P1)" no próprio código da extensão), ele consegue redefinir a senha
+    de QUALQUER outro vendedor pela tela — inclusive um com MAIS
+    permissões que ele. Sem trava, esse vendedor logaria como a vítima e
+    herdaria, por essa porta lateral, poderes que nunca teve (ex:
+    `deleteCustomer`, `financeiro`). A extensão já calcula isso
+    (`hasExtraPower = Object.keys(targetPerms).some((key) => targetPerms[key]
+    && !actingPerms[key])`) e recusa com uma mensagem clara. O
+    `routes/users.js` do servidor, escrito na Fase 7 — bem antes desta
+    tela existir aqui, quando não havia UI nenhuma pra exercitar esse
+    caminho — nunca teve essa checagem: qualquer chamada direta à rota
+    (curl, ou a própria UI assim que ligada agora) conseguia o
+    escalonamento completo. Corrigido copiando a mesma lógica,
+    byte-a-byte, pro servidor (`routes/users.js`), com a mesma mensagem de
+    erro da extensão. Achado **durante** o trabalho desta tela, não nela —
+    o furo já existia há duas fases, só nunca tinha sido alcançável por
+    UI nenhuma até agora.
+
+    Achado secundário, mesma auditoria: as duas checagens de tamanho
+    mínimo de senha em `routes/users.js` (cadastro e redefinição) tinham
+    `4` caracteres soltos no código, sem relação nenhuma com
+    `MIN_USER_PASSWORD_LENGTH = 6` que a extensão define e usa
+    (`utils/permissions.js`) — quem contornasse a tela só precisava de 4
+    caracteres, não 6, a política real divergindo da fonte. Corrigido
+    centralizando a mesma constante em `lib/permissions.js` e usando nas
+    duas checagens do servidor; conferido por grep que nenhum teste já
+    existente usava senha menor que 6 caracteres, então o aperto não
+    quebrou nada em produção.
+
+    Testado em `test-users.cjs` (11 asserções): admin aparece na lista
+    sem poder ser editado por aqui, cadastro/edição/ativar-desativar de
+    vendedor refletem na lista, redefinição de senha realmente funciona
+    (login com a senha nova), servidor rejeita senha de cadastro curta
+    mesmo contornando a tela, e — a checagem mais importante do lote — um
+    "Vendedor B" com só `usuarios` NÃO consegue redefinir a senha de um
+    "Vendedor A" com `deleteCustomer` a mais, e a senha original de A
+    continua funcionando depois da tentativa (nada foi gravado). A suíte
+    de permissões pré-existente (`test-users-permissions.cjs`, da Fase 7)
+    tinha uma asserção que assumia o reset "normal" entre dois vendedores
+    onde o alvo na verdade tinha mais poder que quem resetava — corrigida
+    pra refletir o comportamento correto (bloqueado), com um novo alvo sem
+    poder a mais pro caso "normal" de verdade.
+
+Com os passos 5 a 11 fechados, a Fase 9 está **substancialmente
+completa** pro septeto Estoque+PDV+Histórico+Clientes+Painel+Carreto+
+Usuários: a hipótese central do roteiro (telas reais reaproveitáveis sem
+reescrita) segue provada na prática, a promessa de tempo real já é
+verdade onde faz sentido, e o ciclo operacional inteiro da loja — vender,
+repor estoque, fiado, fidelidade, visão geral, entregar, e agora gerir
+vendedores — já roda pela UI real.
+O que falta da Fase 9 (as ~6 telas restantes — caixa, compras,
+financeiro, logs, relatórios, personalização/backup/ajuda —, o `app.js`
+completo com menu lateral, e a lacuna de crédito de troca cross-terminal
+documentada no passo 8) é trabalho real de mais fases, não risco em
+aberto.

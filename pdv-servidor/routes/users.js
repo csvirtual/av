@@ -11,7 +11,7 @@ import { Router } from 'express';
 import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { hashPassword } from '../lib/auth.js';
-import { sanitizePermissions, PERMISSION_DEFS } from '../lib/permissions.js';
+import { sanitizePermissions, PERMISSION_DEFS, MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 import { logAction } from '../lib/audit.js';
 
 const router = Router();
@@ -41,7 +41,7 @@ router.post('/', async (req, res) => {
     const usernameLower = username.toLowerCase();
     if (!usernameLower) throw new Error('Nome de usuário é obrigatório.');
     if (findByUsernameStmt.get(usernameLower)) throw new Error('Já existe um usuário com esse nome de login.');
-    if (!req.body.password || req.body.password.length < 4) throw new Error('Informe uma senha com pelo menos 4 caracteres.');
+    if (!req.body.password || req.body.password.length < MIN_USER_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.`);
 
     // Um vendedor com 'usuarios' só repassa os poderes que ele mesmo possui —
     // nunca concede a uma conta nova (nem à sua própria, mais tarde) um poder
@@ -166,8 +166,25 @@ router.post('/:id/redefinir-senha', async (req, res) => {
     if (user.role === 'admin' && req.userRole !== 'admin') {
       throw new Error('Apenas o Administrador Geral pode redefinir a própria senha.');
     }
-    if (!req.body.newPassword || req.body.newPassword.length < 4) {
-      throw new Error('Informe uma senha com pelo menos 4 caracteres.');
+    // Achado de auditoria (Fase 9, ao ligar views/users.js): faltava aqui
+    // a mesma trava contra escalonamento de privilégio que
+    // data/usersRepo.js#resetUserPassword da extensão já tem — sem isso,
+    // um vendedor com a permissão 'usuarios' podia redefinir a senha de
+    // OUTRO vendedor com MAIS poderes que ele, logar como essa pessoa e
+    // herdar os poderes extras por uma porta lateral (updateUser, abaixo,
+    // já fechava essa mesma classe de furo pra EDIÇÃO de permissões, mas
+    // reset de senha nunca tinha essa checagem no servidor). Delegação
+    // nunca pode dar mais poder do que quem delega já possui.
+    if (user.role !== 'admin' && req.userRole !== 'admin') {
+      const targetPerms = user.permissions || {};
+      const actingPerms = req.userPermissions || {};
+      const hasExtraPower = Object.keys(targetPerms).some((key) => targetPerms[key] && !actingPerms[key]);
+      if (hasExtraPower) {
+        throw new Error('Você não pode redefinir a senha de um usuário com mais poderes que você — peça pra um Administrador Geral fazer isso.');
+      }
+    }
+    if (!req.body.newPassword || req.body.newPassword.length < MIN_USER_PASSWORD_LENGTH) {
+      throw new Error(`Informe uma senha com pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.`);
     }
     const { salt, hash } = await hashPassword(req.body.newPassword);
     user.passwordSalt = salt;

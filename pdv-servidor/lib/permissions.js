@@ -6,6 +6,18 @@
 // têm uma tela/rota correspondente no servidor — ficam definidas mesmo assim
 // pra já existir o checkbox certo em Usuários quando essas fases forem
 // construídas, e pra nenhum backup/restauração antigo perder o campo.
+// Achado (Fase 9, ao ligar views/users.js): as duas rotas de senha em
+// routes/users.js (cadastro e redefinição) checavam "pelo menos 4
+// caracteres" direto, um número solto sem relação nenhuma com
+// MIN_USER_PASSWORD_LENGTH=6 que a extensão define e usa em
+// utils/permissions.js (a mesma tela que confere isso ANTES de chamar o
+// repositório, achado de auditoria já corrigido lá — "Reforçar validação
+// de senha mínima no repo"). Achando isso o mesmo tipo de furo: quem
+// contorna a tela (curl, uma chamada direta) só precisava de 4
+// caracteres, não 6 — a política real, que devia estar só na fonte,
+// divergia da fonte. Um valor só aqui, usado nas duas checagens.
+export const MIN_USER_PASSWORD_LENGTH = 6;
+
 export const PERMISSION_DEFS = [
   { key: 'compras', label: 'Acessar Compras (fornecedores e pedidos)', group: 'Telas' },
   { key: 'financeiro', label: 'Acessar Financeiro', group: 'Telas' },

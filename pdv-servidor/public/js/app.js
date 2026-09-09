@@ -14,6 +14,7 @@ import { renderSale } from './views/sale.js';
 import { renderSalesHistory } from './views/salesHistory.js';
 import { renderClientes } from './views/clientes.js';
 import { renderCarreto } from './views/carreto.js';
+import { renderUsers } from './views/users.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 
@@ -32,6 +33,7 @@ const ROUTES = {
   vendas: { label: 'Histórico de vendas', render: renderSalesHistory },
   clientes: { label: 'Clientes', render: renderClientes },
   carreto: { label: 'Carreto', render: renderCarreto },
+  usuarios: { label: 'Usuários', render: renderUsers },
 };
 const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (!location.hash) location.hash = '#/dashboard'`)
 
@@ -54,11 +56,14 @@ const DEFAULT_ROUTE = 'dashboard'; // igual à extensão (ver app.js dela: `if (
 // já recarregam) e um F5. 'dashboard' é o oposto: não tem filtro nem
 // estado nenhum pra perder (é só um retrato do momento, recalculado do
 // zero a cada render), então escuta de tudo que pode mudar um dos
-// cartões — é literalmente o propósito da tela.
+// cartões — é literalmente o propósito da tela. 'usuarios' também não
+// tem filtro nem paginação (a lista de vendedores de uma loja é sempre
+// pequena) — seguro escutar 'users-changed' e recarregar sozinho.
 const LIVE_TOPICS = {
   estoque: new Set(['products-changed', 'suppliers-changed']),
   venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
   dashboard: new Set(['products-changed', 'sales-changed', 'customers-changed', 'deliveries-changed', 'cash-changed', 'cash-config-changed', 'company-changed', 'loyalty-config-changed']),
+  usuarios: new Set(['users-changed']),
 };
 const LIVE_DEBOUNCE_MS = 500;
 

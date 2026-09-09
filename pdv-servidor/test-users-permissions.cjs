@@ -98,10 +98,24 @@ function api(cookie) {
   const v2ResetAdminPass = await callV2(`/api/users/${admin.user.id}/redefinir-senha`, { method: 'POST', body: JSON.stringify({ newPassword: 'hackeado123' }) });
   check('vendedor 2 (com "usuarios" mas não admin) não redefine senha do admin', v2ResetAdminPass.status === 400, v2ResetAdminPass.status);
 
+  // Achado de segurança (Fase 9, ao ligar views/users.js): vendedor1 já tem
+  // 'financeiro' (concedido acima) — um poder que vendedor2 (só 'usuarios')
+  // não tem. resetUserPassword() tanto na extensão quanto no servidor (a
+  // trava que faltava aqui, agora corrigida) recusa isso de propósito:
+  // vendedor2 resetando a senha de alguém com MAIS poder que ele seria um
+  // jeito indireto de herdar esse poder, logando como a vítima. Coberto de
+  // forma exaustiva em test-users.cjs; aqui só confirma que o "caminho
+  // normal" desta suíte de fato bate com a trava real.
   const v2ResetV1Pass = await callV2(`/api/users/${v1Res.body.user.id}/redefinir-senha`, { method: 'POST', body: JSON.stringify({ newPassword: 'novaSenha123' }) });
-  check('vendedor 2 redefine a senha do vendedor 1 normalmente', v2ResetV1Pass.status === 200, v2ResetV1Pass.status);
-  const v1LoginNewPass = await login('vendedor1', 'novaSenha123');
-  check('vendedor 1 loga com a senha nova', v1LoginNewPass.status === 200, v1LoginNewPass.status);
+  check('vendedor 2 NÃO redefine a senha do vendedor 1 (tem "financeiro", que v2 não tem)', v2ResetV1Pass.status === 400, v2ResetV1Pass.status);
+
+  // vendedor3 (criado por v2 acima) só tem o que v2 já tinha pra repassar —
+  // nenhuma permissão a mais que v2 não possua — então este é o caso
+  // "normal" de reset, sem escalonamento nenhum envolvido.
+  const v2ResetV3Pass = await callV2(`/api/users/${v3ViaV2.body.user.id}/redefinir-senha`, { method: 'POST', body: JSON.stringify({ newPassword: 'novaSenha123' }) });
+  check('vendedor 2 redefine a senha do vendedor 3 normalmente (sem poder a mais que v2)', v2ResetV3Pass.status === 200, v2ResetV3Pass.status);
+  const v3LoginNewPass = await login('vendedor3', 'novaSenha123');
+  check('vendedor 3 loga com a senha nova', v3LoginNewPass.status === 200, v3LoginNewPass.status);
 
   // --- não dá pra desativar o único admin ativo ---
   const deactivateAdmin = await callAdmin(`/api/users/${admin.user.id}/ativo`, { method: 'POST', body: JSON.stringify({ active: false }) });
