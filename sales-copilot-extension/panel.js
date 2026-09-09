@@ -4568,10 +4568,27 @@ function prepararGeracaoIA(){
   return { lead, pasted, personName, extraContext, provider, key };
 }
 
+// ---------- Fase 8: evita 2 chamadas de IA concorrentes pro MESMO lead ----------
+// Clicar "Gerar resposta" e, antes de terminar, clicar "🔄 Regenerar" (que
+// chama esta mesma função) ou "Sugerir follow-up" PRA ESTE MESMO LEAD
+// disparava duas chamadas de IA em paralelo — gasto de token em dobro à
+// toa, e as duas mexendo na mesma tela/lead ao terminar, uma por cima da
+// outra. Compartilhado entre analyzeAndSuggest e suggestFollowupApproach
+// de propósito: são o mesmo tipo de operação (IA atualizando este lead),
+// nunca deveriam rodar em paralelo pro MESMO lead — leads DIFERENTES
+// continuam livres pra gerar ao mesmo tempo, cada um independente.
+const leadsComGeracaoEmAndamento = new Set();
+
 async function analyzeAndSuggest(){
   const prep = prepararGeracaoIA();
   if(!prep) return;
   const { lead, pasted, personName, extraContext, provider } = prep;
+
+  if(leadsComGeracaoEmAndamento.has(lead.id)){
+    toast('Já tem uma geração em andamento pra este lead — aguarde terminar.');
+    return;
+  }
+  leadsComGeracaoEmAndamento.add(lead.id);
 
   // ---------- Detecção de duplicata + contexto incremental ----------
   // Compara com a última mensagem já processada PRA ESTE LEAD (e, na
@@ -4596,7 +4613,7 @@ async function analyzeAndSuggest(){
       const continuar = await copilotoConfirmar(
         `Você já gerou uma resposta pra essa exata mensagem em ${formatDataHora(ultimoHistorico.quando)} (confira no histórico). Isso vai consumir tokens da API outra vez.`,
         { titulo: 'Gerar de novo mesmo assim?', textoConfirmar: 'Gerar mesmo assim' });
-      if(!continuar) return;
+      if(!continuar){ leadsComGeracaoEmAndamento.delete(lead.id); return; }
     }else if(pasted.startsWith(anterior)){
       const delta = pasted.slice(anterior.length).trim();
       if(delta){
@@ -4785,6 +4802,7 @@ async function analyzeAndSuggest(){
   }finally{
     document.getElementById('loadingIndicator').style.display = 'none';
     btn.disabled = false;
+    leadsComGeracaoEmAndamento.delete(lead.id);
   }
 }
 
@@ -4887,6 +4905,14 @@ async function suggestFollowupApproach(){
   if(!prep) return;
   const { lead, pasted, personName, extraContext, provider } = prep;
 
+  // Mesmo guard de analyzeAndSuggest (fase 8) — compartilhado de propósito,
+  // ver comentário lá.
+  if(leadsComGeracaoEmAndamento.has(lead.id)){
+    toast('Já tem uma geração em andamento pra este lead — aguarde terminar.');
+    return;
+  }
+  leadsComGeracaoEmAndamento.add(lead.id);
+
   const btn = document.getElementById('followupBtn');
   btn.disabled = true;
   document.getElementById('followupLoadingIndicator').style.display = 'inline';
@@ -4950,6 +4976,7 @@ async function suggestFollowupApproach(){
   }finally{
     document.getElementById('followupLoadingIndicator').style.display = 'none';
     btn.disabled = false;
+    leadsComGeracaoEmAndamento.delete(lead.id);
   }
 }
 
@@ -6637,6 +6664,35 @@ function _copilotoWaMensagemConfiavel(sender) {
 let contextosWhatsAppPorContato = new Map();
 let contatoWhatsAppAtivo = null; // nome cru vindo do Adapter — pode ser null (Adapter não conseguiu ler)
 
+// ---------- Fase 8: limite de memória do mapa de contatos ----------
+// Sem isto, uma sessão de horas conversando com dezenas/centenas de
+// contatos diferentes no WhatsApp acumularia um Conversation Context POR
+// CONTATO pra sempre, nunca liberado. 30 contatos simultâneos em memória é
+// generoso pro uso real (muito mais que uma pessoa consegue atender ao
+// mesmo tempo) — Map preserva ordem de inserção, então "mover pro fim" a
+// cada acesso (delete+set) + descartar o primeiro quando estoura o teto é
+// um LRU (menos recentemente usado) sem precisar de estrutura própria.
+// Perder o contexto de um contato há muito inativo é seguro: ele nunca é
+// persistido (existe só nesta aba, nesta sessão) e será recriado do zero,
+// vazio, na próxima mensagem dele — exatamente como um contato nunca
+// visto antes.
+const COPILOTO_WA_MAX_CONTATOS = 30;
+function _copilotoWaObterOuCriarContexto(chaveContato) {
+  if (contextosWhatsAppPorContato.has(chaveContato)) {
+    const existente = contextosWhatsAppPorContato.get(chaveContato);
+    contextosWhatsAppPorContato.delete(chaveContato);
+    contextosWhatsAppPorContato.set(chaveContato, existente); // move pro fim (mais recente)
+    return existente;
+  }
+  const novo = copilotoContextoCriar(chaveContato);
+  contextosWhatsAppPorContato.set(chaveContato, novo);
+  if (contextosWhatsAppPorContato.size > COPILOTO_WA_MAX_CONTATOS) {
+    const maisAntigo = contextosWhatsAppPorContato.keys().next().value;
+    contextosWhatsAppPorContato.delete(maisAntigo);
+  }
+  return novo;
+}
+
 // Decide se a conversa detectada agora deve preencher o LEAD ATUALMENTE
 // SELECIONADO no painel:
 // - Central de mensagens (lead.fixo): a MENSAGEM sempre pode entrar — é
@@ -6696,10 +6752,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   }
   if (message.tipo === COPILOTO_MSG.MENSAGENS_NOVAS) {
     const chaveContato = contatoWhatsAppAtivo || '(contato desconhecido)';
-    if (!contextosWhatsAppPorContato.has(chaveContato)) {
-      contextosWhatsAppPorContato.set(chaveContato, copilotoContextoCriar(chaveContato));
-    }
-    const contexto = contextosWhatsAppPorContato.get(chaveContato);
+    const contexto = _copilotoWaObterOuCriarContexto(chaveContato);
     copilotoContextoAdicionarMensagens(contexto, (message.dados && message.dados.mensagens) || []);
     atualizarPasteBoxComContextoWhatsApp(contexto, contatoWhatsAppAtivo);
     return;

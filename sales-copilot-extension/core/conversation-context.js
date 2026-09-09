@@ -23,6 +23,34 @@
 // Nenhum arquivo existente carrega isto ainda — zero efeito no
 // comportamento atual da extensão.
 
+// ---------- Fase 8: limite de memória por contexto ----------
+// Sem isto, uma conversa de horas (ou dias) acumularia mensagens pra
+// sempre em memória — nada nunca é "esquecido". 500 é generoso pro uso
+// real (uma central de mensagens não deveria trocar 500 mensagens com a
+// MESMA pessoa numa sessão só), e a aparagem só remove mensagens JÁ
+// PROCESSADAS (nunca uma pendente, mesmo que isso signifique passar do
+// teto numa conversa com muita coisa ainda por responder) — nunca perde
+// dado que a próxima chamada de IA ainda precisaria enviar.
+const COPILOTO_CONTEXTO_MAX_MENSAGENS = 500;
+
+function _copilotoContextoAparar(contexto) {
+  // ultimoProcessadoAte === null significa "nada foi processado ainda" —
+  // nada é aparável nesse estado (ver comentário do campo, em
+  // copilotoContextoCriar, sobre por que null e não 0).
+  if (contexto.ultimoProcessadoAte === null) return;
+  const excesso = contexto.mensagens.length - COPILOTO_CONTEXTO_MAX_MENSAGENS;
+  if (excesso <= 0) return;
+  let removidas = 0;
+  while (
+    removidas < excesso &&
+    contexto.mensagens.length &&
+    contexto.mensagens[0].timestamp <= contexto.ultimoProcessadoAte
+  ) {
+    contexto.mensagens.shift();
+    removidas++;
+  }
+}
+
 // `tamanhoJanela`: quantas mensagens recentes (lead + atendente) ficam
 // disponíveis pra copilotoContextoJanela — não limita quantas mensagens o
 // contexto GUARDA no total (isso é papel de uma estratégia de resumo, ainda
@@ -33,7 +61,13 @@ function copilotoContextoCriar(leadId, tamanhoJanela) {
     leadId,
     tamanhoJanela: tamanhoJanela || 20,
     mensagens: [],
-    ultimoProcessadoAte: 0, // timestamp da última mensagem já enviada pra IA com sucesso
+    // null, nunca 0 — achado na fase 8: uma mensagem pode legitimamente ter
+    // timestamp exatamente 0 (o Adapter usa Date.now() só como FALLBACK
+    // quando não consegue ler o horário de verdade — improvável na prática,
+    // mas não impossível). Se o sentinela de "nada processado ainda" fosse
+    // 0, essa mensagem seria confundida com "já processada" nas comparações
+    // abaixo. null nunca colide com um timestamp de verdade.
+    ultimoProcessadoAte: null,
   };
 }
 
@@ -48,6 +82,7 @@ function copilotoContextoAdicionarMensagens(contexto, mensagensBrutas) {
     if (!idsExistentes.has(msg.id)) contexto.mensagens.push(msg);
   }
   contexto.mensagens.sort((a, b) => a.timestamp - b.timestamp);
+  _copilotoContextoAparar(contexto);
   return contexto;
 }
 
@@ -58,7 +93,7 @@ function copilotoContextoAdicionarMensagens(contexto, mensagensBrutas) {
 // não vale a pena (nem custa) disparar uma chamada de IA agora.
 function copilotoContextoTextoPendente(contexto) {
   const pendentes = contexto.mensagens.filter(
-    (m) => m.from === 'lead' && m.timestamp > contexto.ultimoProcessadoAte
+    (m) => m.from === 'lead' && (contexto.ultimoProcessadoAte === null || m.timestamp > contexto.ultimoProcessadoAte)
   );
   if (!pendentes.length) return null;
   return pendentes.map((m) => m.text).join('\n');

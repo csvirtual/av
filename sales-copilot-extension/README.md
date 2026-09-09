@@ -135,6 +135,51 @@ que já existe:
   na mesma entrada — cifrados do mesmo jeito que `resposta`
   (`CAMPOS_HISTORICO_CIFRADOS`). Copiar sem editar não marca nada.
 
+  **Fase 8 — Performance e resiliência (sessões de horas)**: sem limites
+  explícitos, uma sessão longa acumularia estado pra sempre (memória) e
+  cliques repetidos poderiam disparar chamadas de IA duplicadas (custo em
+  dobro, duas respostas competindo pela mesma tela). Quatro mudanças, todas
+  puramente defensivas — nenhuma muda o comportamento observável em uso
+  normal:
+  - **Guarda de reentrância** (`panel.js`, `leadsComGeracaoEmAndamento`):
+    `analyzeAndSuggest` e `suggestFollowupApproach` compartilham um `Set` de
+    leads com geração em andamento. Chamar qualquer uma das duas pra um lead
+    que já tem uma chamada de IA em voo (ex.: clique duplo, ou "Regenerar"
+    clicado antes da primeira resposta chegar) mostra um toast e não chama a
+    API de novo; leads diferentes continuam livres pra gerar em paralelo. O
+    lock é liberado tanto no caminho de sucesso quanto em qualquer erro
+    (`finally`) e também quando a pessoa cancela a confirmação de duplicata.
+  - **Teto de mensagens por contexto** (`core/conversation-context.js`,
+    `COPILOTO_CONTEXTO_MAX_MENSAGENS = 500`): uma conversa muito longa com o
+    mesmo contato apara mensagens **já processadas** acima do teto (nunca
+    uma mensagem pendente, mesmo que isso signifique passar do teto
+    temporariamente) — a próxima chamada de IA nunca perde uma mensagem que
+    ainda precisava enviar.
+  - **Teto de contatos em memória** (`panel.js`,
+    `COPILOTO_WA_MAX_CONTATOS = 30`, `_copilotoWaObterOuCriarContexto`): o
+    mapa `contextosWhatsAppPorContato` (um `Conversation Context` por
+    contato do WhatsApp já visto na sessão) vira um LRU de até 30 entradas —
+    reacessar um contato o move pro fim (mais recente); o mais antigo é
+    descartado só quando o teto é excedido por um contato novo.
+  - **Teto de ids vistos no Adapter** (`content/whatsapp-adapter.js`,
+    `MAX_IDS_VISTOS = 2000`): o `Set` de ids de mensagem já enviados pro
+    painel (dedup) também é limitado, com a mesma lógica de descarte dos
+    mais antigos.
+
+  **Dois bugs reais encontrados escrevendo o teste desta fase** (nenhum
+  reportado — achados testando o teto de memória do Context Manager, e
+  corrigidos antes de prosseguir):
+  - `core/conversation-normalizer.js`: `Number(timestamp) || Date.now()`
+    caía na armadilha clássica do `||` com falsy — um timestamp
+    genuinamente `0` virava `Date.now()` por engano. Corrigido pra só cair
+    no fallback quando o valor não é um número finito, nunca só por ser
+    falsy.
+  - `core/conversation-context.js`: o sentinela de "nada processado ainda"
+    (`ultimoProcessadoAte`) era inicializado como `0` — colidia
+    silenciosamente com o bug acima (uma mensagem de timestamp `0` parecia
+    "já processada"). Trocado o sentinela pra `null`, com checagem explícita
+    `=== null` nos três lugares que liam esse campo.
+
   **Importante — seletores não verificados contra o WhatsApp Web ao vivo**:
   os seletores em `content/selectors.js` foram escritos com base em
   conhecimento geral da estrutura do WhatsApp Web (que muda sem aviso, sem

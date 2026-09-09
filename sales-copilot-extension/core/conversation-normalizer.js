@@ -23,7 +23,16 @@ function copilotoNormalizarMensagem(bruta) {
   // aqui do que o Context Manager ter que filtrar isso mais adiante.
   if (!texto) return null;
   const deMim = bruta.from === 'me' || bruta.fromMe === true || bruta.enviadaPorMim === true;
-  const timestamp = Number(bruta.timestamp) || Date.now();
+  // Achado da fase 8 (testando o limite de memória do Context Manager):
+  // `Number(bruta.timestamp) || Date.now()` cai na armadilha clássica do
+  // `||` com falsy — um timestamp genuinamente 0 (epoch) virava Date.now()
+  // por engano, silenciosamente. Na prática isso exigiria uma mensagem de
+  // 1970 pra acontecer (não deveria surgir do Adapter real), mas o bug é
+  // real e vale corrigir: só cai no fallback quando o valor não é
+  // finito/utilizável, nunca só por ser falsy.
+  const timestamp = typeof bruta.timestamp === 'number' && Number.isFinite(bruta.timestamp)
+    ? bruta.timestamp
+    : Date.now();
   // Fallback de id quando o Adapter não conseguir um identificador estável
   // do DOM (ver seção "Não confie em seletores frágeis" do plano) — nunca
   // deixa a mensagem sem id, mesmo sem um vindo da extração.

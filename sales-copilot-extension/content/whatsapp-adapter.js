@@ -190,6 +190,20 @@
   let conversaAtualNome = null;
   let idsJaVistos = new Set(); // reiniciado a cada troca de conversa
 
+  // Fase 8 — limite de memória: reiniciar a cada troca de conversa já
+  // cobre o caso comum, mas uma ÚNICA conversa muito longa e ativa (a
+  // central de mensagens, por exemplo, rodando por horas sem trocar de
+  // "conversa" do ponto de vista do WhatsApp) acumularia ids pra sempre.
+  // Set preserva ordem de inserção — descarta os mais antigos ao passar do
+  // teto, igual ao LRU do mapa de contatos em panel.js.
+  const MAX_IDS_VISTOS = 2000;
+  function limitarIdsVistos() {
+    const excesso = idsJaVistos.size - MAX_IDS_VISTOS;
+    if (excesso <= 0) return;
+    const it = idsJaVistos.values();
+    for (let i = 0; i < excesso; i++) idsJaVistos.delete(it.next().value);
+  }
+
   function reavaliar() {
     const painelAchado = encontrar('painelMensagens');
     logarSeMudou('painelMensagens', painelAchado ? painelAchado.tier : -1);
@@ -222,6 +236,7 @@
     if (!novas.length) return;
 
     novas.forEach((m) => idsJaVistos.add(m.id));
+    limitarIdsVistos();
     copilotoLog('INFO', TAG, {
       evento: 'mensagens_novas_detectadas',
       quantidade: novas.length,
