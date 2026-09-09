@@ -54,6 +54,23 @@ router.post('/login', async (req, res) => {
   res.json({ user: publicUser(row) });
 });
 
+// Confirma usuário+senha SEM criar sessão nem cookie — usado pra
+// confirmações pontuais de identidade dentro de uma sessão já logada
+// como outra pessoa (ex: aprovação de desconto acima do limite, fechar
+// caixa — ver components/passwordConfirm.js da extensão, o mesmo núcleo
+// reaproveitado nos 3 pontos sensíveis a dinheiro/segurança). SEMPRE com
+// `namespace` próprio (nunca o namespace do login real) — ver achado de
+// auditoria em lib/loginLockout.js.
+router.post('/verify', async (req, res) => {
+  const { username, password, namespace } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
+  }
+  const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' });
+  if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+  res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
+});
+
 router.post('/logout', (req, res) => {
   destroySession(req.cookies?.session);
   res.clearCookie('session');

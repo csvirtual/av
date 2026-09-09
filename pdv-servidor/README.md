@@ -23,20 +23,15 @@ scratchpad efêmero antes de ser recuperado e trazido pro repositório em
 node seed.js && node server.js` sobe em segundos, `/api/status` responde
 `{"ok":true}`.
 
-**Achado (09/set, ao portar productsRepo/stockRepo — ver Fase 9 abaixo):**
-rodando a suíte `test-*.cjs` completa NESTE ambiente sandboxed específico,
-4 dos testes "-multiterminal" das fases 2, 5, 6 e 8 (`test-sales-multiterminal`,
-`test-purchases-finance-multiterminal`, `test-loyalty-carreto-multiterminal`,
-`test-security-multiterminal`) falham por timeout — confirmado que já
-falhavam do MESMO jeito no código original, sem nenhuma mudança desta
-sessão (testado revertendo routes/products.js pro estado do commit
-anterior e rodando de novo). Não é regressão de nada feito aqui, e a
-versão sem "-multiterminal" de cada um desses 4 passa normalmente — mas é
-uma falha real neste ambiente, provavelmente timing de WebSocket/Playwright
-específico deste sandbox (o resto da suíte, incluindo outros testes
-"-multiterminal" como cash/users, passa). Fica registrado como gap
-conhecido a investigar — não interfere no que este passo da Fase 9
-entrega, mas não deveria ser esquecido como os problemas anteriores.
+**Suíte completa (19 arquivos `test-*.cjs`, incluindo `test-real-ui.cjs`)
+roda 100% verde neste ambiente hoje** (confirmado de novo em 09/set, banco
+e servidor recém-subidos pra cada teste, depois de ligar a interface real —
+ver Fase 9 abaixo). Um achado anterior (09/set, ainda de manhã) tinha
+registrado 4 testes "-multiterminal" falhando por timeout neste sandbox
+específico — não reproduziu na rodada mais recente, então parece ter sido
+flutuação de timing pontual, não uma falha persistente do ambiente. Se
+voltar a acontecer, vale registrar de novo aqui com mais detalhe antes de
+investigar a fundo.
 
 ## Roteiro — 10 fases
 
@@ -50,7 +45,7 @@ entrega, mas não deveria ser esquecido como os problemas anteriores.
 | 6 | Carreto (entregas) + Fidelidade (pontos) | ✅ feita, testada (`demo-fase6.cjs`, `test-loyalty-carreto*.cjs`) |
 | 7 | Usuários, 13 permissões granulares, log de auditoria | ✅ feita, testada (`demo-fase7.cjs`, `test-users*.cjs`) |
 | 8 | Segurança: bloqueio por força bruta, autorização de desconto, backup criptografado round-trip | ✅ feita, testada (`demo-fase8.cjs`, `test-security*.cjs`) |
-| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 em andamento — `session.js` + os 9 repositórios que Estoque+PDV precisam (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`) prontos e testados (09/set), incluindo 2 achados de segurança sérios corrigidos em `routes/sales.js` (preço e juro de parcelamento que a rota confiava do cliente). Falta só ligar a UI real nelas (ver abaixo) |
+| 9 | **Interface final** — trocar `public/test.html` (tela de prova de conceito) pelas telas reais da extensão (`pdv-extension/app/js/views/*.js`), com uma camada de dados nova que fala HTTP/WebSocket em vez de IndexedDB | 🟡 Estoque+PDV completos e testados (09/set) — `session.js`, os 9 repositórios (`productsRepo`, `stockRepo`, `suppliersRepo`, `auditRepo`, `salesRepo`, `deliveriesRepo`, `companyRepo`, `cashRepo`, `customersRepo`) e `views/products.js`+`views/sale.js` reais rodando contra o servidor, sem reescrita, `test-real-ui.cjs` verde. Faltam as ~11 telas restantes, o `app.js` completo (menu lateral, todas as rotas) e atualização em tempo real via WebSocket nas telas (ver "Próximo passo recomendado") |
 | 10 | Empacotamento — instalador `.exe`, serviço do Windows, ícone de bandeja, pra rodar sem terminal | ⚪ não iniciada |
 
 **Por que views/*.js deve ser reaproveitável quase inteiro na Fase 9:** na
@@ -89,9 +84,11 @@ node seed.js      # cria admin/admin123 — troque a senha depois de logar
 node server.js    # mostra os endereços de rede (ex: http://192.168.x.x:3131)
 ```
 
-Abre `http://localhost:3131/test.html` (ou o IP mostrado, de outra
-máquina/aba) — é a tela de prova de conceito da Fase 1-8, não a interface
-real (isso é a Fase 9).
+Abre `http://localhost:3131/` (ou o IP mostrado, de outra máquina/aba) —
+login `admin`/`admin123`, telas reais de Estoque e PDV (ver Fase 9 abaixo;
+o resto do sistema ainda não tem tela própria aqui). `test.html` continua
+disponível em `http://localhost:3131/test.html`, prova de conceito da Fase
+1-8 cobrindo os domínios que ainda não ganharam tela real.
 
 ## Estrutura
 
@@ -278,13 +275,80 @@ revisado pro início da Fase 9:
    da extensão já reivindica um `dedupeKey` pra isso; portado aqui também,
    testado com o mesmo padrão de "primeira chamada aceita, reenvio com a
    mesma chave rejeitado" do resto do sistema.
-5. Falta só testar Estoque + PDV **juntos**, multi-terminal, com a UI real
-   (`views/products.js` + `views/sale.js` portadas de verdade, não mais
-   `public/test.html`) — mesmo rigor de teste das fases 1-8 (concorrência,
-   dedupe, nada de estoque ficando negativo com duas máquinas vendendo ao
-   mesmo tempo). Esse é o próximo passo.
+5. ✅ **Interface real ligada** (09/set) — `public/index.html` +
+   `public/js/app.js` (casca mínima, só login + as 2 rotas `#/estoque` e
+   `#/venda`, documentada como tal — NÃO é o `app.js` completo da extensão,
+   ver nota de escopo abaixo) hospedando `views/products.js` e
+   `views/sale.js` **copiados sem nenhuma alteração** de
+   `pdv-extension/app/js/views/`, junto com todos os `components/*.js` e
+   `utils/*.js` de que dependem e `public/css/styles.css`. Confirma na
+   prática a aposta de arquitetura do topo desta fase: as duas telas nunca
+   sabem se estão falando com IndexedDB ou HTTP, só importam
+   `data/*Repo.js`. Testado em `test-real-ui.cjs` (8 asserções, duas
+   "máquinas" reais — contextos de navegador isolados, sem cookie
+   compartilhado — cadastrando produto numa e vendendo na outra pela UI de
+   produção, mesma metodologia das fases 1-8), incluindo as duas checagens
+   adversárias que fecham o círculo dos achados de segurança do passo 4:
+   confirma que a TELA em si nunca expõe um campo pra editar o preço
+   unitário do item no carrinho, e que o estoque mostrado depois da venda é
+   o valor que o SERVIDOR calculou, não o que o navegador imaginava.
 
-Passo 5 não iniciado ainda — é trabalho de verdade, mexe com a interface
-de verdade (não só a camada de dados), então merece o mesmo cuidado de
-teste que o resto do projeto sempre teve antes de qualquer linha ir pra
-produção.
+   **Achados no processo:**
+   - **Bloqueio de força bruta sem namespace, achado ao ligar
+     `passwordConfirm.js`.** Sem isolar por namespace, um vendedor errando
+     de propósito a senha do admin duas vezes no modal de aprovação de
+     desconto trancaria o LOGIN de verdade do admin por 60s, repetível à
+     vontade — um jeito fácil de atrapalhar o administrador de fora.
+     Corrigido em `lib/loginLockout.js` (`keyFor(username, namespace)` agora
+     compõe `` `${namespace}:${username}` ``) e `lib/verifyLogin.js`,
+     threading um `namespace` opcional por todas as funções de estado do
+     bloqueio; a checagem de senha do modal de aprovação de desconto em
+     `routes/sales.js` passou a usar `{namespace: 'confirmPassword'}`,
+     isolado do bloqueio do login real. Adicionado `POST /api/auth/verify`
+     (confere usuário/senha sem criar sessão nova) pra sustentar esse fluxo
+     do lado do cliente, também namespaced.
+   - **`icon('logout', {size:14})` — um crash pego antes de rodar
+     qualquer teste.** `icon.js` lança `Error` pra qualquer nome fora do
+     mapa `PATHS`, e `'logout'` nunca existiu ali (a extensão usa texto
+     simples "Sair", sem ícone, no botão de logout de verdade — conferido
+     por grep). Um rascunho inicial da casca usou o ícone por engano, o que
+     travaria a renderização do shell inteiro no primeiro carregamento.
+     Corrigido antes de sequer subir o servidor pra testar, trocando pelo
+     texto simples que a extensão de fato usa.
+   - **Achado de metodologia de teste (não é bug do app):**
+     `page.goto()` do Playwright pra um hash IDÊNTICO ao já aberto não
+     dispara `hashchange` — o roteador desta casca mínima reage a esse
+     evento, então a Máquina A parecia não ver a baixa de estoque feita
+     pela Máquina B. Confirmado via `curl` direto contra o servidor (com
+     cookie de sessão) que o dado já estava correto no banco — o bug era só
+     na navegação do teste, não no app. Trocado por `page.reload()`, que
+     reflete exatamente o que um vendedor real faria (um F5) até a próxima
+     fase trazer atualização automática via WebSocket — gap já conhecido e
+     documentado abaixo, não escopo deste passo.
+   - Corrigido também: um 404 real de `/favicon.ico` (barulho no console,
+     inofensivo) com `<link rel="icon" href="data:,">`, e um falso-positivo
+     no próprio `test-real-ui.cjs` que contava respostas `HTTP 304` (cache
+     de navegador válido após um `reload()`, comportamento normal) como
+     erro de rede — `res.ok()` do Playwright trata qualquer status fora de
+     200-299 como "não ok", 304 incluído.
+
+   **Nota de escopo, documentada no topo de `public/js/app.js`:** esta
+   casca é deliberadamente mínima — só login, `#/estoque` e `#/venda`, sem
+   menu lateral completo, sem as ~15 rotas da extensão, sem timeout de
+   inatividade, sem trava de aba única, e **sem atualização em tempo real
+   via WebSocket** nas telas (o servidor já transmite `broadcast.js` a cada
+   mutação, mas nada ainda escuta do lado do shell/telas) — cada terminal
+   só vê o estado mais novo depois de um F5 de verdade, não
+   automaticamente. Nenhuma dessas lacunas é bug: é o corte certo pra
+   provar que a arquitetura funciona com as telas REAIS antes de investir
+   no resto. Fica pra uma fase futura: casca completa, as demais telas
+   (`salesHistory.js`, `caixa.js`, `clientes.js`, `company.js`, `users.js`,
+   `compras.js`, `financeiro.js`, `carreto.js`, `logs.js`, `backup.js`,
+   `dashboard.js`, `ajuda.js` — nenhuma ainda portada) e o WebSocket
+   ligando as telas de verdade.
+
+Com o passo 5 fechado, a Fase 9 está **substancialmente completa** pro par
+Estoque+PDV: a hipótese central do roteiro (telas reais reaproveitáveis
+sem reescrita) está provada na prática, não só na teoria. O que falta da
+Fase 9 (as ~11 telas restantes, o `app.js` completo, WebSocket) é trabalho
+real de mais fases, não um risco em aberto.

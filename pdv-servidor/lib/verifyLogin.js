@@ -11,25 +11,25 @@ import { getLoginLockState, recordFailedLogin, clearLoginLock } from './loginLoc
 
 const findByUsernameStmt = db.prepare('SELECT data FROM users WHERE username_lower = ?');
 
-export async function verifyLogin(username, password) {
-  const lockState = getLoginLockState(username);
+export async function verifyLogin(username, password, { namespace } = {}) {
+  const lockState = getLoginLockState(username, namespace);
   if (lockState.remainingMs > 0) return null;
 
   const row = findByUsernameStmt.get(String(username || '').trim().toLowerCase());
   if (!row) {
-    recordFailedLogin(username);
+    recordFailedLogin(username, namespace);
     return null;
   }
   const user = JSON.parse(row.data);
   if (!user.active) {
-    recordFailedLogin(username);
+    recordFailedLogin(username, namespace);
     return null;
   }
   const ok = await verifyPasswordHash(password, user.passwordSalt, user.passwordHash);
   if (!ok) {
-    recordFailedLogin(username);
+    recordFailedLogin(username, namespace);
     return null;
   }
-  clearLoginLock(username);
+  clearLoginLock(username, namespace);
   return user;
 }

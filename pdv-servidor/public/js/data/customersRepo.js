@@ -1,9 +1,27 @@
-// Clientes — versão multi-terminal. Escopo desta primeira fatia: só
-// `getCustomerBalance`, o que views/sale.js lê (saldo devedor do cliente
-// selecionado, antes de vender fiado). `createCustomer`/`listCustomers`/
-// `recordPayment`/extrato (usados por uma futura views/clientes.js
+// Clientes — versão multi-terminal. Escopo desta fatia: `getCustomerBalance`
+// (views/sale.js, saldo devedor antes de vender fiado) e
+// `searchCustomers`/`createCustomer` (components/customerPicker.js,
+// compartilhado por sale.js pro seletor de cliente da venda).
+// `recordPayment`/extrato/edição (usados por uma futura views/clientes.js
 // portada) ficam pra quando essa tela for a vez.
 import { api } from './apiClient.js';
+
+/** Busca por nome ou telefone (só dígitos, ignora pontuação) — mesmo
+ * contrato de app/js/data/customersRepo.js#searchCustomers() da extensão.
+ * Filtro já acontece no servidor (ver routes/customers.js GET /?q=),
+ * diferente de productsRepo.js#searchProducts (que filtra em memória) —
+ * aqui não tem motivo pra trazer a lista inteira só pra filtrar nela de
+ * novo do lado do cliente. */
+export async function searchCustomers(term) {
+  const q = (term || '').trim();
+  const { customers } = await api(`/api/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  return customers;
+}
+
+export async function createCustomer(data) {
+  const { customer } = await api('/api/customers', { method: 'POST', body: JSON.stringify(data) });
+  return customer;
+}
 
 /** Saldo devedor (fiado) do cliente — mesmo contrato de
  * app/js/data/customersRepo.js#getCustomerBalance() da extensão: devolve

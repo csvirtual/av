@@ -253,7 +253,11 @@ router.post('/', async (req, res) => {
     const approval = req.body.discountApproval;
     const discountApprovalProvided = !!(approval && approval.username && approval.password);
     if (discountApprovalProvided) {
-      const admin = await verifyLogin(approval.username, approval.password);
+      // Achado de auditoria (Fase 9): namespace própria, separada do login
+      // real — sem isso, um vendedor errando a senha do admin 2x aqui
+      // (aprovação de desconto) bloqueava o LOGIN DE VERDADE daquele
+      // admin por 60s, repetível à vontade (ver lib/loginLockout.js).
+      const admin = await verifyLogin(approval.username, approval.password, { namespace: 'confirmPassword' });
       if (admin && admin.role === 'admin') approvedAdminId = admin.id;
     }
     const sale = commitSale({
