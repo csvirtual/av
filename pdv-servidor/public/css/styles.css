@@ -282,6 +282,16 @@ a { color: var(--primary); }
   gap: 8px;
   flex-wrap: wrap;
 }
+/* Achado do usuário (Dados da loja, "% ao mês"/"% fixo"): um rádio/
+ * checkbox com um campo curto do lado (não um par de campos normais)
+ * precisa continuar lado a lado mesmo no celular — .form-row empilha em
+ * coluna abaixo de 640px (correto pro caso comum, ex: dois campos de
+ * texto), mas aqui o texto ficaria sozinho, torto, longe do campo que
+ * descreve. align-items:center centraliza o texto com o MEIO do campo
+ * (não com o topo), já que o campo geralmente é mais alto que uma linha
+ * de texto sozinha. */
+.radio-field-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.radio-field-row .field { margin-bottom: 0; }
 .field label {
   font-size: 13px;
   font-weight: 600;
