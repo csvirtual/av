@@ -1015,6 +1015,14 @@ tbody tr:hover { background: var(--surface-alt); }
  * empilha o resto do .toolbar em coluna cheia. Usado hoje em
  * views/products.js (categoria + status). */
 .toolbar-filters { display: flex; gap: 10px; }
+/* Achado (views/logs.js, "De"/"Até"): sem isto, o texto do <label> e o
+ * <input type="date"> ao lado ficam alinhados pela BASELINE do texto
+ * (comportamento padrão de elemento inline) — como o campo de data tem
+ * mais altura que uma linha de texto normal, o texto acaba parecendo
+ * "flutuar" acima do centro do campo em vez de centralizado com ele.
+ * inline-flex + align-items:center resolve pra qualquer <label> com
+ * texto + campo dentro do .toolbar, não só o de data. */
+.toolbar label { display: inline-flex; align-items: center; gap: 6px; }
 .toolbar input[type="search"], .toolbar input[type="text"], .toolbar input[type="date"] {
   padding: 9px 12px;
   border: 1px solid var(--control-border);
