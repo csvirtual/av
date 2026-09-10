@@ -346,13 +346,22 @@ async function renderShell(user) {
   // telas largas.
   const sidebarEl = document.getElementById('sidebar');
   const overlayEl = document.getElementById('sidebar-overlay');
-  const closeSidebar = () => { sidebarEl.classList.remove('open'); overlayEl.classList.remove('open'); };
+  const menuToggleBtn = document.getElementById('menu-toggle-btn');
+  // Achado (celular): o botão de abrir o menu (position:fixed, mesmo
+  // canto da marca do menu) continuava visível por CIMA da gaveta aberta
+  // (z-index maior que o do .sidebar, de propósito, pra ficar clicável
+  // quando a gaveta está FECHADA) — sobrepondo o texto "PDV - C&S
+  // Virtual" do cabeçalho do menu. Some enquanto a gaveta está aberta;
+  // volta a aparecer ao fechar (clique no véu ou num item do menu, ambos
+  // já chamam closeSidebar()).
+  const closeSidebar = () => { sidebarEl.classList.remove('open'); overlayEl.classList.remove('open'); menuToggleBtn.classList.remove('is-hidden'); };
   const toggleSidebar = () => {
     const opening = !sidebarEl.classList.contains('open');
     sidebarEl.classList.toggle('open', opening);
     overlayEl.classList.toggle('open', opening);
+    menuToggleBtn.classList.toggle('is-hidden', opening);
   };
-  document.getElementById('menu-toggle-btn').addEventListener('click', toggleSidebar);
+  menuToggleBtn.addEventListener('click', toggleSidebar);
   overlayEl.addEventListener('click', closeSidebar);
 
   const navGroup = document.getElementById('nav-group');
