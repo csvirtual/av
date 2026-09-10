@@ -61,7 +61,7 @@ export async function renderCompany(container, ctx) {
           <p class="text-muted" style="font-size:12.5px;margin:0 0 8px;">Desmarcado: qualquer parcelamento (2x em diante) já cobra juro.</p>
 
           <div class="form-row" style="align-items:flex-start;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin-bottom:8px;">
               <input type="radio" name="creditInterestType" id="creditInterestTypeMonthly" value="monthly" ${(ci.type ?? 'monthly') === 'monthly' ? 'checked' : ''}>
               % ao mês
             </label>
@@ -70,7 +70,7 @@ export async function renderCompany(container, ctx) {
             </div>
           </div>
           <div class="form-row" style="align-items:flex-start;margin-bottom:16px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin-bottom:8px;">
               <input type="radio" name="creditInterestType" id="creditInterestTypeFixed" value="fixed" ${ci.type === 'fixed' ? 'checked' : ''}>
               % fixo
             </label>
