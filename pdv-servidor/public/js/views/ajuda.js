@@ -46,7 +46,7 @@ const FAQ_CATEGORIES = [
         a: 'Não é um erro que trava a venda — é uma confirmação (janela amarela, não vermelha) quando o cliente selecionado tem um <strong>limite de crédito</strong> cadastrado (tópico Clientes e fiado) e essa venda faria a dívida dele passar desse limite. Clique em "Vender fiado assim mesmo" pra continuar, ou cancele pra ajustar a venda.',
       },
       {
-        q: '"Os pagamentos (...) não somam o total da venda (...)"',
+        q: '"Pagamento (...) não bate com o total da venda (...)"',
         a: 'A soma de todas as formas de pagamento adicionadas precisa bater com o total exato da venda (com até 1 centavo de tolerância pra arredondamento). Confira os valores de cada forma de pagamento na lista — sobrou ou faltou alguns centavos/reais pra fechar.',
       },
       {

@@ -68,7 +68,7 @@ export async function renderUsers(container, ctx) {
     <div class="page-header">
       <div>
         <h1>Usuários</h1>
-        <div class="desc">Vendedores com acesso ao sistema. O Administrador Geral é único e definido no cadastro inicial.</div>
+        <div class="desc">Vendedores com acesso ao sistema. O Administrador Geral é único, criado automaticamente no primeiro arranque do servidor.</div>
       </div>
       <div class="page-actions">
         <button class="btn" id="new-user-btn">+ Novo vendedor</button>
