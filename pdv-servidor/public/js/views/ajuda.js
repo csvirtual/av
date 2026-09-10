@@ -180,36 +180,15 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: '"Arquivo inválido — não parece ser um backup deste sistema"',
-        a: 'O arquivo selecionado não tem o formato esperado de um backup desta extensão — confira se escolheu o arquivo certo (a extensão gerada é sempre a mesma, baixada pela própria tela Backup).',
+        a: 'O arquivo selecionado não tem o formato esperado de um backup deste sistema — confira se escolheu o arquivo certo (o arquivo gerado é sempre o mesmo, baixado pela própria tela Backup).',
       },
       {
         q: '"Não foi possível abrir o backup — senha incorreta ou arquivo corrompido"',
         a: 'O arquivo até parece um backup válido, mas não conseguiu ser decifrado com a senha digitada. Confira a senha (maiúsculas/minúsculas importam) e tente de novo — se continuar falhando com uma senha que você tem certeza que está certa, o arquivo pode estar corrompido ou incompleto (ex: download interrompido no meio).',
       },
       {
-        q: '"Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize a extensão antes de restaurar"',
-        a: 'Só acontece restaurando um backup feito numa instalação já atualizada pra uma versão mais nova do que a que está tentando abrir ele. Atualize a extensão (tópico Licença e ativação → "Verificar se há uma versão nova") e tente restaurar de novo.',
-      },
-    ],
-  },
-  {
-    label: 'Licença e ativação',
-    items: [
-      {
-        q: '"Chave em formato inválido" / "Chave inválida — assinatura não confere" / "Essa chave não corresponde ao CNPJ cadastrado nesta loja"',
-        a: 'A chave colada não é válida pra esta loja — confira se copiou o texto inteiro, sem espaço a mais no início/fim, e se é mesmo a chave que o suporte mandou pra este CNPJ específico (cada chave é amarrada a um CNPJ, não funciona em outra loja). Se o texto está certinho e o erro continua, peça uma nova chave ao suporte (veja "Como conseguir a chave", acima).',
-      },
-      {
-        q: '"Essa chave já expirou. Peça uma nova chave" / "Esse código de liberação já expirou. Peça um novo"',
-        a: 'Chaves demo e códigos de liberação de CNPJ têm prazo de validade. Se passou desse prazo antes de colar, é só pedir um novo — mesmo caminho de sempre (WhatsApp, e-mail, ou o botão "Solicitar chave" em Dados da loja).',
-      },
-      {
-        q: '"Esse código não é uma chave de ativação (é um código de outro tipo)" / "Esse código não é um código de liberação de CNPJ"',
-        a: 'Existem dois tipos de código diferentes — a <strong>chave de ativação</strong> (cola na tela de bloqueio ou em Dados da loja → Ativação) e o <strong>código de liberação de CNPJ</strong> (cola em Dados da loja → CNPJ → "Desbloquear edição"), pedidos ao suporte por motivos diferentes. Colar um no lugar do outro dá este aviso — confira com quem te mandou qual dos dois você recebeu.',
-      },
-      {
-        q: '"Informe um e-mail válido"',
-        a: 'Aparece no modal de contato por e-mail (tela de bloqueio, ou o botão "Solicitar chave" em Dados da loja) quando o campo de e-mail pra contato fica vazio ou sem o formato de um e-mail (falta o "@", por exemplo). Preencha um e-mail de verdade pra receber a resposta do suporte e tente enviar de novo.',
+        q: '"Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize o servidor antes de restaurar"',
+        a: 'Só acontece restaurando um backup gerado por uma versão do servidor mais nova do que a que está rodando agora. Atualize o servidor pra versão mais recente do código (pergunte a quem administra a instalação) e tente restaurar de novo.',
       },
     ],
   },
@@ -277,34 +256,31 @@ const TOPICS = [
       <h2>Primeiros passos</h2>
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
-      <h3>Cadastro da loja</h3>
-      <p>Na primeiríssima vez que o sistema abre, a própria tela de boas-vindas já deixa escolher a <strong>aparência</strong> (claro, escuro ou automático) antes de perguntar se é cadastro novo ou restauração de backup; escolhendo cadastro novo, o passo seguinte pede os dados da empresa (CNPJ, endereço, telefone etc.). Isso só acontece <strong>uma única vez</strong> — depois disso, o sistema nunca mais pede de novo. Começou o cadastro e lembrou que na verdade tem um backup pra restaurar? O botão <strong>"Voltar"</strong>, no rodapé do formulário de dados da loja, leva de volta pra escolha inicial — se algum campo já tiver conteúdo digitado, confirma antes de descartar.</p>
-      <p>Alguns campos se formatam sozinhos enquanto você digita e só aceitam o formato certo: <strong>CNPJ</strong> ("xx.xxx.xxx/xxxx-xx", com dígito verificador conferido de verdade, igual a Receita faz), <strong>telefone</strong> — celular vira "(xx) x xxxx-xxxx", fixo vira "(xx) xxxx-xxxx" —, e <strong>CEP</strong> ("xxxxx-xxx"). O mesmo vale pro <strong>e-mail</strong>, se preenchido. Esses campos aparecem de novo em Clientes, Fornecedores e Dados da loja (edição) — sempre com a mesma formatação e validação.</p>
+      <h3>Ligando o sistema pela primeira vez</h3>
+      <p>Este é o servidor multi-terminal: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Na primeiríssima vez, o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> — usuário <code>admin</code>, senha <code>admin123</code> — pronto pra logar direto, sem nenhum assistente de cadastro de empresa (CNPJ, endereço) pra preencher antes.</p>
+      <div class="tip"><strong>Primeira coisa a fazer:</strong> loga com <code>admin</code>/<code>admin123</code> e troca essa senha (tela <strong>Usuários</strong>) — ela é a mesma em toda instalação nova, então só continua segura enquanto ninguém de fora souber que você não trocou.</div>
 
       <h3>O Administrador Geral</h3>
-      <p>Logo depois de cadastrar a loja, o sistema pede pra cadastrar o primeiro usuário — e esse primeiro usuário é <strong>sempre</strong> o Administrador Geral. Ele é quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
+      <p>É esse primeiro usuário criado sozinho pelo sistema — quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
 
       <h3>Entrando todo dia (Login)</h3>
-      <p>Depois desse cadastro inicial, o sistema sempre abre numa tela de <strong>login</strong>. Cada pessoa que trabalha na loja — administrador ou vendedor — tem seu próprio usuário e senha. Ninguém compartilha login: é assim que o sistema sabe exatamente quem fez cada venda, cada estorno, cada mudança de estoque.</p>
+      <p>O sistema sempre abre numa tela de <strong>login</strong>. Cada pessoa que trabalha na loja — administrador ou vendedor — tem seu próprio usuário e senha. Ninguém compartilha login: é assim que o sistema sabe exatamente quem fez cada venda, cada estorno, cada mudança de estoque.</p>
       <div class="tip"><strong>Errou a senha 2 vezes seguidas?</strong> O campo de senha fica bloqueado por 60 segundos (com contagem regressiva na tela) antes de liberar de novo — é uma proteção contra tentativa de adivinhar a senha de outra pessoa no teclado. Não afeta o usuário digitado nem apaga nada; é só esperar a contagem zerar.</div>
 
       <div class="tip"><strong>Dica:</strong> a sessão não fica salva pra sempre — se você fechar o navegador, na próxima vez vai pedir login de novo. Isso é proposital, pra loja não ficar logada sem querer com o computador ligado o dia todo.</div>
 
       <div class="tip"><strong>Ficou parado 30 minutos?</strong> O sistema desloga sozinho depois de meia hora sem nenhum uso (mouse, teclado etc.), voltando pro login — é uma proteção pra quem sai do balcão e esquece o sistema logado. Se tiver mais de uma aba aberta, mexer em qualquer uma delas conta como uso; só desloga de verdade quando nenhuma aba tiver atividade recente.</div>
 
-      <h3>Primeiro login de cada usuário</h3>
-      <p>Na <strong>primeiríssima vez</strong> que qualquer usuário loga — o Administrador Geral logo depois do cadastro inicial, ou um vendedor recém-cadastrado — o sistema abre direto na tela de <strong>Ajuda</strong> (esta aqui!) em vez do Painel, pra já dar uma primeira olhada em como tudo funciona. Da segunda vez que essa mesma pessoa logar em diante, cai no Painel normalmente — é coisa de uma vez só na vida de cada conta.</p>
-
       <h3>Vendedores</h3>
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
 
       <h3>Tela cheia e mais de uma aba aberta</h3>
-      <p>Clicando no ícone da extensão, o sistema abre numa <strong>aba normal</strong> do navegador, igual qualquer site. Quem preferir usar em tela cheia (sem barra de abas nem de endereço) pode ligar isso na hora: na tela de <strong>login</strong>, o botão <strong>${icon('fullscreen', { size: 14 })}</strong> no canto superior direito do card entra e sai da tela cheia nativa do navegador — o ícone troca conforme o estado, e também reconhece se você saiu apertando Esc.</p>
+      <p>Abrindo o endereço do sistema no navegador, ele carrega numa <strong>aba normal</strong>, igual qualquer site. Quem preferir usar em tela cheia (sem barra de abas nem de endereço) pode ligar isso na hora: na tela de <strong>login</strong>, o botão <strong>${icon('fullscreen', { size: 14 })}</strong> no canto superior direito do card entra e sai da tela cheia nativa do navegador — o ícone troca conforme o estado, e também reconhece se você saiu apertando Esc.</p>
       <p>O sistema roda numa aba de cada vez, de propósito — não dá pra usar em duas ao mesmo tempo. Se você tentar abrir uma segunda (ex: digitando o endereço direto numa aba nova), aparece um aviso e essa segunda fica <strong>bloqueada</strong>, mostrando só uma mensagem explicando a situação: continue usando a original.</p>
       <p>Fechou a original por engano, ou decidiu continuar na nova mesmo? Sem problema — feche a que não quer mais usar e a outra libera <strong>sozinha</strong>, em poucos segundos, sem precisar recarregar nada.</p>
 
       <h3>Aparência (claro ou escuro)</h3>
-      <p>Além da tela de configuração inicial, dá pra trocar quando quiser em <strong>Personalização</strong>, no menu lateral — escolha entre fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
+      <p>Dá pra trocar quando quiser em <strong>Personalização</strong>, no menu lateral — escolha entre fundo claro, escuro, ou automático (seguindo o tema do computador). É uma preferência de quem está usando aquele computador naquele momento — cada máquina guarda a sua.</p>
 
       <h3>Listas grandes (Estoque, Clientes, Caixa, Carreto, Compras, Financeiro)</h3>
       <p>Embaixo dessas listas tem uma barra de paginação: escolha quantos itens mostrar por vez em <strong>Mostrar</strong> (10, 25, 50, 75 ou 100 — o padrão é 10) e navegue entre as páginas com <strong>Anterior</strong>/<strong>Próxima</strong>, ou clicando direto no número de uma página. Trocar o "Mostrar" sempre volta pra primeira página.</p>
@@ -312,32 +288,6 @@ const TOPICS = [
 
       <h3>Filtros no topo das telas de lista</h3>
       <p>Assim que você escolhe qualquer valor diferente do padrão (ex: "Disponível" no lugar de "Todos os status"), aparece um <strong>x</strong> ao lado do filtro — clique nele pra voltar direto ao padrão, sem precisar abrir a lista de novo e catar a primeira opção manualmente. Vale pra todo filtro do sistema (Estoque, Financeiro, Carreto, Histórico de vendas, Log do sistema, Relatórios).</p>
-    `,
-  },
-  {
-    id: 'licenca',
-    icon: icon('key', { size: 16 }),
-    title: 'Licença e ativação',
-    html: `
-      <h2>Licença e ativação</h2>
-      <p class="help-subtitle">Como funciona o período de teste e o que fazer quando pedir ativação.</p>
-
-      <h3>Período de teste</h3>
-      <p>Ao concluir o cadastro da loja (do zero ou restaurando um backup), o sistema libera <strong>1 hora de uso</strong> sem pedir nada. Depois desse tempo, aparece uma tela pedindo uma <strong>chave de ativação</strong> antes de continuar usando.</p>
-
-      <h3>Como conseguir a chave</h3>
-      <p>Quando o teste encerra, a própria tela de bloqueio tem dois botões — <strong>WhatsApp</strong> e <strong>E-mail</strong> — que já preenchem o nome da loja e o CNPJ na mensagem sozinhos, então é só clicar, conferir e enviar. Se preferir falar direto: WhatsApp <strong>(71) 98646-1027</strong> ou e-mail <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a>, informando o CNPJ cadastrado da loja. Ela é única pra esta loja, amarrada a esse CNPJ.</p>
-
-      <h3>Onde colar a chave</h3>
-      <p>Se o teste encerrou, a própria tela de bloqueio tem um campo pra colar a chave, embaixo dos botões de contato. Se ainda estiver dentro do período de teste e já tiver recebido a chave, não precisa esperar — vá em <strong>Dados da loja → Ativação</strong>, no menu lateral, e cole lá a qualquer momento.</p>
-      <p>Não precisa esperar o teste acabar pra pedir a chave, também: o botão <strong>Solicitar chave</strong>, ao lado de "Ativar" na mesma tela de Ativação, abre o mesmo modal de contato (WhatsApp ou e-mail, já com o nome da loja e o CNPJ preenchidos) a qualquer momento — antes ele só existia na tela de bloqueio, quando o teste já tinha encerrado.</p>
-      <p>Existem dois tipos de chave: uma <strong>demo</strong>, que estende o uso por um período combinado, e uma <strong>definitiva</strong>, que não expira. Depois de ativar com a definitiva, a tela de "Ativação" mostra "Definitiva — ativada" e o assunto não aparece mais.</p>
-
-      <div class="tip"><strong>Errou o CNPJ no cadastro?</strong> Por segurança, o campo de CNPJ não pode ser editado sozinho depois de salvo (veja o aviso ao lado do campo, em Dados da loja). Se precisar corrigir, envie um e-mail para <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a> pedindo um código de liberação — ele destrava o campo uma única vez, só pra você corrigir.</div>
-
-      <h3>Verificar se há uma versão nova</h3>
-      <p>Na mesma tela <strong>Dados da loja → Ativação</strong>, ao lado do número da versão instalada, o botão <strong>Verificar atualização</strong> pede pro Chrome checar na hora se existe uma versão mais nova do sistema — sem esperar a checagem automática dele, que roda sozinha de tempos em tempos em segundo plano. Se já tiver uma versão nova baixada, aparece um aviso oferecendo aplicar na hora.</p>
-      <div class="tip"><strong>Aplicar a atualização recarrega o sistema na hora.</strong> Nada que já foi salvo é afetado (vendas, estoque, caixa, clientes etc.) — só uma venda com itens no carrinho ainda não finalizada seria perdida, então é melhor fechar o carrinho antes de atualizar.</div>
     `,
   },
   {
@@ -425,7 +375,7 @@ const TOPICS = [
 
       <h3>Desconto</h3>
       <p>Cada linha do carrinho tem um botão <strong>% desconto</strong> — dá pra descontar em percentual ou em valor fixo (reais), só naquele item. Também existe um <strong>desconto geral</strong>, logo abaixo da lista, que se aplica sobre o total inteiro da venda.</p>
-      <div class="warn-box"><strong>Atenção, vendedores:</strong> existe um limite de desconto que dá pra aplicar sozinho (configurado pelo administrador em Dados da loja → Políticas de venda). Passou do limite? Aparece uma tela pedindo pra um administrador digitar a própria senha ali mesmo, autorizando o desconto — sem precisar trocar de login. Isso não vale pra quem tem a permissão "Aplicar desconto acima do limite sem aprovação" (veja "Usuários e permissões") — pra esse vendedor específico, não existe teto nenhum, igual admin.</div>
+      <div class="warn-box"><strong>Atenção, vendedores:</strong> existe um limite de desconto que dá pra aplicar sozinho (configurado pelo administrador em Dados da loja). Passou do limite? Aparece uma tela pedindo pra um administrador digitar a própria senha ali mesmo, autorizando o desconto — sem precisar trocar de login. Isso não vale pra quem tem a permissão "Aplicar desconto acima do limite sem aprovação" (veja "Usuários e permissões") — pra esse vendedor específico, não existe teto nenhum, igual admin.</div>
 
       <h3>Pagamento</h3>
       <p>Clique em <strong>+ Forma de pagamento</strong> quantas vezes precisar — dá pra dividir a mesma venda entre dinheiro, cartão de débito, cartão de crédito e Pix, por exemplo metade em dinheiro e metade no cartão. O botão de finalizar só libera quando a soma dos pagamentos bate exatamente com o total.</p>
@@ -495,36 +445,22 @@ const TOPICS = [
     id: 'lgpd',
     icon: icon('lock', { size: 16 }),
     title: 'Privacidade e LGPD',
-    // Único tópico com conteúdo dinâmico — puxa o nome da loja e do
-    // encarregado direto do cadastro (ver views/company.js), pra não
-    // obrigar copiar/colar manualmente esses dados no aviso de privacidade
-    // pronto. Os outros tópicos são texto fixo; ver renderTopic() mais
-    // abaixo pra como isso é tratado nos dois casos.
-    html: (company) => {
-      const nomeLoja = company?.nomeFantasia || '[nome da loja]';
-      const encNome = company?.encarregadoLgpd?.nome;
-      const encContato = company?.encarregadoLgpd?.contato;
-      const linhaEncarregado = encNome
-        ? `Responsável pelos seus dados nesta loja: ${encNome}${encContato ? ` — ${encContato}` : ''}.`
-        : '[Se quiser, informe aqui quem é o responsável por dúvidas de privacidade — preencha em Dados da loja → Privacidade e LGPD.]';
-      return `
+    html: `
       <h2>Privacidade e LGPD</h2>
-      <p class="help-subtitle">O sistema é 100% local, mas isso não tira a responsabilidade da loja sobre os dados dos clientes.</p>
+      <p class="help-subtitle">Os dados ficam só no servidor da loja, mas isso não tira a responsabilidade da loja sobre os dados dos clientes.</p>
 
       <h3>Quem é o responsável pelos dados</h3>
-      <p>A Lei Geral de Proteção de Dados (LGPD) se aplica sempre que dado pessoal é tratado — nome, telefone, endereço, histórico de fiado — <strong>mesmo guardado só localmente</strong>, sem sair do computador. Pela lei, quem decide coletar e usar esse dado é o <strong>"controlador"</strong> — e esse é <strong>o dono da loja</strong>, não o sistema em si. O sistema é só a ferramenta; a responsabilidade de informar os clientes e atender pedidos deles sobre os próprios dados é da loja.</p>
+      <p>A Lei Geral de Proteção de Dados (LGPD) se aplica sempre que dado pessoal é tratado — nome, telefone, endereço, histórico de fiado — <strong>mesmo guardado só no servidor da loja</strong>, sem sair da rede interna. Pela lei, quem decide coletar e usar esse dado é o <strong>"controlador"</strong> — e esse é <strong>o dono da loja</strong>, não o sistema em si. O sistema é só a ferramenta; a responsabilidade de informar os clientes e atender pedidos deles sobre os próprios dados é da loja.</p>
 
-      <div class="tip"><strong>O que o sistema já ajuda:</strong> tudo fica só neste computador (nada sobe pra nuvem nem é compartilhado com ninguém), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
+      <div class="tip"><strong>O que o sistema já ajuda:</strong> tudo fica só no servidor da loja (nada sobe pra nuvem nem é compartilhado com ninguém), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
 
       <h3>Aviso de privacidade pronto pra usar</h3>
-      <p>Texto pra afixar no balcão ou entregar ao cliente — pode copiar, adaptar e imprimir como quiser:</p>
-      <div class="template-box">AVISO DE PRIVACIDADE — ${escapeHtml(nomeLoja)}
+      <p>Texto pra afixar no balcão ou entregar ao cliente — pode copiar, adaptar (troque "[nome da loja]" e, se quiser, acrescente um responsável de contato) e imprimir como quiser:</p>
+      <div class="template-box">AVISO DE PRIVACIDADE — [nome da loja]
 
-Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura, apenas no computador da loja — não são enviados para a internet nem compartilhados com terceiros.
+Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura, no servidor desta loja — não são enviados para a internet nem compartilhados com terceiros.
 
-Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.
-
-${escapeHtml(linhaEncarregado)}</div>
+Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.</div>
 
       <h3>Direitos do cliente sobre os próprios dados</h3>
       <p>Pela LGPD (Art. 18), o cliente pode pedir pra <strong>ver</strong>, <strong>corrigir</strong> ou <strong>apagar</strong> os dados que a loja tem sobre ele. Na prática, no sistema:</p>
@@ -534,9 +470,8 @@ ${escapeHtml(linhaEncarregado)}</div>
       </ul>
 
       <h3>Encarregado de dados (opcional, mas recomendado)</h3>
-      <p>A LGPD prevê a figura de um <strong>encarregado</strong> — a pessoa de contato pra dúvidas sobre dados pessoais na loja (pode ser o próprio dono). Dá pra cadastrar em <strong>Dados da loja → Privacidade e LGPD</strong>; uma vez preenchido, o nome e contato aparecem automaticamente no aviso de privacidade acima.</p>
-    `;
-    },
+      <p>A LGPD prevê a figura de um <strong>encarregado</strong> — a pessoa de contato pra dúvidas sobre dados pessoais na loja (pode ser o próprio dono). Esta versão ainda não tem um campo próprio pra cadastrar isso — acrescente o nome/contato dele na cópia impressa do aviso acima, se quiser deixar isso claro pros clientes.</p>
+    `,
   },
   {
     id: 'carreto',
@@ -585,7 +520,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <p>Vá em <strong>Histórico de vendas</strong>, clique em "Ver itens" na venda em questão, e depois em <strong>Estornar itens</strong>. Escolha a quantidade de cada item que está sendo devolvida e escreva o motivo (obrigatório) — pode ser um item só ou a venda inteira.</p>
       <p>O estorno devolve a quantidade pro estoque automaticamente e fica registrado no histórico daquele produto e no log de auditoria.</p>
 
-      <div class="warn-box"><strong>Se a venda teve juro no parcelamento do cartão</strong> (veja "Juro no parcelamento" no tópico Vendas): o estorno devolve só o valor dos <em>produtos</em> — o juro já cobrado na maquininha não é reduzido nem rateado automaticamente, estorno total ou parcial. Isso é porque a extensão não tem nenhuma conexão com a maquininha nem com a operadora do cartão pra saber quanto de juro ela devolveria. Se a loja decidir devolver o juro também, é um acerto manual, fora do sistema.</div>
+      <div class="warn-box"><strong>Se a venda teve juro no parcelamento do cartão</strong> (veja "Juro no parcelamento" no tópico Vendas): o estorno devolve só o valor dos <em>produtos</em> — o juro já cobrado na maquininha não é reduzido nem rateado automaticamente, estorno total ou parcial. Isso é porque o sistema não tem nenhuma conexão com a maquininha nem com a operadora do cartão pra saber quanto de juro ela devolveria. Se a loja decidir devolver o juro também, é um acerto manual, fora do sistema.</div>
 
       <h3>Venda paga em fiado</h3>
       <p>Se a venda estornada tinha sido paga (total ou parcialmente) em <strong>Fiado</strong>, a dívida do cliente é reduzida automaticamente na mesma proporção do que foi devolvido — devolver metade dos produtos reduz metade do valor que aquela venda tinha gerado de dívida, não o valor cheio. Isso aparece no extrato do cliente (tela Clientes) como um lançamento <span class="badge badge-gold">Estorno</span>, separado dos pagamentos recebidos — não conta como dinheiro que entrou no caixa.</p>
@@ -633,7 +568,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <p>Assim que a senha é aceita, o sistema já <strong>gera e baixa sozinho um backup completo e atualizado</strong> de tudo (a mesma senha digitada criptografa o arquivo, sem pedir uma segunda) — uma segurança extra de fim de turno, sem precisar lembrar de ir na tela <strong>Backup</strong> fazer isso à parte. Se por algum motivo o backup não puder ser gerado, o caixa fecha normalmente do mesmo jeito — só aparece um aviso pra gerar um backup manual depois.</p>
 
       <h3>Caixa obrigatório (opcional, configurável)</h3>
-      <p>O administrador pode ligar, em <strong>Dados da loja → Políticas de venda</strong>, a opção "Exigir caixa aberto para registrar vendas". Ligada essa opção, ninguém consegue finalizar uma venda sem abrir o caixa primeiro.</p>
+      <p>O administrador pode ligar, em <strong>Dados da loja</strong>, a opção "Exigir caixa aberto pra vender". Ligada essa opção, ninguém consegue finalizar uma venda sem abrir o caixa primeiro.</p>
       <p>Com a política ligada, abrir o caixa mostra um aviso avisando que vai redirecionar pro PDV em alguns segundos, com contagem regressiva — o próximo lugar pra onde todo mundo vai de qualquer jeito. Quem não quer esperar clica em <strong>Ir agora</strong>; quem só abriu o caixa pra conferir o troco inicial antes de vender clica em <strong>Ficar aqui</strong> (ou aperta Esc, ou clica fora do aviso) pra cancelar o redirecionamento e continuar na tela de Caixa.</p>
 
       <div class="tip"><strong>Fiado não conta como dinheiro no caixa</strong> — uma venda fiada não entra na conferência, porque é uma promessa de pagamento, não dinheiro na gaveta. Só quando o cliente vem pagar o fiado (veja o tópico "Clientes e fiado") é que o valor entra no caixa, na hora do pagamento.</div>
@@ -753,7 +688,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <p>Quer guardar ou enviar o relatório? Clique em <strong>${icon('printer', { size: 14 })} Exportar PDF</strong>, ao lado do seletor de período — abre o diálogo de impressão do navegador, já formatado pra folha (A4/Carta), com todas as tabelas do período escolhido. Escolha "Salvar como PDF" no próprio diálogo, ou uma impressora de verdade se preferir uma cópia em papel.</p>
 
       <h3>Programa de fidelidade</h3>
-      <p>Fica desligado por padrão. Pra ativar, vá em <strong>Dados da loja → Políticas de venda → Fidelidade</strong> e defina quantos pontos o cliente ganha por real gasto. A partir daí, toda venda com cliente selecionado já soma pontos sozinha — não precisa de nenhuma ação extra na hora de vender.</p>
+      <p>Fica desligado por padrão (0 pontos por real). Quantos pontos o cliente ganha por real gasto ainda não tem uma tela própria pra ajustar nesta versão — peça pra quem administra o servidor configurar direto. Uma vez ligado, toda venda com cliente selecionado já soma pontos sozinha — não precisa de nenhuma ação extra na hora de vender.</p>
       <p>Pra usar os pontos, vá no <strong>extrato do cliente</strong> (tela Clientes) e clique em <strong>Resgatar pontos</strong>. Eles viram um crédito de troca, disponível como forma de pagamento na próxima venda — o mesmo mecanismo já usado pelas trocas (veja o tópico "Estorno e troca").</p>
     `,
   },
@@ -787,7 +722,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <h2>Backup e restauração</h2>
       <p class="help-subtitle">Como proteger os dados da loja contra perda — exige a permissão "Acessar Backup".</p>
 
-      <p>Todos os dados do sistema (estoque, vendas, clientes, financeiro, usuários...) ficam salvos só no computador onde a extensão está instalada. Se esse computador quebrar, for formatado, ou o Chrome for reinstalado, esses dados <strong>não têm como ser recuperados</strong> a não ser que exista um backup feito antes.</p>
+      <p>Todos os dados do sistema (estoque, vendas, clientes, financeiro, usuários...) ficam salvos só no computador que roda o servidor — todo terminal que acessa pelo navegador só está lendo/escrevendo remotamente, nada fica salvo nos outros computadores. Se esse computador (o servidor) quebrar, for formatado, ou tiver o disco corrompido, esses dados <strong>não têm como ser recuperados</strong> a não ser que exista um backup feito antes.</p>
 
       <div class="tip"><strong>Também existe um backup automático:</strong> toda vez que o caixa é fechado, o sistema já gera e baixa sozinho um backup completo, sem precisar vir nesta tela — veja "Confirmação por senha e backup automático" no tópico Caixa. Isso não substitui fazer backup manual com regularidade (nem todo mundo fecha caixa todo dia), só é uma rede de segurança a mais.</div>
 
@@ -800,9 +735,8 @@ ${escapeHtml(linhaEncarregado)}</div>
       <div class="warn-box"><strong>Atenção:</strong> restaurar um backup <strong>apaga todos os dados atuais</strong> e substitui pelos dados do arquivo — não tem como desfazer.</div>
       <p>Depois de restaurar, o sistema desloga automaticamente — faça login de novo com um usuário que exista no backup restaurado.</p>
 
-      <h3>Restaurar numa instalação nova</h3>
-      <p>Numa extensão recém-instalada (sem loja cadastrada ainda), a primeira tela já pergunta: <strong>"Cadastrar do zero"</strong> ou <strong>"Já tenho um backup"</strong>. Escolhendo a segunda opção, você seleciona o arquivo e digita a senha ali mesmo — o sistema pula o cadastro inteiro (empresa e administrador não precisam ser digitados de novo, já vêm do backup) e vai direto pro login.</p>
-      <p>Errar a senha nessa tela não bloqueia nada: mostra o erro e deixa tentar de novo quantas vezes precisar, e a opção "Cadastrar do zero" continua sempre disponível, clicando em "Voltar".</p>
+      <h3>Restaurar num servidor novo</h3>
+      <p>Um servidor recém-instalado já sobe com o Administrador Geral pronto (<code>admin</code>/<code>admin123</code>, ver "Ligando o sistema pela primeira vez" no tópico Primeiros passos) — não tem assistente nenhum perguntando "cadastrar do zero ou restaurar backup". Pra trazer os dados de uma loja já existente, é só logar com esse usuário padrão e restaurar o backup normalmente pela tela <strong>Backup</strong>, como em qualquer restauração — os usuários e a política de venda do arquivo substituem os daqui, então o login de quem administrava antes volta a funcionar depois de restaurar.</p>
 
       <h3>Zerar dados e reiniciar a operação</h3>
       <p>Feito pra depois de um período de teste ou de transição vindo de outro sistema de PDV: na tela <strong>Backup</strong>, a seção <strong>"Zerar dados e reiniciar a operação"</strong> apaga vendas, caixa, financeiro, fiado (o saldo de cada cliente volta a zero), carretos, compras, fidelidade e o log de auditoria — mas <strong>mantém intactos</strong> o estoque (produtos e a quantidade atual de cada um), os dados da loja, os usuários, os fornecedores e os clientes. Não precisa refazer nenhum cadastro pra começar a operar de verdade.</p>
@@ -810,7 +744,7 @@ ${escapeHtml(linhaEncarregado)}</div>
       <div class="warn-box"><strong>Atenção:</strong> assim como restaurar um backup, zerar os dados <strong>não pode ser desfeito</strong> — o backup automático gerado antes é a única forma de voltar atrás, se precisar.</div>
 
       <h3>Backup é manual, de propósito</h3>
-      <p>O sistema não faz backup sozinho, automaticamente, em segundo plano. Isso é intencional: rodar backup automático sem ninguém abrir o sistema exigiria pedir permissões novas ao Chrome (pra salvar arquivo e "acordar" a extensão em horário fixo) — e esse sistema é feito pra pedir o mínimo possível. Faça backup manualmente com a frequência que fizer sentido pra sua loja (ex: toda semana).</p>
+      <p>O sistema não faz backup sozinho, automaticamente, em segundo plano (fora do gerado ao fechar o caixa, que já cobre o fim de cada turno). Faça backup manualmente com a frequência que fizer sentido pra sua loja (ex: toda semana).</p>
     `,
   },
   {
@@ -820,7 +754,7 @@ ${escapeHtml(linhaEncarregado)}</div>
     html: `
       <h2>Perguntas frequentes (F.A.Q)</h2>
       <p class="help-subtitle">Todo aviso vermelho (ou amarelo) previsto no sistema, tela por tela — o que cada um significa e o que fazer.</p>
-      <p>Tudo abaixo é o sistema travando algo de propósito, antes de gravar um dado errado — nunca aparece sozinho por acaso. Se algo <strong>diferente</strong> do que está listado aqui aparecer, aí sim vale anotar o texto exato e chamar o suporte (veja o tópico "Licença e ativação" pros contatos).</p>
+      <p>Tudo abaixo é o sistema travando algo de propósito, antes de gravar um dado errado — nunca aparece sozinho por acaso. Se algo <strong>diferente</strong> do que está listado aqui aparecer, aí sim vale anotar o texto exato e chamar quem administra o sistema.</p>
 
       ${renderFaqAccordion()}
     `,
@@ -837,26 +771,20 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ');
 }
 
-/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 34
+/** Índice de busca da Ajuda — achado do usuário: com 14 tópicos e 34
  * perguntas de F.A.Q, navegar só pelo menu lateral demorava demais pra
  * achar algo específico. `searchText` cobre título/pergunta E o corpo da
  * resposta/tópico inteiro (sem tags) — uma palavra que só aparece dentro
  * do texto corrido (ex: "gaveta", que só existe na resposta sobre abertura
  * de caixa, não na pergunta em si) agora encontra o resultado do mesmo
  * jeito; `label` continua sendo só o título/pergunta, usado pra EXIBIR o
- * resultado (ver renderTopic/runSearch mais abaixo). O único tópico com
- * `html` como função (LGPD, precisa dos dados da loja pra render de
- * verdade) é indexado chamando a função com um objeto vazio — os campos
- * opcionais (`company?.nomeFantasia` etc.) já têm fallback, então isso não
- * quebra, só indexa o texto com os placeholders genéricos no lugar dos
- * dados reais da loja (irrelevante pra busca, ninguém pesquisa por
- * "[nome da loja]"). `faqIndex` é a posição (0-based, na ordem em que
- * renderFaqAccordion() gera os itens) usada pra abrir a pergunta certa
- * depois de trocar pro tópico F.A.Q — ver openFaqItem(). */
-const SEARCH_INDEX = TOPICS.map((t) => {
-  const bodyHtml = typeof t.html === 'function' ? t.html({}) : t.html;
-  return { type: 'topic', topicId: t.id, label: t.title, searchText: `${t.title} ${stripHtml(bodyHtml)}`.toLowerCase() };
-});
+ * resultado (ver renderTopic/runSearch mais abaixo). `faqIndex` é a
+ * posição (0-based, na ordem em que renderFaqAccordion() gera os itens)
+ * usada pra abrir a pergunta certa depois de trocar pro tópico F.A.Q — ver
+ * openFaqItem(). */
+const SEARCH_INDEX = TOPICS.map((t) => (
+  { type: 'topic', topicId: t.id, label: t.title, searchText: `${t.title} ${stripHtml(t.html)}`.toLowerCase() }
+));
 {
   let faqIndex = 0;
   for (const cat of FAQ_CATEGORIES) {
@@ -887,7 +815,7 @@ function highlightMatch(text, words) {
   return text;
 }
 
-export async function renderAjuda(container, ctx) {
+export async function renderAjuda(container) {
   let activeId = TOPICS[0].id;
 
   container.innerHTML = `
@@ -923,12 +851,9 @@ export async function renderAjuda(container, ctx) {
   function renderTopic(id) {
     activeId = id;
     const topic = TOPICS.find((t) => t.id === id);
-    // Só o tópico de LGPD tem `html` como função (precisa dos dados da
-    // loja pra preencher o aviso de privacidade) — os demais são string
-    // fixa, ver comentário junto do tópico 'lgpd' acima.
-    contentBox.innerHTML = typeof topic.html === 'function' ? topic.html(ctx.company) : topic.html;
+    contentBox.innerHTML = topic.html;
     // Só o tópico F.A.Q tem os botões de acordeão — a busca por
-    // '.faq-question' não encontra nada (e não faz nada) nos outros 14.
+    // '.faq-question' não encontra nada (e não faz nada) nos outros 13.
     wireFaqAccordion(contentBox);
     topicsNav.querySelectorAll('.help-topic-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.topic === id);

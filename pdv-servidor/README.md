@@ -1430,3 +1430,31 @@ lacunas de uso descobertas na prática.
   `.toolbar-filters` (CSS específico, mesma especificidade, declarado
   depois — vence a regra genérica) — voltam a ficar lado a lado,
   dividindo a largura da linha.
+
+- **"De"/"Até" desalinhado do campo de data** (Log do sistema,
+  Relatórios) — o texto do `<label>` e o `<input type="date">` ao lado
+  ficavam alinhados pela baseline do texto (padrão de elemento
+  inline); como o campo de data tem mais altura que uma linha de
+  texto normal, o texto parecia flutuar acima do centro dele.
+  `.toolbar label` virou `inline-flex` com `align-items:center`.
+
+- **Ajuda/F.A.Q com conteúdo da extensão que não existe aqui** —
+  `views/ajuda.js` foi portada verbatim (mesmo princípio do resto da
+  Fase 9), mas a extensão original tem um sistema de licenciamento
+  comercial (chave de ativação, trial/demo, CNPJ, assistente de
+  cadastro inicial) que este servidor não tem — aqui o acesso é só
+  usuário/senha, sem nada disso. Removido o tópico inteiro "Licença e
+  ativação" (e a categoria de F.A.Q correspondente), reescrito
+  "Primeiros passos" pra descrever como o servidor sobe de verdade
+  (`node server.js` cria o admin sozinho, sem assistente), e corrigidas
+  outras ~10 referências espalhadas (CNPJ, "Dados da loja → Ativação",
+  o tópico de LGPD que puxava campos que não existem no servidor —
+  `nomeFantasia`/`encarregadoLgpd`, nunca preenchidos —, e várias
+  menções a "a extensão"/"o Chrome" onde a explicação técnica não se
+  aplica a um servidor Node, incluindo uma factualmente errada sobre
+  onde os dados ficam salvos). Achado no caminho, ainda em aberto: a
+  Ajuda promete configurar pontos de fidelidade em "Dados da loja",
+  mas essa tela ainda não tem esse campo (só a API, `PUT
+  /api/loyalty/config`) — texto ajustado pra não apontar um caminho
+  que não existe, telinha em si fica pra outra hora. Suíte oficial
+  (`test-personalizacao-ajuda.cjs`, 16 asserções) continua verde.
