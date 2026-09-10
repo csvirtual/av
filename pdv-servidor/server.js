@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 
 import { db } from './db/index.js';
+import { ensureAdminUser } from './lib/seedAdmin.js';
 import { resolveSession, sweepExpiredSessions } from './lib/session.js';
 import { registerClient } from './lib/broadcast.js';
 import authRoutes from './routes/auth.js';
@@ -155,6 +156,13 @@ wss.on('connection', (ws) => registerClient(ws));
 // cresce (cada login novo insere, nada nunca removia sozinho antes de
 // existir isto).
 setInterval(sweepExpiredSessions, 30 * 60 * 1000);
+
+// Garante que o usuário admin exista antes de aceitar qualquer conexão —
+// idempotente (não faz nada se já existir), então é seguro rodar em TODO
+// arranque, mesmo numa hospedagem gerenciada (tipo GoDaddy) onde não dá
+// pra rodar `node seed.js` à parte do comando de start configurado no
+// painel.
+await ensureAdminUser();
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   const nets = os.networkInterfaces();
