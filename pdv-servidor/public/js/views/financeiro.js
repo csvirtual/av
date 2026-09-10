@@ -41,19 +41,21 @@ export async function renderFinanceiro(container, ctx) {
     </div>
     <div id="summary-box"></div>
     <div class="toolbar">
-      <select id="type-filter">
-        <option value="">Pagar e receber</option>
-        <option value="pagar">A pagar</option>
-        <option value="receber">A receber</option>
-      </select>
-      <select id="status-filter">
-        <option value="">Todos os status</option>
-        <option value="pendente">Pendente</option>
-        <option value="vencido">Vencido</option>
-        <option value="parcial">Pago parcialmente</option>
-        <option value="pago">Pago</option>
-        <option value="cancelado">Cancelado</option>
-      </select>
+      <div class="toolbar-filters">
+        <select id="type-filter">
+          <option value="">Pagar e receber</option>
+          <option value="pagar">A pagar</option>
+          <option value="receber">A receber</option>
+        </select>
+        <select id="status-filter">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="vencido">Vencido</option>
+          <option value="parcial">Pago parcialmente</option>
+          <option value="pago">Pago</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
     </div>
     <div id="entries-table"></div>
   `;

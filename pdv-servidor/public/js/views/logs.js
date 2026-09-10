@@ -22,15 +22,17 @@ export async function renderLogs(container) {
       </div>
     </div>
     <div class="toolbar">
-      <select id="role-filter">
-        <option value="">Todos os perfis</option>
-        <option value="admin">Administrador</option>
-        <option value="vendedor">Vendedor</option>
-      </select>
-      <select id="user-filter">
-        <option value="">Todos os usuários</option>
-        ${users.map((u) => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join('')}
-      </select>
+      <div class="toolbar-filters">
+        <select id="role-filter">
+          <option value="">Todos os perfis</option>
+          <option value="admin">Administrador</option>
+          <option value="vendedor">Vendedor</option>
+        </select>
+        <select id="user-filter">
+          <option value="">Todos os usuários</option>
+          ${users.map((u) => `<option value="${u.id}">${escapeHtml(u.nome)}</option>`).join('')}
+        </select>
+      </div>
       <input type="search" id="term-filter" placeholder="Buscar na ação/detalhes…">
       <label class="text-muted" style="font-size:13px;">De <input type="date" id="date-from"></label>
       <label class="text-muted" style="font-size:13px;">Até <input type="date" id="date-to"></label>
