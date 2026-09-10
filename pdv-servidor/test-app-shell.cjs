@@ -1,5 +1,6 @@
 // Prova o app.js completo (Fase 9, último passo do roteiro): menu lateral
-// com as 15 rotas gated por permissão, timeout de inatividade (30min),
+// com as rotas gated por permissão (16 desde que "empresa"/Dados da loja
+// ganhou tela), timeout de inatividade (30min),
 // trava de aba única (por terminal) e o achado de segurança no caminho —
 // uma conta desativada continuava com sessão válida no servidor até o
 // cookie expirar sozinho (12h), corrigido no middleware global
@@ -41,10 +42,10 @@ async function apiCall(page, path, opts = {}) {
 
   await login(page, 'admin', 'admin123');
 
-  // ---------- Sidebar: admin vê as 15 rotas ----------
+  // ---------- Sidebar: admin vê as 16 rotas (15 originais + "empresa", telas/company.js) ----------
   const adminLinks = await page.locator('.nav-link').evaluateAll((els) => els.map((e) => e.dataset.route));
-  const expectedRoutes = ['dashboard', 'estoque', 'venda', 'vendas', 'caixa', 'clientes', 'carreto', 'compras', 'financeiro', 'relatorios', 'usuarios', 'logs', 'backup', 'personalizacao', 'ajuda'];
-  check('Admin vê as 15 rotas no menu lateral', expectedRoutes.every((r) => adminLinks.includes(r)) && adminLinks.length === 15, adminLinks.join(','));
+  const expectedRoutes = ['dashboard', 'estoque', 'venda', 'vendas', 'caixa', 'clientes', 'carreto', 'compras', 'financeiro', 'relatorios', 'usuarios', 'logs', 'backup', 'empresa', 'personalizacao', 'ajuda'];
+  check('Admin vê as 16 rotas no menu lateral', expectedRoutes.every((r) => adminLinks.includes(r)) && adminLinks.length === 16, adminLinks.join(','));
 
   // ---------- Vendedor sem NENHUMA permissão: só vê as rotas sem gate ----------
   const vendorRes = await apiCall(page, '/api/users', {

@@ -1371,3 +1371,62 @@ fechado com rede de segurança em duas camadas (por rota + global); a
 processo), documentada acima com uma recomendação concreta, e não
 bloqueia ligar o sistema — só reduz o tempo de recuperação de uma
 queda rara até "alguém reiniciar na mão" em vez de "automático".
+
+## Achados de uso real, pós-lançamento (10/set)
+
+Depois do GO, com a loja usando de verdade em celular e desktop: um
+achado de funcionalidade faltando e uma leva de achados de UI só
+visíveis em tela de celular — nenhum dos dois passa pela auditoria
+acima porque não são bugs de segurança/corretude/disponibilidade, são
+lacunas de uso descobertas na prática.
+
+- **Tela "Dados da loja" (política de venda) não existia** — um
+  usuário tentando editar o juro do parcelamento no cartão não achava
+  onde. `routes/company.js` já existia desde a Fase 8 (leitura pra
+  `sale.js`, escrita já testada só por API em `test-security.cjs`), só
+  faltava a TELA pra editar sem chamar a API na unha. `views/company.js`
+  da extensão mistura essa política com cadastro da loja (cnpj,
+  endereço) e ATIVAÇÃO DE LICENÇA (trial/demo, chave) — conceito que o
+  servidor multi-terminal não tem (ver decisão de arquitetura no topo
+  deste README). Extraída só a parte de política (desconto máximo do
+  vendedor, exigir caixa aberto, juro do cartão), nova
+  `public/js/views/company.js`, enxuta, sem nada de licenciamento — o
+  resto (cadastro/licença) continua de propósito sem tela nenhuma,
+  fora de escopo. Testado fim a fim em `test-company.cjs` (14
+  asserções): edita e salva, servidor grava de verdade (não só a
+  tela), sobrevive a um F5, e o juro configurado passa a valer na hora
+  em cima de uma venda real (3x a 5,5%/mês = 16,5% cobrado certinho).
+  Mesmo padrão de gate já testado em relatorios/logs/financeiro/backup:
+  o menu esconde o link de quem não tem a permissão `empresa`, mas um
+  link direto ainda renderiza a tela — o gate de verdade é sempre o
+  servidor (403 amigável, tela não trava).
+
+- **Menu lateral (celular) — três achados de UI, mesma tela `.sidebar`
+  gaveta (breakpoint 900px)**:
+  1. O botão de abrir o menu (`position:fixed`, mesmo canto do
+     cabeçalho do menu) continuava visível por CIMA da própria gaveta
+     depois de aberta — sobrepondo o texto "PDV - C&S Virtual".
+     Corrigido: some enquanto a gaveta está aberta.
+  2. O rodapé do menu (nome do usuário + "Sair") usava `100vh` pra
+     travar a altura da gaveta — no Chrome/Safari mobile isso mede com
+     a barra de endereço/gestos recolhida, maior que o espaço
+     realmente visível, cortando o rodapé quase embaixo da barra de
+     gestos do aparelho. Trocado pra `100dvh` (acompanha a barra),
+     `100vh` mantido como fallback.
+  3. O mesmo botão de abrir o menu também ficava por cima do CONTEÚDO
+     da página ao rolar pra baixo (ele é fixo na tela, a página rola
+     por baixo dele) — sobrepondo, por exemplo, o botão "Nova venda"
+     do Painel. Corrigido: some também quando a página sai do topo
+     (`window.scrollY > 4`), some com a gaveta aberta OU com scroll —
+     as duas condições somadas num único `updateMenuToggleVisibility()`.
+
+- **Filtros duplos empilhados em tela de celular** — Estoque
+  (categoria + status), Financeiro (tipo + status) e Log do sistema
+  (perfil + usuário) são as três únicas telas com 2 `<select>` soltos
+  dentro do `.toolbar`; a regra mobile (640px) que empilha o
+  `.toolbar` inteiro em coluna cheia também dava `width:100%` pra
+  QUALQUER `.custom-select` solto ali — cada filtro ia pra sua própria
+  linha, desperdiçando tela. Agrupados os pares dentro de um novo
+  `.toolbar-filters` (CSS específico, mesma especificidade, declarado
+  depois — vence a regra genérica) — voltam a ficar lado a lado,
+  dividindo a largura da linha.

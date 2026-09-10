@@ -1,10 +1,13 @@
-// Dados/políticas da loja — versão multi-terminal. Escopo desta primeira
-// fatia: só `getCompany`, o que views/sale.js lê (`company.policies.X`
-// pro limite de desconto e juro de parcelamento). `saveCompany`/
-// `isCompanyRegistered` (usados por uma futura views/company.js e pelo
-// assistente de instalação portados) ficam pra quando essa tela for a
-// vez — o servidor ainda nem tem um fluxo de cadastro inicial da loja
-// (cnpj, endereço etc.), só a política de venda em si.
+// Dados/políticas da loja — versão multi-terminal. `getCompany`/
+// `saveCompany` cobrem a política de venda (desconto máximo do vendedor,
+// exigir caixa aberto, juro do parcelamento no cartão) — o que
+// views/company.js (nova, enxuta) edita e views/sale.js lê
+// (`company.policies.X`). `isCompanyRegistered`/cadastro inicial (cnpj,
+// endereço, ATIVAÇÃO DE LICENÇA) ficam de fora de propósito: o servidor
+// não tem esse conceito (sem trial/demo bloqueando o uso, ver
+// README) — a extensão original mistura isso tudo numa `views/company.js`
+// só; aqui a tela nova extrai SÓ a política de venda, que é a parte sem
+// nenhuma relação com licenciamento comercial.
 import { api } from './apiClient.js';
 
 /** Devolve `{ policies: { vendorMaxDiscountPercent, requireOpenCashSession,
@@ -14,5 +17,17 @@ import { api } from './apiClient.js';
  * soltos na raiz da resposta (ver routes/company.js). */
 export async function getCompany() {
   const policies = await api('/api/company');
+  return { policies };
+}
+
+/** Grava um PATCH das políticas — só os campos presentes no objeto são
+ * alterados (ver routes/company.js#PUT, que ecoa esse mesmo raciocínio de
+ * patch parcial). Exige a permissão 'empresa' no servidor; sem ela, a
+ * chamada rejeita com a mensagem amigável já pronta (ver api(), que
+ * lança Error com `body.error`) — a tela mostra isso direto, sem
+ * precisar checar a permissão aqui antes de propósito (mesmo padrão já
+ * estabelecido em financeiro.js/backup.js: nunca confiar só na tela). */
+export async function saveCompany(patch) {
+  const policies = await api('/api/company', { method: 'PUT', body: JSON.stringify(patch) });
   return { policies };
 }

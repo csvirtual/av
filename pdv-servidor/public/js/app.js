@@ -29,6 +29,7 @@ import { renderRelatorios } from './views/relatorios.js';
 import { renderPersonalizacao } from './views/personalizacao.js';
 import { renderAjuda } from './views/ajuda.js';
 import { renderBackup } from './views/backup.js';
+import { renderCompany } from './views/company.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 import { getCompany } from './data/companyRepo.js';
@@ -80,6 +81,7 @@ const ROUTES = {
   usuarios: { label: 'Usuários', icon: icon('users'), permission: 'usuarios', render: renderUsers },
   logs: { label: 'Log do sistema', icon: icon('clipboard'), permission: 'logs', render: renderLogs },
   backup: { label: 'Backup', icon: icon('save'), permission: 'backup', render: renderBackup },
+  empresa: { label: 'Dados da loja', icon: icon('store'), permission: 'empresa', render: renderCompany },
   personalizacao: { label: 'Personalização', icon: icon('palette'), render: renderPersonalizacao },
   ajuda: { label: 'Ajuda', icon: icon('question'), render: renderAjuda },
 };
@@ -287,6 +289,10 @@ let stopIdleWatch = null;
 // menu (ver dentro de renderShell): preso a `window`, que nunca é
 // recriado como os elementos do shell são.
 let stopNavScrollWatch = null;
+// Mesmo motivo de novo, pro listener de scroll que esconde o botão de
+// abrir o menu quando a página não está mais no topo (ver
+// updateMenuToggleVisibility dentro de renderShell).
+let stopMenuScrollWatch = null;
 // Função de limpeza (opcional) que a TELA ATUAL devolveu — ver
 // renderCurrentRoute(). `null` quando a tela atual não precisa de nenhuma
 // limpeza (a maioria não precisa: trocar innerHTML já solta os listeners
@@ -310,6 +316,7 @@ let unmountCurrentRoute = null;
 async function renderShell(user) {
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
   if (stopNavScrollWatch) { stopNavScrollWatch(); stopNavScrollWatch = null; }
+  if (stopMenuScrollWatch) { stopMenuScrollWatch(); stopMenuScrollWatch = null; }
   if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
 
   root.innerHTML = `
@@ -348,21 +355,32 @@ async function renderShell(user) {
   const overlayEl = document.getElementById('sidebar-overlay');
   const menuToggleBtn = document.getElementById('menu-toggle-btn');
   // Achado (celular): o botão de abrir o menu (position:fixed, mesmo
-  // canto da marca do menu) continuava visível por CIMA da gaveta aberta
-  // (z-index maior que o do .sidebar, de propósito, pra ficar clicável
-  // quando a gaveta está FECHADA) — sobrepondo o texto "PDV - C&S
-  // Virtual" do cabeçalho do menu. Some enquanto a gaveta está aberta;
-  // volta a aparecer ao fechar (clique no véu ou num item do menu, ambos
-  // já chamam closeSidebar()).
-  const closeSidebar = () => { sidebarEl.classList.remove('open'); overlayEl.classList.remove('open'); menuToggleBtn.classList.remove('is-hidden'); };
+  // canto da marca do menu) continuava visível por CIMA de coisa demais —
+  // por cima do próprio cabeçalho da gaveta quando ela abre (sobrepondo o
+  // texto "PDV - C&S Virtual"), e por cima do conteúdo da página ao rolar
+  // pra baixo (sobrepondo o botão "Nova venda", por exemplo — o botão é
+  // position:fixed, então fica parado enquanto a página rola por baixo
+  // dele). Junta as duas condições aqui: só fica visível na gaveta
+  // FECHADA e com a página no TOPO — soma no scroll (não troca pra um
+  // ícone de fechar) de propósito, já que fechar a gaveta continua tendo
+  // dois jeitos óbvios sem o botão (tocar no véu escurecido ou num item
+  // do menu).
+  const updateMenuToggleVisibility = () => {
+    const hide = sidebarEl.classList.contains('open') || window.scrollY > 4;
+    menuToggleBtn.classList.toggle('is-hidden', hide);
+  };
+  const closeSidebar = () => { sidebarEl.classList.remove('open'); overlayEl.classList.remove('open'); updateMenuToggleVisibility(); };
   const toggleSidebar = () => {
     const opening = !sidebarEl.classList.contains('open');
     sidebarEl.classList.toggle('open', opening);
     overlayEl.classList.toggle('open', opening);
-    menuToggleBtn.classList.toggle('is-hidden', opening);
+    updateMenuToggleVisibility();
   };
   menuToggleBtn.addEventListener('click', toggleSidebar);
   overlayEl.addEventListener('click', closeSidebar);
+  window.addEventListener('scroll', updateMenuToggleVisibility, { passive: true });
+  stopMenuScrollWatch = () => window.removeEventListener('scroll', updateMenuToggleVisibility);
+  updateMenuToggleVisibility();
 
   const navGroup = document.getElementById('nav-group');
   navGroup.innerHTML = Object.entries(ROUTES)
@@ -603,6 +621,7 @@ async function bootImpl() {
   closeAllCustomSelects();
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
   if (stopNavScrollWatch) { stopNavScrollWatch(); stopNavScrollWatch = null; }
+  if (stopMenuScrollWatch) { stopMenuScrollWatch(); stopMenuScrollWatch = null; }
   if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
 
