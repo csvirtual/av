@@ -95,19 +95,21 @@ export async function renderProducts(container, ctx) {
     </div>
     <div class="toolbar">
       <input type="search" id="search-input" placeholder="Buscar por nome ou código de barras — ou escaneie…" autofocus>
-      <select id="category-filter">
-        <option value="">Todas as categorias</option>
-        <option value="material">Material de construção</option>
-        <option value="mercearia">Mercearia</option>
-      </select>
-      <select id="status-filter">
-        <option value="" ${initialStatus === '' ? 'selected' : ''}>Todos os status</option>
-        <option value="available" ${initialStatus === 'available' ? 'selected' : ''}>Disponível</option>
-        <option value="low-stock" ${initialStatus === 'low-stock' ? 'selected' : ''}>Estoque baixo</option>
-        <option value="inactive" ${initialStatus === 'inactive' ? 'selected' : ''}>Inativo</option>
-        <option value="near-expiry" ${initialStatus === 'near-expiry' ? 'selected' : ''}>Próximo da validade</option>
-        <option value="expired" ${initialStatus === 'expired' ? 'selected' : ''}>Fora da validade</option>
-      </select>
+      <div class="toolbar-filters">
+        <select id="category-filter">
+          <option value="">Todas as categorias</option>
+          <option value="material">Material de construção</option>
+          <option value="mercearia">Mercearia</option>
+        </select>
+        <select id="status-filter">
+          <option value="" ${initialStatus === '' ? 'selected' : ''}>Todos os status</option>
+          <option value="available" ${initialStatus === 'available' ? 'selected' : ''}>Disponível</option>
+          <option value="low-stock" ${initialStatus === 'low-stock' ? 'selected' : ''}>Estoque baixo</option>
+          <option value="inactive" ${initialStatus === 'inactive' ? 'selected' : ''}>Inativo</option>
+          <option value="near-expiry" ${initialStatus === 'near-expiry' ? 'selected' : ''}>Próximo da validade</option>
+          <option value="expired" ${initialStatus === 'expired' ? 'selected' : ''}>Fora da validade</option>
+        </select>
+      </div>
     </div>
     <div id="products-table"></div>
   `;

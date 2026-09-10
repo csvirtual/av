@@ -1010,6 +1010,11 @@ tbody tr:hover { background: var(--surface-alt); }
   flex-wrap: wrap;
   align-items: center;
 }
+/* Agrupa dois (ou mais) filtros dentro do .toolbar pra ficarem sempre
+ * lado a lado, mesmo em tela estreita — ver o breakpoint 640px, que
+ * empilha o resto do .toolbar em coluna cheia. Usado hoje em
+ * views/products.js (categoria + status). */
+.toolbar-filters { display: flex; gap: 10px; }
 .toolbar input[type="search"], .toolbar input[type="text"], .toolbar input[type="date"] {
   padding: 9px 12px;
   border: 1px solid var(--control-border);
@@ -1863,6 +1868,15 @@ input.customer-search-input:focus {
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar input, .toolbar select, .toolbar label, .toolbar .custom-select { width: 100%; min-width: 0; }
   .toolbar label { display: flex; justify-content: space-between; gap: 8px; }
+  /* Achado (celular, Estoque): sem isto, os dois filtros (categoria e
+   * status) empilhavam um embaixo do outro, cada um ocupando a linha
+   * inteira, feito a regra genérica logo acima manda pra QUALQUER
+   * .custom-select solto no .toolbar. Aqui os dois moram juntos dentro
+   * de um .toolbar-filters — a regra abaixo (mesma especificidade,
+   * declarada DEPOIS) devolve os dois pra lado a lado, dividindo a
+   * largura da linha, só a busca continua sozinha na linha de cima. */
+  .toolbar-filters { width: 100%; gap: 8px; }
+  .toolbar-filters .custom-select { width: auto; flex: 1 1 0; min-width: 0; }
 
   .page-header { flex-direction: column; align-items: flex-start; }
   .page-actions { width: 100%; }
