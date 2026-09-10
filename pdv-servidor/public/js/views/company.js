@@ -31,44 +31,54 @@ export async function renderCompany(container, ctx) {
           <div class="desc">Política de venda desta loja — vale pra todos os terminais, na hora.</div>
         </div>
       </div>
-      <div class="card" style="max-width:640px;">
+      <div class="card" style="max-width:560px;">
         <form id="company-form">
           <div id="company-form-error"></div>
 
-          <p class="section-title mt-0">Desconto e caixa</p>
-          <div class="field">
+          <p class="section-title mt-0">Políticas de venda</p>
+          <div class="field" style="max-width:320px;">
             <label for="vendorMaxDiscount">Desconto máximo do vendedor sem aprovação (%)</label>
             <input id="vendorMaxDiscount" type="number" min="0" max="100" step="0.5" value="${policies.vendorMaxDiscountPercent ?? 10}">
-            <span class="hint">Acima disso, a venda pede a senha de um administrador (ou de quem tiver a permissão "desconto sem limite").</span>
+            <span class="hint">Acima disso, a venda só finaliza com a senha de um administrador (ou de quem tiver a permissão "desconto sem limite").</span>
           </div>
-          <div class="field field-inline-row">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin:6px 0 16px;">
             <input type="checkbox" id="requireCashSession" ${policies.requireOpenCashSession ? 'checked' : ''}>
-            <label for="requireCashSession" style="margin:0;">Exigir caixa aberto pra vender</label>
-          </div>
+            Exigir caixa aberto para registrar vendas
+          </label>
 
           <p class="section-title">Juros no parcelamento do cartão de crédito</p>
-          <p class="text-muted" style="font-size:12.5px;margin:0 0 12px;">Configurado só aqui — o vendedor nunca vê nem edita essa taxa na hora da venda, ela entra sozinha ao escolher Cartão de crédito e o número de parcelas. 1x (à vista no cartão) nunca tem juro, sempre.</p>
-          <div class="field field-inline-row">
+          <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
+            Configurado só aqui — o vendedor nunca vê nem edita essa taxa na hora da venda, ela entra sozinha ao escolher Cartão de crédito e o número de parcelas. 1x (à vista no cartão) nunca tem juro, sempre.
+          </p>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin:10px 0 6px;">
             <input type="checkbox" id="creditInterestFreeEnabled" ${ci.freeInstallmentsEnabled ? 'checked' : ''}>
-            <label for="creditInterestFreeEnabled" style="margin:0;">Até quantas vezes sem juros</label>
-          </div>
+            Até quantas vezes sem juros
+          </label>
           <div class="field field-inline-row" id="creditInterestFreeBox" style="display:${ci.freeInstallmentsEnabled ? 'flex' : 'none'};">
             <input id="creditInterestFreeInstallments" type="number" min="1" max="${MAX_INSTALLMENTS}" step="1" style="width:70px;flex-shrink:0;" value="${ci.freeInstallments ?? 1}">
             <span class="hint" style="margin:0;">vezes sem juros (contando o 1x, que já é sempre isento).</span>
           </div>
           <p class="text-muted" style="font-size:12.5px;margin:0 0 8px;">Desmarcado: qualquer parcelamento (2x em diante) já cobra juro.</p>
 
-          <div class="field field-inline-row">
-            <input type="radio" name="creditInterestType" id="creditInterestTypeMonthly" value="monthly" ${(ci.type ?? 'monthly') === 'monthly' ? 'checked' : ''}>
-            <label for="creditInterestTypeMonthly" style="margin:0;">% ao mês</label>
-            <input id="creditInterestMonthlyPercent" type="number" min="0" step="0.1" value="${ci.monthlyPercent ?? 0}" style="width:90px;margin-left:8px;">
+          <div class="form-row" style="align-items:flex-start;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+              <input type="radio" name="creditInterestType" id="creditInterestTypeMonthly" value="monthly" ${(ci.type ?? 'monthly') === 'monthly' ? 'checked' : ''}>
+              % ao mês
+            </label>
+            <div class="field" style="max-width:120px;">
+              <input id="creditInterestMonthlyPercent" type="number" min="0" step="0.1" value="${ci.monthlyPercent ?? 0}">
+            </div>
           </div>
-          <div class="field field-inline-row">
-            <input type="radio" name="creditInterestType" id="creditInterestTypeFixed" value="fixed" ${ci.type === 'fixed' ? 'checked' : ''}>
-            <label for="creditInterestTypeFixed" style="margin:0;">% fixo</label>
-            <input id="creditInterestFixedPercent" type="number" min="0" step="0.1" value="${ci.fixedPercent ?? 0}" style="width:90px;margin-left:8px;">
+          <div class="form-row" style="align-items:flex-start;margin-bottom:16px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+              <input type="radio" name="creditInterestType" id="creditInterestTypeFixed" value="fixed" ${ci.type === 'fixed' ? 'checked' : ''}>
+              % fixo
+            </label>
+            <div class="field" style="max-width:120px;">
+              <input id="creditInterestFixedPercent" type="number" min="0" step="0.1" value="${ci.fixedPercent ?? 0}">
+            </div>
           </div>
-          <span class="hint" style="display:block;margin:-4px 0 16px;">"% ao mês" multiplica pela quantidade de parcelas (mais parcelas, mais juro total). "% fixo" é o mesmo valor não importa quantas parcelas.</span>
+          <span class="hint" style="display:block;margin:-8px 0 16px;">"% ao mês" multiplica pela quantidade de parcelas (mais parcelas, mais juro total). "% fixo" é o mesmo valor não importa quantas parcelas.</span>
 
           <button type="submit" class="btn" id="company-save-btn">${icon('save', { size: 15 })} Salvar</button>
         </form>
