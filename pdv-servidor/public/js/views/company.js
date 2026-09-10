@@ -80,7 +80,9 @@ export async function renderCompany(container, ctx) {
           </div>
           <span class="hint" style="display:block;margin:-8px 0 16px;">"% ao mês" multiplica pela quantidade de parcelas (mais parcelas, mais juro total). "% fixo" é o mesmo valor não importa quantas parcelas.</span>
 
-          <button type="submit" class="btn" id="company-save-btn">${icon('save', { size: 15 })} Salvar</button>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+            <button type="submit" class="btn" id="company-save-btn">${icon('save', { size: 15 })} Salvar</button>
+          </div>
         </form>
       </div>
     `;

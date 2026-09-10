@@ -316,7 +316,14 @@ a { color: var(--primary); }
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
 }
-.field .hint { font-size: 12px; color: var(--text-muted); }
+/* Achado do usuário (Dados da loja, texto sob "% ao mês"/"% fixo"): a regra
+ * era `.field .hint`, só valendo dentro de um `.field` — mas o próprio padrão
+ * já usado em backup.js e na extensão original tem `<span class="hint">`
+ * solto fora de `.field` (legenda depois de um `.form-row`, não dentro de um
+ * campo). Sem o `.field` na frente a regra não batia e o texto caía pro preto
+ * padrão, destoando de todo hint vizinho — daí a queixa de "feio". Classe
+ * solta, vale em qualquer lugar. */
+.hint { font-size: 12px; color: var(--text-muted); }
 
 /* Ícone "?" de informação ao lado de um label (hoje só o aviso legal do
  * CNPJ, ver components/infoTooltip.js) + o popover de texto que ele abre. */
