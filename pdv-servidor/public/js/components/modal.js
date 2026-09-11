@@ -13,6 +13,18 @@
 // "Voltar" do navegador enquanto um modal estava aberto).
 const openModals = new Set();
 
+// Achado do usuário (celular): o botão de hambúrguer é `position:fixed`
+// com z-index maior que o do `.modal-backdrop` (ver styles.css), pra ficar
+// sempre acessível por cima do conteúdo normal da tela — mas isso também
+// fazia ele flutuar por cima de QUALQUER modal aberto, sobrepondo o
+// cabeçalho do formulário. Uma classe no <body>, ligada/desligada aqui (o
+// único lugar por onde todo modal — openModal E confirmDialog — nasce e
+// morre) deixa o CSS escondê-lo enquanto `openModals` não estiver vazio,
+// sem o modal.js precisar saber nada sobre o menu lateral.
+function syncModalOpenClass() {
+  document.body.classList.toggle('has-open-modal', openModals.size > 0);
+}
+
 export function closeAllModals() {
   // Cópia porque cada função, ao rodar, se remove do Set original — mexer
   // no Set original durante o for...of pularia entradas.
@@ -38,6 +50,7 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submit
   const close = () => {
     backdrop.remove();
     openModals.delete(forceClose);
+    syncModalOpenClass();
     document.removeEventListener('keydown', onKeydown);
   };
   // `submitting` é a defesa contra clique duplo/rápido no botão de
@@ -89,6 +102,7 @@ export function openModal({ title, bodyHtml, onMount, onSubmit, onCancel, submit
     if (!wasSubmitting && onCancel) onCancel();
   };
   openModals.add(forceClose);
+  syncModalOpenClass();
 
   backdrop.addEventListener('mousedown', (e) => {
     if (e.target === backdrop) cancel();
@@ -138,6 +152,7 @@ export function confirmDialog({ title = 'Confirmar', message, confirmLabel = 'Co
     const close = (result) => {
       backdrop.remove();
       openModals.delete(forceClose);
+      syncModalOpenClass();
       document.removeEventListener('keydown', onKeydown);
       resolve(result);
     };
@@ -147,6 +162,7 @@ export function confirmDialog({ title = 'Confirmar', message, confirmLabel = 'Co
     // mais acontecer.
     const forceClose = () => close(false);
     openModals.add(forceClose);
+    syncModalOpenClass();
     const onKeydown = (e) => { if (e.key === 'Escape') close(false); };
     document.addEventListener('keydown', onKeydown);
     backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop) close(false); });

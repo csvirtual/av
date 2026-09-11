@@ -664,6 +664,14 @@ a { color: var(--primary); }
  * isso o botão ficava por cima do cabeçalho do menu aberto, no mesmo
  * canto, sobrepondo o texto. */
 .menu-toggle-btn.is-hidden { display: none; }
+/* Achado do usuário (celular): com um modal aberto, este botão (fixo, acima
+ * do resto da tela) ficava flutuando por cima do cabeçalho do modal — o
+ * `.modal-backdrop` cobre a tela inteira mas é semitransparente, então o
+ * hambúrguer aparecia meio apagado, sobrepondo o título do formulário. O
+ * botão Cancelar do próprio modal já resolve "voltar", então some enquanto
+ * `body` tiver `has-open-modal` (ligado/desligado em components/modal.js,
+ * único lugar por onde todo modal nasce e morre). */
+.has-open-modal .menu-toggle-btn { display: none; }
 
 .sidebar-overlay {
   display: none;
@@ -1907,7 +1915,10 @@ input.customer-search-input:focus {
   .page-actions { width: 100%; }
   .page-actions .btn { flex: 1; }
 
-  .modal-backdrop { padding: 10px; align-items: flex-end; }
+  /* Achado do usuário (celular): "align-items: flex-end" grudava o modal no
+   * rodapé da tela (efeito "bottom sheet") — pedido explícito era o mesmo
+   * comportamento do desktop, centralizado na vertical. */
+  .modal-backdrop { padding: 10px; align-items: center; }
   .modal { max-width: 100%; max-height: 92vh; }
   .modal h2 { padding: 18px 16px 14px; }
   .modal-body { padding: 0 16px; }
