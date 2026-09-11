@@ -72,7 +72,7 @@ export function onlyDigits(str) {
 // Rótulo de exibição de cada categoria de produto (ver data/productsRepo.js)
 // — uma única fonte pras 3 telas que precisam mostrar isso (Estoque,
 // Relatórios, PDF de relatório), em vez de repetir o mesmo par de strings.
-export const CATEGORY_LABELS = { material: 'Material de construção', mercearia: 'Mercearia' };
+export const CATEGORY_LABELS = { material: 'Material de construção', mercearia: 'Mercearia / Mercadinho', loja: 'Loja' };
 export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || escapeHtml(category);
 }

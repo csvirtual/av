@@ -13,7 +13,7 @@ import { recordMovement, recordManualAdjustment, listMovementsByProduct } from '
 import { listSuppliers } from '../data/suppliersRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { bindBarcodeInput, generateInternalBarcode } from '../utils/barcode.js';
-import { formatMoney, formatDateTime, escapeHtml, displayUnit, formatQty } from '../utils/format.js';
+import { formatMoney, formatDateTime, escapeHtml, displayUnit, formatQty, CATEGORY_LABELS, categoryLabel } from '../utils/format.js';
 import { isNearExpiry, isExpired } from '../utils/pricing.js';
 import { userCan } from '../utils/permissions.js';
 import { openModal, confirmDialog } from '../components/modal.js';
@@ -86,7 +86,7 @@ export async function renderProducts(container, ctx) {
     <div class="page-header">
       <div>
         <h1>Estoque</h1>
-        <div class="desc">Material de construção e mercearia — visão geral do que a loja tem disponível.</div>
+        <div class="desc">Material de construção, mercearia/mercadinho e loja — visão geral do que a loja tem disponível.</div>
       </div>
       <div class="page-actions">
         ${canAdjustStock ? '<button class="btn btn-secondary" id="inventory-btn">Fazer inventário</button>' : ''}
@@ -98,8 +98,9 @@ export async function renderProducts(container, ctx) {
       <div class="toolbar-filters">
         <select id="category-filter">
           <option value="">Todas as categorias</option>
-          <option value="material">Material de construção</option>
-          <option value="mercearia">Mercearia</option>
+          <option value="material">${CATEGORY_LABELS.material}</option>
+          <option value="mercearia">${CATEGORY_LABELS.mercearia}</option>
+          <option value="loja">${CATEGORY_LABELS.loja}</option>
         </select>
         <select id="status-filter">
           <option value="" ${initialStatus === '' ? 'selected' : ''}>Todos os status</option>
@@ -210,7 +211,7 @@ export async function renderProducts(container, ctx) {
   });
 
   if (canManageProducts) {
-    document.getElementById('new-product-btn').addEventListener('click', () => openProductModal(ctx, { onSaved: refresh }));
+    document.getElementById('new-product-btn').addEventListener('click', () => openProductModal(ctx, { initialCategory: currentFilter.category, onSaved: refresh }));
   }
   if (canAdjustStock) {
     document.getElementById('inventory-btn').addEventListener('click', () => openInventoryModal());
@@ -641,8 +642,19 @@ export async function renderProducts(container, ctx) {
  * uma closure de tela específica. `onSaved(record)` roda depois de gravar
  * com sucesso — cada chamador decide o que fazer com o produto salvo
  * (recarregar a tabela, já jogar no carrinho da venda etc.). */
-async function openProductModal(ctx, { product = null, initialBarcode = '', onSaved } = {}) {
+async function openProductModal(ctx, { product = null, initialBarcode = '', initialCategory = null, onSaved } = {}) {
   const isEdit = !!product;
+  // Achado do usuário: cadastrar produto com um filtro de categoria já
+  // ativo na tela de Estoque sempre abria o modal em "Material de
+  // construção" (padrão fixo), obrigando trocar de novo toda vez — mesmo
+  // já tendo acabado de escolher a categoria no filtro. Só vale pra
+  // cadastro NOVO (edição sempre respeita a categoria do produto já
+  // salvo) e só se o filtro realmente aponta pra uma das categorias
+  // conhecidas (CATEGORY_LABELS) — filtro em branco ("Todas as
+  // categorias") continua caindo no padrão de sempre.
+  const defaultCategory = !isEdit && initialCategory && CATEGORY_LABELS[initialCategory]
+    ? initialCategory
+    : 'material';
   const isCustomEdit = isEdit && product.unit === CUSTOM_UNIT_VALUE;
   const suppliers = await listSuppliers();
   // Estado das formas de venda (só usado em modo Personalizado) — vive fora
@@ -669,8 +681,9 @@ async function openProductModal(ctx, { product = null, initialBarcode = '', onSa
         <div class="field">
           <label>Categoria *</label>
           <select id="f-category">
-            <option value="material" ${!isEdit || product.category === 'material' ? 'selected' : ''}>Material de construção</option>
-            <option value="mercearia" ${isEdit && product.category === 'mercearia' ? 'selected' : ''}>Mercearia</option>
+            <option value="material" ${(isEdit ? product.category : defaultCategory) === 'material' ? 'selected' : ''}>${CATEGORY_LABELS.material}</option>
+            <option value="mercearia" ${(isEdit ? product.category : defaultCategory) === 'mercearia' ? 'selected' : ''}>${CATEGORY_LABELS.mercearia}</option>
+            <option value="loja" ${(isEdit ? product.category : defaultCategory) === 'loja' ? 'selected' : ''}>${CATEGORY_LABELS.loja}</option>
           </select>
         </div>
         <div class="field">
@@ -1165,7 +1178,7 @@ function renderTable(products, flags) {
           ${products.map((p) => `
             <tr class="${p.active && p.quantity <= p.minStock ? 'low-stock-row' : ''}">
               <td>${escapeHtml(p.name)}</td>
-              <td>${p.category === 'material' ? 'Material' : 'Mercearia'}</td>
+              <td>${categoryLabel(p.category)}</td>
               <td style="text-align:center;">${p.barcodeIsInternal
                 ? `<div>${escapeHtml(p.barcode)}</div><span class="badge badge-gray" style="margin-top:2px;">interno</span>`
                 : escapeHtml(p.barcode)}</td>

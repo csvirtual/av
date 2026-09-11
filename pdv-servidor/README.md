@@ -85,15 +85,27 @@ casos. Ainda não verificado na prática — é o primeiro risco real da Fase 9.
 ```
 cd pdv-servidor
 npm install
-node seed.js      # cria admin/admin123 — troque a senha depois de logar
 node server.js    # mostra os endereços de rede (ex: http://192.168.x.x:3131)
 ```
 
+Achado de auditoria (Passada 3, Release Candidate — testado a partir de um
+`git archive` limpo, exatamente como um cliente receberia): esta seção
+estava desatualizada desde a Fase 9. `node seed.js` **não é mais um passo
+obrigatório** — `server.js` chama sozinho a mesma criação idempotente do
+admin a cada arranque (`lib/seedAdmin.js`); `seed.js` continua existindo só
+pra quem prefere rodar isso explícito, numa vez só, numa hospedagem que só
+deixa configurar um comando avulso como "start" (ver comentário no próprio
+arquivo).
+
 Abre `http://localhost:3131/` (ou o IP mostrado, de outra máquina/aba) —
-login `admin`/`admin123`, telas reais de Estoque e PDV (ver Fase 9 abaixo;
-o resto do sistema ainda não tem tela própria aqui). `test.html` continua
-disponível em `http://localhost:3131/test.html`, prova de conceito da Fase
-1-8 cobrindo os domínios que ainda não ganharam tela real.
+login `admin`/`admin123` (troca de senha obrigatória no primeiro login),
+**todas as 16 telas reais** (Painel, Estoque, Nova venda, Histórico de
+vendas, Caixa, Clientes, Carreto, Compras, Financeiro, Relatórios,
+Usuários, Log do sistema, Backup, Dados da loja, Personalização, Ajuda —
+Fase 9 completa, ver abaixo). `test.html` (e qualquer `test-*.html`) fica
+**bloqueado por padrão** (404) em qualquer instalação — só liberado
+setando `ALLOW_TEST_PAGES=1` no ambiente, usado pela suíte de testes deste
+repo (ver `server.js`).
 
 ## Estrutura
 

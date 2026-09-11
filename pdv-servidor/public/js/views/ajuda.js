@@ -353,7 +353,7 @@ const TOPICS = [
       <p class="help-subtitle">Cadastrar produtos, código de barras, validade e controlar quantidade.</p>
 
       <h3>Cadastrar um produto novo</h3>
-      <p>Na tela <strong>Estoque</strong>, clique em <strong>+ Novo produto</strong> (só aparece pra quem tem a permissão "Cadastrar/editar produto" — veja o tópico "Usuários e permissões"). Preencha nome, categoria (material de construção ou mercearia), unidade (un, kg, saco...), código de barras, preço de venda, preço de custo, quantidade inicial e, se quiser, fornecedor padrão.</p>
+      <p>Na tela <strong>Estoque</strong>, clique em <strong>+ Novo produto</strong> (só aparece pra quem tem a permissão "Cadastrar/editar produto" — veja o tópico "Usuários e permissões"). Preencha nome, categoria (material de construção, mercearia/mercadinho ou loja), unidade (un, kg, saco...), código de barras, preço de venda, preço de custo, quantidade inicial e, se quiser, fornecedor padrão.</p>
 
       <h3>Produto vendido de mais de um jeito — unidade "Personalizado"</h3>
       <p>Pra produto vendido em <strong>formas diferentes</strong> ao mesmo tempo — o exemplo clássico é areia, vendida à lata, ao metro ou à carrada, cada forma com um preço próprio — não precisa cadastrar um produto separado pra cada forma. Escolha <strong>Personalizado</strong> no campo Unidade: aparece um campo <strong>Unidade de medida raiz</strong> (uma lista com as mesmas unidades de sempre, mais "Outra" pra digitar algo como "lata", que não é uma unidade padrão) — é nela que o estoque único do produto é contado. Logo abaixo, o preço único vira uma lista de até <strong>7 formas de venda</strong>, cada uma com 4 campos:</p>
