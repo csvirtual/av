@@ -1,8 +1,10 @@
 // Prova a regra nova: todo login cai no Painel (nunca herda a última rota
 // de quem usou este navegador por último — risco real quando as
-// permissões são diferentes), exceto o PRIMEIRO login de verdade de um
-// vendedor recém-cadastrado, que cai na Ajuda uma única vez (ver
-// routes/auth.js#POST /login e app.js#renderLogin — achado do usuário).
+// permissões são diferentes), exceto o PRIMEIRO login de verdade de
+// QUALQUER conta (admin incluído — subir o servidor pela primeira vez
+// também deve cair na Ajuda, que já explica o que fazer, achado do
+// usuário), que cai na Ajuda uma única vez, por conta (ver
+// routes/auth.js#POST /login e app.js#renderLogin).
 //
 // Rodar: sobe o servidor (`node server.js`) numa janela, `node
 // test-login-landing.cjs` noutra.
@@ -35,9 +37,16 @@ async function logout(page) {
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('401')) errors.push('console.error: ' + m.text()); });
 
-  // ---------- Admin: login sempre cai no Painel ----------
+  // ---------- Primeiro login do admin (servidor recém-subido): cai na Ajuda ----------
   await login(page, 'admin', 'admin123');
-  check('Admin: login cai no Painel', page.url().endsWith('#/dashboard'), page.url());
+  check('Admin (1º login, servidor novo): cai na Ajuda, não no Painel', page.url().endsWith('#/ajuda'), page.url());
+  const adminHelpText = await page.locator('#view-root').innerText();
+  check('Tela realmente é a Ajuda (título "Ajuda" visível)', /Ajuda/.test(adminHelpText));
+  await logout(page);
+
+  // ---------- Segundo login do admin: já não é mais "primeira vez" ----------
+  await login(page, 'admin', 'admin123');
+  check('Admin (2º login): cai no Painel, não mais na Ajuda', page.url().endsWith('#/dashboard'), page.url());
 
   // Admin cadastra um vendedor novo (sem nenhuma permissão extra) e navega
   // pra uma tela que esse vendedor NÃO vai poder acessar de verdade —
@@ -79,9 +88,9 @@ async function logout(page) {
   await page.waitForTimeout(400);
   await logout(page);
 
-  // ---------- Admin loga de novo: não herda a rota do vendedor ----------
+  // ---------- Admin loga de novo (3º login): não herda a rota do vendedor ----------
   await login(page, 'admin', 'admin123');
-  check('Admin (login de novo): cai no Painel, não herda #/estoque do vendedor', page.url().endsWith('#/dashboard'), page.url());
+  check('Admin (3º login): cai no Painel, não herda #/estoque do vendedor', page.url().endsWith('#/dashboard'), page.url());
 
   check('Zero erros JS/console inesperados', errors.length === 0, JSON.stringify(errors));
 

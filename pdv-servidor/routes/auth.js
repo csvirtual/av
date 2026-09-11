@@ -50,15 +50,17 @@ router.post('/login', async (req, res) => {
     // tela que não devia acessar (com as ações bloqueadas, mas ainda
     // assim confuso). Regra nova, decidida aqui no servidor pra valer em
     // qualquer terminal: todo login cai no Painel — EXCETO o primeiro
-    // login de verdade de um vendedor recém-cadastrado, que cai na Ajuda
-    // uma única vez, pra aprender a usar o sistema antes de mexer em
-    // qualquer coisa. `hasSeenAjuda` nasce `false` só em vendedores (ver
-    // routes/users.js#POST) e vira `true` aqui, então mesmo esse vendedor
-    // nunca mais vê a Ajuda forçada nos próximos logins. Nunca vale pra
-    // admin (só existe um, é quem monta a loja — não precisa desse
-    // onboarding). O cliente (app.js) decide o `#/dashboard` vs `#/ajuda`
-    // com este único campo da resposta — ver renderLogin().
-    const firstLogin = user.role === 'vendedor' && !user.hasSeenAjuda;
+    // login de verdade de QUALQUER conta (admin incluído — achado do
+    // usuário: o admin, ao subir o servidor pela primeira vez num Node
+    // novo, também deve cair direto na Ajuda, que já explica o que fazer,
+    // em vez do Painel vazio), que cai na Ajuda uma única vez. `admin`
+    // (seed.js) e todo vendedor novo (routes/users.js#POST) nascem com
+    // `hasSeenAjuda: false`; vira `true` aqui no primeiro login de cada
+    // um, então ninguém vê a Ajuda forçada de novo nos próximos logins —
+    // cada CONTA passa por isso uma vez só, não é por terminal/navegador.
+    // O cliente (app.js) decide o `#/dashboard` vs `#/ajuda` com este
+    // único campo da resposta — ver renderLogin().
+    const firstLogin = !user.hasSeenAjuda;
     if (firstLogin) {
       user.hasSeenAjuda = true;
       updateUserData.run({ id: user.id, data: JSON.stringify(user) });
