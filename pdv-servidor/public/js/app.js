@@ -58,6 +58,19 @@ import { watchTabPresence } from './tabPresence.js';
   applyTheme(await getThemePreference());
 })();
 
+// Registro do service worker do PWA (ver public/sw.js pra estratégia de
+// cache — network-first, nunca intercepta /api/) — instalável no celular
+// ("Adicionar à tela inicial") e no PC (Chrome/Edge oferecem "Instalar
+// app"). Fire-and-forget de propósito: nada na inicialização do app
+// depende disto, e um navegador sem suporte (raro) simplesmente ignora.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.error('[pwa] Falha ao registrar o service worker:', err);
+    });
+  });
+}
+
 const root = document.getElementById('root');
 
 // Nomes de rota iguais aos da extensão de propósito (ver app.js dela,
@@ -661,21 +674,39 @@ async function bootImpl() {
   if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
 
-  // Igual à extensão: conferido ANTES até da tela de login — sem chave
-  // definitiva ativada e com o trial/demo vencido, o sistema INTEIRO fica
-  // bloqueado, ninguém entra (nem admin). GET /api/license/status não
-  // exige sessão nenhuma (ver routes/license.js), de propósito: precisa
-  // funcionar mesmo sem ninguém logado ainda.
-  const license = await getLicenseStatus();
-  if (!license.active) {
-    // Achado do usuário: aqui NUNCA pode ser getCompany() (GET
-    // /api/company exige sessão) — ninguém está logado ainda nesta tela,
-    // então a chamada sempre voltava 401 e travava o boot inteiro em
-    // "Carregando…" pra sempre. license.company já vem junto da resposta
-    // de /api/license/status (só o mínimo não-sensível — nome fantasia,
-    // CNPJ, e-mail — pra montar a mensagem de contato do suporte; ver
-    // routes/license.js).
-    renderLicenseBlockedScreen(license.company || {}, license.keyIssue);
+  // Achado do PWA (ver public/sw.js): instalado como app, é fácil abrir
+  // sem rede de verdade (fora da loja, servidor reiniciando, Wi-Fi caiu)
+  // — o casco (HTML/CSS/JS) carrega puro cache, mas GET
+  // /api/license/status logo abaixo é sempre rede de verdade, nunca
+  // cacheado de propósito (ver sw.js). Sem este try/catch, uma falha de
+  // rede aqui (fetch rejeitando antes até de existir uma resposta HTTP —
+  // diferente de um 401/500, que api() já transforma num Error com
+  // mensagem amigável) derrubava a Promise de bootImpl() sem ninguém
+  // pegar, e a tela ficava presa em "Carregando…" pra sempre — pior
+  // ainda por ser exatamente o cenário mais comum de abrir um app
+  // instalado longe de rede. Agora mostra uma tela clara, com um botão
+  // que só tenta o boot de novo (a causa mais comum resolve sozinha
+  // assim que a rede voltar).
+  try {
+    // Igual à extensão: conferido ANTES até da tela de login — sem chave
+    // definitiva ativada e com o trial/demo vencido, o sistema INTEIRO
+    // fica bloqueado, ninguém entra (nem admin). GET /api/license/status
+    // não exige sessão nenhuma (ver routes/license.js), de propósito:
+    // precisa funcionar mesmo sem ninguém logado ainda.
+    const license = await getLicenseStatus();
+    if (!license.active) {
+      // Achado do usuário: aqui NUNCA pode ser getCompany() (GET
+      // /api/company exige sessão) — ninguém está logado ainda nesta
+      // tela, então a chamada sempre voltava 401 e travava o boot
+      // inteiro em "Carregando…" pra sempre. license.company já vem
+      // junto da resposta de /api/license/status (só o mínimo
+      // não-sensível — nome fantasia, CNPJ, e-mail — pra montar a
+      // mensagem de contato do suporte; ver routes/license.js).
+      renderLicenseBlockedScreen(license.company || {}, license.keyIssue);
+      return;
+    }
+  } catch {
+    renderOfflineScreen();
     return;
   }
 
@@ -686,7 +717,13 @@ async function bootImpl() {
     renderLogin();
     return;
   }
-  const user = await fetchCurrentUser();
+  let user;
+  try {
+    user = await fetchCurrentUser();
+  } catch {
+    renderOfflineScreen();
+    return;
+  }
   if (!user) {
     // Cookie de sessão do servidor não bate mais com o cache local (ex:
     // expirou por inatividade, foi limpo direto no servidor, ou a conta
@@ -776,6 +813,27 @@ function renderLicenseBlockedScreen(company, keyIssue) {
       btn.textContent = 'Ativar';
     }
   });
+}
+
+// Achado do PWA: sem rede de verdade pro servidor (offline, Wi-Fi caiu,
+// servidor reiniciando) logo na abertura do app — ver o try/catch em
+// bootImpl(), acima. Este sistema depende do servidor pra tudo (nenhuma
+// tela funciona sem ele, nem o login), então não tem "modo offline" de
+// verdade — só uma tela clara em vez de uma tela travada, com um botão
+// que tenta de novo (o caso comum, "voltei a ter sinal", resolve
+// sozinho).
+function renderOfflineScreen() {
+  root.innerHTML = `
+    <div class="boot-loading">
+      <div class="card" style="max-width:420px;text-align:center;">
+        <div style="margin-bottom:6px;">${icon('warning', { size: 34 })}</div>
+        <h1 style="font-size:18px;margin:0 0 18px;text-transform:uppercase;letter-spacing:0.4px;">Sem conexão com o servidor</h1>
+        <p style="margin:0 0 14px;">Não foi possível falar com o servidor da loja. Confira a rede (Wi-Fi/cabo) e se o computador que hospeda o sistema está ligado.</p>
+        <button type="button" class="btn" id="offline-retry-btn" style="width:100%;">${icon('refresh', { size: 15 })} Tentar de novo</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('offline-retry-btn').addEventListener('click', () => boot());
 }
 
 function renderTabBlockedScreen() {

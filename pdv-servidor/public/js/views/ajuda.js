@@ -277,6 +277,9 @@ const TOPICS = [
       <h3>O Administrador Geral</h3>
       <p>É esse primeiro usuário criado sozinho pelo sistema — quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
 
+      <h3>Instalar como app (opcional)</h3>
+      <p>Em vez de abrir sempre pelo navegador, dá pra "instalar" este sistema como se fosse um app de verdade — mesmo site, só ganha um ícone próprio e abre em janela cheia, sem barra de endereço. No celular/tablet: no menu do navegador, procure "Adicionar à tela inicial" (Android) ou "Adicionar à Tela de Início" (iPhone/iPad, no botão de compartilhar do Safari). No computador (Chrome/Edge): clique no ícone de instalar que aparece na barra de endereço, ou no menu do navegador em "Instalar PDV - C&S Virtual...". Continua sendo o mesmo sistema, com os mesmos dados — é só um jeito mais rápido de abrir.</p>
+
       <h3>Entrando todo dia (Login)</h3>
       <p>O sistema sempre abre numa tela de <strong>login</strong>. Cada pessoa que trabalha na loja — administrador ou vendedor — tem seu próprio usuário e senha. Ninguém compartilha login: é assim que o sistema sabe exatamente quem fez cada venda, cada estorno, cada mudança de estoque.</p>
       <div class="tip"><strong>Pra onde o login leva:</strong> todo login cai direto no <strong>Painel</strong> — nunca herda a tela em que a sessão anterior (de qualquer usuário, neste mesmo navegador) estava, de propósito, pra ninguém cair sem querer numa tela que não tem permissão de usar. Única exceção: o <strong>primeiríssimo login de cada conta</strong> — a sua, ou a de um vendedor recém-cadastrado — cai nesta Ajuda em vez do Painel, só essa vez, pra aprender a usar o sistema antes de mexer em qualquer coisa. Do segundo login em diante, essa mesma conta já cai sempre no Painel, como todo mundo.</div>

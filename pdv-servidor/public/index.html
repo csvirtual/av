@@ -4,7 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDV - C&amp;S Virtual (multi-terminal)</title>
-<link rel="icon" href="data:,">
+<!-- PWA: instalável em celular/tablet ("Adicionar à tela inicial") e em
+     PC (Chrome/Edge oferecem "Instalar app") — mesmo site, só ganha o
+     invólucro de app. Ícones reaproveitam o mesmo desenho (verde +
+     código de barras) já usado no ícone da extensão irmã, gerados em
+     resolução maior (só existia até 128px lá — ver public/icons/). -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#145333">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PDV C&amp;S">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
