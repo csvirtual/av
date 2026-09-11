@@ -8,12 +8,22 @@
 // não tem como logar pra "ganhar permissão" de ativar. A chave assinada é
 // a única proteção de verdade aqui, não uma sessão.
 import { Router } from 'express';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { getConfig } from '../lib/companyConfig.js';
 import { getLicenseStatus, setStoredActivationKey } from '../lib/licenseState.js';
 import { verifyLicenseKey } from '../lib/license.js';
 import { logAction } from '../lib/audit.js';
 
 const router = Router();
+
+// Versão exibida em Dados da loja, abaixo da situação da licença — lida
+// direto do package.json (fonte única, nunca duplicada à mão) pra nunca
+// ficar desatualizada num release. Lida uma vez, no arranque — reiniciar o
+// servidor já é o próprio evento de "atualizei o sistema".
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const APP_VERSION = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
 
 router.get('/status', async (req, res) => {
   try {
@@ -29,6 +39,7 @@ router.get('/status', async (req, res) => {
     // num comprovante) — nunca o cadastro fiscal completo (endereço,
     // inscrições, LGPD), que continua exigindo login.
     status.company = { nomeFantasia: cfg.nomeFantasia || '', cnpj, email: cfg.email || '' };
+    status.version = APP_VERSION;
     res.json(status);
   } catch (err) {
     console.error('[erro inesperado] GET /api/license/status:', err);

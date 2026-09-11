@@ -1,7 +1,7 @@
 {
   "name": "gestao-loja-servidor",
-  "version": "0.1.0-fase1",
-  "description": "Servidor local (rede da loja) para uso multi-terminal do Gestao de Loja — Estoque & Vendas. Fase 1: esqueleto + Estoque compartilhado em tempo real.",
+  "version": "1.0.0",
+  "description": "Servidor local (rede da loja) para uso multi-terminal do Gestao de Loja — Estoque & Vendas — versão multi-terminal do PDV - C&S Virtual, com paridade de recursos com a extensão (licenciamento, permissões granulares, todas as telas).",
   "type": "module",
   "main": "server.js",
   "scripts": {
