@@ -68,6 +68,7 @@ export async function renderCompany(container, ctx) {
 
       <div class="card" style="max-width:760px;margin-bottom:20px;">
         <p class="section-title mt-0">Ativação</p>
+        ${license.keyIssue ? `<div class="notice notice-warning"><strong>Havia uma chave de ativação salva, mas ela parou de valer:</strong> ${escAttr(license.keyIssue)} Isso costuma acontecer depois de restaurar um backup com o CNPJ diferente do que estava quando a chave foi ativada — confira se o CNPJ abaixo está correto, ou cole a chave de novo.</div>` : ''}
         <p style="margin:0 0 6px;">Situação atual: <span class="badge ${statusInfo.cls}">${escAttr(statusInfo.text)}</span></p>
         ${license.version ? `<p style="margin:0 0 14px;">Versão atual: <span class="badge badge-gray">${escAttr(versionDisplayLabel(license.version))}</span></p>` : ''}
         ${license.tipo !== 'full' ? `

@@ -675,7 +675,7 @@ async function bootImpl() {
     // de /api/license/status (só o mínimo não-sensível — nome fantasia,
     // CNPJ, e-mail — pra montar a mensagem de contato do suporte; ver
     // routes/license.js).
-    renderLicenseBlockedScreen(license.company || {});
+    renderLicenseBlockedScreen(license.company || {}, license.keyIssue);
     return;
   }
 
@@ -719,11 +719,14 @@ const TRIAL_REASON_TEXT = 'meu período de teste encerrou — gostaria de saber 
 // menos o que não existe mais aqui: setStoredActivationKey/verifyLicenseKey
 // direto (a verificação e a gravação agora são responsabilidade do
 // servidor, ver POST /api/license/activate).
-function renderLicenseBlockedScreen(company) {
+function renderLicenseBlockedScreen(company, keyIssue) {
   root.innerHTML = `
     <div class="boot-loading">
       <div class="card" style="max-width:440px;">
         <h1 style="font-size:18px;margin:0 0 18px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Período de teste encerrado</h1>
+        ${keyIssue ? `
+          <div class="notice notice-warning" style="text-align:left;"><strong>Havia uma chave de ativação salva, mas ela parou de valer:</strong> ${escapeHtml(keyIssue)} Isso costuma acontecer depois de restaurar um backup com o CNPJ diferente do que estava quando a chave foi ativada — confira em "Dados da loja" se o CNPJ está correto, ou cole a chave de novo abaixo.</div>
+        ` : ''}
         <p style="margin:0 0 14px;text-align:center;">O período de teste deste sistema encerrou. Entre em contato pelo WhatsApp ou e-mail abaixo pra receber sua chave de ativação — é rápido.</p>
         <div style="display:flex;justify-content:center;gap:22px;margin:0 0 16px;">
           <div style="text-align:center;">

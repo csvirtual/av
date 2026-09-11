@@ -48,6 +48,16 @@ export function markTrialStartIfNeeded() {
  * loja — mesmo contrato de getLicenseStatus() da extensão. */
 export async function getLicenseStatus(cnpj) {
   const state = getState();
+  // Achado do usuário: uma chave definitiva guardada que pára de bater com
+  // o CNPJ atual (ex: restaurou um backup com um CNPJ diferente do que
+  // estava quando a chave foi ativada — `company` está em BACKUP_TABLES,
+  // `license_state` não) sempre caiu pro trial em silêncio, sem NENHUMA
+  // pista de que existia uma chave guardada que parou de funcionar —
+  // parecia que a ativação tinha simplesmente sumido. `keyIssue` carrega
+  // o motivo (mesmo `reason` de verifyLicenseKey) pra tela poder avisar
+  // exatamente o que aconteceu, em vez de mostrar só "período de teste"
+  // como se nunca tivesse existido chave nenhuma.
+  let keyIssue = null;
   if (state.activationKey) {
     const result = await verifyLicenseKey(state.activationKey, cnpj);
     if (result.valid) {
@@ -56,14 +66,16 @@ export async function getLicenseStatus(cnpj) {
         : { active: true, tipo: 'full', expiraEm: null };
     }
     // Chave guardada parou de valer (CNPJ mudou, demo expirou etc.) — cai
-    // pro trial padrão como se não houvesse chave nenhuma.
+    // pro trial padrão como se não houvesse chave nenhuma, mas agora
+    // avisando o motivo (keyIssue) em vez de ficar em silêncio.
+    keyIssue = result.reason;
   }
 
-  if (!state.trialStartedAt) return { active: true, tipo: 'sem-trial' }; // nunca deveria acontecer (markTrialStartIfNeeded roda todo arranque), mas nunca bloqueia por segurança
+  if (!state.trialStartedAt) return { active: true, tipo: 'sem-trial', keyIssue }; // nunca deveria acontecer (markTrialStartIfNeeded roda todo arranque), mas nunca bloqueia por segurança
   const expired = (Date.now() - state.trialStartedAt) > TRIAL_DURATION_MS;
   return expired
-    ? { active: false, tipo: 'trial-expirado' }
-    : { active: true, tipo: 'trial', expiraEm: state.trialStartedAt + TRIAL_DURATION_MS };
+    ? { active: false, tipo: 'trial-expirado', keyIssue }
+    : { active: true, tipo: 'trial', expiraEm: state.trialStartedAt + TRIAL_DURATION_MS, keyIssue };
 }
 
 export function setStoredActivationKey(keyString) {
