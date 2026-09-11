@@ -62,7 +62,7 @@ export async function renderCompany(container, ctx) {
       <div class="card" style="max-width:760px;margin-bottom:20px;">
         <p class="section-title mt-0">Ativação</p>
         <p style="margin:0 0 6px;">Situação atual: <span class="badge ${statusInfo.cls}">${escAttr(statusInfo.text)}</span></p>
-        ${license.version ? `<p class="text-muted" style="margin:0 0 14px;font-size:12.5px;">Versão atual: ${escAttr(license.version)}</p>` : ''}
+        ${license.version ? `<p style="margin:0 0 14px;">Versão atual: ${escAttr(license.version)}</p>` : ''}
         ${license.tipo !== 'full' ? `
           <div id="license-error"></div>
           <div class="field" style="max-width:420px;">

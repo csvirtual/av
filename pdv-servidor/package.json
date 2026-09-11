@@ -1,6 +1,6 @@
 {
   "name": "gestao-loja-servidor",
-  "version": "1.0.0",
+  "version": "0.1.0-fase1",
   "description": "Servidor local (rede da loja) para uso multi-terminal do Gestao de Loja — Estoque & Vendas — versão multi-terminal do PDV - C&S Virtual, com paridade de recursos com a extensão (licenciamento, permissões granulares, todas as telas).",
   "type": "module",
   "main": "server.js",
