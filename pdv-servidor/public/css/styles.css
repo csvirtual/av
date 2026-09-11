@@ -26,6 +26,11 @@
   --radius-sm: 6px;
   --shadow: 0 1px 3px rgba(20, 30, 27, 0.08), 0 1px 2px rgba(20, 30, 27, 0.06);
   --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+  /* Sombra de borda usada só em .table-wrap, pra indicar "tem mais coluna
+   * pra rolar" (ver comentário lá) — mais forte que --shadow porque
+   * precisa ser notada de relance numa tira fina de 14px, não é uma
+   * elevação de superfície normal. */
+  --scroll-shadow: rgba(20, 30, 27, 0.18);
   font-size: 15px;
 }
 
@@ -62,6 +67,7 @@
     --warning-light: rgba(217, 154, 53, 0.18);
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --scroll-shadow: rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -85,6 +91,7 @@
   --warning-light: rgba(217, 154, 53, 0.18);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --scroll-shadow: rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -889,12 +896,35 @@ a { color: var(--primary); }
  * colunas quando tem poucas): o resto da página (.stat-grid, cabeçalho,
  * botões) usa a tela toda normalmente, ganhando mais colunas de card por
  * linha em vez de ficar com margem morta do lado. */
+/* Achado do usuário: telas de tablet/intermediárias (a mesma faixa que já
+ * usa a gaveta de menu do celular, mas larga o bastante pra a tabela não
+ * levar as regras de compactação de <640px) tinham tabela de muitas
+ * colunas (Usuários, Histórico de vendas, Financeiro, Compras...) cortada
+ * sem aviso nenhum na borda direita — .table-wrap já rolava
+ * (overflow-x:auto), só não tinha NENHUMA pista visual de que havia mais
+ * coluna pra ver, então parecia quebrado, não "role pro lado". Sombra
+ * nas duas bordas via 4 camadas de fundo (técnica clássica de "scroll
+ * shadow", sem JS): as duas primeiras (mesma cor do fundo, attachment
+ * local — rolam JUNTO com o conteúdo) cobrem as duas últimas (a sombra em
+ * si, attachment scroll — fica FIXA na borda) sempre que aquela ponta
+ * está com tudo visível; ao rolar, a camada local "sai da frente" e
+ * revela a sombra fixa por baixo. Não depende de JS nem de saber se o
+ * conteúdo estoura — aparece e some sozinho, sempre certo. */
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
   max-width: 1440px;
+  background-color: var(--surface);
+  background-repeat: no-repeat;
+  background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
+  background-image:
+    linear-gradient(to right, var(--surface) 30%, transparent),
+    linear-gradient(to left, var(--surface) 30%, transparent),
+    linear-gradient(to right, var(--scroll-shadow), transparent),
+    linear-gradient(to left, var(--scroll-shadow), transparent);
 }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 thead th {
