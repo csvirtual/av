@@ -8,6 +8,7 @@ import os from 'node:os';
 
 import { db } from './db/index.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
+import { markTrialStartIfNeeded } from './lib/licenseState.js';
 import { resolveSession, sweepExpiredSessions } from './lib/session.js';
 import { registerClient } from './lib/broadcast.js';
 import authRoutes from './routes/auth.js';
@@ -23,6 +24,7 @@ import deliveriesRoutes from './routes/deliveries.js';
 import usersRoutes from './routes/users.js';
 import auditRoutes from './routes/audit.js';
 import companyRoutes from './routes/company.js';
+import licenseRoutes from './routes/license.js';
 import backupRoutes from './routes/backup.js';
 import reportsRoutes from './routes/reports.js';
 import { requirePermission } from './lib/permissions.js';
@@ -108,6 +110,10 @@ function requireAuth(req, res, next) {
 }
 
 app.use('/api/auth', authRoutes);
+// SEM requireAuth de propósito — ver comentário no topo de routes/license.js:
+// precisa funcionar mesmo sem sessão nenhuma, inclusive travando a tela de
+// login em si quando o trial/demo expira.
+app.use('/api/license', licenseRoutes);
 app.use('/api/products', requireAuth, productsRoutes);
 app.use('/api/sales', requireAuth, salesRoutes);
 app.use('/api/cash', requireAuth, cashRoutes);
@@ -163,6 +169,13 @@ setInterval(sweepExpiredSessions, 30 * 60 * 1000);
 // pra rodar `node seed.js` à parte do comando de start configurado no
 // painel.
 await ensureAdminUser();
+
+// Idempotente igual ensureAdminUser() acima — só grava na primeira vez,
+// nos arranques seguintes não faz nada (ver lib/licenseState.js). É o
+// equivalente daqui pro markTrialStartIfNeeded() da extensão (lá chamado
+// só ao concluir o assistente de primeira execução, que este servidor não
+// tem — o próprio primeiro arranque já é o evento correspondente).
+markTrialStartIfNeeded();
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   const nets = os.networkInterfaces();

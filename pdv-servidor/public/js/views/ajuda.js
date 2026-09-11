@@ -176,6 +176,19 @@ const FAQ_CATEGORIES = [
     ],
   },
   {
+    label: 'Dados da loja e licença',
+    items: [
+      {
+        q: '"CNPJ já cadastrado e travado — ..."',
+        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes — depois do primeiro salvamento, o campo trava de propósito (ver tópico "Dados da loja e licença"). Clique em "Desbloquear edição" e cole o código de liberação — peça a quem administra a instalação, é o mesmo lugar que fornece a chave de ativação.',
+      },
+      {
+        q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
+        a: 'A chave/código colado não é válido para o que você está tentando fazer — pode ser um código do tipo errado (ex: um código de liberação de CNPJ colado onde se espera uma chave de ativação, ou o contrário), estar vencido, ou ter sido digitado com algum caractere a menos/a mais. Confira se copiou o texto completo, sem espaços extras no início/fim, e se é mesmo do tipo certo pra o que você quer fazer.',
+      },
+    ],
+  },
+  {
     label: 'Backup',
     items: [
       {
@@ -257,7 +270,7 @@ const TOPICS = [
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
       <h3>Ligando o sistema pela primeira vez</h3>
-      <p>Este é o servidor multi-terminal: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Na primeiríssima vez, o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> — usuário <code>admin</code>, senha <code>admin123</code> — pronto pra logar direto, sem nenhum assistente de cadastro de empresa (CNPJ, endereço) pra preencher antes.</p>
+      <p>Este é o servidor multi-terminal: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Na primeiríssima vez, o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> — usuário <code>admin</code>, senha <code>admin123</code> — pronto pra logar direto, sem nenhum assistente de cadastro pra preencher antes. O cadastro da loja (CNPJ, endereço...) e a ativação da licença ficam em <strong>Dados da loja</strong>, no menu — veja o tópico "Dados da loja e licença", mais abaixo.</p>
       <div class="tip"><strong>Primeira coisa a fazer:</strong> loga com <code>admin</code>/<code>admin123</code> e troca essa senha (tela <strong>Usuários</strong>) — ela é a mesma em toda instalação nova, então só continua segura enquanto ninguém de fora souber que você não trocou.</div>
 
       <h3>O Administrador Geral</h3>
@@ -273,6 +286,7 @@ const TOPICS = [
 
       <h3>Vendedores</h3>
       <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
+      <div class="tip"><strong>Primeiro login de um vendedor novo:</strong> a tela que abre sozinha, só dessa vez, é esta mesma Ajuda — pra já aprender a usar o sistema antes de mexer em qualquer coisa. Do segundo login em diante, cai sempre no Painel, como todo mundo (veja "Entrando todo dia" logo acima: nenhum login herda a tela em que a sessão anterior — de qualquer usuário — estava, de propósito, pra nunca cair sem querer numa tela que este usuário não tem permissão de usar).</div>
 
       <h3>Tela cheia e mais de uma aba aberta</h3>
       <p>Abrindo o endereço do sistema no navegador, ele carrega numa <strong>aba normal</strong>, igual qualquer site. Quem preferir usar em tela cheia (sem barra de abas nem de endereço) pode ligar isso na hora: na tela de <strong>login</strong>, o botão <strong>${icon('fullscreen', { size: 14 })}</strong> no canto superior direito do card entra e sai da tela cheia nativa do navegador — o ícone troca conforme o estado, e também reconhece se você saiu apertando Esc.</p>
@@ -636,7 +650,33 @@ Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Reg
       </ul>
 
       <h3>Gerenciando vendedores</h3>
-      <p>Na tela <strong>Usuários</strong>: <strong>Editar</strong> muda nome e as permissões do vendedor; <strong>Desativar</strong> impede login (as vendas dele continuam no histórico) e pode ser revertido em <strong>Reativar</strong>; <strong>Redefinir senha</strong> troca a senha de qualquer vendedor sem precisar saber a antiga.</p>
+      <p>Na tela <strong>Usuários</strong>: <strong>Editar</strong> muda nome, <strong>usuário de login</strong> e as permissões do vendedor; <strong>Desativar</strong> impede login (as vendas dele continuam no histórico) e pode ser revertido em <strong>Reativar</strong>; <strong>Redefinir senha</strong> troca a senha de qualquer vendedor sem precisar saber a antiga.</p>
+      <div class="tip"><strong>Trocou de funcionário?</strong> Não precisa cadastrar um vendedor do zero (perdendo as permissões já configuradas) — edite o vendedor que saiu: troque o nome e o usuário de login pro do novo funcionário, e redefina a senha. A mesma conta continua, com o histórico de vendas antigo preservado normalmente (fica registrado com o nome de quem vendeu <em>na época</em>, não muda retroativamente).</div>
+    `,
+  },
+  {
+    id: 'empresa',
+    icon: icon('store', { size: 16 }),
+    title: 'Dados da loja e licença',
+    html: `
+      <h2>Dados da loja e licença</h2>
+      <p class="help-subtitle">Cadastro fiscal, ativação da licença — exige a permissão "Acessar Dados da loja".</p>
+
+      <h3>Cadastro fiscal</h3>
+      <p>Em <strong>Dados da loja</strong>, preencha CNPJ, razão social, nome fantasia, endereço e os demais dados da empresa. Isso não é só burocracia: é o que aparece no <strong>recibo impresso</strong> de cada venda e no <strong>relatório em PDF</strong> — sem preencher, os dois saem sem identificação nenhuma da loja, o que não serve pra fiscalização.</p>
+
+      <h3>CNPJ trava depois de salvo</h3>
+      <p>O campo nasce vazio e editável. Assim que um CNPJ é salvo pela primeira vez, ele <strong>trava</strong> — não dá pra editar de novo por engano ou sem querer. Pra corrigir um CNPJ já salvo, clique em <strong>"Desbloquear edição (com código do suporte)"</strong> e cole o código de liberação — peça esse código a quem administra a instalação (o mesmo lugar que fornece a chave de ativação).</p>
+
+      <h3>Ativação (trial, demo, definitiva)</h3>
+      <p>Todo servidor novo começa num <strong>período de teste</strong>. O card "Ativação", no topo desta tela, mostra a situação atual:</p>
+      <ul>
+        <li><span class="badge badge-gold">Período de teste</span> — ainda dentro do prazo de avaliação.</li>
+        <li><span class="badge badge-gold">Demo</span> — uma chave de demonstração foi ativada, com data de expiração própria.</li>
+        <li><span class="badge badge-green">Definitiva — ativada</span> — licença completa, sem expiração.</li>
+      </ul>
+      <p>Tem uma chave em mãos? Cole no campo e clique em <strong>Ativar</strong>. Não tem? Clique em <strong>Solicitar chave</strong> pra abrir um contato pronto (WhatsApp ou e-mail) com o suporte.</p>
+      <div class="warn-box"><strong>Período de teste encerrado sem chave ativada:</strong> o sistema inteiro fica bloqueado — ninguém entra, nem o Administrador Geral — até uma chave válida ser ativada. A tela de bloqueio já tem os mesmos atalhos de contato e um campo pra colar a chave, então dá pra resolver sem precisar de ajuda de fora pra "destravar o sistema" tecnicamente.</div>
     `,
   },
   {
@@ -771,7 +811,7 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ');
 }
 
-/** Índice de busca da Ajuda — achado do usuário: com 14 tópicos e 34
+/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 36
  * perguntas de F.A.Q, navegar só pelo menu lateral demorava demais pra
  * achar algo específico. `searchText` cobre título/pergunta E o corpo da
  * resposta/tópico inteiro (sem tags) — uma palavra que só aparece dentro

@@ -1,33 +1,46 @@
-// Dados/políticas da loja — versão multi-terminal. `getCompany`/
-// `saveCompany` cobrem a política de venda (desconto máximo do vendedor,
-// exigir caixa aberto, juro do parcelamento no cartão) — o que
-// views/company.js (nova, enxuta) edita e views/sale.js lê
-// (`company.policies.X`). `isCompanyRegistered`/cadastro inicial (cnpj,
-// endereço, ATIVAÇÃO DE LICENÇA) ficam de fora de propósito: o servidor
-// não tem esse conceito (sem trial/demo bloqueando o uso, ver
-// README) — a extensão original mistura isso tudo numa `views/company.js`
-// só; aqui a tela nova extrai SÓ a política de venda, que é a parte sem
-// nenhuma relação com licenciamento comercial.
+// Dados/políticas da loja — versão multi-terminal. Cobre os dois blocos
+// que views/company.js edita: os dados cadastrais de verdade (CNPJ, razão
+// social, endereço...) — sem eles, o recibo/relatório impresso saem sem
+// nome/CNPJ da loja (ver components/receipt.js/reportPrint.js, que já
+// esperavam esses campos prontos) e não valem pra fiscalização — e a
+// política de venda (desconto máximo, exigir caixa aberto, juro do
+// parcelamento). Diferente da extensão: sem assistente de primeira
+// execução separado (este servidor nunca teve um) — o CNPJ nasce vazio e
+// é editável direto nesta mesma tela; uma vez salvo, trava (ver
+// `cnpjLocked`/`cnpjUnlockToken` abaixo, e a validação de verdade em
+// routes/company.js).
 import { api } from './apiClient.js';
 
-/** Devolve `{ policies: { vendorMaxDiscountPercent, requireOpenCashSession,
- * creditInterest } }` — mesmo formato de acesso de
- * app/js/data/companyRepo.js#getCompany() da extensão
- * (`company.policies.X`), mesmo a rota do servidor guardando esses campos
- * soltos na raiz da resposta (ver routes/company.js). */
+const POLICY_KEYS = ['vendorMaxDiscountPercent', 'requireOpenCashSession', 'creditInterest', 'loyaltyPointsPerReal'];
+
+/** Devolve `{ cnpj, razaoSocial, ..., cnpjLocked, policies: { X } }` —
+ * mesmo formato de acesso de app/js/data/companyRepo.js#getCompany() da
+ * extensão (`company.cnpj` na raiz, `company.policies.X` aninhado),
+ * mesmo o servidor devolvendo tudo solto na raiz da resposta (ver
+ * routes/company.js). */
 export async function getCompany() {
-  const policies = await api('/api/company');
-  return { policies };
+  const data = await api('/api/company');
+  const info = {};
+  const policies = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (POLICY_KEYS.includes(key)) policies[key] = value;
+    else info[key] = value;
+  }
+  return { ...info, policies };
 }
 
-/** Grava um PATCH das políticas — só os campos presentes no objeto são
- * alterados (ver routes/company.js#PUT, que ecoa esse mesmo raciocínio de
- * patch parcial). Exige a permissão 'empresa' no servidor; sem ela, a
- * chamada rejeita com a mensagem amigável já pronta (ver api(), que
- * lança Error com `body.error`) — a tela mostra isso direto, sem
- * precisar checar a permissão aqui antes de propósito (mesmo padrão já
- * estabelecido em financeiro.js/backup.js: nunca confiar só na tela). */
+/** Grava um PATCH — só os campos presentes no objeto são alterados (ver
+ * routes/company.js#PUT, mesmo raciocínio de patch parcial de sempre).
+ * `patch.cnpjUnlockToken` (opcional) só é necessário quando `patch.cnpj`
+ * está tentando MUDAR um CNPJ que já estava cadastrado — o servidor é
+ * quem decide se precisa dele ou não, esta função só repassa. */
 export async function saveCompany(patch) {
-  const policies = await api('/api/company', { method: 'PUT', body: JSON.stringify(patch) });
-  return { policies };
+  const data = await api('/api/company', { method: 'PUT', body: JSON.stringify(patch) });
+  const info = {};
+  const policies = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (POLICY_KEYS.includes(key)) policies[key] = value;
+    else info[key] = value;
+  }
+  return { ...info, policies };
 }

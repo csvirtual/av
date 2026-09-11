@@ -36,10 +36,10 @@ export async function createUser({ nome, username, password, permissions }) {
   return user;
 }
 
-export async function updateUser(id, { nome, permissions } = {}) {
+export async function updateUser(id, { nome, username, permissions } = {}) {
   const { user } = await api(`/api/users/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    body: JSON.stringify({ nome, permissions }),
+    body: JSON.stringify({ nome, username, permissions }),
   });
   return user;
 }

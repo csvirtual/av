@@ -1,11 +1,11 @@
-// Tela "Dados da loja" (public/js/views/company.js) — nova, enxuta: só a
-// política de venda (desconto máximo, exigir caixa aberto, juro do
-// parcelamento no cartão). routes/company.js já existia desde a Fase 8
-// (leitura pra sale.js, escrita já testada por API em test-security.cjs);
-// esta tela fecha a lacuna de EDITAR isso sem chamar a API na unha —
-// achado real de um usuário tentando configurar o juro do cartão sem
-// achar onde. Cadastro/licenciamento (fora de escopo do servidor, ver
-// README) continuam sem tela nenhuma — só a política mesmo.
+// Tela "Dados da loja" (public/js/views/company.js) — foco original desta
+// suíte: a POLÍTICA de venda (desconto máximo, exigir caixa aberto, juro
+// do parcelamento no cartão), incluindo o caminho fim a fim (juro
+// configurado aqui valendo numa venda real) e o gate de permissão. O
+// cadastro fiscal completo e a ativação de licença que a tela ganhou
+// depois (achado do usuário — ver README, "Achados de uso real, 11/set")
+// são cobertos com detalhe à parte em test-company-full.cjs; aqui só
+// preenche o mínimo desses campos pra passar da validação do formulário.
 //
 // Rodar: sobe o servidor (`node server.js`) numa janela, `node
 // test-company.cjs` noutra.
@@ -55,6 +55,23 @@ async function apiCall(page, path, opts = {}) {
   check('Campo de desconto máximo vem preenchido (padrão 10)', vendorMaxDiscountInitial === '10', vendorMaxDiscountInitial);
 
   // ---------- Edita e salva ----------
+  // Achado (depois que "Dados da loja" ganhou o cadastro fiscal completo,
+  // ver test-company-full.cjs): o formulário agora é um só, com CNPJ/
+  // endereço obrigatórios (*) junto da política — sem preenchê-los, a
+  // validação do próprio cliente barra o submit antes de chegar no
+  // servidor. Preenche o mínimo pra passar da validação; o foco deste
+  // teste continua sendo a política (desconto/caixa/juro), já coberto
+  // com detalhe pelo cadastro fiscal em si em test-company-full.cjs.
+  await page.fill('#cnpj', '11.222.333/0001-81');
+  await page.fill('#telefone', '71999998888');
+  await page.fill('#razaoSocial', 'Loja Teste LTDA');
+  await page.fill('#nomeFantasia', 'Loja Teste');
+  await page.fill('#logradouro', 'Rua Exemplo');
+  await page.fill('#numero', '1');
+  await page.fill('#bairro', 'Centro');
+  await page.fill('#cidade', 'Salvador');
+  await page.selectOption('#uf', 'BA');
+  await page.fill('#cep', '40000-000');
   await page.fill('#vendorMaxDiscount', '15');
   await page.check('#requireCashSession');
   await page.check('#creditInterestFreeEnabled');
@@ -64,7 +81,7 @@ async function apiCall(page, path, opts = {}) {
   await page.click('#company-save-btn');
   await page.waitForTimeout(500);
   const toastText = await page.locator('.toast').innerText().catch(() => '');
-  check('Toast de sucesso ao salvar', /salva/i.test(toastText), toastText);
+  check('Toast de sucesso ao salvar', /atualizado/i.test(toastText), toastText);
 
   // ---------- Confirma no servidor (fonte de verdade), não só na tela ----------
   const afterSave = await apiCall(page, '/api/company');
@@ -131,7 +148,7 @@ async function apiCall(page, path, opts = {}) {
   await pageV.fill('#vendorMaxDiscount', '99');
   await pageV.click('#company-save-btn');
   await pageV.waitForTimeout(500);
-  const vendorErrText = await pageV.locator('#company-form-error').innerText().catch(() => '');
+  const vendorErrText = await pageV.locator('#form-error').innerText().catch(() => '');
   check('Vendedor sem permissão recebe erro amigável (403), tela não trava', /permiss/i.test(vendorErrText), vendorErrText);
 
   const afterVendorAttempt = await apiCall(page, '/api/company');

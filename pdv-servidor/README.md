@@ -948,6 +948,33 @@ da loja (`nomeFantasia`, `encarregadoLgpd`, etc.) simplesmente não
 existem aqui, e o único lugar que os lê (`ajuda.js`, com fallback
 seguro) nunca quebra por causa disso.
 
+> **Atualização (11/set): decisão revertida — o sistema de licenciamento
+> FOI portado, achado do usuário.** O motivo original ("servidor interno
+> de uma loja só") não se sustentava: este servidor também é distribuído/
+> licenciado a lojas terceiras, e os recibos/relatórios impressos
+> (`components/receipt.js`/`reportPrint.js`) já esperavam `company.cnpj`/
+> `nomeFantasia`/`razaoSocial`/`telefone` prontos — sempre vinham
+> `undefined`, então todo comprovante saía sem identificação da loja
+> nenhuma, inválido pra fiscalização. `lib/license.js` (ECDSA P-256, MESMA
+> chave pública da extensão — o gerador da chave privada, externo,
+> continua o mesmo sem nenhuma mudança), `lib/licenseState.js` (trial/
+> ativação numa tabela própria — `license_state`, de propósito FORA de
+> `BACKUP_TABLES`, pra restaurar um backup nunca resetar o trial nem
+> apagar uma ativação, mesmo espírito do `chrome.storage.local` da
+> extensão) e `routes/license.js` (`GET /status`, `POST /activate`, sem
+> `requireAuth` de propósito — precisa bloquear o sistema INTEIRO,
+> inclusive a tela de login, quando o trial/demo expira). Diferença
+> deliberada da extensão: sem assistente de primeira execução separado
+> (este servidor sempre nasce com o admin já criado sozinho, ver
+> `lib/seedAdmin.js`) — o CNPJ nasce vazio e é digitado direto em "Dados
+> da loja" (`views/company.js`, agora com o cadastro fiscal completo:
+> CNPJ, razão social, endereço...), travando (só destrava com um código
+> de liberação assinado, `tipo:'cnpj-unlock'`, conferido no SERVIDOR —
+> `routes/company.js#PUT` — nunca só no campo desabilitado da tela) assim
+> que o primeiro CNPJ não-vazio é salvo. Trial: 7 dias (a extensão usa 1h,
+> valor de teste/demonstração do código-fonte, não pensado pra cliente
+> real). Testado em `test-company-full.cjs` (19/19).
+
 18. ✅ **`views/backup.js` real ligada** (09/set) — décima quinta e
     última tela real do roteiro original: exportar, restaurar (com
     prévia de contagem antes/depois) e **"Zerar dados e reiniciar a
@@ -1400,6 +1427,11 @@ lacunas de uso descobertas na prática.
   o menu esconde o link de quem não tem a permissão `empresa`, mas um
   link direto ainda renderiza a tela — o gate de verdade é sempre o
   servidor (403 amigável, tela não trava).
+
+  > **Atualização (11/set):** "sem nada de licenciamento" acima não vale
+  > mais — ver "Achados de uso real (11/set)" logo abaixo. `views/company.js`
+  > ganhou o cadastro fiscal completo e a Ativação de licença de volta;
+  > só o assistente de primeira execução continua fora de escopo.
 
 - **Menu lateral (celular) — três achados de UI, mesma tela `.sidebar`
   gaveta (breakpoint 900px)**:

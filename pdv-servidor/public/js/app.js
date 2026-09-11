@@ -7,12 +7,17 @@
 // (renderShell monta a casca uma vez por login; renderCurrentRoute troca
 // só a tela a cada #hash).
 //
-// Fora de escopo aqui, de propósito (ver README): tudo que gira em torno
-// do assistente de primeira execução e do sistema de licenciamento
-// comercial da extensão (setup.js, company.js, trial, chave de ativação) —
-// este servidor não é um produto vendido/licenciado por instalação, é
-// software interno de uma loja só, sempre com pelo menos um admin já
-// cadastrado (ver seed.js).
+// Achado do usuário: diferente do que este comentário dizia antes, o
+// sistema de licenciamento da extensão (trial/demo/chave de ativação,
+// mesma chave pública — ver lib/license.js) FOI portado, porque este
+// servidor também é distribuído/licenciado a lojas terceiras — só o
+// assistente de primeira execução (setup.js da extensão) continua fora
+// de escopo, porque este servidor sempre nasce com o admin já criado
+// sozinho (ver lib/seedAdmin.js): o CNPJ é digitado direto em "Dados da
+// loja" (views/company.js) em vez de numa tela de setup à parte. Ver
+// renderLicenseBlockedScreen logo abaixo — igual à extensão, o sistema
+// INTEIRO (inclusive a tela de login) fica bloqueado quando o trial/demo
+// expira sem uma chave definitiva ativada.
 import { getSessionUserId, setSessionUserId, onSessionUserIdChanged, clearSession, touchActivity, getIdleMs, IDLE_LIMIT_MS } from './session.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderProducts } from './views/products.js';
@@ -33,6 +38,8 @@ import { renderCompany } from './views/company.js';
 import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 import { getCompany } from './data/companyRepo.js';
+import { getLicenseStatus, activateLicenseKey } from './data/licenseRepo.js';
+import { openSupportWhatsappModal, openSupportEmailModal } from './components/supportContact.js';
 import { logAction } from './data/auditRepo.js';
 import { getThemePreference, applyTheme } from './theme.js';
 import { icon } from './components/icon.js';
@@ -263,6 +270,18 @@ function renderLogin() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || 'Erro ao entrar.');
+      // Achado do usuário: sem isto, um login novo herdava o #hash que
+      // ficou de quem usou este navegador por último — com permissões
+      // diferentes, o próximo a entrar podia cair numa tela que não devia
+      // acessar. Definido ANTES de setSessionUserId() (ainda na tela de
+      // login, sem #view-root, então um eventual onhashchange de sobra da
+      // sessão anterior não tem onde renderizar nada — ver
+      // renderCurrentRoute) pra já estar valendo assim que renderShell()
+      // rodar: todo login cai no Painel, exceto o primeiro login de
+      // verdade de um vendedor recém-cadastrado (`firstLogin`, decidido
+      // pelo servidor — ver routes/auth.js), que cai na Ajuda uma única
+      // vez.
+      location.hash = body.firstLogin ? '#/ajuda' : '#/dashboard';
       // Sem boot() explícito aqui de propósito — setSessionUserId() já
       // dispara onSessionUserIdChanged sozinho, inclusive nesta mesma aba
       // (ver comentário em session.js). Chamar os dois juntos duplicava
@@ -293,6 +312,9 @@ let stopNavScrollWatch = null;
 // abrir o menu quando a página não está mais no topo (ver
 // updateMenuToggleVisibility dentro de renderShell).
 let stopMenuScrollWatch = null;
+// Mesmo motivo de novo, pro listener em `document` que fecha a gaveta do
+// menu quando um modal abre (ver dentro de renderShell).
+let stopModalOpenWatch = null;
 // Função de limpeza (opcional) que a TELA ATUAL devolveu — ver
 // renderCurrentRoute(). `null` quando a tela atual não precisa de nenhuma
 // limpeza (a maioria não precisa: trocar innerHTML já solta os listeners
@@ -317,6 +339,7 @@ async function renderShell(user) {
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
   if (stopNavScrollWatch) { stopNavScrollWatch(); stopNavScrollWatch = null; }
   if (stopMenuScrollWatch) { stopMenuScrollWatch(); stopMenuScrollWatch = null; }
+  if (stopModalOpenWatch) { stopModalOpenWatch(); stopModalOpenWatch = null; }
   if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
 
   root.innerHTML = `
@@ -381,6 +404,18 @@ async function renderShell(user) {
   window.addEventListener('scroll', updateMenuToggleVisibility, { passive: true });
   stopMenuScrollWatch = () => window.removeEventListener('scroll', updateMenuToggleVisibility);
   updateMenuToggleVisibility();
+
+  // Achado do usuário (celular): abrir a gaveta do menu e, sem fechá-la,
+  // tocar num item que abre um modal (ex: "Sair", que pede confirmação)
+  // deixava a gaveta inteira aberta atrás do modal. `components/modal.js`
+  // avisa aqui (evento genérico, sem conhecer #sidebar) toda vez que um
+  // modal abre ou fecha — fecha a gaveta só na ABERTURA (closeSidebar() é
+  // seguro chamar mesmo se ela já estiver fechada). Precisa do
+  // removeEventListener no cleanup: `document` nunca é recriado entre
+  // logins, diferente dos elementos da gaveta em si.
+  const onModalOpenChange = (ev) => { if (ev.detail.open) closeSidebar(); };
+  document.addEventListener('pdv:modal-open-change', onModalOpenChange);
+  stopModalOpenWatch = () => document.removeEventListener('pdv:modal-open-change', onModalOpenChange);
 
   const navGroup = document.getElementById('nav-group');
   navGroup.innerHTML = Object.entries(ROUTES)
@@ -622,8 +657,21 @@ async function bootImpl() {
   if (stopIdleWatch) { stopIdleWatch(); stopIdleWatch = null; }
   if (stopNavScrollWatch) { stopNavScrollWatch(); stopNavScrollWatch = null; }
   if (stopMenuScrollWatch) { stopMenuScrollWatch(); stopMenuScrollWatch = null; }
+  if (stopModalOpenWatch) { stopModalOpenWatch(); stopModalOpenWatch = null; }
   if (unmountCurrentRoute) { unmountCurrentRoute(); unmountCurrentRoute = null; }
   root.innerHTML = '<div class="boot-loading">Carregando…</div>';
+
+  // Igual à extensão: conferido ANTES até da tela de login — sem chave
+  // definitiva ativada e com o trial/demo vencido, o sistema INTEIRO fica
+  // bloqueado, ninguém entra (nem admin). GET /api/license/status não
+  // exige sessão nenhuma (ver routes/license.js), de propósito: precisa
+  // funcionar mesmo sem ninguém logado ainda.
+  const license = await getLicenseStatus();
+  if (!license.active) {
+    const company = await getCompany();
+    renderLicenseBlockedScreen(company);
+    return;
+  }
 
   const userId = await getSessionUserId();
   if (!userId) {
@@ -653,6 +701,70 @@ async function bootImpl() {
 // empilharia mais um listener.
 onSessionUserIdChanged(() => boot());
 boot();
+
+// Motivo da mensagem passada pro suporte, igual ao atalho "Solicitar
+// chave" em Dados da loja — ver components/supportContact.js.
+const TRIAL_REASON_TEXT = 'meu período de teste encerrou — gostaria de saber mais sobre a ativação';
+
+// Tela de bloqueio por trial/demo expirado (sem chave de ativação válida
+// guardada). Tem campo pra colar a chave na hora — sem isso a pessoa
+// ficaria travada aqui sem nenhum jeito de sair, mesmo já tendo comprado.
+// Porta quase literal de app.js#renderLicenseBlockedScreen da extensão,
+// menos o que não existe mais aqui: setStoredActivationKey/verifyLicenseKey
+// direto (a verificação e a gravação agora são responsabilidade do
+// servidor, ver POST /api/license/activate).
+function renderLicenseBlockedScreen(company) {
+  root.innerHTML = `
+    <div class="boot-loading">
+      <div class="card" style="max-width:440px;">
+        <h1 style="font-size:18px;margin:0 0 18px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Período de teste encerrado</h1>
+        <p style="margin:0 0 14px;text-align:center;">O período de teste deste sistema encerrou. Entre em contato pelo WhatsApp ou e-mail abaixo pra receber sua chave de ativação — é rápido.</p>
+        <div style="display:flex;justify-content:center;gap:22px;margin:0 0 16px;">
+          <div style="text-align:center;">
+            <button type="button" class="contact-icon-btn" id="license-whatsapp-btn" title="Falar no WhatsApp">${icon('whatsapp', { size: 42 })}</button>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">WhatsApp</div>
+          </div>
+          <div style="text-align:center;">
+            <button type="button" class="contact-icon-btn" id="license-email-btn" title="Enviar e-mail">${icon('mail', { size: 42 })}</button>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">E-mail</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin:0 0 16px;color:var(--text-muted);font-size:12px;">
+          <div style="flex:1;height:1px;background:var(--border);"></div>ou<div style="flex:1;height:1px;background:var(--border);"></div>
+        </div>
+        <div id="license-error"></div>
+        <div class="field" style="text-align:center;gap:10px;">
+          <label for="license-key-input">Já tem uma chave? Cole aqui</label>
+          <input id="license-key-input" placeholder="Cole a chave de ativação" style="text-align:center;">
+        </div>
+        <button class="btn" id="license-activate-btn" style="width:100%;">Ativar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('license-whatsapp-btn').addEventListener('click', () => openSupportWhatsappModal(company, TRIAL_REASON_TEXT));
+  document.getElementById('license-email-btn').addEventListener('click', () => openSupportEmailModal(company, TRIAL_REASON_TEXT));
+  document.getElementById('license-activate-btn').addEventListener('click', async () => {
+    const errBox = document.getElementById('license-error');
+    errBox.innerHTML = '';
+    const input = document.getElementById('license-key-input');
+    const btn = document.getElementById('license-activate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+    try {
+      // POST /api/license/activate já confere a assinatura, o CNPJ e o
+      // tipo (só aceita 'demo'/'full' — 'cnpj-unlock' é rejeitado) — ver
+      // routes/license.js. Sem sessão nenhuma exigida de propósito: quem
+      // está bloqueado não tem como logar pra "ganhar permissão" antes.
+      await activateLicenseKey(input.value.trim());
+      showToast('Chave ativada com sucesso!', 'success');
+      boot();
+    } catch (err) {
+      errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = 'Ativar';
+    }
+  });
+}
 
 function renderTabBlockedScreen() {
   root.innerHTML = `

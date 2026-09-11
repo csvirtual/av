@@ -124,6 +124,11 @@ export async function renderUsers(container, ctx) {
       bodyHtml: `
         <div id="modal-error"></div>
         <div class="field"><label>Nome completo *</label><input id="f-nome" value="${escapeHtml(user.nome)}"></div>
+        <div class="field">
+          <label>Usuário de login *</label>
+          <input id="f-username" value="${escapeHtml(user.username)}">
+          <span class="hint">Pra reaproveitar esta conta com um vendedor novo (ex: o antigo saiu da loja), troque nome e login aqui e a senha em "Redefinir senha", ao lado.</span>
+        </div>
         <p class="section-title">Permissões</p>
         <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
           O que este vendedor pode fazer além do básico (vender, consultar estoque, caixa, clientes, carreto,
@@ -134,13 +139,23 @@ export async function renderUsers(container, ctx) {
       onSubmit: async (modalEl) => {
         const errBox = modalEl.querySelector('#modal-error');
         const nome = modalEl.querySelector('#f-nome').value.trim();
-        if (!nome) { errBox.innerHTML = '<div class="form-error">Nome é obrigatório.</div>'; return false; }
+        const username = modalEl.querySelector('#f-username').value.trim();
+        if (!nome || !username) { errBox.innerHTML = '<div class="form-error">Preencha nome e usuário de login.</div>'; return false; }
+        // Só confere duplicidade se o login realmente mudou — checar contra
+        // si mesma (nome igual, ou só maiúsculas/minúsculas diferentes)
+        // sempre acusaria "já existe" por engano. Mesmo raciocínio do
+        // servidor (ver routes/users.js#PUT), aqui só como checagem
+        // otimista — a de verdade é sempre lá.
+        if (username.toLowerCase() !== user.username.toLowerCase() && await findByUsername(username)) {
+          errBox.innerHTML = '<div class="form-error">Esse usuário de login já existe.</div>';
+          return false;
+        }
         try {
-          await updateUser(user.id, { nome, permissions: collectPermissions(modalEl) });
+          await updateUser(user.id, { nome, username, permissions: collectPermissions(modalEl) });
           await logAction({
             userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
             action: 'Edição de usuário',
-            details: `Vendedor "${nome}" (${user.username}) editado — nome e permissões atualizados.`,
+            details: `Vendedor "${nome}" (${username}) editado — nome, usuário de login e permissões atualizados.`,
             entity: 'user', entityId: user.id,
           });
           showToast('Vendedor atualizado.', 'success');

@@ -21,8 +21,19 @@ const openModals = new Set();
 // único lugar por onde todo modal — openModal E confirmDialog — nasce e
 // morre) deixa o CSS escondê-lo enquanto `openModals` não estiver vazio,
 // sem o modal.js precisar saber nada sobre o menu lateral.
+//
+// Segundo achado do usuário (mesma tela, celular): abrir a GAVETA do menu
+// e, sem fechá-la, tocar em "Sair" (que abre um confirmDialog) deixava a
+// gaveta inteira aberta atrás do modal de confirmação — o "esconder só o
+// botão de hambúrguer" acima não resolve isso, porque a gaveta em si é
+// outro elemento. Um evento no `document` (não só a classe do body, que o
+// app.js já observaria via MutationObserver, mais complicado à toa) deixa
+// renderShell() (dono de fechar a gaveta) reagir sem modal.js precisar
+// conhecer #sidebar/#sidebar-overlay — mesmo desacoplamento de sempre.
 function syncModalOpenClass() {
-  document.body.classList.toggle('has-open-modal', openModals.size > 0);
+  const isOpen = openModals.size > 0;
+  document.body.classList.toggle('has-open-modal', isOpen);
+  document.dispatchEvent(new CustomEvent('pdv:modal-open-change', { detail: { open: isOpen } }));
 }
 
 export function closeAllModals() {

@@ -8,6 +8,7 @@ import { getLoginLockState } from '../lib/loginLockout.js';
 const router = Router();
 
 const findById = db.prepare('SELECT * FROM users WHERE id = ?');
+const updateUserData = db.prepare('UPDATE users SET data = @data WHERE id = @id');
 
 function publicUser(row) {
   const u = JSON.parse(row.data);
@@ -43,6 +44,26 @@ router.post('/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
     const row = findById.get(user.id);
 
+    // Achado do usuário: até aqui, todo login herdava a MESMA rota
+    // (#hash) que quem usou este navegador por último estava vendo — se
+    // as permissões forem diferentes, o próximo a entrar podia cair numa
+    // tela que não devia acessar (com as ações bloqueadas, mas ainda
+    // assim confuso). Regra nova, decidida aqui no servidor pra valer em
+    // qualquer terminal: todo login cai no Painel — EXCETO o primeiro
+    // login de verdade de um vendedor recém-cadastrado, que cai na Ajuda
+    // uma única vez, pra aprender a usar o sistema antes de mexer em
+    // qualquer coisa. `hasSeenAjuda` nasce `false` só em vendedores (ver
+    // routes/users.js#POST) e vira `true` aqui, então mesmo esse vendedor
+    // nunca mais vê a Ajuda forçada nos próximos logins. Nunca vale pra
+    // admin (só existe um, é quem monta a loja — não precisa desse
+    // onboarding). O cliente (app.js) decide o `#/dashboard` vs `#/ajuda`
+    // com este único campo da resposta — ver renderLogin().
+    const firstLogin = user.role === 'vendedor' && !user.hasSeenAjuda;
+    if (firstLogin) {
+      user.hasSeenAjuda = true;
+      updateUserData.run({ id: user.id, data: JSON.stringify(user) });
+    }
+
     const token = createSession(user.id);
     res.cookie('session', token, {
       httpOnly: true,
@@ -52,7 +73,7 @@ router.post('/login', async (req, res) => {
       maxAge: 12 * 60 * 60 * 1000,
     });
     logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id });
-    res.json({ user: publicUser(row) });
+    res.json({ user: publicUser(row), firstLogin });
   } catch (err) {
     // Achado de auditoria (auditoria de prontidão pra produção): esta rota
     // é, de longe, a mais chamada do sistema inteiro (todo login) — era a

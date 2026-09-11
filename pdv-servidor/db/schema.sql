@@ -175,3 +175,17 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   last_seen_at INTEGER NOT NULL
 );
+
+-- Estado do trial/ativação de licença (ver lib/license.js, lib/licenseState.js)
+-- — equivalente ao chrome.storage.local da extensão (app/js/data/licenseRepo.js),
+-- que por sua vez é deliberadamente separado do IndexedDB (o que viaja no
+-- backup) pelo MESMO motivo daqui: se isto morasse na tabela `company` (que
+-- entra em todo backup, ver lib/backup.js#BACKUP_TABLES), restaurar um
+-- backup tirado durante o trial "resetaria o relógio" de qualquer instalação
+-- nova sozinho, sem chave nenhuma — furo que a extensão evita mantendo o
+-- estado da licença fora do que é salvo/restaurado. Aqui o equivalente é:
+-- esta tabela existe, mas de propósito NUNCA aparece em BACKUP_TABLES.
+CREATE TABLE IF NOT EXISTS license_state (
+  id TEXT PRIMARY KEY,
+  data TEXT NOT NULL
+);

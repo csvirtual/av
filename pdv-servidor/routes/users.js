@@ -18,6 +18,13 @@ const router = Router();
 
 const insertUserStmt = db.prepare('INSERT INTO users (id, username_lower, data) VALUES (@id, @usernameLower, @data)');
 const updateUserStmt = db.prepare('UPDATE users SET data = @data WHERE id = @id');
+// Só usado no PUT /:id, que agora também pode mudar o login (ver abaixo) —
+// `username_lower` é uma COLUNA própria (não só um campo dentro do JSON de
+// `data`), usada pra achar a conta no login (ver findByUsernameStmt.js/
+// verifyLogin.js). Gravar só `data` e esquecer desta coluna deixaria o
+// login antigo continuando a funcionar (e o novo, não) — sempre as duas
+// juntas, na mesma escrita.
+const updateUserFullStmt = db.prepare('UPDATE users SET data = @data, username_lower = @usernameLower WHERE id = @id');
 const getUserStmt = db.prepare('SELECT data FROM users WHERE id = ?');
 const findByUsernameStmt = db.prepare('SELECT data FROM users WHERE username_lower = ?');
 const listUsersStmt = db.prepare('SELECT data FROM users');
@@ -89,6 +96,28 @@ router.put('/:id', (req, res) => {
       if (!nome) throw new Error('Nome é obrigatório.');
       user.nome = nome;
     }
+    // Achado do usuário: só dava pra editar o nome completo — sem poder
+    // trocar o login, não tinha como reaproveitar a conta de um vendedor
+    // que saiu da loja pro próximo que entrar no lugar dele (precisava
+    // desativar a antiga e cadastrar uma nova do zero, perdendo o
+    // histórico de permissões já configurado). Mesma checagem de
+    // duplicidade do cadastro (findByUsernameStmt), só que ignorando a
+    // PRÓPRIA conta sendo editada — senão salvar sem mudar o login (ou só
+    // mudando maiúsculas/minúsculas) sempre acusaria "duplicado" contra
+    // si mesma.
+    if (req.body.username !== undefined) {
+      const username = req.body.username.trim();
+      if (!username) throw new Error('Usuário de login é obrigatório.');
+      const usernameLower = username.toLowerCase();
+      if (usernameLower !== user.usernameLower) {
+        const existing = findByUsernameStmt.get(usernameLower);
+        if (existing && rowToUser(existing).id !== user.id) {
+          throw new Error('Já existe um usuário com esse nome de login.');
+        }
+      }
+      user.username = username;
+      user.usernameLower = usernameLower;
+    }
     if (req.body.permissions !== undefined) {
       const requested = sanitizePermissions(req.body.permissions);
       if (req.userRole === 'admin') {
@@ -105,7 +134,7 @@ router.put('/:id', (req, res) => {
         user.permissions = next;
       }
     }
-    updateUserStmt.run({ id: user.id, data: JSON.stringify(user) });
+    updateUserFullStmt.run({ id: user.id, usernameLower: user.usernameLower, data: JSON.stringify(user) });
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Edição de usuário', details: `Cadastro de "${user.nome}" (${user.username}) atualizado.`,
