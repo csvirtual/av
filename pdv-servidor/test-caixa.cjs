@@ -204,7 +204,7 @@ async function apiCall(page, path, opts = {}) {
   const shortPasswordBackup = await apiCall(page, '/api/cash/backup-fechamento', {
     method: 'POST', body: JSON.stringify({ password: '12' }),
   });
-  check('Backup automático rejeita senha curta (menos de 4 caracteres)', shortPasswordBackup.status === 400, shortPasswordBackup.status);
+  check('Backup automático rejeita senha curta (menos de 8 caracteres)', shortPasswordBackup.status === 400, shortPasswordBackup.status);
 
   const noPermBackup = await apiCall(page, '/api/cash/backup-fechamento', {
     method: 'POST', body: JSON.stringify({ password: 'qualquerSenha123' }),

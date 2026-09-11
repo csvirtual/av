@@ -106,7 +106,7 @@ async function login(page, username, password) {
     });
     return { status: res.status, body: await res.json().catch(() => ({})) };
   });
-  check('Servidor rejeita senha de cadastro com menos de 6 caracteres', shortPasswordResult.status >= 400 && /pelo menos 6/i.test(shortPasswordResult.body.error || ''), JSON.stringify(shortPasswordResult));
+  check('Servidor rejeita senha de cadastro com menos de 8 caracteres', shortPasswordResult.status >= 400 && /pelo menos 8/i.test(shortPasswordResult.body.error || ''), JSON.stringify(shortPasswordResult));
 
   // ---------- Achado de segurança: escalonamento de privilégio no reset de senha ----------
   // Vendedor A tem 'deleteCustomer' (um poder que B não tem) + 'usuarios'

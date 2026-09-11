@@ -5,7 +5,12 @@
 // atrasa a resposta desta única requisição, aceitável pro tamanho de dados
 // de uma loja usando este sistema. Buffer.from(...).toString('base64')
 // substitui o FileReader/data-URI que o navegador precisava.
-const ITERATIONS = 150000;
+// Achado de auditoria (P3): 150 mil iterações era a recomendação OWASP de
+// ~2013 — a atual (OWASP Password Storage Cheat Sheet) é 600 mil pra
+// PBKDF2-HMAC-SHA256. Backups antigos continuam abrindo normalmente:
+// decryptPayload sempre usa `envelope.iterations` gravado no PRÓPRIO
+// arquivo (nunca esta constante), só backups NOVOS passam a usar 600k.
+const ITERATIONS = 600000;
 
 // Achado de auditoria (P2): igual à tela (public/js/views/backup.js), mas
 // antes o SERVIDOR — a autoridade de verdade, já que qualquer chamada

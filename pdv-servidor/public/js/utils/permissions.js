@@ -9,7 +9,9 @@
 // diferente da senha do backup (MIN_PASSWORD_LENGTH em views/backup.js, que
 // tem sua própria regra). Repetido em cadastro inicial e nos dois modais de
 // usuários antes desta constante existir.
-export const MIN_USER_PASSWORD_LENGTH = 6;
+// Achado de auditoria (P4): subido de 6 pra 8 — precisa ficar sincronizado
+// com lib/permissions.js (cópia do servidor).
+export const MIN_USER_PASSWORD_LENGTH = 8;
 
 export const PERMISSION_DEFS = [
   { key: 'compras', label: 'Acessar Compras', group: 'Telas' },

@@ -134,6 +134,14 @@ router.post('/open', (req, res) => {
     broadcast('cash-changed', { reason: 'opened', id: session.id });
     res.status(201).json({ session });
   } catch (err) {
+    // Achado de auditoria (P3): traduz o índice único parcial de
+    // db/schema.sql (defesa em profundidade contra duas aberturas no mesmo
+    // terminal) pra mensagem amigável — a checagem de openCashSession já
+    // cobre o caso normal, isto só evita um "UNIQUE constraint failed" cru
+    // se algum dia a colisão passar por ela mesmo assim.
+    if (String(err.message).includes('idx_cashsessions_open_terminal_unique')) {
+      return res.status(400).json({ error: 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.' });
+    }
     res.status(400).json({ error: err.message });
   }
 });

@@ -148,10 +148,24 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
-  insertStmt.run({
-    id: product.id, barcode: product.barcode, nameLower: product.nameLower,
-    active: 1, updatedAt: product.updatedAt, data: JSON.stringify(product),
-  });
+  // Achado de auditoria (P3): a checagem acima e este insert não têm
+  // `await` nenhum entre os dois — como o resto do servidor (ver comentário
+  // de commitMovement mais abaixo), isto já roda atômico contra qualquer
+  // outra requisição neste processo único, então não existe corrida de
+  // verdade aqui. O try/catch é defesa em profundidade: se algo ainda assim
+  // colidir com o UNIQUE de `barcode` na tabela (db/schema.sql), devolve o
+  // mesmo 409 amigável em vez de deixar o erro cru estourar como 500.
+  try {
+    insertStmt.run({
+      id: product.id, barcode: product.barcode, nameLower: product.nameLower,
+      active: 1, updatedAt: product.updatedAt, data: JSON.stringify(product),
+    });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: 'Já existe um produto com esse código de barras.' });
+    }
+    throw err;
+  }
   broadcast('products-changed', { reason: 'created', id: product.id });
   res.status(201).json({ product });
 });
@@ -216,10 +230,22 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
   }
   updated.updatedAt = Date.now();
 
-  updateStmt.run({
-    id: updated.id, barcode: updated.barcode, nameLower: updated.nameLower,
-    active: updated.active ? 1 : 0, updatedAt: updated.updatedAt, data: JSON.stringify(updated),
-  });
+  // Achado de auditoria (P3): mesma defesa em profundidade do POST acima —
+  // a checagem de duplicidade e este update também rodam sem `await` entre
+  // os dois, então já são atômicos entre requisições; o try/catch só troca
+  // um eventual 500 cru por um 409 amigável se o UNIQUE de `barcode` colidir
+  // mesmo assim.
+  try {
+    updateStmt.run({
+      id: updated.id, barcode: updated.barcode, nameLower: updated.nameLower,
+      active: updated.active ? 1 : 0, updatedAt: updated.updatedAt, data: JSON.stringify(updated),
+    });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: 'Já existe um produto com esse código de barras.' });
+    }
+    throw err;
+  }
   broadcast('products-changed', { reason: 'updated', id: updated.id });
   res.json({ product: updated });
 });

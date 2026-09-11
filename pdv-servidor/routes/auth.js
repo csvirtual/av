@@ -72,11 +72,21 @@ router.post('/login', async (req, res) => {
     }
 
     const token = createSession(user.id);
+    // Achado de auditoria (P3): `secure` fixo em `false` deixaria o cookie de
+    // sessão trafegando sem essa proteção mesmo em quem hospeda isto atrás de
+    // HTTPS (ex.: GoDaddy/preview, que fala HTTPS com o navegador e repassa
+    // pro Node por trás) — condicional, liga sozinho nesse caso e continua
+    // desligado no uso principal (HTTP puro na rede interna da loja, sem
+    // certificado, onde exigir `secure` quebraria o login). `req.secure`
+    // cobre TLS terminado no próprio processo; `x-forwarded-proto` cobre TLS
+    // terminado num proxy na frente (não habilitamos `trust proxy` global só
+    // por isso — nada mais no servidor lê req.ip/protocol, então checar o
+    // cabeçalho aqui é suficiente e não muda comportamento em outro lugar).
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('session', token, {
       httpOnly: true,
       sameSite: 'lax',
-      // Sem `secure`: o servidor roda em HTTP puro na rede local (sem
-      // certificado — é só a rede interna da loja, não a internet aberta).
+      secure: isHttps,
       maxAge: 12 * 60 * 60 * 1000,
     });
     logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id });

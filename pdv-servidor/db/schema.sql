@@ -5,6 +5,17 @@
 -- Fase 1 só usa de verdade a tabela `products` (prova de conceito de Estoque
 -- compartilhado) — as demais já entram criadas pra não precisar de uma
 -- migração nova a cada fase seguinte (vendas, caixa, financeiro...).
+--
+-- Achado de auditoria (P3, decisão registrada — sem mudança de schema):
+-- como o registro de verdade de cada linha é o JSON em `data` (não colunas
+-- tipadas), FOREIGN KEY/CHECK não têm onde morder a maioria dos campos que
+-- importariam (ex.: productId dentro de um item de venda) — só valeriam
+-- pras poucas colunas extraídas à parte, e mesmo essas relações já são
+-- garantidas no código (toda gravação passa por um único caminho em
+-- routes/*.js, nunca INSERT solto). Adicionar isso agora arriscaria quebrar
+-- a leitura de um banco de loja já em produção sem um ganho real de
+-- segurança — decisão consciente de NÃO migrar o schema pra isso, não um
+-- descuido.
 
 CREATE TABLE IF NOT EXISTS company (
   id TEXT PRIMARY KEY,
@@ -66,6 +77,21 @@ CREATE TABLE IF NOT EXISTS cash_sessions (
 CREATE INDEX IF NOT EXISTS idx_cashsessions_openedat ON cash_sessions(opened_at);
 CREATE INDEX IF NOT EXISTS idx_cashsessions_status ON cash_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_cashsessions_terminal ON cash_sessions(terminal_id);
+-- Achado de auditoria (P3): routes/cash.js#openCashSession já impede duas
+-- aberturas simultâneas no MESMO terminal (modo "porTerminal") dentro de um
+-- db.transaction() síncrono — já atômico contra qualquer outra requisição
+-- neste processo único (mesmo raciocínio de todo db.transaction() do
+-- servidor). Este índice é defesa em profundidade: uma restrição de
+-- verdade no banco, caso algum caminho futuro grave numa sessão fora dessa
+-- função. `terminal_id IS NOT NULL` deixa de fora o modo "único" de
+-- propósito — lá `terminal_id` é sempre NULL em toda sessão (aberta ou
+-- fechada), e SQLite não indexa NULL num índice parcial com esta condição,
+-- então esta restrição não se aplica a esse modo (que segue só com a
+-- proteção por código, mesma decisão já documentada na auditoria — um
+-- "único aberto em toda a loja" globalmente é bem mais complexo de expressar
+-- só com SQL puro).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cashsessions_open_terminal_unique
+  ON cash_sessions(terminal_id) WHERE status = 'aberto' AND terminal_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS cash_movements (
   id TEXT PRIMARY KEY,
@@ -156,6 +182,12 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_customer ON deliveries(customer_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(status);
 CREATE INDEX IF NOT EXISTS idx_deliveries_createdat ON deliveries(created_at);
 
+-- Achado de auditoria (P4): tabela não usada por nenhuma rota/lib deste
+-- servidor no momento (nenhum código lê ou grava nela) — mantida por
+-- compatibilidade com o formato de backup da extensão original (que tinha
+-- um placar diário pré-calculado) e reservada pra um possível uso futuro
+-- (ex.: um placar diário com cache, como o `daily_sales` da extensão).
+-- Não é dado morto por engano; é dado reservado de propósito.
 CREATE TABLE IF NOT EXISTS daily_sales (
   date TEXT PRIMARY KEY,
   data TEXT NOT NULL

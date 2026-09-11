@@ -5,12 +5,13 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
+import fs from 'node:fs';
 
-import { db } from './db/index.js';
+import { db, sweepOldIdempotencyKeys } from './db/index.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded } from './lib/licenseState.js';
 import { resolveSession, sweepExpiredSessions } from './lib/session.js';
-import { registerClient } from './lib/broadcast.js';
+import { registerClient, closeAllClients } from './lib/broadcast.js';
 import authRoutes from './routes/auth.js';
 import productsRoutes from './routes/products.js';
 import salesRoutes from './routes/sales.js';
@@ -51,9 +52,56 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3131;
 const getUserByIdStmt = db.prepare('SELECT data FROM users WHERE id = ?');
 
+// Achado de auditoria (P3): duas instâncias de `node server.js` abertas por
+// engano no mesmo computador (ex.: um atalho clicado duas vezes) apontando
+// pro mesmo arquivo .sqlite3 é o tipo de coisa que só aparece muito depois,
+// como corrupção/estranheza esporádica difícil de rastrear — melhor travar
+// na cara na hora. Um lockfile com o PID de quem está rodando: se já existe
+// um lock apontando pra um processo VIVO, este processo novo recusa subir;
+// se o PID do lock não existe mais (processo anterior morreu sem limpar —
+// ex.: `kill -9`), o lock é considerado órfão e substituído. Removido no
+// desligamento gracioso (ver SIGTERM/SIGINT mais abaixo).
+const LOCK_PATH = path.join(__dirname, '.server.lock');
+function acquireProcessLock() {
+  if (fs.existsSync(LOCK_PATH)) {
+    const pid = Number(fs.readFileSync(LOCK_PATH, 'utf8').trim());
+    let alive = false;
+    if (Number.isInteger(pid) && pid > 0) {
+      try { process.kill(pid, 0); alive = true; } catch { alive = false; }
+    }
+    if (alive) {
+      console.error(`\nJá existe um servidor rodando (PID ${pid}) usando este mesmo banco de dados. Feche-o antes de abrir outro, ou os dois vão brigar pelo mesmo arquivo .sqlite3.\n`);
+      process.exit(1);
+    }
+  }
+  fs.writeFileSync(LOCK_PATH, String(process.pid));
+}
+function releaseProcessLock() {
+  try {
+    if (fs.existsSync(LOCK_PATH) && fs.readFileSync(LOCK_PATH, 'utf8').trim() === String(process.pid)) {
+      fs.unlinkSync(LOCK_PATH);
+    }
+  } catch { /* melhor esforço — não impede o desligamento */ }
+}
+acquireProcessLock();
+process.on('exit', releaseProcessLock);
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
+// Achado de auditoria (P3): public/test*.html são páginas de prova das
+// telas (usadas pelos test-*.cjs deste repo, ver run_all.sh no
+// scratchpad), servidas sem exigir login — expostas numa loja de verdade
+// dariam a qualquer um na rede um jeito de acionar rotas da API pela mão.
+// Bloqueadas por padrão; só liberam com ALLOW_TEST_PAGES=1 no ambiente
+// (é isso que run_all.sh precisa setar pra continuar rodando a suíte).
+app.use((req, res, next) => {
+  if (process.env.ALLOW_TEST_PAGES === '1') return next();
+  if (/^\/test.*\.html$/i.test(req.path)) return res.status(404).end();
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Preenche req.userId/userName/userRole a partir do cookie de sessão — não
@@ -181,6 +229,9 @@ wss.on('connection', (ws) => registerClient(ws));
 // cresce (cada login novo insere, nada nunca removia sozinho antes de
 // existir isto).
 setInterval(sweepExpiredSessions, 30 * 60 * 1000);
+// Achado de auditoria (P4): mesmo motivo, agora pra `idempotency_keys` —
+// ver db/index.js#sweepOldIdempotencyKeys.
+setInterval(sweepOldIdempotencyKeys, 30 * 60 * 1000);
 
 // Garante que o usuário admin exista antes de aceitar qualquer conexão —
 // idempotente (não faz nada se já existir), então é seguro rodar em TODO
@@ -214,3 +265,34 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   }
   console.log('');
 });
+
+// Achado de auditoria (P4): sem isto, um `Ctrl+C`/reinício de serviço
+// (SIGINT/SIGTERM) matava o processo no meio de qualquer coisa — incluindo,
+// em tese, no meio da janela mínima de uma escrita no WAL. Fecha primeiro
+// as conexões HTTP (não aceita gente nova, deixa quem já está em request
+// terminar), faz um checkpoint do WAL pro arquivo principal (não deixa
+// nada só no -wal) e só então fecha o handle do banco — nessa ordem, pra
+// não fechar o banco com alguma resposta HTTP ainda em voo tentando lê-lo.
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n[${signal}] Desligando o servidor da loja...`);
+  closeAllClients();
+  httpServer.close(() => {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+    } catch (err) {
+      console.error('[shutdown] erro ao fechar o banco:', err);
+    }
+    releaseProcessLock();
+    console.log('[shutdown] Encerrado.');
+    process.exit(0);
+  });
+  // Segurança: se alguma conexão HTTP ficar pendurada e `close()` nunca
+  // chamar o callback, não deixa o processo preso pra sempre.
+  setTimeout(() => process.exit(1), 5000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

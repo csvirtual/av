@@ -389,6 +389,16 @@ export async function renderSalesHistory(container, ctx) {
           // ser de dias atrás) é o que importa pra conferência de fechamento
           // saber de onde esse dinheiro saiu (ver cashRepo.js#computeExpectedAmounts).
           const openSession = await getOpenSession();
+          // Achado de auditoria (P3): sale.js já bloqueia uma VENDA nova sem
+          // caixa aberto quando a loja liga essa política (Dados da loja →
+          // Políticas de venda) — um estorno sem caixa aberto tinha o mesmo
+          // problema (dinheiro saindo da gaveta sem entrar em nenhuma
+          // conferência de fechamento) mas não seguia a mesma regra.
+          // Consistente com sale.js: mesma política, mesmo aviso.
+          if (company?.policies?.requireOpenCashSession && !openSession) {
+            errBox.innerHTML = '<div class="form-error">A loja exige caixa aberto para registrar estornos. Abra o caixa antes de continuar.</div>';
+            return false;
+          }
           const { refund, debtReduced } = await refundSaleItems({
             saleId: sale.id, userId: ctx.user.id, userName: ctx.user.nome, reason, items, generateCredit,
             cashSessionId: openSession?.id || null,

@@ -17,3 +17,17 @@ export function broadcast(topic, payload = {}) {
     if (ws.readyState === ws.OPEN) ws.send(message);
   }
 }
+
+// Achado de auditoria (P4): `httpServer.close()` no desligamento gracioso
+// (ver server.js) só chama seu callback depois que TODA conexão ativa
+// fechar sozinha — e uma conexão WebSocket upgraded fica contada como
+// "ativa" até o cliente (ou o servidor) fechar explicitamente, então um
+// terminal com a aba aberta faria o servidor ficar esperando pra sempre.
+// Chamado no desligamento antes de fechar o servidor HTTP, pra não
+// depender do temporizador de segurança pra sair rápido.
+export function closeAllClients() {
+  for (const ws of clients) {
+    try { ws.close(); } catch { /* melhor esforço */ }
+  }
+  clients.clear();
+}

@@ -16,7 +16,13 @@
 // contorna a tela (curl, uma chamada direta) só precisava de 4
 // caracteres, não 6 — a política real, que devia estar só na fonte,
 // divergia da fonte. Um valor só aqui, usado nas duas checagens.
-export const MIN_USER_PASSWORD_LENGTH = 6;
+//
+// Achado de auditoria (P4): 6 caracteres está abaixo do padrão atual pra
+// senha de sistema comercial — subido pra 8, mesmo mínimo já usado pro
+// backup (ver lib/backupCrypto.js). Precisa ficar sincronizado com
+// public/js/utils/permissions.js (cópia do cliente, mesma limitação de
+// não dar pra compartilhar módulo ES entre navegador/servidor aqui).
+export const MIN_USER_PASSWORD_LENGTH = 8;
 
 export const PERMISSION_DEFS = [
   { key: 'compras', label: 'Acessar Compras (fornecedores e pedidos)', group: 'Telas' },
