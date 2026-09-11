@@ -725,7 +725,10 @@ function renderLicenseBlockedScreen(company, keyIssue) {
       <div class="card" style="max-width:440px;">
         <h1 style="font-size:18px;margin:0 0 18px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Período de teste encerrado</h1>
         ${keyIssue ? `
-          <div class="notice notice-warning" style="text-align:left;"><strong>Havia uma chave de ativação salva, mas ela parou de valer:</strong> ${escapeHtml(keyIssue)} Isso costuma acontecer depois de restaurar um backup com o CNPJ diferente do que estava quando a chave foi ativada — confira em "Dados da loja" se o CNPJ está correto, ou cole a chave de novo abaixo.</div>
+          <div class="notice-card" style="text-align:left;">
+            <div class="notice-card-head">${icon('warning', { size: 16 })} A chave salva parou de valer</div>
+            <p>${escapeHtml(keyIssue)} Isso costuma acontecer depois de restaurar um backup com o CNPJ diferente do que estava quando a chave foi ativada — confira em "Dados da loja" se o CNPJ está correto, ou cole a chave de novo abaixo.</p>
+          </div>
         ` : ''}
         <p style="margin:0 0 14px;text-align:center;">O período de teste deste sistema encerrou. Entre em contato pelo WhatsApp ou e-mail abaixo pra receber sua chave de ativação — é rápido.</p>
         <div style="display:flex;justify-content:center;gap:22px;margin:0 0 16px;">
