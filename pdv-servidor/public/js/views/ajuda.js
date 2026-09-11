@@ -186,6 +186,10 @@ const FAQ_CATEGORIES = [
         q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
         a: 'A chave/código colado não é válido para o que você está tentando fazer — pode ser um código do tipo errado (ex: um código de liberação de CNPJ colado onde se espera uma chave de ativação, ou o contrário), estar vencido, ou ter sido digitado com algum caractere a menos/a mais. Confira se copiou o texto completo, sem espaços extras no início/fim, e se é mesmo do tipo certo pra o que você quer fazer.',
       },
+      {
+        q: '"A chave salva parou de valer"',
+        a: 'A chave de ativação salva não bate mais com o CNPJ cadastrado agora — geralmente acontece depois de restaurar um backup feito num momento em que o CNPJ da loja era outro (a chave nunca é apagada, só deixa de bater com o CNPJ atual). Confira em "Dados da loja" se o CNPJ está correto e cole a chave de novo — não precisa de uma chave nova.',
+      },
     ],
   },
   {
@@ -682,6 +686,9 @@ Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Reg
       </ul>
       <p>Tem uma chave em mãos? Cole no campo e clique em <strong>Ativar</strong>. Não tem? Clique em <strong>Solicitar chave</strong> pra abrir um contato pronto (WhatsApp ou e-mail) com o suporte.</p>
       <div class="warn-box"><strong>Período de teste encerrado sem chave ativada:</strong> o sistema inteiro fica bloqueado — ninguém entra, nem o Administrador Geral — até uma chave válida ser ativada. A tela de bloqueio já tem os mesmos atalhos de contato e um campo pra colar a chave, então dá pra resolver sem precisar de ajuda de fora pra "destravar o sistema" tecnicamente.</div>
+
+      <h3>"A chave salva parou de valer" (depois de restaurar um backup)</h3>
+      <p>Esse aviso aparece acima do card "Ativação" (e, se acontecer com o sistema todo bloqueado, também na própria tela de bloqueio) quando existe uma chave de ativação salva, mas ela não bate mais com o CNPJ cadastrado agora. A causa mais comum é ter <strong>restaurado um backup</strong> feito num momento em que o CNPJ da loja era outro — a chave em si nunca é apagada nem mexida (backup não guarda licença de propósito, veja o tópico "Backup"), só que ela foi ativada pra um CNPJ específico, e o CNPJ que voltou do backup restaurado é diferente. Pra resolver: confira em "Dados da loja" se o CNPJ está correto e, se estiver, cole a chave de novo — ela ativa igual, sem precisar de uma chave nova.</p>
     `,
   },
   {
@@ -816,7 +823,7 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ');
 }
 
-/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 36
+/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 37
  * perguntas de F.A.Q, navegar só pelo menu lateral demorava demais pra
  * achar algo específico. `searchText` cobre título/pergunta E o corpo da
  * resposta/tópico inteiro (sem tags) — uma palavra que só aparece dentro
