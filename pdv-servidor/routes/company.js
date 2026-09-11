@@ -166,7 +166,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
       patch.email = email;
     }
     if (body.ramos !== undefined) {
-      patch.ramos = (Array.isArray(body.ramos) ? body.ramos : []).filter((r) => r === 'material' || r === 'mercearia');
+      patch.ramos = (Array.isArray(body.ramos) ? body.ramos : []).filter((r) => r === 'material' || r === 'mercearia' || r === 'loja');
     }
     if (body.horarioFuncionamento !== undefined) patch.horarioFuncionamento = String(body.horarioFuncionamento).trim();
     if (body.endereco !== undefined) {

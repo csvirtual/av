@@ -141,7 +141,8 @@ export async function renderCompany(container, ctx) {
           <p class="section-title">Ramo de atuação</p>
           <div class="form-row" style="margin-bottom:14px;">
             <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;"><input type="checkbox" id="ramoMaterial" ${company.ramos.includes('material') ? 'checked' : ''}> Material de construção</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;"><input type="checkbox" id="ramoMercearia" ${company.ramos.includes('mercearia') ? 'checked' : ''}> Mercearia</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;"><input type="checkbox" id="ramoMercearia" ${company.ramos.includes('mercearia') ? 'checked' : ''}> Mercearia / Mercadinho</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;"><input type="checkbox" id="ramoLoja" ${company.ramos.includes('loja') ? 'checked' : ''}> Loja</label>
           </div>
 
           <div class="field"><label for="horario">Horário de funcionamento</label><input id="horario" value="${escAttr(company.horarioFuncionamento)}"></div>
@@ -304,6 +305,7 @@ export async function renderCompany(container, ctx) {
       const ramos = [];
       if (document.getElementById('ramoMaterial').checked) ramos.push('material');
       if (document.getElementById('ramoMercearia').checked) ramos.push('mercearia');
+      if (document.getElementById('ramoLoja').checked) ramos.push('loja');
 
       const required = ['razaoSocial', 'nomeFantasia', 'telefone', 'logradouro', 'numero', 'bairro', 'cidade', 'uf', 'cep'];
       for (const id of required) {
