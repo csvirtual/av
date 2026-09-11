@@ -47,7 +47,7 @@ function api(cookieJar, terminalId) {
   const openNow = await call('/api/cash/open');
   if (openNow.body.session) {
     await call(`/api/cash/sessions/${openNow.body.session.id}/fechar`, {
-      method: 'POST', body: JSON.stringify({ countedAmounts: {} }),
+      method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }),
     });
   }
 
@@ -99,7 +99,7 @@ function api(cookieJar, terminalId) {
 
   // (3) fechamento com diferença de -5 (faltou dinheiro)
   const fechar = await call(`/api/cash/sessions/${session.id}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 135 }, closingNotes: 'Teste automatizado' }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 135 }, closingNotes: 'Teste automatizado', confirmUsername: 'admin', confirmPassword: 'admin123' }),
   });
   check('fechamento aceito', fechar.status === 200, fechar.status);
   check('diferença calculada certa (135-140=-5)', Math.abs(fechar.body.session.difference - (-5)) < 0.001, fechar.body.session.difference);
@@ -109,7 +109,7 @@ function api(cookieJar, terminalId) {
   check('depois de fechado, /open não mostra mais sessão ativa', reopenAttempt.body.session === null, JSON.stringify(reopenAttempt.body.session));
 
   const fecharDeNovo = await call(`/api/cash/sessions/${session.id}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: {} }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }),
   });
   check('fechar um caixa já fechado é rejeitado', fecharDeNovo.status === 400, fecharDeNovo.status);
 
@@ -135,8 +135,8 @@ function api(cookieJar, terminalId) {
   check('GET /open do terminal B só mostra a sessão do B (troco 70)', openViewB.body.session.openingAmount === 70, openViewB.body.session.openingAmount);
 
   // limpa: fecha os dois caixas por-terminal abertos neste teste
-  await callA(`/api/cash/sessions/${openA.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {} }) });
-  await callB(`/api/cash/sessions/${openB.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {} }) });
+  await callA(`/api/cash/sessions/${openA.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }) });
+  await callB(`/api/cash/sessions/${openB.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }) });
   await call('/api/cash/config', { method: 'PUT', body: JSON.stringify({ caixaMode: 'unico' }) });
 
   console.log('\n' + (results.every(Boolean) ? 'TUDO OK' : 'ALGO FALHOU'));

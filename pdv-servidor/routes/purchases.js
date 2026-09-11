@@ -28,6 +28,16 @@ const updateProductStmt = db.prepare(`
 `);
 const listActiveProductsStmt = db.prepare('SELECT data FROM products WHERE active = 1');
 const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
+// Achado de auditoria (P1, Red Team, Fase 7): recebimento de compra creditava
+// `product.quantity` direto (saveProduct) sem nunca gravar em
+// `stock_movements` — mesma classe de furo já corrigida em routes/sales.js
+// (venda/estorno). Mesmo formato de registro, gravado dentro da MESMA
+// transação do recebimento.
+const insertMovementStmt = db.prepare('INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)');
+function recordStockMovement({ productId, type, qty, userId, userName, note }) {
+  const record = { id: crypto.randomUUID(), productId, type, qty, userId, userName, note: note || '', timestamp: Date.now() };
+  insertMovementStmt.run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
+}
 
 function rowToOrder(row) { return JSON.parse(row.data); }
 function rowToProduct(row) { return JSON.parse(row.data); }
@@ -145,6 +155,7 @@ const commitReceive = db.transaction((input) => {
     // por UI nenhuma até esta tela ser ligada.
     if (product.unit !== CUSTOM_UNIT_VALUE && ri.unitCost > 0) product.costPrice = ri.unitCost;
     saveProduct(product);
+    recordStockMovement({ productId: product.id, type: 'compra', qty: ri.qty, userId: input.userId, userName: input.userName, note: `Recebimento do pedido ${order.id} (entrega ${entry.id})` });
   }
 
   updateOrderStmt.run({ id: order.id, status: order.status, data: JSON.stringify(order) });

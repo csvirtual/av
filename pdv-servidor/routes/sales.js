@@ -32,11 +32,38 @@ const getSaleStmt = db.prepare('SELECT * FROM sales WHERE id = ?');
 const updateSaleStmt = db.prepare('UPDATE sales SET customer_id = @customerId, data = @data WHERE id = @id');
 const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
 const insertDebtEntryStmt = db.prepare('INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)');
+// Achado de auditoria (P1, Red Team, Fase 7): venda e estorno mudavam
+// `product.quantity` direto (saveProduct) sem NUNCA gravar em
+// `stock_movements` — só o ajuste manual/inventário (routes/products.js)
+// gravava lá. Isso quebra o ledger unificado que o pedido de auditoria
+// exige ("não aceite product.quantity mudar sem uma operação de estoque
+// correspondente") — reconstruir o estoque exigia combinar `sales` +
+// `stock_movements` à mão, em vez de uma fonte única. Mesmo formato de
+// registro que routes/products.js#commitMovement já usa (id, productId,
+// type, qty — delta com sinal, userId, userName, note, timestamp), só que
+// gravado AQUI DENTRO da mesma transação da venda/estorno (nunca uma
+// chamada separada), pra continuar atômico.
+const insertMovementStmt = db.prepare('INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)');
+function recordStockMovement({ productId, type, qty, userId, userName, note }) {
+  const record = { id: crypto.randomUUID(), productId, type, qty, userId, userName, note: note || '', timestamp: Date.now() };
+  insertMovementStmt.run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
+}
 
 const FIADO_METHOD = 'Fiado';
 const CREDIT_METHOD = 'Crédito de troca';
 const CREDIT_CARD_METHOD = 'Cartão de crédito';
 const CREDIT_TOLERANCE = 0.01;
+
+// Achado de auditoria (P1, Red Team): sem isto, `payment.method` era gravado
+// no ledger financeiro exatamente como veio do pedido, sem NUNCA conferir
+// se era uma das formas de pagamento de verdade — reproduzido mandando
+// `{"method":"Bitcoin","amount":100}` direto (fora da tela) e a venda foi
+// aceita normalmente. A lista tem que ficar sincronizada com as formas que
+// a tela oferece (BASE_PAYMENT_METHODS em public/js/utils/format.js +
+// 'Fiado'/'Crédito de troca'), mesma limitação de sempre entre cliente/
+// servidor não compartilharem módulo — ver o mesmo raciocínio de
+// MIN_USER_PASSWORD_LENGTH em lib/permissions.js.
+const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', CREDIT_CARD_METHOD, 'Pix', FIADO_METHOD, CREDIT_METHOD]);
 
 function rowToSale(row) {
   return JSON.parse(row.data);
@@ -64,6 +91,10 @@ const commitSale = db.transaction((input) => {
   if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
   claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
 
+  // Gerado aqui (não só lá embaixo no objeto `sale`) pra já existir a
+  // tempo de referenciar na nota do movimento de estoque de cada item,
+  // gravado dentro do loop abaixo.
+  const saleId = crypto.randomUUID();
   const items = [];
   let subtotal = 0;
   let itemsDiscountTotal = 0;
@@ -114,6 +145,7 @@ const commitSale = db.transaction((input) => {
 
     product.quantity -= stockQty;
     saveProduct(product);
+    recordStockMovement({ productId: product.id, type: 'venda', qty: -stockQty, userId: input.userId, userName: input.userName, note: `Venda ${saleId}` });
   }
 
   if (items.length === 0) throw new Error('A venda precisa ter ao menos um item.');
@@ -155,7 +187,20 @@ const commitSale = db.transaction((input) => {
   // fórmula, quem decide de verdade é sempre o servidor.
   const companyPolicies = getConfig();
   const payments = (input.payments || []).map((p) => {
+    // Achado de auditoria (P1, Red Team): nenhuma das duas checagens
+    // existia antes — um `method` inventado entrava direto no ledger, e um
+    // `amount` negativo escondido dentro de uma soma que ainda batia com o
+    // total (ex: Dinheiro +110, Pix -10, total 100) passava sem ninguém
+    // perceber, inflando o "esperado em Dinheiro" da conferência de
+    // fechamento de caixa (routes/cash.js#computeExpectedAmounts soma
+    // cada payment.amount por método) além do que a venda realmente valia.
+    if (!VALID_PAYMENT_METHODS.has(p.method)) {
+      throw new Error(`Forma de pagamento inválida: "${p.method}".`);
+    }
     const amount = Number(p.amount) || 0;
+    if (amount < 0) {
+      throw new Error(`Valor de pagamento não pode ser negativo (${p.method}: ${amount}).`);
+    }
     const installments = Math.max(1, Math.min(MAX_INSTALLMENTS, Math.floor(Number(p.installments)) || 1));
     const interestAmount = p.method === CREDIT_CARD_METHOD
       ? computeCreditInterest(amount, installments, companyPolicies).interestAmount
@@ -188,7 +233,7 @@ const commitSale = db.transaction((input) => {
 
   const openSession = resolveOpenSession(input.terminalId);
   const sale = {
-    id: crypto.randomUUID(),
+    id: saleId,
     timestamp: Date.now(),
     userId: input.userId,
     userName: input.userName,
@@ -370,6 +415,7 @@ const commitRefund = db.transaction((input) => {
       const product = rowToProduct(prodRow);
       product.quantity += qty;
       saveProduct(product);
+      recordStockMovement({ productId: product.id, type: 'estorno', qty, userId: input.userId, userName: input.userName, note: `Estorno da venda ${sale.id}` });
     }
   }
   if (refundedItems.length === 0) throw new Error('Marque ao menos um item para estornar.');

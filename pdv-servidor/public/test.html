@@ -719,6 +719,8 @@ async function openCloseCashModal(sessionId) {
           </tbody>
         </table>
         <input id="closing-notes" placeholder="Observações (opcional)" style="width:100%;margin-top:8px;">
+        <input id="close-confirm-username" placeholder="usuário (confirmação)" value="admin" style="width:100%;margin-top:8px;">
+        <input id="close-confirm-password" type="password" placeholder="senha (confirmação)" value="admin123" style="width:100%;margin-top:4px;">
         <div id="modal-error" style="color:#b00;font-size:12px;margin-top:6px;"></div>
         <div class="row" style="margin-top:12px;">
           <button id="confirm-close-btn">Confirmar fechamento</button>
@@ -733,10 +735,17 @@ async function openCloseCashModal(sessionId) {
     const countedAmounts = {};
     methods.forEach((m) => { countedAmounts[m] = document.querySelector(`[data-count="${m}"]`).value; });
     const closingNotes = document.getElementById('closing-notes').value;
+    // Achado de auditoria (P1, Red Team): a rota agora exige confirmação de
+    // senha de verdade no servidor (ver routes/cash.js) — este harness
+    // precisa mandar os mesmos campos que a tela real (views/caixa.js) já
+    // manda, senão o fechamento nunca sai do 400 e o modal fica preso na
+    // tela, travando o próximo clique de quem estiver rodando os testes.
+    const confirmUsername = document.getElementById('close-confirm-username').value;
+    const confirmPassword = document.getElementById('close-confirm-password').value;
     try {
       await api(`/api/cash/sessions/${sessionId}/fechar`, {
         method: 'POST',
-        body: JSON.stringify({ countedAmounts, closingNotes }),
+        body: JSON.stringify({ countedAmounts, closingNotes, confirmUsername, confirmPassword }),
       });
       root.innerHTML = '';
       await loadCash();

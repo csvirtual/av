@@ -91,11 +91,16 @@ export async function recordCashAdjustment({
   return movement;
 }
 
-export async function closeSession({ sessionId, userId, userName, countedAmounts, closingNotes = '' }) {
+// Achado de auditoria (P1, Red Team): `confirmUsername`/`confirmPassword`
+// agora viajam até o SERVIDOR (ver routes/cash.js#POST /sessions/:id/fechar)
+// — antes, a tela já pedia essa senha (confirmUserPassword em
+// views/caixa.js) mas nunca mandava pra rota conferir de novo, então
+// chamar a API direto (fora da tela) fechava o caixa sem senha nenhuma.
+export async function closeSession({ sessionId, userId, userName, countedAmounts, closingNotes = '', confirmUsername, confirmPassword }) {
   void userId; void userName;
   const { session } = await api(`/api/cash/sessions/${encodeURIComponent(sessionId)}/fechar`, {
     method: 'POST',
-    body: JSON.stringify({ countedAmounts, closingNotes }),
+    body: JSON.stringify({ countedAmounts, closingNotes, confirmUsername, confirmPassword }),
   });
   return session;
 }

@@ -477,6 +477,7 @@ async function renderOpenSession(container, ctx, session, refresh) {
         try {
           closed = await closeSession({
             sessionId: session.id, userId: ctx.user.id, userName: ctx.user.nome, countedAmounts, closingNotes,
+            confirmUsername, confirmPassword,
           });
         } catch (err) {
           errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;

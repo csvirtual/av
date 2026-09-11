@@ -9,7 +9,8 @@ import fs from 'node:fs';
 
 import { db, sweepOldIdempotencyKeys } from './db/index.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
-import { markTrialStartIfNeeded } from './lib/licenseState.js';
+import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
+import { getConfig } from './lib/companyConfig.js';
 import { resolveSession, sweepExpiredSessions } from './lib/session.js';
 import { registerClient, closeAllClients } from './lib/broadcast.js';
 import authRoutes from './routes/auth.js';
@@ -174,6 +175,38 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
   if (!req.path.startsWith('/api/')) return next();
   res.status(403).json({ error: 'Troque a senha padrão antes de continuar.', mustChangePassword: true });
+});
+
+// Achado de auditoria (P0, Red Team): a tela de bloqueio de licença
+// (renderLicenseBlockedScreen em public/js/app.js) intercepta o boot ANTES
+// de chegar no login quando o trial/demo/chave expirou — mas isso é só o
+// CLIENTE decidindo o que mostrar. Nada no servidor impedia uma sessão que
+// já estava logada ANTES da expiração (ou uma chamada direta à API,
+// ignorando a tela por completo) de continuar vendendo, cadastrando
+// produto, fechando caixa etc. depois que a licença expirasse — reproduzido
+// na auditoria: forcei o trial pra expirado e um POST /api/products com
+// sessão válida voltou 201 normalmente. Mesmo padrão de allowlist do gate
+// de mustChangePassword acima: bloqueia toda rota /api, exceto /api/auth
+// (login precisa continuar funcionando — é assim que a tela de bloqueio
+// consegue at least deixar alguém entrar pra ativar uma chave nova) e
+// /api/license (já pública de propósito, ver routes/license.js).
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
+  if (!req.path.startsWith('/api/')) return next();
+  try {
+    const cnpj = getConfig().cnpj || '';
+    const status = await getLicenseStatus(cnpj);
+    if (status.active) return next();
+    res.status(403).json({ error: 'A licença deste sistema expirou. Ative uma chave nova em Dados da loja → Licença.', licenseExpired: true });
+  } catch (err) {
+    console.error('[erro inesperado] gate de licença:', err);
+    // Nunca bloqueia por um erro INESPERADO na própria checagem (ex.: banco
+    // momentaneamente indisponível) — só quando a licença de fato está
+    // expirada/inválida, que é o único caso que `status.active === false`
+    // representa. Um bug aqui travar a loja inteira seria pior que o risco
+    // que este gate existe pra fechar.
+    next();
+  }
 });
 
 app.use('/api/auth', authRoutes);

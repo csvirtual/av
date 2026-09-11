@@ -196,7 +196,7 @@ async function apiCall(page, path, opts = {}) {
   check('Servidor rejeita retificação numa sessão já fechada', adjustOnClosed.status === 400 && /não está mais aberto/i.test(adjustOnClosed.body.error || ''), JSON.stringify(adjustOnClosed));
 
   const closeAgain = await apiCall(page, `/api/cash/sessions/${sessionId}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: {} }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }),
   });
   check('Servidor rejeita fechar a mesma sessão duas vezes', closeAgain.status === 400 && /não está mais aberto/i.test(closeAgain.body.error || ''), JSON.stringify(closeAgain));
 

@@ -14,6 +14,7 @@ import { requirePermission } from '../lib/permissions.js';
 import { buildBackupPayload } from '../lib/backup.js';
 import { encryptPayload } from '../lib/backupCrypto.js';
 import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
+import { verifyLogin } from '../lib/verifyLogin.js';
 
 const router = Router();
 
@@ -325,8 +326,28 @@ function effectiveAmount(targetType, baseAmount, movements, targetMovementId = n
   return targetType === 'sangria' ? baseAmount - totalDelta : baseAmount + totalDelta;
 }
 
-router.post('/sessions/:id/fechar', (req, res) => {
+router.post('/sessions/:id/fechar', async (req, res) => {
   try {
+    // Achado de auditoria (P1, Red Team): a tela (views/caixa.js) já pede
+    // "usuário e senha de qualquer conta ativa" antes de fechar — mas essa
+    // senha nunca era enviada nem conferida por esta rota, só ficava presa
+    // na UI. Reproduzido chamando esta rota direto (curl), sem nenhum
+    // campo de senha: o caixa fechava normalmente. Diferente da aprovação
+    // de desconto (routes/sales.js, que exige especificamente um ADMIN),
+    // aqui vale QUALQUER conta ativa — mesma regra que a tela já descrevia
+    // pro usuário, agora reforçada de verdade no servidor. namespace
+    // 'confirmPassword' (mesmo de sales.js) pra não confundir com o
+    // bloqueio por força bruta do login real (ver lib/loginLockout.js).
+    const confirmUsername = req.body.confirmUsername;
+    const confirmPassword = req.body.confirmPassword;
+    if (!confirmUsername || !confirmPassword) {
+      return res.status(400).json({ error: 'Informe usuário e senha pra confirmar o fechamento.' });
+    }
+    const confirmedUser = await verifyLogin(confirmUsername, confirmPassword, { namespace: 'confirmPassword' });
+    if (!confirmedUser) {
+      return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+    }
+
     const row = getSessionByIdStmt.get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Caixa não encontrado.' });
     const session = rowToSession(row);
