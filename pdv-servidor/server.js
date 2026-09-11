@@ -83,6 +83,7 @@ app.use((req, res, next) => {
   req.userName = null;
   req.userRole = null;
   req.userPermissions = null;
+  req.mustChangePassword = false;
   if (req.userId) {
     const row = getUserByIdStmt.get(req.userId);
     const u = row ? JSON.parse(row.data) : null;
@@ -90,6 +91,7 @@ app.use((req, res, next) => {
       req.userName = u.nome;
       req.userRole = u.role;
       req.userPermissions = u.permissions || {};
+      req.mustChangePassword = !!u.mustChangePassword;
     } else {
       req.userId = null;
     }
@@ -108,6 +110,23 @@ function requireAuth(req, res, next) {
   if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
   next();
 }
+
+// Achado de auditoria (P1): sem isto, `mustChangePassword` (ver
+// lib/seedAdmin.js) era só um aviso textual na tela de Ajuda — nada no
+// SERVIDOR impedia continuar usando o admin/admin123 padrão indefinidamente.
+// Bloqueia toda rota /api enquanto a troca estiver pendente, EXCETO
+// /api/auth (login/logout/me/verify/change-password — sem isso ninguém
+// conseguiria nem trocar a senha) e /api/license (já é pública de
+// propósito, precisa continuar funcionando mesmo bloqueado). O cliente
+// (app.js) já reforça a mesma coisa numa tela dedicada antes disto sequer
+// ser testado — isto aqui é a garantia real, que vale mesmo pra quem
+// ignorar a tela e chamar a API direto.
+app.use((req, res, next) => {
+  if (!req.mustChangePassword) return next();
+  if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
+  if (!req.path.startsWith('/api/')) return next();
+  res.status(403).json({ error: 'Troque a senha padrão antes de continuar.', mustChangePassword: true });
+});
 
 app.use('/api/auth', authRoutes);
 // SEM requireAuth de propósito — ver comentário no topo de routes/license.js:

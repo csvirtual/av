@@ -99,9 +99,10 @@ const commitPayment = db.transaction((input) => {
   if (value > remaining + PAYMENT_TOLERANCE) {
     throw new Error(`O valor informado (${value.toFixed(2)}) é maior que o restante a pagar (${remaining.toFixed(2)}).`);
   }
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
 
   const payment = { id: crypto.randomUUID(), amount: value, paymentMethod: input.paymentMethod, paidAt: Date.now(), userId: input.userId, userName: input.userName };
   entry.payments = Array.isArray(entry.payments) ? [...entry.payments, payment] : [payment];

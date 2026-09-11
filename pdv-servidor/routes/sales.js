@@ -59,9 +59,10 @@ const PAYMENT_TOLERANCE = 0.01;
  * debitado pela metade). `db.transaction()` do better-sqlite3 já cuida
  * do BEGIN/COMMIT/ROLLBACK; só precisa lançar uma exceção pra abortar. */
 const commitSale = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
 
   const items = [];
   let subtotal = 0;
@@ -326,15 +327,28 @@ router.get('/:id', (req, res) => {
  * conferir, marcar qtyRefunded e devolver ao estoque tudo dentro de uma
  * transação só. */
 const commitRefund = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
   const row = getSaleStmt.get(input.saleId);
   if (!row) throw new Error('Venda não encontrada.');
   const sale = rowToSale(row);
   if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo do estorno.');
   if (input.generateCredit && !sale.customerId) {
     throw new Error('Esta venda não tem cliente — não é possível gerar crédito de troca.');
+  }
+  // Achado de auditoria (P2): "gerar crédito de troca" transforma um
+  // estorno em dinheiro NOVO (gasto depois como forma de pagamento em
+  // qualquer terminal, ver POST /) sem nenhuma segunda aprovação — a
+  // mesma classe de risco que o desconto acima do limite já fecha com
+  // senha de admin (ver bypassDiscountCap/discountApprovedBy em
+  // commitSale, acima). Réplica do mesmo mecanismo aqui: só o admin agindo
+  // dispensa a confirmação; qualquer vendedor precisa da senha de um
+  // administrador (checada de verdade em POST /:id/refund, antes desta
+  // transação — ver ali o mesmo raciocínio já documentado em POST /).
+  if (input.generateCredit && input.actingRole !== 'admin' && !input.approvedAdminId) {
+    throw new Error('Estornar gerando crédito de troca passa do que um vendedor pode fazer sozinho — peça a autorização de um administrador.');
   }
 
   let totalRefunded = 0;
@@ -371,6 +385,7 @@ const commitRefund = db.transaction((input) => {
     id: crypto.randomUUID(), timestamp: Date.now(), userId: input.userId, userName: input.userName,
     reason: input.reason.trim(), totalRefunded, items: refundedItems,
     creditGenerated: !!input.generateCredit,
+    creditApprovedBy: input.generateCredit ? (input.approvedAdminId || null) : null,
     cashSessionId: openSession ? openSession.id : null,
   };
   sale.refundedTotal += totalRefunded;
@@ -435,9 +450,30 @@ const commitRefund = db.transaction((input) => {
   return { sale, debtReduced };
 });
 
-router.post('/:id/refund', (req, res) => {
+router.post('/:id/refund', async (req, res) => {
   try {
-    const { sale, debtReduced } = commitRefund({ ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId });
+    // Achado de auditoria (P2): mesmo raciocínio de POST / (desconto acima
+    // do limite) — a verificação de senha (assíncrona) roda ANTES da
+    // transação síncrona de commitRefund; só o resultado (id do admin
+    // aprovador, se a senha bateu) entra nela. Só exigido quando
+    // `generateCredit` está marcado (é o que transforma o estorno em
+    // dinheiro novo gastável em qualquer terminal — ver commitRefund).
+    let approvedAdminId = null;
+    const approval = req.body.creditApproval;
+    if (req.body.generateCredit && req.userRole !== 'admin') {
+      if (!approval || !approval.username || !approval.password) {
+        return res.status(400).json({ error: 'Estornar gerando crédito de troca passa do que um vendedor pode fazer sozinho — peça a autorização de um administrador.' });
+      }
+      const admin = await verifyLogin(approval.username, approval.password, { namespace: 'confirmPassword' });
+      if (!admin || admin.role !== 'admin') {
+        return res.status(401).json({ error: 'Usuário ou senha de administrador inválidos para autorizar o crédito.' });
+      }
+      approvedAdminId = admin.id;
+    }
+    const { sale, debtReduced } = commitRefund({
+      ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
+      actingRole: req.userRole, approvedAdminId,
+    });
     broadcast('sales-changed', { reason: 'refunded', id: sale.id });
     broadcast('products-changed', { reason: 'refund' });
     if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId });
@@ -447,7 +483,8 @@ router.post('/:id/refund', (req, res) => {
     // resposta. views/salesHistory.js#openRefundModal usa refund.id e
     // refund.totalRefunded pro toast de confirmação; debtReduced, quando >
     // 0, também entra na mesma mensagem.
-    res.json({ sale, refund: sale.refunds[sale.refunds.length - 1], debtReduced });
+    const refund = sale.refunds[sale.refunds.length - 1];
+    res.json({ sale, refund, debtReduced });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este estorno já foi registrado — evite reenviar.' });

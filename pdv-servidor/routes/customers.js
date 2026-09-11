@@ -78,16 +78,34 @@ router.get('/:id/ledger', (req, res) => {
   res.json({ entries });
 });
 
+// Achado de auditoria (P2): saldo de fiado e de fidelidade são sempre
+// calculados por `customer.id` (extrato, ver customerBalance acima) — dois
+// cadastros diferentes pra mesma pessoa (mesmo CPF/CNPJ) resultam em dois
+// saldos INDEPENDENTES, sem nenhuma trava impedindo isso hoje (schema não
+// tem UNIQUE pra documento — ele vive dentro do JSON de `data`). Um cliente
+// (ou um vendedor desatento) podia comprar fiado até o limite num cadastro,
+// e voltar a comprar fiado do zero criando outro com o mesmo documento.
+// Mesmo padrão de checagem que products.js já faz pra barcode.
+function findCustomerByDocument(digits, excludeId = null) {
+  if (!digits) return null;
+  return listCustomers().find((c) => c.id !== excludeId && onlyDigits(c.documento) === digits);
+}
+
 router.post('/', (req, res) => {
   try {
     const nome = (req.body.nome || '').trim();
     if (!nome) throw new Error('Nome do cliente é obrigatório.');
+    const documento = (req.body.documento || '').trim();
+    const documentoDigits = onlyDigits(documento);
+    if (documentoDigits && findCustomerByDocument(documentoDigits)) {
+      throw new Error('Já existe um cliente cadastrado com esse CPF/CNPJ.');
+    }
     const customer = {
       id: crypto.randomUUID(),
       nome,
       nameLower: nome.toLowerCase(),
       telefone: (req.body.telefone || '').trim(),
-      documento: (req.body.documento || '').trim(),
+      documento,
       endereco: (req.body.endereco || '').trim(),
       observacoes: (req.body.observacoes || '').trim(),
       creditLimit: Math.max(0, Number(req.body.creditLimit) || 0),
@@ -117,7 +135,14 @@ router.put('/:id', (req, res) => {
       customer.nameLower = nome.toLowerCase();
     }
     if (body.telefone !== undefined) customer.telefone = body.telefone.trim();
-    if (body.documento !== undefined) customer.documento = body.documento.trim();
+    if (body.documento !== undefined) {
+      const documento = body.documento.trim();
+      const documentoDigits = onlyDigits(documento);
+      if (documentoDigits && findCustomerByDocument(documentoDigits, customer.id)) {
+        throw new Error('Já existe outro cliente cadastrado com esse CPF/CNPJ.');
+      }
+      customer.documento = documento;
+    }
     if (body.endereco !== undefined) customer.endereco = body.endereco.trim();
     if (body.observacoes !== undefined) customer.observacoes = body.observacoes.trim();
     if (body.creditLimit !== undefined) customer.creditLimit = Math.max(0, Number(body.creditLimit) || 0);
@@ -166,9 +191,10 @@ const commitPayment = db.transaction((input) => {
   if (value > balance + 0.01) {
     throw new Error(`O cliente deve ${money(balance)} — não é possível registrar um pagamento maior que a dívida.`);
   }
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
 
   const openSession = resolveOpenSession(input.terminalId);
   const entry = {

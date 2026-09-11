@@ -6,7 +6,7 @@
 // quando (existe também um backup automático só no fechamento de caixa,
 // ver views/caixa.js).
 import {
-  getCurrentCounts, buildBackupBlob, readBackupFile, applyBackup, resetOperationalData, STORE_LABELS,
+  getCurrentCounts, getLastBackupAt, buildBackupBlob, readBackupFile, applyBackup, resetOperationalData, STORE_LABELS,
 } from '../data/backupRepo.js';
 import { STORE_NAMES } from '../db.js';
 import { logAction } from '../data/auditRepo.js';
@@ -14,8 +14,14 @@ import { clearSession } from '../session.js';
 import { confirmUserPassword } from '../components/passwordConfirm.js';
 import { showToast } from '../components/toast.js';
 import { confirmDialog } from '../components/modal.js';
-import { escapeHtml } from '../utils/format.js';
+import { escapeHtml, formatDateTime } from '../utils/format.js';
 import { icon } from '../components/icon.js';
+
+// Achado de auditoria (P2): a partir de quantos dias sem nenhum backup a
+// tela passa a avisar de propósito, em vez de só informar a data — bastante
+// pra não incomodar quem já tem uma rotina (ex: fecha caixa toda sexta) mas
+// suficiente pra pegar quem nunca tirou um backup de verdade.
+const STALE_BACKUP_DAYS = 7;
 
 const EXPORT_BTN_LABEL = `${icon('download', { size: 15 })} Gerar backup`;
 
@@ -71,6 +77,8 @@ export async function renderBackup(container, ctx) {
     <div class="card" style="max-width:640px;margin-bottom:20px;">
       <p class="section-title">Exportar backup</p>
       <div class="notice">Gera um arquivo com <strong>todos</strong> os dados da loja (estoque, vendas, clientes, financeiro, usuários...), protegido pela senha que você definir agora. Sem essa senha, ninguém consegue abrir o arquivo — <strong>e nem existe "esqueci a senha"</strong>, guarde ela num lugar seguro.</div>
+      <div class="notice">Baixar o arquivo aqui não é a mesma coisa que estar seguro — se este backup ficar salvo só neste mesmo computador que roda o sistema, um problema no disco dele leva os dois juntos. Mova o arquivo pra outro lugar (pendrive, e-mail pra você mesmo, nuvem pessoal) assim que baixar.</div>
+      <div id="last-backup-info" class="text-muted" style="font-size:12.5px;margin:0 0 12px;">Verificando quando saiu o último backup...</div>
       <form id="export-form" novalidate>
         <div id="export-error"></div>
         <div class="form-row">
@@ -123,6 +131,30 @@ export async function renderBackup(container, ctx) {
     </div>
   `;
 
+  // Achado de auditoria (P2): carregado à parte (não bloqueia o resto da
+  // tela) — se falhar por qualquer motivo, some com a mensagem em vez de
+  // travar a tela inteira de Backup por causa de uma informação só
+  // informativa.
+  (async () => {
+    const infoBox = document.getElementById('last-backup-info');
+    try {
+      const lastBackupAt = await getLastBackupAt();
+      if (!lastBackupAt) {
+        infoBox.innerHTML = `${icon('warning', { size: 13 })} Nenhum backup foi gerado ainda nesta instalação.`;
+        return;
+      }
+      const daysSince = Math.floor((Date.now() - lastBackupAt) / (24 * 60 * 60 * 1000));
+      const dateLabel = formatDateTime(lastBackupAt);
+      if (daysSince >= STALE_BACKUP_DAYS) {
+        infoBox.innerHTML = `${icon('warning', { size: 13 })} Último backup: ${escapeHtml(dateLabel)} (há ${daysSince} dias) — considere gerar um novo.`;
+      } else {
+        infoBox.textContent = `Último backup: ${dateLabel}.`;
+      }
+    } catch {
+      infoBox.hidden = true;
+    }
+  })();
+
   // ---------- Exportar ----------
   document.getElementById('export-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -154,6 +186,8 @@ export async function renderBackup(container, ctx) {
       });
       showToast('Backup gerado e baixado.', 'success');
       document.getElementById('export-form').reset();
+      const infoBox = document.getElementById('last-backup-info');
+      if (infoBox) infoBox.textContent = `Último backup: ${formatDateTime(Date.now())}.`;
     } catch (err) {
       errBox.innerHTML = `<div class="form-error">Não foi possível gerar o backup: ${escapeHtml(err.message)}</div>`;
     } finally {

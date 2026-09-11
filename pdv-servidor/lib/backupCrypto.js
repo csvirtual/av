@@ -7,6 +7,15 @@
 // substitui o FileReader/data-URI que o navegador precisava.
 const ITERATIONS = 150000;
 
+// Achado de auditoria (P2): igual à tela (public/js/views/backup.js), mas
+// antes o SERVIDOR — a autoridade de verdade, já que qualquer chamada
+// direta à API contorna a tela — só exigia 4 caracteres em ambas as rotas
+// que geram backup (routes/backup.js#export e routes/cash.js#backup-
+// fechamento). Uma senha de 4 caracteres é trivialmente quebrável offline
+// mesmo com 150 mil iterações de PBKDF2, enfraquecendo a garantia de
+// confidencialidade que a tela promete.
+export const MIN_BACKUP_PASSWORD_LENGTH = 8;
+
 async function deriveKey(password, salt, iterations) {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);

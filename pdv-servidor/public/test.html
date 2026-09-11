@@ -1190,7 +1190,7 @@ document.getElementById('create-delivery-btn').addEventListener('click', async (
   if (deliveryCart.length === 0) { showError('Adicione ao menos um item ao carreto.'); return; }
   try {
     const address = document.getElementById('delivery-address').value;
-    await api('/api/deliveries', { method: 'POST', body: JSON.stringify({ customerId, items: deliveryCart, address }) });
+    await api('/api/deliveries', { method: 'POST', body: JSON.stringify({ customerId, items: deliveryCart, address, dedupeKey: dedupeKey() }) });
     deliveryCart = [];
     renderDeliveryCart();
     document.getElementById('delivery-address').value = '';

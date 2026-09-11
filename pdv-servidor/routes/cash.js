@@ -10,8 +10,10 @@ import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getCaixaMode, resolveOpenSession } from '../lib/cashSession.js';
 import { updateConfig } from '../lib/companyConfig.js';
+import { requirePermission } from '../lib/permissions.js';
 import { buildBackupPayload } from '../lib/backup.js';
 import { encryptPayload } from '../lib/backupCrypto.js';
+import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 
 const router = Router();
 
@@ -40,7 +42,13 @@ router.get('/config', (req, res) => {
   res.json({ caixaMode: getCaixaMode() });
 });
 
-router.put('/config', (req, res) => {
+// Achado de auditoria (P2): sem isto, qualquer vendedor autenticado
+// conseguia trocar o modo de operação do caixa (único ↔ por-terminal) da
+// loja inteira a qualquer momento — inclusive pra atrapalhar de propósito
+// uma conferência de caixa, abrindo uma sessão isolada antes de um
+// fechamento. Mesma classe de política sensível já protegida em
+// company.js e loyalty.js.
+router.put('/config', requirePermission('empresa'), (req, res) => {
   const mode = req.body.caixaMode;
   if (mode !== 'unico' && mode !== 'porTerminal') {
     return res.status(400).json({ error: 'Modo de caixa inválido.' });
@@ -131,9 +139,10 @@ router.post('/open', (req, res) => {
 });
 
 const commitMovement = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
   const row = getSessionByIdStmt.get(input.sessionId);
   if (!row) throw new Error('Caixa não encontrado.');
   const session = rowToSession(row);
@@ -177,9 +186,10 @@ router.post('/sessions/:id/movimento', (req, res) => {
  * navegador achava, e a retificação é rejeitada em vez de aplicada sobre
  * base desatualizada. */
 const commitAdjustment = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
   if (!['abertura', 'sangria', 'suprimento'].includes(input.targetType)) {
     throw new Error('Tipo de retificação inválido.');
   }
@@ -368,9 +378,17 @@ router.post('/sessions/:id/fechar', (req, res) => {
 router.post('/backup-fechamento', async (req, res) => {
   try {
     const password = req.body.password;
-    if (!password || password.length < 4) throw new Error('Informe uma senha com pelo menos 4 caracteres pra proteger o backup.');
+    // Achado de auditoria (P2): diferente de POST /api/backup/export (senha
+    // ESCOLHIDA na hora, mínimo 8 igual à tela — ver lib/backupCrypto.js),
+    // a senha aqui é sempre a mesma que acabou de confirmar o fechamento de
+    // caixa (a senha de LOGIN de quem fechou — ver views/caixa.js), então o
+    // piso real é o mesmo já aplicado a toda senha de usuário
+    // (MIN_USER_PASSWORD_LENGTH). Exigir 8 aqui rejeitaria, sem motivo,
+    // contas com senha de 6-7 caracteres que já passaram no cadastro.
+    if (!password || password.length < MIN_USER_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres pra proteger o backup.`);
     const payload = buildBackupPayload();
     const envelope = await encryptPayload(payload, password);
+    updateConfig({ lastBackupAt: Date.now() });
     res.json({ envelope });
   } catch (err) {
     res.status(400).json({ error: err.message });

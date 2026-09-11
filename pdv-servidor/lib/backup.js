@@ -27,14 +27,28 @@ function tableColumns(table) {
   return db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
 }
 
-/** Lê todas as tabelas de backup e monta o payload (ainda sem cifrar). */
-export function buildBackupPayload() {
+/** Lê todas as tabelas de backup e monta o payload (ainda sem cifrar).
+ *
+ * Achado de auditoria (P1): antes, isto era uma sequência de 16 `SELECT`s
+ * soltos — cada um em modo autocommit, sem nada garantindo que todos
+ * enxergassem o banco no mesmo instante lógico. Numa loja com vários
+ * terminais vendendo ao mesmo tempo (o cenário de design deste sistema), uma
+ * venda podia commitar EXATAMENTE entre a leitura de `products` e a leitura
+ * de `sales` — o backup saía com a venda já presente, mas o estoque debitado
+ * dela ainda não (ou vice-versa): um backup internamente inconsistente,
+ * silencioso, exatamente o arquivo em que a loja confiaria num desastre.
+ * `db.transaction()` sem nenhuma escrita dentro vira uma transação de
+ * LEITURA (`BEGIN DEFERRED`) — em modo WAL, isso fixa um snapshot MVCC
+ * consistente no primeiro `SELECT` e mantém até o fim da função, sem travar
+ * nenhum escritor concorrente (leitores em WAL nunca bloqueiam escritores,
+ * nem o contrário). */
+export const buildBackupPayload = db.transaction(() => {
   const tables = {};
   for (const table of BACKUP_TABLES) {
     tables[table] = db.prepare(`SELECT * FROM ${table}`).all();
   }
   return { backupFormatVersion: BACKUP_FORMAT_VERSION, exportedAt: new Date().toISOString(), tables };
-}
+});
 
 /** Quantos registros existem HOJE em cada tabela — pra mostrar "o que vai
  * ser substituído" antes de uma restauração, junto com a contagem de cada

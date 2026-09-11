@@ -89,9 +89,10 @@ router.post('/', (req, res) => {
 });
 
 const commitReceive = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
   const row = getOrderStmt.get(input.orderId);
   if (!row) throw new Error('Pedido não encontrado.');
   const order = rowToOrder(row);

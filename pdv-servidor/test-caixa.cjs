@@ -186,12 +186,12 @@ async function apiCall(page, path, opts = {}) {
 
   // ---------- Adversária: sessão já fechada rejeita novas ações ----------
   const movementOnClosed = await apiCall(page, `/api/cash/sessions/${sessionId}/movimento`, {
-    method: 'POST', body: JSON.stringify({ type: 'sangria', amount: 1, reason: 'depois de fechado' }),
+    method: 'POST', body: JSON.stringify({ type: 'sangria', amount: 1, reason: 'depois de fechado', dedupeKey: 'dk-movement-on-closed-' + Date.now() }),
   });
   check('Servidor rejeita sangria numa sessão já fechada', movementOnClosed.status === 400 && /não está mais aberto/i.test(movementOnClosed.body.error || ''), JSON.stringify(movementOnClosed));
 
   const adjustOnClosed = await apiCall(page, `/api/cash/sessions/${sessionId}/retificar`, {
-    method: 'POST', body: JSON.stringify({ targetType: 'abertura', originalAmount: 100, correctedAmount: 99, reason: 'depois de fechado' }),
+    method: 'POST', body: JSON.stringify({ targetType: 'abertura', originalAmount: 100, correctedAmount: 99, reason: 'depois de fechado', dedupeKey: 'dk-adjust-on-closed-' + Date.now() }),
   });
   check('Servidor rejeita retificação numa sessão já fechada', adjustOnClosed.status === 400 && /não está mais aberto/i.test(adjustOnClosed.body.error || ''), JSON.stringify(adjustOnClosed));
 

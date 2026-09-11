@@ -50,13 +50,13 @@ async function apiCall(page, path, opts = {}) {
   const prod = (await apiCall(page, '/api/products', {
     method: 'POST', body: JSON.stringify({ barcode: '7809999999999', name: 'Produto Backup', category: 'material', unit: 'un', price: 50, costPrice: 20, minStock: 1 }),
   })).body.product;
-  await apiCall(page, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 30, note: 'estoque inicial' }) });
+  await apiCall(page, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 30, note: 'estoque inicial', dedupeKey: crypto.randomUUID() }) });
 
   const cashOpen = await apiCall(page, '/api/cash/open', { method: 'POST', body: JSON.stringify({ openingAmount: 100 }) });
   check('Caixa aberto (pra virar movimento a zerar depois)', cashOpen.status === 201, cashOpen.status);
 
   const sale = await apiCall(page, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 2 }], payments: [{ method: 'Dinheiro', amount: 100 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 2 }], payments: [{ method: 'Dinheiro', amount: 100 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Venda registrada (pra virar movimento a zerar depois)', sale.status === 201, sale.status);
 
@@ -186,7 +186,7 @@ async function apiCall(page, path, opts = {}) {
   const cashStateAfterRestore = await apiCall(page, '/api/cash/open');
   check('Caixa continua aberto depois de restaurar (fazia parte do backup, não é zerado por ele)', !!cashStateAfterRestore.body.session, cashStateAfterRestore.body);
   const sale2 = await apiCall(page, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 50 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 50 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Venda registrada de novo (novo movimento pro teste de reset)', sale2.status === 201, sale2.status);
 

@@ -155,7 +155,7 @@ async function apiCall(page, path, opts = {}) {
     method: 'POST', body: JSON.stringify({ type: 'pagar', description: 'Conta que vai ser paga e depois tentarão cancelar', amount: 80, dueDate: Date.now() }),
   });
   const paidEntryId = paidEntryRes.body.entry.id;
-  await apiCall(page, `/api/finance/${paidEntryId}/pagamento`, { method: 'POST', body: JSON.stringify({ amount: 80, paymentMethod: 'Dinheiro' }) });
+  await apiCall(page, `/api/finance/${paidEntryId}/pagamento`, { method: 'POST', body: JSON.stringify({ amount: 80, paymentMethod: 'Dinheiro', dedupeKey: crypto.randomUUID() }) });
   const cancelPaid = await apiCall(page, `/api/finance/${paidEntryId}/cancelar`, { method: 'POST' });
   check('Cancelar conta já totalmente paga é rejeitado', cancelPaid.status === 400 && /já paga/i.test(cancelPaid.body.error || ''), JSON.stringify(cancelPaid));
 

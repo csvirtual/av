@@ -27,6 +27,15 @@ export async function ensureAdminUser() {
     passwordHash: hash,
     active: true,
     hasSeenAjuda: false,
+    // Achado de auditoria (P1): senha padrão (`admin123`) é a mesma em toda
+    // instalação nova deste sistema, documentada publicamente na própria
+    // Ajuda — só um aviso textual (não bloqueante) não impedia ninguém de
+    // continuar usando o sistema com ela indefinidamente. Este campo força
+    // a troca antes de qualquer outra ação (ver o middleware em server.js
+    // que bloqueia toda rota /api, exceto /api/auth e /api/license,
+    // enquanto isto for true — e POST /api/auth/change-password, o único
+    // jeito de zerá-lo).
+    mustChangePassword: true,
     createdAt: Date.now(),
   };
   db.prepare('INSERT INTO users (id, username_lower, data) VALUES (?, ?, ?)')

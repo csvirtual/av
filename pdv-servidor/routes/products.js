@@ -269,13 +269,34 @@ router.delete('/:id', requirePermission('deleteProduct'), (req, res) => {
 // caminhos forem portados pro servidor (fases futuras), eles gravam direto
 // na mesma tabela dentro da PRÓPRIA transação deles (como sales.js já faz
 // hoje), sem passar por esta rota HTTP.
+// Achado de auditoria (P1): `expectedQuantity`, quando mandado (hoje só o
+// Inventário em lote manda — ver views/products.js#openInventoryModal),
+// é o valor que o CLIENTE achava que era o estoque atual no momento em que
+// calculou `input.qty` (o delta). Pra um ajuste manual comum ("+50 chegou
+// mercadoria") isso não importa — o delta é sempre correto não importa o
+// valor atual. Mas o Inventário em lote calcula o delta contra um SNAPSHOT
+// tirado ao abrir o modal, e a contagem física de uma loja inteira pode
+// levar minutos — tempo de sobra pra uma venda em outro terminal já ter
+// debitado o mesmo produto nesse meio-tempo. Sem reconferir, o delta
+// (calculado contra o número antigo) se aplicava sozinho sobre o número
+// NOVO, apagando silenciosamente a baixa da venda concorrente — mesma
+// classe de bug que cash.js#commitAdjustment já fecha pra retificação de
+// caixa, replicado aqui.
+const STOCK_RECONCILE_TOLERANCE = 0.0001;
 const commitMovement = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura (UNIQUE) se repetido
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura (UNIQUE) se repetido
   const row = getByIdStmt.get(input.productId);
   if (!row) throw new Error('Produto não encontrado.');
   const product = rowToProduct(row);
+  if (input.expectedQuantity !== null && input.expectedQuantity !== undefined) {
+    const expected = Number(input.expectedQuantity);
+    if (Number.isFinite(expected) && Math.abs(product.quantity - expected) > STOCK_RECONCILE_TOLERANCE) {
+      throw new Error(`O estoque de "${product.name}" mudou desde que a contagem foi feita (outra venda ou ajuste aconteceu nesse meio-tempo) — recontar e reabrir o inventário.`);
+    }
+  }
   const newQuantity = product.quantity + input.qty;
   if (newQuantity < 0) throw new Error(`Estoque insuficiente de "${product.name}".`);
   product.quantity = newQuantity;
@@ -303,6 +324,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
     const { product, record } = commitMovement({
       productId: req.params.id, type: body.type || 'ajuste', qty, note: body.note || '',
       userId: req.userId, userName: req.userName, dedupeKey: body.dedupeKey || null,
+      expectedQuantity: body.expectedQuantity ?? null,
     });
     broadcast('products-changed', { reason: 'stock-adjusted', id: product.id });
     res.status(201).json({ product, movement: record });

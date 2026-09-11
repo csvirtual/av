@@ -4,6 +4,8 @@ import { createSession, destroySession } from '../lib/session.js';
 import { logAction } from '../lib/audit.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
 import { getLoginLockState } from '../lib/loginLockout.js';
+import { hashPassword, verifyPasswordHash } from '../lib/auth.js';
+import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 
 const router = Router();
 
@@ -14,7 +16,10 @@ function publicUser(row) {
   const u = JSON.parse(row.data);
   // Nunca manda salt/hash de senha pro cliente — só o necessário pra tela
   // (mesmo formato que a extensão single-machine expõe em ctx.user).
-  return { id: u.id, nome: u.nome, username: u.username, role: u.role, permissions: u.permissions };
+  return {
+    id: u.id, nome: u.nome, username: u.username, role: u.role, permissions: u.permissions,
+    mustChangePassword: !!u.mustChangePassword,
+  };
 }
 
 router.post('/login', async (req, res) => {
@@ -125,6 +130,45 @@ router.get('/me', (req, res) => {
   const row = findById.get(req.userId);
   if (!row) return res.status(401).json({ error: 'Não autenticado.' });
   res.json({ user: publicUser(row) });
+});
+
+/** Achado de auditoria (P1): único caminho pra zerar `mustChangePassword`
+ * — sempre a PRÓPRIA conta (via sessão, nunca um :id no path), sempre
+ * confirmando a senha atual primeiro. Fica em /api/auth (não em
+ * /api/users, que é montado com requirePermission('usuarios') e não faria
+ * sentido de qualquer forma: um vendedor sem essa permissão nunca teria
+ * como trocar a própria senha) de propósito, pra ficar alcançável mesmo
+ * com o middleware de server.js bloqueando o resto de /api enquanto a
+ * troca obrigatória estiver pendente. */
+router.post('/change-password', async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
+    }
+    if (newPassword.length < MIN_USER_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `A nova senha precisa ter pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.` });
+    }
+    const row = findById.get(req.userId);
+    if (!row) return res.status(401).json({ error: 'Não autenticado.' });
+    const user = JSON.parse(row.data);
+    const ok = await verifyPasswordHash(currentPassword, user.passwordSalt, user.passwordHash);
+    if (!ok) return res.status(401).json({ error: 'Senha atual incorreta.' });
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: 'A nova senha precisa ser diferente da atual.' });
+    }
+    const { salt, hash } = await hashPassword(newPassword);
+    user.passwordSalt = salt;
+    user.passwordHash = hash;
+    user.mustChangePassword = false;
+    updateUserData.run({ id: user.id, data: JSON.stringify(user) });
+    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Troca de senha', details: 'Senha própria alterada.', entity: 'user', entityId: user.id });
+    res.json({ user: publicUser({ data: JSON.stringify(user) }) });
+  } catch (err) {
+    console.error('[erro inesperado] POST /api/auth/change-password:', err);
+    res.status(500).json({ error: 'Erro inesperado ao trocar a senha. Tente novamente.' });
+  }
 });
 
 export default router;

@@ -583,11 +583,23 @@ export async function renderProducts(container, ctx) {
         try {
           for (const { product, counted } of diffs) {
             const delta = counted - product.quantity;
+            // Achado de auditoria (P1): `product.quantity` aqui é o
+            // snapshot tirado quando o modal abriu (linha ~505) — a
+            // contagem física de toda a loja pode levar minutos, tempo de
+            // sobra pra uma venda em OUTRO terminal já ter debitado esse
+            // mesmo produto nesse meio-tempo. Manda esse snapshot como
+            // `expectedQuantity`: o servidor reconfere contra o valor
+            // FRESCO do banco, dentro da própria transação, e rejeita se
+            // divergiu — mesmo padrão já usado em cash.js#commitAdjustment
+            // pra retificação de caixa. Sem isso, o delta calculado contra
+            // um número já obsoleto sobrescrevia silenciosamente a venda
+            // concorrente, sem erro nem aviso.
             await recordManualAdjustment({
               productId: product.id, type: 'ajuste', qty: delta,
               userId: ctx.user.id, userName: ctx.user.nome,
               note: `${note} (${delta > 0 ? '+' : ''}${delta})`,
               dedupeKey: `${batchKey}:${product.id}`,
+              expectedQuantity: product.quantity,
             });
           }
           await logAction({

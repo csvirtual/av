@@ -75,6 +75,16 @@ export async function getCurrentCounts() {
   return mapTableCountsToStoreNames(counts);
 }
 
+/** Quando saiu o último backup bem-sucedido (manual ou automático no
+ * fechamento de caixa) — `null` se nunca saiu nenhum. Achado de auditoria
+ * (P2): antes, a tela de Backup não tinha como mostrar isso, então uma loja
+ * só dependendo do gatilho automático não tinha como perceber, sem abrir o
+ * Log do sistema, se aquela rede de segurança estava funcionando de verdade. */
+export async function getLastBackupAt() {
+  const { lastBackupAt } = await api('/api/backup/current-counts');
+  return lastBackupAt;
+}
+
 /** Gera o backup completo (o servidor lê o banco inteiro e cifra com
  * `password`) e devolve um Blob já pronto pra virar arquivo — não mexe em
  * disco nem dispara download nenhum, isso fica por conta da view (facilita

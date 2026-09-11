@@ -34,9 +34,13 @@ router.get('/', (req, res) => {
 // dois registros idênticos. deliveriesRepo.js#createDelivery da extensão
 // já reivindica um dedupeKey pra isso — porta o mesmo aqui.
 const commitDelivery = db.transaction((input) => {
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): antes, `dedupeKey` era inteiramente opcional
+  // — o servidor nunca EXIGIA a chave, só a usava se o chamador decidisse
+  // mandar. Uma chamada direta à API (fora das telas, que sempre mandam)
+  // não tinha proteção nenhuma contra reenvio duplicado. Agora é exigida
+  // em toda rota com efeito de negócio real.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
   insertDeliveryStmt.run({
     id: input.delivery.id, customerId: input.delivery.customerId, status: input.delivery.status,
     createdAt: input.delivery.createdAt, data: JSON.stringify(input.delivery),

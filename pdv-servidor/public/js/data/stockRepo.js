@@ -14,10 +14,10 @@
 // verdade de autorização (ver comentário no topo daquele arquivo).
 import { api, newDedupeKey } from './apiClient.js';
 
-export async function recordMovement({ productId, type, qty, note = '', dedupeKey = null }) {
+export async function recordMovement({ productId, type, qty, note = '', dedupeKey = null, expectedQuantity = null }) {
   const { product, movement } = await api(`/api/products/${encodeURIComponent(productId)}/movimentos`, {
     method: 'POST',
-    body: JSON.stringify({ type, qty, note, dedupeKey: dedupeKey || newDedupeKey() }),
+    body: JSON.stringify({ type, qty, note, dedupeKey: dedupeKey || newDedupeKey(), expectedQuantity }),
   });
   void product; // devolvido pelo servidor só pra quem quiser atualizar a UI direto; a chamadora típica já recarrega a lista à parte
   return movement;

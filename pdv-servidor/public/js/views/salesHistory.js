@@ -5,8 +5,14 @@
 //
 // Estorno (total ou por item) está disponível pros dois perfis — admin e
 // vendedor. Continua exigindo motivo obrigatório e sempre vai pro log de
-// auditoria com quem fez, então mesmo sem aprovação prévia de um admin, dá
-// pra rastrear todo estorno depois.
+// auditoria com quem fez, pra rastrear todo estorno depois. Achado de
+// auditoria (P2): "gerar crédito de troca" transforma o estorno em dinheiro
+// NOVO (gasto depois como forma de pagamento em qualquer terminal) — um
+// vendedor sozinho não pode mais fazer isso: precisa da senha de um
+// administrador, mesma exigência que já existia pra desconto acima do
+// limite (ver sale.js#openAdminApprovalModal). O servidor reforça de
+// verdade (routes/sales.js#commitRefund) — isto aqui só evita ida e volta
+// desnecessária pro vendedor descobrir isso só depois de enviar.
 import { listSalesPage, summarizeSales, refundSaleItems, saleStatus } from '../data/salesRepo.js';
 import { listUsers } from '../data/usersRepo.js';
 import { listCustomers } from '../data/customersRepo.js';
@@ -20,6 +26,8 @@ import { showToast } from '../components/toast.js';
 import { printSaleReceipt } from '../components/receipt.js';
 import { icon } from '../components/icon.js';
 import { enhanceSelect } from '../components/customSelect.js';
+import { confirmUserPassword } from '../components/passwordConfirm.js';
+import { isAdmin } from '../utils/permissions.js';
 
 const STATUS_BADGE = {
   completa: '<span class="badge badge-green">Completa</span>',
@@ -330,7 +338,23 @@ export async function renderSalesHistory(container, ctx) {
         <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;margin-top:6px;">
           <input type="checkbox" id="f-credit"> Gerar crédito de troca (o cliente leva outro produto em vez do dinheiro de volta)
         </label>
+        <div id="credit-approval-fields" hidden style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <p class="text-muted" style="font-size:12.5px;margin:0 0 8px;">Isso passa do que um vendedor pode fazer sozinho — peça pra um administrador digitar a senha dele pra autorizar.</p>
+          <div class="field"><label>Usuário do administrador</label><input id="f-admin-user"></div>
+          <div class="field"><label>Senha</label><input id="f-admin-pass" type="password"></div>
+        </div>
       `,
+      onMount: (modalEl) => {
+        // Achado de auditoria (P2): campos de aprovação só aparecem (e só
+        // são exigidos) quando "Gerar crédito de troca" está marcado E quem
+        // está estornando não é admin — admin não precisa se autorizar.
+        if (isAdmin(ctx.user)) return;
+        const creditCheckbox = modalEl.querySelector('#f-credit');
+        const approvalFields = modalEl.querySelector('#credit-approval-fields');
+        creditCheckbox.addEventListener('change', () => {
+          approvalFields.hidden = !creditCheckbox.checked;
+        });
+      },
       onSubmit: async (modalEl) => {
         const errBox = modalEl.querySelector('#modal-error');
         const reason = modalEl.querySelector('#f-reason').value.trim();
@@ -342,6 +366,24 @@ export async function renderSalesHistory(container, ctx) {
         if (!reason) { errBox.innerHTML = '<div class="form-error">Informe o motivo do estorno.</div>'; return false; }
         if (items.length === 0) { errBox.innerHTML = '<div class="form-error">Marque ao menos um item para estornar.</div>'; return false; }
 
+        let creditApproval = null;
+        if (generateCredit && !isAdmin(ctx.user)) {
+          const username = modalEl.querySelector('#f-admin-user').value.trim();
+          const password = modalEl.querySelector('#f-admin-pass').value;
+          // Confere aqui só pra dar um retorno rápido (evita mandar pro
+          // servidor e só descobrir que errou depois) — quem decide de
+          // verdade se autoriza é o servidor (routes/sales.js#commitRefund),
+          // que confere usuário/senha de novo por conta própria.
+          const admin = await confirmUserPassword({
+            username, password, errBox, checkEmpty: true,
+            emptyMessage: 'Informe usuário e senha de um administrador pra autorizar o crédito.',
+            requireAdmin: true,
+            invalidMessage: 'Usuário/senha inválidos ou não é um administrador.',
+          });
+          if (!admin) return false;
+          creditApproval = { username, password };
+        }
+
         try {
           // A sessão de caixa ABERTA agora (não a da venda original — pode
           // ser de dias atrás) é o que importa pra conferência de fechamento
@@ -350,7 +392,7 @@ export async function renderSalesHistory(container, ctx) {
           const { refund, debtReduced } = await refundSaleItems({
             saleId: sale.id, userId: ctx.user.id, userName: ctx.user.nome, reason, items, generateCredit,
             cashSessionId: openSession?.id || null,
-            dedupeKey,
+            dedupeKey, creditApproval,
           });
           await logAction({
             userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,

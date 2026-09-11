@@ -44,7 +44,7 @@ function api(jar) {
 
   await call('/api/products', { method: 'POST', body: JSON.stringify({ barcode: 'LOYALTY-TEST-01', name: 'Item fidelidade', price: 25 }) });
   const product = (await call('/api/products')).body.products.find((p) => p.barcode === 'LOYALTY-TEST-01');
-  await call(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 20 }) });
+  await call(`/api/products/${product.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 20, dedupeKey: crypto.randomUUID() }) });
 
   // --- Ganho de pontos ---
   const sale1 = await call('/api/sales', {
@@ -151,7 +151,7 @@ function api(jar) {
   // --- Carreto ---
   const deliveryRes = await call('/api/deliveries', {
     method: 'POST',
-    body: JSON.stringify({ customerId: customer.id, items: [{ source: 'estoque', productId: product.id, name: product.name, unit: 'un', qty: 2 }], address: 'Rua Teste, 123' }),
+    body: JSON.stringify({ customerId: customer.id, items: [{ source: 'estoque', productId: product.id, name: product.name, unit: 'un', qty: 2 }], address: 'Rua Teste, 123', dedupeKey: crypto.randomUUID() }),
   });
   check('carreto criado', deliveryRes.status === 201 && deliveryRes.body.delivery.status === 'pendente', deliveryRes.status);
   const delivery = deliveryRes.body.delivery;
@@ -164,7 +164,7 @@ function api(jar) {
   check('cancelar carreto já entregue é rejeitado', cancelAfterDelivered.status === 400, cancelAfterDelivered.status);
 
   const delivery2Res = await call('/api/deliveries', {
-    method: 'POST', body: JSON.stringify({ customerId: customer.id, items: [{ source: 'avulso', name: 'Carga de areia', unit: 'un', qty: 1 }] }),
+    method: 'POST', body: JSON.stringify({ customerId: customer.id, items: [{ source: 'avulso', name: 'Carga de areia', unit: 'un', qty: 1 }], dedupeKey: crypto.randomUUID() }),
   });
   const cancelFresh = await call(`/api/deliveries/${delivery2Res.body.delivery.id}/cancelar`, { method: 'POST' });
   check('cancelar carreto pendente funciona', cancelFresh.status === 200 && cancelFresh.body.delivery.status === 'cancelado', cancelFresh.status);

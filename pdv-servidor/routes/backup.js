@@ -5,26 +5,33 @@
 // contagem de cada tabela, pra tela pedir confirmação ANTES de aplicar de
 // verdade (ver public/test.html).
 import { Router } from 'express';
-import { encryptPayload, decryptPayload } from '../lib/backupCrypto.js';
+import { encryptPayload, decryptPayload, MIN_BACKUP_PASSWORD_LENGTH } from '../lib/backupCrypto.js';
 import { buildBackupPayload, applyBackupPayload, getCurrentCounts, resetOperationalData, BACKUP_FORMAT_VERSION, BACKUP_TABLES } from '../lib/backup.js';
 import { logAction } from '../lib/audit.js';
 import { broadcast } from '../lib/broadcast.js';
+import { getConfig, updateConfig } from '../lib/companyConfig.js';
 
 const router = Router();
 
 /** Só a contagem atual de cada tabela — usado pela tela de Backup pra
  * mostrar "o que existe hoje" mesmo fora do fluxo de restaurar (ver
- * data/backupRepo.js#getCurrentCounts no cliente, chamada solta da tela). */
+ * data/backupRepo.js#getCurrentCounts no cliente, chamada solta da tela).
+ * `lastBackupAt` (achado de auditoria, P2) vai junto — sem isso, a tela
+ * nunca mostrava HÁ QUANTO TEMPO não sai um backup, e uma loja que só conta
+ * com o gatilho automático do fechamento de caixa (ver
+ * routes/cash.js#backup-fechamento) não tinha como perceber, sem abrir o
+ * Log do sistema, se aquela rede de segurança estava realmente funcionando. */
 router.get('/current-counts', (req, res) => {
-  res.json({ counts: getCurrentCounts() });
+  res.json({ counts: getCurrentCounts(), lastBackupAt: getConfig().lastBackupAt || null });
 });
 
 router.post('/export', async (req, res) => {
   try {
     const password = req.body.password;
-    if (!password || password.length < 4) throw new Error('Informe uma senha com pelo menos 4 caracteres pra proteger o backup.');
+    if (!password || password.length < MIN_BACKUP_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres pra proteger o backup.`);
     const payload = buildBackupPayload();
     const envelope = await encryptPayload(payload, password);
+    updateConfig({ lastBackupAt: Date.now() });
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Exportação de backup', details: 'Backup completo gerado e baixado.', entity: 'backup', entityId: 'export',

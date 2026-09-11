@@ -9,6 +9,7 @@ import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { updateConfig } from '../lib/companyConfig.js';
+import { requirePermission } from '../lib/permissions.js';
 import { pointsBalance, creditBalance, listLoyaltyLedger, listCreditLedger, insertLoyaltyStmt, insertCreditStmt } from '../lib/loyaltyLedger.js';
 
 const router = Router();
@@ -20,7 +21,14 @@ router.get('/config', (req, res) => {
   res.json(getLoyaltyConfig());
 });
 
-router.put('/config', (req, res) => {
+// Achado de auditoria (P1): sem isto, qualquer vendedor autenticado
+// conseguia mudar a taxa de conversão pontos↔dinheiro da loja inteira sem
+// nenhuma restrição — ex: `redemptionRate` quase zero faz qualquer resgate
+// virar um crédito de troca gigante, gasto depois como forma de pagamento
+// numa venda real. Mesma classe de política sensível que Dados da loja
+// (desconto máximo, juro de parcelamento) já exige 'empresa' pra editar
+// (ver routes/company.js) — replicado aqui.
+router.put('/config', requirePermission('empresa'), (req, res) => {
   const pointsPerReal = Number(req.body.pointsPerReal);
   const redemptionRate = Number(req.body.redemptionRate);
   if (!Number.isFinite(pointsPerReal) || pointsPerReal < 0) {
@@ -77,9 +85,10 @@ const commitRedemption = db.transaction((input) => {
 
   const balance = pointsBalance(input.customerId);
   if (points > balance) throw new Error(`O cliente só tem ${balance} pontos disponíveis.`);
-  if (input.dedupeKey) {
-    claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  }
+  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+  // routes/deliveries.js#commitDelivery pro raciocínio completo.
+  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
 
   const { redemptionRate } = getLoyaltyConfig();
   const amount = points / redemptionRate;

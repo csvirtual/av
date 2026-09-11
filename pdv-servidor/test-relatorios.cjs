@@ -56,8 +56,8 @@ async function pickCustomSelect(page, selectId, optionText) {
   const prodB = (await apiCall(page, '/api/products', {
     method: 'POST', body: JSON.stringify({ barcode: '7802222222222', name: 'Produto B', category: 'ferramenta', unit: 'un', price: 10, costPrice: 4, minStock: 1 }),
   })).body.product;
-  await apiCall(page, `/api/products/${prodA.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 20, note: 'estoque' }) });
-  await apiCall(page, `/api/products/${prodB.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 20, note: 'estoque' }) });
+  await apiCall(page, `/api/products/${prodA.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 20, note: 'estoque', dedupeKey: crypto.randomUUID() }) });
+  await apiCall(page, `/api/products/${prodB.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 20, note: 'estoque', dedupeKey: crypto.randomUUID() }) });
 
   const vendorRes = await apiCall(page, '/api/users', {
     method: 'POST', body: JSON.stringify({ nome: 'Vendedor Relatorio', username: 'vendedor.relatorio', password: 'senhaVendedor1', permissions: {} }),
@@ -66,14 +66,14 @@ async function pickCustomSelect(page, selectId, optionText) {
 
   // Venda 1 (admin): 2× Produto A (R$200) — a maior parte do faturamento.
   const sale1 = await apiCall(page, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prodA.id, qty: 2 }], payments: [{ method: 'Dinheiro', amount: 200 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prodA.id, qty: 2 }], payments: [{ method: 'Dinheiro', amount: 200 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Venda 1 (admin, Produto A) criada', sale1.status === 201, sale1.status);
 
   // Venda 2 (vendedor): 1× Produto B (R$10) — pequena, deve ficar em C.
   await apiCall(page, '/api/auth/login', { method: 'POST', body: JSON.stringify({ username: 'vendedor.relatorio', password: 'senhaVendedor1' }) });
   const sale2 = await apiCall(page, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prodB.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 10 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prodB.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 10 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Venda 2 (vendedor, Produto B) criada', sale2.status === 201, sale2.status);
   await apiCall(page, '/api/auth/login', { method: 'POST', body: JSON.stringify({ username: 'admin', password: 'admin123' }) });
@@ -82,7 +82,7 @@ async function pickCustomSelect(page, selectId, optionText) {
   // reportada precisa refletir só a quantidade REALMENTE vendida
   // (qty - qtyRefunded), não o que foi originalmente lançado no pedido.
   const refund = await apiCall(page, `/api/sales/${sale1.body.sale.id}/refund`, {
-    method: 'POST', body: JSON.stringify({ items: [{ itemIndex: 0, productId: prodA.id, qty: 1 }], reason: 'Teste de estorno pra relatório' }),
+    method: 'POST', body: JSON.stringify({ items: [{ itemIndex: 0, productId: prodA.id, qty: 1 }], reason: 'Teste de estorno pra relatório', dedupeKey: crypto.randomUUID() }),
   });
   check('Estorno parcial da venda 1 (1 de 2 unidades de Produto A) funciona', refund.status === 200, JSON.stringify(refund).slice(0, 200));
 

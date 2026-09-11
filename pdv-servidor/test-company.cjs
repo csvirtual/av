@@ -106,7 +106,7 @@ async function apiCall(page, path, opts = {}) {
   const prod = (await apiCall(page, '/api/products', {
     method: 'POST', body: JSON.stringify({ barcode: '7822222222222', name: 'Produto Juro', category: 'material', unit: 'un', price: 100, costPrice: 40, minStock: 1 }),
   })).body.product;
-  await apiCall(page, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 10, note: 'estoque' }) });
+  await apiCall(page, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 10, note: 'estoque', dedupeKey: crypto.randomUUID() }) });
 
   await page.goto(`${BASE}/#/venda`);
   await page.waitForTimeout(700);

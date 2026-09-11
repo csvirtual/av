@@ -68,11 +68,12 @@ export async function summarizeSales({ sellerId, customerId, fromTs, toTs } = {}
  * do que o cliente mandou — mesmo raciocínio de createSale acima). */
 export async function refundSaleItems({
   saleId, userId, userName, reason, items, generateCredit = false, cashSessionId = null, dedupeKey = null,
+  creditApproval = null,
 }) {
   void userId; void userName; void cashSessionId;
   return api(`/api/sales/${encodeURIComponent(saleId)}/refund`, {
     method: 'POST',
-    body: JSON.stringify({ reason, items, generateCredit, dedupeKey: dedupeKey || newDedupeKey() }),
+    body: JSON.stringify({ reason, items, generateCredit, dedupeKey: dedupeKey || newDedupeKey(), creditApproval }),
   });
 }
 

@@ -168,7 +168,7 @@ async function apiCall(page, path, opts = {}) {
 
   // ---------- Adversária: não dá pra receber além do pedido ----------
   const overReceive = await apiCall(page, `/api/purchases/${orderId}/receber`, {
-    method: 'POST', body: JSON.stringify({ items: [{ productId, qty: 1 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId, qty: 1 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Servidor rejeita receber mais do que o pedido já fechado permite', overReceive.status === 400, JSON.stringify(overReceive));
 
@@ -204,7 +204,7 @@ async function apiCall(page, path, opts = {}) {
   });
   const customOrderId = customOrderRes.body.order.id;
   const customReceive = await apiCall(page, `/api/purchases/${customOrderId}/receber`, {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: customProductId, qty: 10, unitCost: 7.5 }] }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: customProductId, qty: 10, unitCost: 7.5 }], dedupeKey: crypto.randomUUID() }),
   });
   check('Recebimento de produto personalizado funciona', customReceive.status === 200, customReceive.status);
   const customProductAfter = await apiCall(page, `/api/products/${customProductId}`);
@@ -225,7 +225,7 @@ async function apiCall(page, path, opts = {}) {
   // muda o sinal sozinho.
   const productBeforeZero = await apiCall(page, `/api/products/${productId}`);
   await apiCall(page, `/api/products/${productId}/movimentos`, {
-    method: 'POST', body: JSON.stringify({ type: 'saida', qty: -productBeforeZero.body.product.quantity, note: 'zerando pra teste de sugestão' }),
+    method: 'POST', body: JSON.stringify({ type: 'saida', qty: -productBeforeZero.body.product.quantity, note: 'zerando pra teste de sugestão', dedupeKey: crypto.randomUUID() }),
   });
   await page.click('#suggest-btn');
   await page.waitForTimeout(500);

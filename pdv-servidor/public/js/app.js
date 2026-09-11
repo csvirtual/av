@@ -39,6 +39,7 @@ import { escapeHtml } from './utils/format.js';
 import { connectLive, onLiveMessage } from './live.js';
 import { getCompany } from './data/companyRepo.js';
 import { getLicenseStatus, activateLicenseKey } from './data/licenseRepo.js';
+import { api } from './data/apiClient.js';
 import { openSupportWhatsappModal, openSupportEmailModal } from './components/supportContact.js';
 import { logAction } from './data/auditRepo.js';
 import { getThemePreference, applyTheme } from './theme.js';
@@ -735,6 +736,16 @@ async function bootImpl() {
     renderLogin();
     return;
   }
+  // Achado de auditoria (P1): senha padrão (admin/admin123) sem exigência
+  // de troca — reforçado de verdade no servidor (ver o middleware em
+  // server.js que bloqueia toda rota /api enquanto isto for true), esta
+  // tela é só a experiência normal do caminho feliz: qualquer outra tela
+  // que tentasse renderizar agora ia falhar em toda chamada de API mesmo
+  // assim.
+  if (user.mustChangePassword) {
+    renderMustChangePasswordScreen(user);
+    return;
+  }
   await renderShell(user);
 }
 
@@ -834,6 +845,69 @@ function renderOfflineScreen() {
     </div>
   `;
   document.getElementById('offline-retry-btn').addEventListener('click', () => boot());
+}
+
+// Achado de auditoria (P1): toda instalação nova sobe com admin/admin123 —
+// antes disto, só um aviso textual na Ajuda, nada travava de verdade quem
+// nunca trocasse. Bloqueia o sistema inteiro (só /api/auth e /api/license
+// continuam abertos — ver server.js) até a própria conta trocar a senha,
+// mesma ideia visual das outras telas de bloqueio (boot-loading > card).
+function renderMustChangePasswordScreen(user) {
+  root.innerHTML = `
+    <div class="boot-loading">
+      <div class="card" style="max-width:420px;">
+        <div style="text-align:center;margin-bottom:6px;">${icon('warning', { size: 34 })}</div>
+        <h1 style="font-size:18px;margin:0 0 14px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Troque a senha padrão</h1>
+        <p style="margin:0 0 18px;text-align:center;">Esta conta (<strong>${escapeHtml(user.username)}</strong>) ainda está com a senha padrão de instalação — troque agora antes de continuar. É rápido, só desta vez.</p>
+        <form id="change-password-form" novalidate>
+          <div id="change-password-error"></div>
+          <div class="field">
+            <label for="current-password">Senha atual</label>
+            <input id="current-password" type="password" autocomplete="current-password" autofocus required>
+          </div>
+          <div class="field">
+            <label for="new-password">Nova senha</label>
+            <input id="new-password" type="password" autocomplete="new-password" required>
+          </div>
+          <div class="field">
+            <label for="confirm-password">Confirmar nova senha</label>
+            <input id="confirm-password" type="password" autocomplete="new-password" required>
+          </div>
+          <button type="submit" class="btn" style="width:100%;padding:11px;">Trocar senha e continuar</button>
+        </form>
+        <p style="text-align:center;margin:14px 0 0;">
+          <a href="#" id="must-change-password-logout">Não é você? Sair</a>
+        </p>
+      </div>
+    </div>
+  `;
+  const form = document.getElementById('change-password-form');
+  const errBox = document.getElementById('change-password-error');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errBox.innerHTML = '';
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    if (newPassword !== confirmPassword) {
+      errBox.innerHTML = '<div class="form-error">As duas senhas novas não são iguais.</div>';
+      return;
+    }
+    try {
+      await api('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      showToast('Senha trocada com sucesso.', 'success');
+      boot();
+    } catch (err) {
+      errBox.innerHTML = `<div class="form-error">${escapeHtml(err.message)}</div>`;
+    }
+  });
+  document.getElementById('must-change-password-logout').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await clearSession();
+  });
 }
 
 function renderTabBlockedScreen() {

@@ -102,7 +102,7 @@ router.get('/', (req, res) => {
 
 router.put('/', requirePermission('empresa'), async (req, res) => {
   const body = req.body || {};
-  const cfg = getConfig();
+  let cfg = getConfig();
   const patch = {};
 
   try {
@@ -138,6 +138,20 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
       }
       patch.cnpj = nextCnpj;
     }
+
+    // Achado de auditoria (P2): o único `await` deste handler inteiro fica
+    // no bloco do CNPJ acima (verifyLicenseKey) — o resto do handler é
+    // síncrono. Mas os campos abaixo (endereço, encarregado de LGPD, juro
+    // de crediário) fazem merge com `cfg` pra preencher o que o pedido não
+    // mandou (`existing.*`) — se `cfg` continuasse sendo a leitura de ANTES
+    // do await, uma segunda edição concorrente (ex: outro admin salvando só
+    // o telefone do encarregado de LGPD) que gravasse NESSE meio-tempo
+    // seria sobrescrita silenciosamente aqui embaixo, porque este handler
+    // usaria um `existing` desatualizado. Relê `cfg` fresco assim que o
+    // único ponto de cessão do event loop já passou — daqui pra baixo, o
+    // resto do handler roda 100% síncrono até `updateConfig`, então não há
+    // mais nenhuma janela de corrida.
+    cfg = getConfig();
 
     if (body.razaoSocial !== undefined) patch.razaoSocial = String(body.razaoSocial).trim();
     if (body.nomeFantasia !== undefined) patch.nomeFantasia = String(body.nomeFantasia).trim();

@@ -64,7 +64,7 @@ async function pickCustomer(page, term) {
   const prod = (await apiCall(pageA, '/api/products', {
     method: 'POST', body: JSON.stringify({ barcode: '7811111111111', name: 'Produto Credito', category: 'material', unit: 'un', price: 50, costPrice: 20, minStock: 1 }),
   })).body.product;
-  await apiCall(pageA, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 50, note: 'estoque' }) });
+  await apiCall(pageA, `/api/products/${prod.id}/movimentos`, { method: 'POST', body: JSON.stringify({ type: 'entrada', qty: 50, note: 'estoque', dedupeKey: crypto.randomUUID() }) });
 
   const customerX = (await apiCall(pageA, '/api/customers', { method: 'POST', body: JSON.stringify({ nome: 'Cliente X Credito' }) })).body.customer;
   const customerY = (await apiCall(pageA, '/api/customers', { method: 'POST', body: JSON.stringify({ nome: 'Cliente Y Sem Credito' }) })).body.customer;
@@ -73,10 +73,10 @@ async function pickCustomer(page, term) {
 
   // ---------- Terminal A: venda + estorno com crédito pro Cliente X ----------
   const sale = (await apiCall(pageA, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 50 }], customerId: customerX.id }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Dinheiro', amount: 50 }], customerId: customerX.id, dedupeKey: crypto.randomUUID() }),
   })).body.sale;
   const refund = await apiCall(pageA, `/api/sales/${sale.id}/refund`, {
-    method: 'POST', body: JSON.stringify({ items: [{ itemIndex: 0, productId: prod.id, qty: 1 }], reason: 'Cliente trocou de ideia', generateCredit: true }),
+    method: 'POST', body: JSON.stringify({ items: [{ itemIndex: 0, productId: prod.id, qty: 1 }], reason: 'Cliente trocou de ideia', generateCredit: true, dedupeKey: crypto.randomUUID() }),
   });
   check('Estorno com geração de crédito de troca (Terminal A)', refund.status === 200, refund.status);
 
@@ -136,16 +136,16 @@ async function pickCustomer(page, term) {
 
   // ---------- Regra de negócio já existente continua de pé: gastar mais do que o saldo real é recusado pelo servidor ----------
   const overspend = await apiCall(pageA, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Crédito de troca', amount: 999 }], customerId: customerX.id }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 1 }], payments: [{ method: 'Crédito de troca', amount: 999 }], customerId: customerX.id, dedupeKey: crypto.randomUUID() }),
   });
   check('Tentar gastar crédito além do saldo real (mesmo direto pela API) é recusado pelo servidor', overspend.status === 400, overspend.status);
 
   // ---------- Resgate de pontos de fidelidade (via Clientes) também aparece cross-terminal ----------
   const sale2 = (await apiCall(pageA, '/api/sales', {
-    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 4 }], payments: [{ method: 'Dinheiro', amount: 200 }], customerId: customerX.id }),
+    method: 'POST', body: JSON.stringify({ items: [{ productId: prod.id, qty: 4 }], payments: [{ method: 'Dinheiro', amount: 200 }], customerId: customerX.id, dedupeKey: crypto.randomUUID() }),
   })).body.sale;
   check('Segunda venda do Cliente X gera pontos de fidelidade', sale2.total === 200, sale2.total);
-  const redemption = await apiCall(pageA, `/api/loyalty/${customerX.id}/resgatar`, { method: 'POST', body: JSON.stringify({ points: 100 }) });
+  const redemption = await apiCall(pageA, `/api/loyalty/${customerX.id}/resgatar`, { method: 'POST', body: JSON.stringify({ points: 100, dedupeKey: crypto.randomUUID() }) });
   check('Resgate de 100 pontos gera R$ 10 de crédito (redemptionRate=10)', redemption.status === 201 && redemption.body.amount === 10, JSON.stringify(redemption.body));
 
   await pageB.goto(`${BASE}/#/venda`);

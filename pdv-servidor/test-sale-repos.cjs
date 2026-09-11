@@ -72,6 +72,7 @@ async function rawApi(page, path, opts = {}) {
     body: JSON.stringify({
       items: [{ productId: cimento.id, qty: 1, unitPrice: 0.01 }], // tentativa deliberada de forjar o preço
       payments: [{ method: 'Dinheiro', amount: 0.01 }], // paga o valor forjado, não o real — só passaria se o servidor confiasse no unitPrice
+      dedupeKey: crypto.randomUUID(),
     }),
   });
   check('venda com unitPrice forjado (R$0,01) é REJEITADA — pagamento não bate com o preço real do catálogo', tampered.status === 400 && /não bate/.test(tampered.body.error), JSON.stringify(tampered.body));
@@ -81,6 +82,7 @@ async function rawApi(page, path, opts = {}) {
     body: JSON.stringify({
       items: [{ productId: cimento.id, qty: 1, unitPrice: 0.01 }], // preço forjado no item
       payments: [{ method: 'Dinheiro', amount: 32 }], // mas paga o preço REAL do catálogo (32) — só bate se o servidor ignorou o unitPrice forjado e usou 32
+      dedupeKey: crypto.randomUUID(),
     }),
   });
   check('mesmo pagando o valor REAL, o servidor gravou o unitPrice do CATÁLOGO (32), não o forjado (0,01)', tamperedButCorrectPayment.status === 201 && tamperedButCorrectPayment.body.sale.items[0].unitPrice === 32, JSON.stringify(tamperedButCorrectPayment.body.sale?.items?.[0]));
@@ -105,7 +107,7 @@ async function rawApi(page, path, opts = {}) {
 
   const formInvalid = await rawApi(admin, '/api/sales', {
     method: 'POST',
-    body: JSON.stringify({ items: [{ productId: areia.id, qty: 1, formName: 'Forma Que Não Existe' }], payments: [{ method: 'Dinheiro', amount: 1 }] }),
+    body: JSON.stringify({ items: [{ productId: areia.id, qty: 1, formName: 'Forma Que Não Existe' }], payments: [{ method: 'Dinheiro', amount: 1 }], dedupeKey: crypto.randomUUID() }),
   });
   check('vender uma forma que não existe mais no produto é rejeitado', formInvalid.status === 400 && /não existe mais/.test(formInvalid.body.error), JSON.stringify(formInvalid.body));
 
@@ -122,7 +124,7 @@ async function rawApi(page, path, opts = {}) {
 
   const salePromo = await rawApi(admin, '/api/sales', {
     method: 'POST',
-    body: JSON.stringify({ items: [{ productId: tijolo.id, qty: 1, unitPrice: 10 }], payments: [{ method: 'Dinheiro', amount: 6 }] }), // forjando 10, mas o real esperado é o PROMO (6, perto de vencer)
+    body: JSON.stringify({ items: [{ productId: tijolo.id, qty: 1, unitPrice: 10 }], payments: [{ method: 'Dinheiro', amount: 6 }], dedupeKey: crypto.randomUUID() }), // forjando 10, mas o real esperado é o PROMO (6, perto de vencer)
   });
   check('produto perto de vencer usa o preço PROMOCIONAL automaticamente, mesmo que o cliente tenha mandado o preço cheio', salePromo.status === 201 && salePromo.body.sale.items[0].unitPrice === 6, JSON.stringify(salePromo.body.sale?.items?.[0]));
 
@@ -133,6 +135,7 @@ async function rawApi(page, path, opts = {}) {
     body: JSON.stringify({
       items: [{ productId: cimento.id, qty: 1 }],
       payments: [{ method: 'Cartão de crédito', amount: 32, installments: 3, interestAmount: 0 }], // tenta zerar o juro (política configurada: 5%/mês, sem isenção)
+      dedupeKey: crypto.randomUUID(),
     }),
   });
   const expectedInterest = 32 * 0.05 * 3; // monthlyPercent × parcelas, sem isenção
@@ -143,6 +146,7 @@ async function rawApi(page, path, opts = {}) {
     body: JSON.stringify({
       items: [{ productId: cimento.id, qty: 1 }],
       payments: [{ method: 'Cartão de crédito', amount: 32, installments: 3, interestAmount: 999 }], // tenta inflar o juro pra muito mais que a política manda
+      dedupeKey: crypto.randomUUID(),
     }),
   });
   check('juro inflado pelo cliente também é ignorado — servidor usa a mesma fórmula de sempre', inflatedInterest.status === 201 && Math.abs(inflatedInterest.body.sale.creditInterestTotal - expectedInterest) < 0.01, inflatedInterest.body.sale?.creditInterestTotal);
@@ -166,7 +170,7 @@ async function rawApi(page, path, opts = {}) {
 
   const fiadoNoCustomer = await rawApi(admin, '/api/sales', {
     method: 'POST',
-    body: JSON.stringify({ items: [{ productId: cimento.id, qty: 1 }], payments: [{ method: 'Fiado', amount: 32 }] }),
+    body: JSON.stringify({ items: [{ productId: cimento.id, qty: 1 }], payments: [{ method: 'Fiado', amount: 32 }], dedupeKey: crypto.randomUUID() }),
   });
   check('venda fiada sem cliente selecionado é rejeitada', fiadoNoCustomer.status === 400 && /Selecione um cliente/.test(fiadoNoCustomer.body.error), JSON.stringify(fiadoNoCustomer.body));
 
