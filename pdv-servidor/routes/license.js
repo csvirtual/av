@@ -17,8 +17,18 @@ const router = Router();
 
 router.get('/status', async (req, res) => {
   try {
-    const cnpj = getConfig().cnpj || '';
+    const cfg = getConfig();
+    const cnpj = cfg.cnpj || '';
     const status = await getLicenseStatus(cnpj);
+    // Achado do usuário: a tela de bloqueio (public/js/app.js#renderLicenseBlockedScreen)
+    // roda ANTES de qualquer login — chamar GET /api/company (que exige
+    // sessão) pra montar a mensagem de contato do suporte sempre dava 401
+    // e travava o boot inteiro em "Carregando…". Aqui, junto do status
+    // (já público de propósito, ver comentário no topo do arquivo), vai só
+    // o mínimo não-sensível (mesmas informações que já aparecem impressas
+    // num comprovante) — nunca o cadastro fiscal completo (endereço,
+    // inscrições, LGPD), que continua exigindo login.
+    status.company = { nomeFantasia: cfg.nomeFantasia || '', cnpj, email: cfg.email || '' };
     res.json(status);
   } catch (err) {
     console.error('[erro inesperado] GET /api/license/status:', err);

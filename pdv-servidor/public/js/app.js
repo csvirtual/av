@@ -668,8 +668,14 @@ async function bootImpl() {
   // funcionar mesmo sem ninguém logado ainda.
   const license = await getLicenseStatus();
   if (!license.active) {
-    const company = await getCompany();
-    renderLicenseBlockedScreen(company);
+    // Achado do usuário: aqui NUNCA pode ser getCompany() (GET
+    // /api/company exige sessão) — ninguém está logado ainda nesta tela,
+    // então a chamada sempre voltava 401 e travava o boot inteiro em
+    // "Carregando…" pra sempre. license.company já vem junto da resposta
+    // de /api/license/status (só o mínimo não-sensível — nome fantasia,
+    // CNPJ, e-mail — pra montar a mensagem de contato do suporte; ver
+    // routes/license.js).
+    renderLicenseBlockedScreen(license.company || {});
     return;
   }
 
