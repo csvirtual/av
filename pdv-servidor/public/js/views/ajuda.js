@@ -3,6 +3,7 @@
 // pode fazer, mas por que algumas coisas ficam bloqueadas pro seu perfil.
 import { escapeHtml } from '../utils/format.js';
 import { icon } from '../components/icon.js';
+import { getCompany } from '../data/companyRepo.js';
 
 /** Conteúdo do tópico F.A.Q, à parte de TOPICS (ver renderFaqAccordion logo
  * abaixo) — cada pergunta vira um item de acordeão (botão + resposta
@@ -499,7 +500,22 @@ const TOPICS = [
     id: 'lgpd',
     icon: icon('lock', { size: 16 }),
     title: 'Privacidade e LGPD',
-    html: `
+    // Achado de auditoria (paridade com a extensão): único tópico com
+    // conteúdo dinâmico — puxa o nome da loja e do encarregado direto do
+    // cadastro (ver views/company.js), pra não obrigar copiar/colar
+    // manualmente esses dados no aviso de privacidade pronto. Os outros
+    // tópicos são texto fixo; ver renderTopic()/SEARCH_INDEX mais abaixo
+    // pra como isso é tratado nos dois casos. Cópia fiel da lógica de
+    // app/js/views/ajuda.js da extensão, só com "servidor da loja" no
+    // lugar de "localmente"/"este computador".
+    html: (company) => {
+      const nomeLoja = company?.nomeFantasia || '[nome da loja]';
+      const encNome = company?.encarregadoLgpd?.nome;
+      const encContato = company?.encarregadoLgpd?.contato;
+      const linhaEncarregado = encNome
+        ? `Responsável pelos seus dados nesta loja: ${encNome}${encContato ? ` — ${encContato}` : ''}.`
+        : '[Se quiser, informe aqui quem é o responsável por dúvidas de privacidade — preencha em Dados da loja → Privacidade e LGPD.]';
+      return `
       <h2>Privacidade e LGPD</h2>
       <p class="help-subtitle">Os dados ficam só no servidor da loja, mas isso não tira a responsabilidade da loja sobre os dados dos clientes.</p>
 
@@ -509,12 +525,14 @@ const TOPICS = [
       <div class="tip"><strong>O que o sistema já ajuda:</strong> tudo fica só no servidor da loja (nada sobe pra nuvem nem é compartilhado com ninguém), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
 
       <h3>Aviso de privacidade pronto pra usar</h3>
-      <p>Texto pra afixar no balcão ou entregar ao cliente — pode copiar, adaptar (troque "[nome da loja]" e, se quiser, acrescente um responsável de contato) e imprimir como quiser:</p>
-      <div class="template-box">AVISO DE PRIVACIDADE — [nome da loja]
+      <p>Texto pra afixar no balcão ou entregar ao cliente — pode copiar, adaptar e imprimir como quiser:</p>
+      <div class="template-box">AVISO DE PRIVACIDADE — ${escapeHtml(nomeLoja)}
 
 Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura, no servidor desta loja — não são enviados para a internet nem compartilhados com terceiros.
 
-Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.</div>
+Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.
+
+${linhaEncarregado}</div>
 
       <h3>Direitos do cliente sobre os próprios dados</h3>
       <p>Pela LGPD (Art. 18), o cliente pode pedir pra <strong>ver</strong>, <strong>corrigir</strong> ou <strong>apagar</strong> os dados que a loja tem sobre ele. Na prática, no sistema:</p>
@@ -524,8 +542,9 @@ Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Reg
       </ul>
 
       <h3>Encarregado de dados (opcional, mas recomendado)</h3>
-      <p>A LGPD prevê a figura de um <strong>encarregado</strong> — a pessoa de contato pra dúvidas sobre dados pessoais na loja (pode ser o próprio dono). Esta versão ainda não tem um campo próprio pra cadastrar isso — acrescente o nome/contato dele na cópia impressa do aviso acima, se quiser deixar isso claro pros clientes.</p>
-    `,
+      <p>A LGPD prevê a figura de um <strong>encarregado</strong> — a pessoa de contato pra dúvidas sobre dados pessoais na loja (pode ser o próprio dono). Cadastre o nome e o contato dele em <strong>Dados da loja → Privacidade e LGPD</strong> — preenchido, ele aparece automaticamente no aviso pronto pra imprimir acima.</p>
+    `;
+    },
   },
   {
     id: 'carreto',
@@ -838,7 +857,7 @@ function stripHtml(html) {
  * usada pra abrir a pergunta certa depois de trocar pro tópico F.A.Q — ver
  * openFaqItem(). */
 const SEARCH_INDEX = TOPICS.map((t) => (
-  { type: 'topic', topicId: t.id, label: t.title, searchText: `${t.title} ${stripHtml(t.html)}`.toLowerCase() }
+  { type: 'topic', topicId: t.id, label: t.title, searchText: `${t.title} ${stripHtml(typeof t.html === 'function' ? t.html({}) : t.html)}`.toLowerCase() }
 ));
 {
   let faqIndex = 0;
@@ -872,6 +891,11 @@ function highlightMatch(text, words) {
 
 export async function renderAjuda(container) {
   let activeId = TOPICS[0].id;
+  // Só o tópico 'lgpd' usa isto (nome da loja/encarregado no aviso de
+  // privacidade pronto pra imprimir) — buscado uma vez aqui, igual ao
+  // resto das telas (ver getCompany() em caixa.js/dashboard.js/etc.),
+  // nunca do que a URL ou o clique mandou.
+  const company = await getCompany();
 
   container.innerHTML = `
     <div class="page-header">
@@ -906,7 +930,7 @@ export async function renderAjuda(container) {
   function renderTopic(id) {
     activeId = id;
     const topic = TOPICS.find((t) => t.id === id);
-    contentBox.innerHTML = topic.html;
+    contentBox.innerHTML = typeof topic.html === 'function' ? topic.html(company) : topic.html;
     // Só o tópico F.A.Q tem os botões de acordeão — a busca por
     // '.faq-question' não encontra nada (e não faz nada) nos outros 13.
     wireFaqAccordion(contentBox);
