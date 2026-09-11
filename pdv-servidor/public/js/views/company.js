@@ -39,6 +39,13 @@ function licenseStatusLabel(license) {
   return { text: 'Sem restrição de licença', cls: 'badge-gray' };
 }
 
+// version já vem pronta do servidor como o hash curto do commit (ver
+// lib/buildVersion.js) — achado do usuário: mais padrão usar o mesmo
+// identificador do commit do que um número de versão bumpado à mão.
+function versionDisplayLabel(version) {
+  return `Build ${version}`;
+}
+
 export async function renderCompany(container, ctx) {
   let company = ctx.company;
   let license = await getLicenseStatus();
@@ -62,7 +69,7 @@ export async function renderCompany(container, ctx) {
       <div class="card" style="max-width:760px;margin-bottom:20px;">
         <p class="section-title mt-0">Ativação</p>
         <p style="margin:0 0 6px;">Situação atual: <span class="badge ${statusInfo.cls}">${escAttr(statusInfo.text)}</span></p>
-        ${license.version ? `<p style="margin:0 0 14px;">Versão atual: ${escAttr(license.version)}</p>` : ''}
+        ${license.version ? `<p style="margin:0 0 14px;">Versão atual: <span class="badge badge-gray">${escAttr(versionDisplayLabel(license.version))}</span></p>` : ''}
         ${license.tipo !== 'full' ? `
           <div id="license-error"></div>
           <div class="field" style="max-width:420px;">
