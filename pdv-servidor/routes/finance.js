@@ -14,6 +14,14 @@ const router = Router();
 
 const PAYMENT_TOLERANCE = 0.01;
 
+// Achado de auditoria (Red Team, Passada 1): paymentMethod chegava sem
+// nenhuma validação — aceitava objeto, string gigante, o que fosse. Nunca
+// deu pra manipular saldo com isso (amount é sempre validado à parte), mas
+// mesmo raciocínio de defesa em profundidade já aplicado em
+// routes/sales.js#VALID_PAYMENT_METHODS: mesma lista que o dropdown desta
+// tela mostra (ver public/js/views/financeiro.js#PAYMENT_METHODS).
+const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix', 'Transferência']);
+
 const insertEntryStmt = db.prepare(`
   INSERT INTO financial_entries (id, status, due_date, data) VALUES (@id, @status, @dueDate, @data)
 `);
@@ -89,6 +97,7 @@ router.post('/', (req, res) => {
 const commitPayment = db.transaction((input) => {
   const value = Number(input.amount);
   if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor pago maior que zero.');
+  if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
 
   const row = getEntryStmt.get(input.id);
   if (!row) throw new Error('Conta não encontrada.');

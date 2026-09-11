@@ -13,6 +13,14 @@ import { userCan } from '../lib/permissions.js';
 
 const router = Router();
 
+// Achado de auditoria (Red Team, Passada 1): paymentMethod chegava sem
+// nenhuma validação — aceitava objeto, string gigante, o que fosse. Nunca
+// deu pra manipular saldo com isso (amount é sempre validado à parte), mas
+// mesmo raciocínio de defesa em profundidade já aplicado em
+// routes/sales.js#VALID_PAYMENT_METHODS: mesma lista que o dropdown desta
+// tela mostra (ver public/js/views/clientes.js#PAYMENT_METHODS).
+const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix']);
+
 const insertCustomerStmt = db.prepare('INSERT INTO customers (id, name_lower, data) VALUES (@id, @nameLower, @data)');
 const updateCustomerStmt = db.prepare('UPDATE customers SET name_lower = @nameLower, data = @data WHERE id = @id');
 const deleteCustomerStmt = db.prepare('DELETE FROM customers WHERE id = ?');
@@ -185,6 +193,7 @@ router.delete('/:id', (req, res) => {
 const commitPayment = db.transaction((input) => {
   const value = Number(input.amount);
   if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor de pagamento maior que zero.');
+  if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
 
   const entries = listLedgerStmt.all(input.customerId).map((r) => JSON.parse(r.data));
   const balance = entries.reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);

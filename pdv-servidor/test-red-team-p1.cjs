@@ -7,10 +7,12 @@
 // Cobre: (1) licença expirada bloqueia toda rota /api, mesmo com sessão já
 // logada; (2) venda/estorno/recebimento de compra gravam em
 // stock_movements (ledger de estoque completo, reconstrutível); (3)
-// whitelist de método de pagamento; (4) pagamento negativo rejeitado; (5)
-// fechamento de caixa exige senha de verdade no servidor; (6) limite de
-// crédito de fiado reconferido de verdade no servidor (era só aviso de
-// tela), inclusive sob concorrência real.
+// whitelist de método de pagamento em vendas; (4) pagamento negativo
+// rejeitado; (5) fechamento de caixa exige senha de verdade no servidor;
+// (6) limite de crédito de fiado reconferido de verdade no servidor (era
+// só aviso de tela), inclusive sob concorrência real; (7) whitelist de
+// paymentMethod em contas a pagar/receber (finance.js) e pagamento de
+// fiado (customers.js).
 const BASE = 'http://localhost:3131';
 const results = [];
 const check = (label, cond, detail) => { results.push(cond); console.log((cond ? 'OK  ' : 'FAIL') + ' - ' + label + (detail !== undefined ? ' | ' + detail : '')); };
@@ -257,6 +259,48 @@ const dedupeKey = (label) => `${label}-${Date.now()}-${Math.random().toString(36
     Math.abs(fiadoConcCustomerAfter.body.balance - 30) < 0.01,
     JSON.stringify(fiadoConcCustomerAfter.body),
   );
+
+  // --- (7): whitelist de paymentMethod em finance.js/customers.js ---
+  // Achado (Red Team, Passada 1): diferente de routes/sales.js, essas duas
+  // rotas aceitavam paymentMethod sem nenhuma validação (objeto, string
+  // gigante, HTML). Nunca deu pra manipular saldo com isso — `amount` é
+  // sempre validado e clampado à parte — mas era um buraco real de
+  // defesa em profundidade (dados não confiáveis armazenados sem checagem,
+  // mesmo escapados na hora de renderizar). Corrigido com a mesma lista
+  // que cada dropdown da tela mostra.
+  const financeEntryRes = await callAdmin('/api/finance', {
+    method: 'POST', body: JSON.stringify({ type: 'receber', description: 'Red Team paymentMethod', amount: 100, dueDate: Date.now() + 86400000 }),
+  });
+  const financeEntryId = financeEntryRes.body.entry?.id;
+  const financeBadRes = await callAdmin(`/api/finance/${financeEntryId}/pagamento`, {
+    method: 'POST', body: JSON.stringify({ amount: 10, paymentMethod: { evil: true }, dedupeKey: dedupeKey('finance-pm-obj') }),
+  });
+  check('finance.js rejeita paymentMethod fora da whitelist (objeto)', financeBadRes.status === 400, financeBadRes.status);
+  const financeGoodRes = await callAdmin(`/api/finance/${financeEntryId}/pagamento`, {
+    method: 'POST', body: JSON.stringify({ amount: 10, paymentMethod: 'Pix', dedupeKey: dedupeKey('finance-pm-ok') }),
+  });
+  check('finance.js aceita paymentMethod legítimo (Pix)', financeGoodRes.status === 201, financeGoodRes.status);
+
+  const custPmRes = await callAdmin('/api/customers', { method: 'POST', body: JSON.stringify({ nome: 'Cliente Red Team paymentMethod' }) });
+  const custPmId = custPmRes.body.customer?.id;
+  const custPmSaleRes = await callAdmin('/api/sales', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: [{ productId, qty: 1 }], payments: [{ method: 'Fiado', amount: 100 }],
+      customerId: custPmId, userName: 'admin', dedupeKey: dedupeKey('cust-pm-sale'),
+    }),
+  });
+  check('venda fiado pra testar paymentMethod de pagamento do cliente', custPmSaleRes.status === 201, custPmSaleRes.status);
+  const custPmBadRes = await callAdmin(`/api/customers/${custPmId}/pagamento`, {
+    method: 'POST', body: JSON.stringify({ amount: 10, paymentMethod: '<script>alert(1)</script>', dedupeKey: dedupeKey('cust-pm-xss') }),
+  });
+  check('customers.js rejeita paymentMethod fora da whitelist (XSS)', custPmBadRes.status === 400, custPmBadRes.status);
+  const custPmGoodRes = await callAdmin(`/api/customers/${custPmId}/pagamento`, {
+    method: 'POST', body: JSON.stringify({ amount: 10, paymentMethod: 'Dinheiro', dedupeKey: dedupeKey('cust-pm-ok') }),
+  });
+  check('customers.js aceita paymentMethod legítimo (Dinheiro)', custPmGoodRes.status === 201, custPmGoodRes.status);
+  const custPmBalanceRes = await callAdmin(`/api/customers/${custPmId}`);
+  check('saldo do cliente correto (100 - 10 = 90, ataques rejeitados não contaram)', Math.abs(custPmBalanceRes.body.balance - 90) < 0.01, custPmBalanceRes.body.balance);
 
   const passed = results.filter(Boolean).length;
   console.log(`\n${passed}/${results.length} passaram.`);
