@@ -176,23 +176,6 @@ const FAQ_CATEGORIES = [
     ],
   },
   {
-    label: 'Dados da loja e licença',
-    items: [
-      {
-        q: '"CNPJ já cadastrado e travado — ..."',
-        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes — depois do primeiro salvamento, o campo trava de propósito (ver tópico "Dados da loja e licença"). Clique em "Desbloquear edição" e cole o código de liberação — peça a quem administra a instalação, é o mesmo lugar que fornece a chave de ativação.',
-      },
-      {
-        q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
-        a: 'A chave/código colado não é válido para o que você está tentando fazer — pode ser um código do tipo errado (ex: um código de liberação de CNPJ colado onde se espera uma chave de ativação, ou o contrário), estar vencido, ou ter sido digitado com algum caractere a menos/a mais. Confira se copiou o texto completo, sem espaços extras no início/fim, e se é mesmo do tipo certo pra o que você quer fazer.',
-      },
-      {
-        q: '"A chave salva parou de valer"',
-        a: 'A chave de ativação salva não bate mais com o CNPJ cadastrado agora — geralmente acontece depois de restaurar um backup feito num momento em que o CNPJ da loja era outro (a chave nunca é apagada, só deixa de bater com o CNPJ atual). Confira em "Dados da loja" se o CNPJ está correto e cole a chave de novo — não precisa de uma chave nova.',
-      },
-    ],
-  },
-  {
     label: 'Backup',
     items: [
       {
@@ -206,6 +189,23 @@ const FAQ_CATEGORIES = [
       {
         q: '"Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize o servidor antes de restaurar"',
         a: 'Só acontece restaurando um backup gerado por uma versão do servidor mais nova do que a que está rodando agora. Atualize o servidor pra versão mais recente do código (pergunte a quem administra a instalação) e tente restaurar de novo.',
+      },
+    ],
+  },
+  {
+    label: 'Licença e ativação',
+    items: [
+      {
+        q: '"CNPJ já cadastrado e travado — ..."',
+        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes — depois do primeiro salvamento, o campo trava de propósito (ver tópico "Licença e ativação"). Clique em "Desbloquear edição" e cole o código de liberação — peça a quem administra a instalação, é o mesmo lugar que fornece a chave de ativação.',
+      },
+      {
+        q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
+        a: 'A chave/código colado não é válido para o que você está tentando fazer — pode ser um código do tipo errado (ex: um código de liberação de CNPJ colado onde se espera uma chave de ativação, ou o contrário), estar vencido, ou ter sido digitado com algum caractere a menos/a mais. Confira se copiou o texto completo, sem espaços extras no início/fim, e se é mesmo do tipo certo pra o que você quer fazer.',
+      },
+      {
+        q: '"A chave salva parou de valer"',
+        a: 'A chave de ativação salva não bate mais com o CNPJ cadastrado agora — geralmente acontece depois de restaurar um backup feito num momento em que o CNPJ da loja era outro (a chave nunca é apagada, só deixa de bater com o CNPJ atual). Confira em "Dados da loja" se o CNPJ está correto e cole a chave de novo — não precisa de uma chave nova.',
       },
     ],
   },
@@ -273,30 +273,28 @@ const TOPICS = [
       <h2>Primeiros passos</h2>
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
-      <h3>Ligando o sistema pela primeira vez</h3>
-      <p>Este é o servidor multi-terminal: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Na primeiríssima vez, o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> — usuário <code>admin</code>, senha <code>admin123</code> — pronto pra logar direto, sem nenhum assistente de cadastro pra preencher antes. O cadastro da loja (CNPJ, endereço...) e a ativação da licença ficam em <strong>Dados da loja</strong>, no menu — veja o tópico "Dados da loja e licença", mais abaixo.</p>
+      <h3>Cadastro da loja</h3>
+      <p>Este é o servidor multi-terminal: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Diferente da extensão (que pede os dados da loja num assistente de primeira execução), o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> — usuário <code>admin</code>, senha <code>admin123</code> — pronto pra logar direto, sem nenhum assistente pra preencher antes. O cadastro da loja em si (CNPJ, razão social, endereço, telefone...) fica em <strong>Dados da loja</strong>, no menu — sempre disponível pra editar, sem um passo único de "configuração inicial". Preencher isso não é só burocracia: é o que aparece no recibo impresso de cada venda e no relatório em PDF.</p>
+      <p>Alguns campos se formatam sozinhos enquanto você digita e só aceitam o formato certo: <strong>CNPJ</strong> ("xx.xxx.xxx/xxxx-xx", com dígito verificador conferido de verdade, igual a Receita faz), <strong>telefone</strong> — celular vira "(xx) x xxxx-xxxx", fixo vira "(xx) xxxx-xxxx" —, e <strong>CEP</strong> ("xxxxx-xxx"). O mesmo vale pro <strong>e-mail</strong>, se preenchido. Esses campos aparecem de novo em Clientes, Fornecedores e Dados da loja (edição) — sempre com a mesma formatação e validação.</p>
       <div class="warn-box"><strong>Primeira coisa a fazer — troque a senha padrão:</strong> loga com <code>admin</code>/<code>admin123</code> e já vai em <strong>Usuários</strong> trocar essa senha. Ela é a mesma em toda instalação nova deste sistema — continua segura só enquanto ninguém de fora souber que você ainda não trocou. Recomendado fazer isso antes de qualquer outra coisa, principalmente se este servidor for acessível por outros computadores da rede.</div>
-      <div class="tip">Repare que o primeiro login já abre <strong>nesta própria tela de Ajuda</strong>, em vez do Painel — de propósito, pra já ter esse guia na mão antes de mexer em qualquer coisa (veja o porquê logo abaixo, em "Entrando todo dia").</div>
 
       <h3>O Administrador Geral</h3>
       <p>É esse primeiro usuário criado sozinho pelo sistema — quem tem acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
 
-      <h3>Instalar como app (opcional, só no computador do servidor)</h3>
-      <p>Em vez de abrir sempre pelo navegador, dá pra "instalar" este sistema como se fosse um app de verdade — mesmo site, só ganha um ícone próprio e abre em janela cheia, sem barra de endereço. No computador que roda o servidor (o que fica ligado com <code>node server.js</code>), abrindo pelo endereço <code>http://localhost:3131</code>: no Chrome/Edge, clique no ícone de instalar que aparece na barra de endereço, ou no menu do navegador em "Instalar PDV - C&S Virtual...".</p>
-      <div class="warn-box"><strong>Não funciona nos outros terminais nem no celular.</strong> Este sistema roda em HTTP puro na rede da loja, sem certificado (é assim de propósito — ver o porquê no tópico "Dados da loja e licença"). Instalar como app exige uma conexão segura (HTTPS) ou o endereço <code>localhost</code> — qualquer terminal ou celular que acesse pelo IP da rede (o jeito normal de usar este sistema no dia a dia) não vai ver a opção de instalar, porque o navegador bloqueia isso por segurança em conexões sem certificado. Continue usando pelo navegador normalmente nesses casos — funciona exatamente igual, só sem o ícone de app.</div>
-      <div class="tip"><strong>Hospedando fora da loja, em HTTPS, e mesmo assim não aparece a opção de instalar?</strong> Alguns planos gratuitos de hospedagem colocam uma barreira de acesso própria na frente do site (uma senha/token de "preview") — nesse caso o navegador consegue abrir a página normalmente, mas a busca automática pelo arquivo de configuração do app (<code>manifest.json</code>) esbarra nessa barreira e falha, e a opção de instalar não aparece. Não é um problema deste sistema: dá pra confirmar abrindo o Console do navegador (F12) e procurando um erro do tipo "Manifest fetch... failed, code 401" — se aparecer, o jeito de resolver é checar com a hospedagem se tem como tirar essa proteção de "preview" do site, ou passar pra um plano que não tenha essa barreira.</div>
-
       <h3>Entrando todo dia (Login)</h3>
       <p>O sistema sempre abre numa tela de <strong>login</strong>. Cada pessoa que trabalha na loja — administrador ou vendedor — tem seu próprio usuário e senha. Ninguém compartilha login: é assim que o sistema sabe exatamente quem fez cada venda, cada estorno, cada mudança de estoque.</p>
-      <div class="tip"><strong>Pra onde o login leva:</strong> todo login cai direto no <strong>Painel</strong> — nunca herda a tela em que a sessão anterior (de qualquer usuário, neste mesmo navegador) estava, de propósito, pra ninguém cair sem querer numa tela que não tem permissão de usar. Única exceção: o <strong>primeiríssimo login de cada conta</strong> — a sua, ou a de um vendedor recém-cadastrado — cai nesta Ajuda em vez do Painel, só essa vez, pra aprender a usar o sistema antes de mexer em qualquer coisa. Do segundo login em diante, essa mesma conta já cai sempre no Painel, como todo mundo.</div>
+      <div class="tip"><strong>Pra onde o login leva:</strong> todo login cai direto no <strong>Painel</strong> — nunca herda a tela em que a sessão anterior (de qualquer usuário, neste mesmo navegador) estava, de propósito, pra ninguém cair sem querer numa tela que não tem permissão de usar. Única exceção: o <strong>primeiríssimo login de cada conta</strong> (veja "Primeiro login de cada usuário", logo abaixo).</div>
       <div class="tip"><strong>Errou a senha 2 vezes seguidas?</strong> O campo de senha fica bloqueado por 60 segundos (com contagem regressiva na tela) antes de liberar de novo — é uma proteção contra tentativa de adivinhar a senha de outra pessoa no teclado. Não afeta o usuário digitado nem apaga nada; é só esperar a contagem zerar.</div>
 
       <div class="tip"><strong>Dica:</strong> a sessão não fica salva pra sempre — se você fechar o navegador, na próxima vez vai pedir login de novo. Isso é proposital, pra loja não ficar logada sem querer com o computador ligado o dia todo.</div>
 
       <div class="tip"><strong>Ficou parado 30 minutos?</strong> O sistema desloga sozinho depois de meia hora sem nenhum uso (mouse, teclado etc.), voltando pro login — é uma proteção pra quem sai do balcão e esquece o sistema logado. Se tiver mais de uma aba aberta, mexer em qualquer uma delas conta como uso; só desloga de verdade quando nenhuma aba tiver atividade recente.</div>
 
+      <h3>Primeiro login de cada usuário</h3>
+      <p>Na <strong>primeiríssima vez</strong> que qualquer usuário loga — o Administrador Geral logo depois do arranque inicial, ou um vendedor recém-cadastrado — o sistema abre direto na tela de <strong>Ajuda</strong> (esta aqui!) em vez do Painel, pra já dar uma primeira olhada em como tudo funciona. Da segunda vez que essa mesma pessoa logar em diante, cai no Painel normalmente — é coisa de uma vez só na vida de cada conta.</p>
+
       <h3>Vendedores</h3>
-      <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa). O primeiro login dele também cai nesta Ajuda, não no Painel — mesma regra explicada em "Entrando todo dia", logo acima.</p>
+      <p>Todo usuário cadastrado <em>depois</em> do administrador nasce como <strong>vendedor</strong> — um perfil com menos permissões (veja o tópico "Usuários e permissões" pra entender a diferença completa).</p>
 
       <h3>Tela cheia e mais de uma aba aberta</h3>
       <p>Abrindo o endereço do sistema no navegador, ele carrega numa <strong>aba normal</strong>, igual qualquer site. Quem preferir usar em tela cheia (sem barra de abas nem de endereço) pode ligar isso na hora: na tela de <strong>login</strong>, o botão <strong>${icon('fullscreen', { size: 14 })}</strong> no canto superior direito do card entra e sai da tela cheia nativa do navegador — o ícone troca conforme o estado, e também reconhece se você saiu apertando Esc.</p>
@@ -312,6 +310,37 @@ const TOPICS = [
 
       <h3>Filtros no topo das telas de lista</h3>
       <p>Assim que você escolhe qualquer valor diferente do padrão (ex: "Disponível" no lugar de "Todos os status"), aparece um <strong>x</strong> ao lado do filtro — clique nele pra voltar direto ao padrão, sem precisar abrir a lista de novo e catar a primeira opção manualmente. Vale pra todo filtro do sistema (Estoque, Financeiro, Carreto, Histórico de vendas, Log do sistema, Relatórios).</p>
+    `,
+  },
+  {
+    id: 'empresa',
+    icon: icon('key', { size: 16 }),
+    title: 'Licença e ativação',
+    html: `
+      <h2>Licença e ativação</h2>
+      <p class="help-subtitle">Como funciona o período de teste e o que fazer quando pedir ativação.</p>
+
+      <h3>Período de teste</h3>
+      <p>Todo servidor novo começa num <strong>período de teste de 7 dias</strong>, contado a partir do primeiro arranque. Depois desse prazo, o sistema inteiro fica bloqueado — ninguém entra, nem o Administrador Geral — até uma chave de ativação válida ser colada.</p>
+
+      <h3>Como conseguir a chave</h3>
+      <p>Quando o teste encerra, a própria tela de bloqueio tem dois botões — <strong>WhatsApp</strong> e <strong>E-mail</strong> — que já preenchem o nome da loja e o CNPJ na mensagem sozinhos, então é só clicar, conferir e enviar. Se preferir falar direto: WhatsApp <strong>(71) 98646-1027</strong> ou e-mail <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a>, informando o CNPJ cadastrado da loja. Ela é única pra esta loja, amarrada a esse CNPJ.</p>
+
+      <h3>Onde colar a chave</h3>
+      <p>Se o teste encerrou, a própria tela de bloqueio tem um campo pra colar a chave, embaixo dos botões de contato. Se ainda estiver dentro do período de teste e já tiver recebido a chave, não precisa esperar — vá em <strong>Dados da loja</strong>, no menu lateral, e cole lá a qualquer momento.</p>
+      <p>Não precisa esperar o teste acabar pra pedir a chave, também: o botão <strong>Solicitar chave</strong>, ao lado de "Ativar" na mesma tela, abre o mesmo modal de contato (WhatsApp ou e-mail, já com o nome da loja e o CNPJ preenchidos) a qualquer momento — antes ele só existiria na tela de bloqueio, quando o teste já tivesse encerrado.</p>
+      <p>Existem dois tipos de chave: uma <strong>demo</strong>, que estende o uso por um período combinado, e uma <strong>definitiva</strong>, que não expira. Depois de ativar com a definitiva, a tela de "Dados da loja" mostra "Definitiva — ativada" e o assunto não aparece mais.</p>
+      <div class="tip"><strong>Errou o CNPJ no cadastro?</strong> Por segurança, o campo de CNPJ não pode ser editado sozinho depois de salvo (veja o aviso ao lado do campo, em Dados da loja). Se precisar corrigir, envie um e-mail para <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a> pedindo um código de liberação — ele destrava o campo uma única vez, só pra você corrigir.</div>
+      <div class="tip"><strong>"A chave salva parou de valer"?</strong> Esse aviso aparece quando existe uma chave de ativação salva, mas ela não bate mais com o CNPJ cadastrado agora — a causa mais comum é ter <strong>restaurado um backup</strong> feito num momento em que o CNPJ da loja era outro (a chave nunca é apagada nem mexida por um backup — veja o tópico "Backup" — só que ela foi ativada pra um CNPJ específico). Pra resolver: confira em "Dados da loja" se o CNPJ está correto e, se estiver, cole a chave de novo — ela ativa igual, sem precisar de uma chave nova.</div>
+
+      <h3>Verificar se há uma versão nova</h3>
+      <p>Diferente da extensão (que se atualiza sozinha pelo Chrome), este servidor não tem um botão de atualização dentro do sistema — quem administra a instalação precisa baixar o código mais novo e reiniciar o processo (<code>node server.js</code>) na mão. A versão instalada agora aparece em <strong>Dados da loja</strong>, como "Build" seguido de um código curto — é ela que identifica exatamente qual versão está rodando, pra conferir com quem dá suporte se já existe uma atualização disponível.</p>
+      <div class="tip"><strong>Reiniciar o servidor nunca perde dado nenhum</strong> (vendas, estoque, caixa, clientes etc. ficam gravados no banco, não na memória) — só uma venda com itens no carrinho ainda não finalizada, em algum terminal, seria perdida se o servidor reiniciar bem nesse instante. Se der pra avisar os terminais e esperar o carrinho fechar antes, melhor.</div>
+
+      <h3>Instalar como app (opcional, só no computador do servidor)</h3>
+      <p>Em vez de abrir sempre pelo navegador, dá pra "instalar" este sistema como se fosse um app de verdade — mesmo site, só ganha um ícone próprio e abre em janela cheia, sem barra de endereço. No computador que roda o servidor (o que fica ligado com <code>node server.js</code>), abrindo pelo endereço <code>http://localhost:3131</code>: no Chrome/Edge, clique no ícone de instalar que aparece na barra de endereço, ou no menu do navegador em "Instalar PDV - C&S Virtual...".</p>
+      <div class="warn-box"><strong>Não funciona nos outros terminais nem no celular.</strong> Este sistema roda em HTTP puro na rede da loja, sem certificado (é assim de propósito). Instalar como app exige uma conexão segura (HTTPS) ou o endereço <code>localhost</code> — qualquer terminal ou celular que acesse pelo IP da rede (o jeito normal de usar este sistema no dia a dia) não vai ver a opção de instalar, porque o navegador bloqueia isso por segurança em conexões sem certificado. Continue usando pelo navegador normalmente nesses casos — funciona exatamente igual, só sem o ícone de app.</div>
+      <div class="tip"><strong>Hospedando fora da loja, em HTTPS, e mesmo assim não aparece a opção de instalar?</strong> Alguns planos gratuitos de hospedagem colocam uma barreira de acesso própria na frente do site (uma senha/token de "preview") — nesse caso o navegador consegue abrir a página normalmente, mas a busca automática pelo arquivo de configuração do app (<code>manifest.json</code>) esbarra nessa barreira e falha, e a opção de instalar não aparece. Não é um problema deste sistema: dá pra confirmar abrindo o Console do navegador (F12) e procurando um erro do tipo "Manifest fetch... failed, code 401" — se aparecer, o jeito de resolver é checar com a hospedagem se tem como tirar essa proteção de "preview" do site, ou passar pra um plano que não tenha essa barreira.</div>
     `,
   },
   {
@@ -663,34 +692,6 @@ Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Reg
       <h3>Gerenciando vendedores</h3>
       <p>Na tela <strong>Usuários</strong>: <strong>Editar</strong> muda nome, <strong>usuário de login</strong> e as permissões do vendedor; <strong>Desativar</strong> impede login (as vendas dele continuam no histórico) e pode ser revertido em <strong>Reativar</strong>; <strong>Redefinir senha</strong> troca a senha de qualquer vendedor sem precisar saber a antiga.</p>
       <div class="tip"><strong>Trocou de funcionário?</strong> Não precisa cadastrar um vendedor do zero (perdendo as permissões já configuradas) — edite o vendedor que saiu: troque o nome e o usuário de login pro do novo funcionário, e redefina a senha. A mesma conta continua, com o histórico de vendas antigo preservado normalmente (fica registrado com o nome de quem vendeu <em>na época</em>, não muda retroativamente).</div>
-    `,
-  },
-  {
-    id: 'empresa',
-    icon: icon('store', { size: 16 }),
-    title: 'Dados da loja e licença',
-    html: `
-      <h2>Dados da loja e licença</h2>
-      <p class="help-subtitle">Cadastro fiscal, ativação da licença — exige a permissão "Acessar Dados da loja".</p>
-
-      <h3>Cadastro fiscal</h3>
-      <p>Em <strong>Dados da loja</strong>, preencha CNPJ, razão social, nome fantasia, endereço e os demais dados da empresa. Isso não é só burocracia: é o que aparece no <strong>recibo impresso</strong> de cada venda e no <strong>relatório em PDF</strong> — sem preencher, os dois saem sem identificação nenhuma da loja, o que não serve pra fiscalização.</p>
-
-      <h3>CNPJ trava depois de salvo</h3>
-      <p>O campo nasce vazio e editável. Assim que um CNPJ é salvo pela primeira vez, ele <strong>trava</strong> — não dá pra editar de novo por engano ou sem querer. Pra corrigir um CNPJ já salvo, clique em <strong>"Desbloquear edição (com código do suporte)"</strong> e cole o código de liberação — peça esse código a quem administra a instalação (o mesmo lugar que fornece a chave de ativação).</p>
-
-      <h3>Ativação (trial, demo, definitiva)</h3>
-      <p>Todo servidor novo começa num <strong>período de teste</strong>. O card "Ativação", no topo desta tela, mostra a situação atual:</p>
-      <ul>
-        <li><span class="badge badge-gold">Período de teste</span> — ainda dentro do prazo de avaliação.</li>
-        <li><span class="badge badge-gold">Demo</span> — uma chave de demonstração foi ativada, com data de expiração própria.</li>
-        <li><span class="badge badge-green">Definitiva — ativada</span> — licença completa, sem expiração.</li>
-      </ul>
-      <p>Tem uma chave em mãos? Cole no campo e clique em <strong>Ativar</strong>. Não tem? Clique em <strong>Solicitar chave</strong> pra abrir um contato pronto (WhatsApp ou e-mail) com o suporte.</p>
-      <div class="warn-box"><strong>Período de teste encerrado sem chave ativada:</strong> o sistema inteiro fica bloqueado — ninguém entra, nem o Administrador Geral — até uma chave válida ser ativada. A tela de bloqueio já tem os mesmos atalhos de contato e um campo pra colar a chave, então dá pra resolver sem precisar de ajuda de fora pra "destravar o sistema" tecnicamente.</div>
-
-      <h3>"A chave salva parou de valer" (depois de restaurar um backup)</h3>
-      <p>Esse aviso aparece acima do card "Ativação" (e, se acontecer com o sistema todo bloqueado, também na própria tela de bloqueio) quando existe uma chave de ativação salva, mas ela não bate mais com o CNPJ cadastrado agora. A causa mais comum é ter <strong>restaurado um backup</strong> feito num momento em que o CNPJ da loja era outro — a chave em si nunca é apagada nem mexida (backup não guarda licença de propósito, veja o tópico "Backup"), só que ela foi ativada pra um CNPJ específico, e o CNPJ que voltou do backup restaurado é diferente. Pra resolver: confira em "Dados da loja" se o CNPJ está correto e, se estiver, cole a chave de novo — ela ativa igual, sem precisar de uma chave nova.</p>
     `,
   },
   {

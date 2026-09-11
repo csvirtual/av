@@ -59,6 +59,45 @@ import { watchTabPresence } from './tabPresence.js';
   applyTheme(await getThemePreference());
 })();
 
+// Botão flutuante "voltar ao topo" — pedido do usuário (extensão): precisa
+// ser global de verdade, disponível em QUALQUER tela que role (login, tela
+// de aba bloqueada, app normal), não só dentro do shell já logado. O
+// elemento em si vive em index.html, fora de #root (ver comentário lá) —
+// sobrevive a qualquer root.innerHTML ser reescrito — e a ligação com o
+// scroll é feita uma única vez aqui, também fora de qualquer função que
+// possa rodar mais de uma vez (renderShell, boot etc.), então não há nada
+// pra desligar/religar nunca: um só listener, pra sempre. Mesmo mecanismo
+// da extensão (o CSS já existia aqui; só faltava isto).
+{
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  // Achado do usuário (extensão): com um limiar FIXO, o botão nunca
+  // aparecia em telas "médias" — longas o bastante pra precisar rolar até
+  // o fim com o mouse (ex: Painel, Backup), mas cujo overflow total
+  // (scrollHeight - innerHeight, o quanto dá pra rolar de verdade) fica
+  // ABAIXO de 400px. O limiar agora se adapta ao quanto CADA tela
+  // realmente rola — metade do overflow disponível, sem nunca passar de
+  // 400px — recalculado a cada scroll (o roteador reescreve #root com
+  // conteúdo de altura diferente a cada navegação).
+  const SCROLL_TOP_SHOW_AT = 400;
+  const onScroll = () => {
+    const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+    const showAt = Math.min(SCROLL_TOP_SHOW_AT, maxScrollY / 2);
+    const visible = maxScrollY > 0 && window.scrollY > showAt;
+    scrollTopBtn.classList.toggle('visible', visible);
+    // Enquanto invisível, tira do fluxo de tab/leitor de tela — sem isso
+    // um usuário navegando por teclado esbarraria num botão que não dá
+    // pra ver nem faz sentido ativar ainda.
+    scrollTopBtn.tabIndex = visible ? 0 : -1;
+    scrollTopBtn.setAttribute('aria-hidden', String(!visible));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  scrollTopBtn.addEventListener('click', () => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+  onScroll(); // estado inicial correto se a página já nascer rolada (ex: refreshShell)
+}
+
 // Registro do service worker do PWA (ver public/sw.js pra estratégia de
 // cache — network-first, nunca intercepta /api/) — instalável no celular
 // ("Adicionar à tela inicial") e no PC (Chrome/Edge oferecem "Instalar
@@ -363,7 +402,7 @@ async function renderShell(user) {
       <nav class="sidebar" id="sidebar">
         <div class="sidebar-brand">
           <div class="name">PDV - C&amp;S Virtual</div>
-          <div class="sub">multi-terminal</div>
+          <div class="sub">multi-terminal / MT</div>
         </div>
         <div class="nav-scroll-wrap" id="nav-scroll-wrap">
           <div class="nav-group" id="nav-group"></div>
