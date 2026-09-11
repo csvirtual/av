@@ -1140,6 +1140,11 @@ export async function renderSale(container, ctx) {
     }
 
     const fiadoAmount = payments.filter((p) => p.method === FIADO_METHOD).reduce((sum, p) => sum + p.amount, 0);
+    // Achado de auditoria (P1, Red Team): esta confirmação era só de tela —
+    // o servidor nunca conferia o limite de verdade (ver routes/sales.js).
+    // Agora precisa viajar até lá (`fiadoLimitOverrideConfirmed`), senão a
+    // venda é rejeitada mesmo depois do vendedor confirmar aqui.
+    let fiadoLimitOverrideConfirmed = false;
     if (fiadoAmount > 0) {
       if (!selectedCustomer) {
         showToast('Selecione um cliente para vender fiado.', 'error');
@@ -1156,10 +1161,11 @@ export async function renderSale(container, ctx) {
             danger: true,
           });
           if (!ok) return null;
+          fiadoLimitOverrideConfirmed = true;
         }
       }
     }
-    return { discountApproval, fiadoAmount };
+    return { discountApproval, fiadoAmount, fiadoLimitOverrideConfirmed };
   }
 
   // Modal de escolha dos itens que vão no carreto, aberto só pelo botão
@@ -1239,7 +1245,7 @@ export async function renderSale(container, ctx) {
   // de novo e cobrar o cliente duas vezes. Por isso só a criação da venda
   // em si aborta o fluxo inteiro; uma falha no carreto vira um aviso
   // separado, sem desfazer nem esconder que a venda foi concluída.
-  async function commitSale(discountApproval, fiadoAmount, deliveryPlan) {
+  async function commitSale(discountApproval, fiadoAmount, deliveryPlan, fiadoLimitOverrideConfirmed) {
     finalizeBtn.disabled = true;
     finalizeCarretoBtn.disabled = true;
     // Gerada uma vez só por carrinho (ver declaração de saleDedupeKey lá em
@@ -1276,6 +1282,7 @@ export async function renderSale(container, ctx) {
         overallDiscountType, overallDiscountValue,
         payments,
         discountApproval,
+        fiadoLimitOverrideConfirmed,
         cashSessionId: openSessionNow?.id || null,
         customerId: selectedCustomer?.id || null,
         dedupeKey: saleDedupeKey,
@@ -1403,7 +1410,7 @@ export async function renderSale(container, ctx) {
     finalizeCarretoBtn.disabled = true;
     const pre = await runPreFinalizeChecks();
     if (!pre) { renderPayments(); return; }
-    await commitSale(pre.discountApproval, pre.fiadoAmount, null);
+    await commitSale(pre.discountApproval, pre.fiadoAmount, null, pre.fiadoLimitOverrideConfirmed);
   });
 
   finalizeCarretoBtn.addEventListener('click', async () => {
@@ -1418,7 +1425,7 @@ export async function renderSale(container, ctx) {
     if (!pre) { renderPayments(); return; }
     const deliveryPlan = await openCarretoPickerModal();
     if (!deliveryPlan) { renderPayments(); return; } // cancelado — nem venda nem carreto são registrados
-    await commitSale(pre.discountApproval, pre.fiadoAmount, deliveryPlan);
+    await commitSale(pre.discountApproval, pre.fiadoAmount, deliveryPlan, pre.fiadoLimitOverrideConfirmed);
   });
 
   // Não só renderCreditBanner() — o carrinho é um rascunho persistido

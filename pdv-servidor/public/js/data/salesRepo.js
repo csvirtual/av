@@ -15,6 +15,10 @@ export async function createSale({
   userId, userName, cashSessionId, // aceitos só pra bater a assinatura da extensão — servidor sempre resolve quem vendeu (sessão) e qual caixa está aberto (terminalId) sozinho, nunca do que o cliente mandou
   items, overallDiscountType = null, overallDiscountValue = 0,
   payments, discountApproval = null, customerId = null, dedupeKey = null,
+  // Achado de auditoria (P1, Red Team): precisa chegar no servidor — ver
+  // routes/sales.js#commitSale, que agora reconfere o limite de crédito de
+  // verdade (antes só a tela conferia).
+  fiadoLimitOverrideConfirmed = false,
 }) {
   void userId; void userName; void cashSessionId;
   const { sale } = await api('/api/sales', {
@@ -22,6 +26,7 @@ export async function createSale({
     body: JSON.stringify({
       items, overallDiscountType, overallDiscountValue, payments,
       discountApproval, customerId, dedupeKey: dedupeKey || newDedupeKey(),
+      fiadoLimitOverrideConfirmed,
     }),
   });
   return sale;

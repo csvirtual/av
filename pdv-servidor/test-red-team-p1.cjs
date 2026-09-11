@@ -8,7 +8,9 @@
 // logada; (2) venda/estorno/recebimento de compra gravam em
 // stock_movements (ledger de estoque completo, reconstrutível); (3)
 // whitelist de método de pagamento; (4) pagamento negativo rejeitado; (5)
-// fechamento de caixa exige senha de verdade no servidor.
+// fechamento de caixa exige senha de verdade no servidor; (6) limite de
+// crédito de fiado reconferido de verdade no servidor (era só aviso de
+// tela), inclusive sob concorrência real.
 const BASE = 'http://localhost:3131';
 const results = [];
 const check = (label, cond, detail) => { results.push(cond); console.log((cond ? 'OK  ' : 'FAIL') + ' - ' + label + (detail !== undefined ? ' | ' + detail : '')); };
@@ -179,6 +181,82 @@ const dedupeKey = (label) => `${label}-${Date.now()}-${Math.random().toString(36
     method: 'POST', body: JSON.stringify({ barcode: 'REDTEAM-LIC-UNBLOCK', name: 'Deveria criar de novo', unit: 'un', price: 1, costPrice: 1 }),
   });
   check('rota volta a funcionar normalmente depois da licença ser restaurada', unblockedRes.status === 201, unblockedRes.status);
+
+  // --- (6): limite de crédito de fiado reconferido de verdade no servidor ---
+  const fiadoProdRes = await callAdmin('/api/products', {
+    method: 'POST', body: JSON.stringify({ barcode: 'REDTEAM-FIADO-001', name: 'Produto Fiado Red Team', unit: 'un', price: 100, costPrice: 50 }),
+  });
+  const fiadoProductId = fiadoProdRes.body.product?.id;
+  await callAdmin(`/api/products/${fiadoProductId}/movimentos`, {
+    method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 50, note: 'inicial', dedupeKey: dedupeKey('fiado-prod-init') }),
+  });
+  const fiadoCustRes = await callAdmin('/api/customers', {
+    method: 'POST', body: JSON.stringify({ nome: 'Cliente Fiado Red Team', creditLimit: 50 }),
+  });
+  const fiadoCustomerId = fiadoCustRes.body.customer?.id;
+  check('cliente com limite de crédito (R$50) criado pro teste de fiado', fiadoCustRes.status === 201 && !!fiadoCustomerId, fiadoCustRes.status);
+
+  const fiadoOverLimitRes = await callAdmin('/api/sales', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: [{ productId: fiadoProductId, qty: 5 }], payments: [{ method: 'Fiado', amount: 500 }],
+      customerId: fiadoCustomerId, userName: 'admin', dedupeKey: dedupeKey('fiado-over-limit'),
+    }),
+  });
+  check(
+    'servidor REJEITA venda fiada acima do limite de crédito SEM confirmação — achado P1 Red Team',
+    fiadoOverLimitRes.status === 400 && /acima do limite/i.test(fiadoOverLimitRes.body.error || ''),
+    JSON.stringify(fiadoOverLimitRes),
+  );
+
+  const fiadoOverLimitConfirmedRes = await callAdmin('/api/sales', {
+    method: 'POST',
+    body: JSON.stringify({
+      items: [{ productId: fiadoProductId, qty: 5 }], payments: [{ method: 'Fiado', amount: 500 }],
+      customerId: fiadoCustomerId, fiadoLimitOverrideConfirmed: true, userName: 'admin', dedupeKey: dedupeKey('fiado-over-limit-confirmed'),
+    }),
+  });
+  check(
+    'venda fiada acima do limite COM confirmação explícita continua funcionando (mesmo comportamento de negócio de antes)',
+    fiadoOverLimitConfirmedRes.status === 201,
+    fiadoOverLimitConfirmedRes.status,
+  );
+
+  // Concorrência real: 2 vendas fiadas pro MESMO cliente (limite zerado
+  // pelo estorno abaixo pra simplificar a conta), cada uma cabendo
+  // isolada no limite, juntas não.
+  const fiadoConcProdRes = await callAdmin('/api/products', {
+    method: 'POST', body: JSON.stringify({ barcode: 'REDTEAM-FIADO-CONC-001', name: 'Produto Fiado Concorrente Red Team', unit: 'un', price: 30, costPrice: 15 }),
+  });
+  const fiadoConcProductId = fiadoConcProdRes.body.product?.id;
+  await callAdmin(`/api/products/${fiadoConcProductId}/movimentos`, {
+    method: 'POST', body: JSON.stringify({ type: 'ajuste', qty: 10, note: 'inicial', dedupeKey: dedupeKey('fiado-conc-prod-init') }),
+  });
+  const fiadoConcCustRes = await callAdmin('/api/customers', {
+    method: 'POST', body: JSON.stringify({ nome: 'Cliente Fiado Concorrente Red Team', creditLimit: 40 }),
+  });
+  const fiadoConcCustomerId = fiadoConcCustRes.body.customer?.id;
+  const fiadoConcReqs = [1, 2].map((i) => fetch(`${BASE}/api/sales`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminLogin.cookie },
+    body: JSON.stringify({
+      items: [{ productId: fiadoConcProductId, qty: 1 }], payments: [{ method: 'Fiado', amount: 30 }],
+      customerId: fiadoConcCustomerId, userName: 'admin', dedupeKey: dedupeKey('fiado-concurrent-' + i),
+    }),
+  }));
+  const fiadoConcResults = await Promise.all(fiadoConcReqs);
+  const fiadoConcStatuses = fiadoConcResults.map((r) => r.status);
+  const fiadoConcSuccesses = fiadoConcStatuses.filter((s) => s === 201).length;
+  check(
+    'concorrência real: só 1 de 2 vendas fiadas (juntas estourando o limite, isoladas não) passa — sem double-spend do limite de crédito',
+    fiadoConcSuccesses === 1,
+    `status=${JSON.stringify(fiadoConcStatuses)}`,
+  );
+  const fiadoConcCustomerAfter = await callAdmin(`/api/customers/${fiadoConcCustomerId}`);
+  check(
+    'saldo devedor final bate exatamente com 1 venda (30), nunca as 2 juntas (60)',
+    Math.abs(fiadoConcCustomerAfter.body.balance - 30) < 0.01,
+    JSON.stringify(fiadoConcCustomerAfter.body),
+  );
 
   const passed = results.filter(Boolean).length;
   console.log(`\n${passed}/${results.length} passaram.`);

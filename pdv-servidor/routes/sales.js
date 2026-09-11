@@ -22,6 +22,18 @@ import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS } from 
 const router = Router();
 
 const getProductStmt = db.prepare('SELECT * FROM products WHERE id = ?');
+const getCustomerStmt = db.prepare('SELECT data FROM customers WHERE id = ?');
+const listDebtLedgerStmt = db.prepare('SELECT data FROM customer_debts WHERE customer_id = ?');
+// Achado de auditoria (P1, Red Team, Fase 11): saldo devedor sempre
+// recalculado do extrato (customer_debts), nunca um número em cache — mesmo
+// princípio de creditBalance()/pointsBalance() (lib/loyaltyLedger.js), que
+// já são à prova de double-spend por construção. Cópia local da mesma
+// função de routes/customers.js#customerBalance (não exportada de lá,
+// mesmo padrão de cada rota ter sua própria versão da query).
+function customerDebtBalance(customerId) {
+  return listDebtLedgerStmt.all(customerId).map((r) => JSON.parse(r.data))
+    .reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
+}
 const updateProductStmt = db.prepare(`
   UPDATE products SET name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data WHERE id = @id
 `);
@@ -215,6 +227,27 @@ const commitSale = db.transaction((input) => {
   const fiadoTotal = payments.filter((p) => p.method === FIADO_METHOD).reduce((s, p) => s + p.amount, 0);
   if (fiadoTotal > 0 && !input.customerId) {
     throw new Error('Selecione um cliente para vender fiado.');
+  }
+  // Achado de auditoria (P1, Red Team): `creditLimit` só era conferido na
+  // TELA (public/js/views/sale.js#confirmDiscountAndFiado — um aviso com
+  // "Continuar mesmo assim?", que qualquer vendedor pode confirmar sozinho,
+  // sem senha de admin — diferente do desconto acima do limite). O
+  // SERVIDOR nunca reconferia: reproduzido mandando uma venda fiada de
+  // R$500 pra um cliente com limite de R$50 direto pela API, aceita sem
+  // erro nenhum. Mesma regra de negócio de antes (não é uma trava nova,
+  // nem exige aprovação de admin — só passa a ser REAL): se ultrapassar o
+  // limite, precisa do mesmo "sim, mesmo assim" que a tela já pedia,
+  // agora conferido aqui (`fiadoLimitOverrideConfirmed`), não só confiado
+  // de quem chamou.
+  if (fiadoTotal > 0) {
+    const customerRow = getCustomerStmt.get(input.customerId);
+    const customer = customerRow ? JSON.parse(customerRow.data) : null;
+    if (customer && customer.creditLimit > 0) {
+      const newBalance = customerDebtBalance(input.customerId) + fiadoTotal;
+      if (newBalance > customer.creditLimit + 0.001 && !input.fiadoLimitOverrideConfirmed) {
+        throw new Error(`Com essa venda, "${customer.nome}" vai ficar devendo ${newBalance.toFixed(2)}, acima do limite de ${customer.creditLimit.toFixed(2)} cadastrado — confirme que quer vender fiado mesmo assim.`);
+      }
+    }
   }
 
   // Crédito de troca é dinheiro que o cliente JÁ tem guardado (de um
