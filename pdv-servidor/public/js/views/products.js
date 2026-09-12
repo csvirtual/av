@@ -22,6 +22,7 @@ import { paginationHtml, wirePagination, createPageState } from '../components/p
 import { enhanceSelect } from '../components/customSelect.js';
 import { icon } from '../components/icon.js';
 import { draftCartLocationsForProduct } from './sale.js';
+import { PRODUCT_CSV_COLUMNS, stringifyCsv, parseCsv, downloadCsv } from '../utils/csv.js';
 
 const MOVEMENT_LABELS = {
   entrada: 'Entrada', saida: 'Saída', venda: 'Venda', ajuste: 'Ajuste', estorno: 'Estorno',
@@ -89,10 +90,14 @@ export async function renderProducts(container, ctx) {
         <div class="desc">Material de construção, mercearia/mercadinho e loja — visão geral do que a loja tem disponível.</div>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" id="export-csv-btn">Exportar CSV</button>
+        ${canManageProducts ? '<button class="btn btn-secondary" id="import-csv-btn">Importar CSV</button>' : ''}
         ${canAdjustStock ? '<button class="btn btn-secondary" id="inventory-btn">Fazer inventário</button>' : ''}
         ${canManageProducts ? '<button class="btn" id="new-product-btn">+ Novo produto</button>' : ''}
       </div>
     </div>
+    <input type="file" id="csv-import-input" accept=".csv,text/csv" hidden>
+    <div id="csv-import-progress" class="text-muted" style="font-size:13px;margin-bottom:8px;" hidden></div>
     <div class="toolbar">
       <input type="search" id="search-input" placeholder="Buscar por nome ou código de barras — ou escaneie…" autofocus>
       <div class="toolbar-filters">
@@ -215,6 +220,45 @@ export async function renderProducts(container, ctx) {
   }
   if (canAdjustStock) {
     document.getElementById('inventory-btn').addEventListener('click', () => openInventoryModal());
+  }
+
+  // Exportação sempre disponível pra quem já pode ver o Estoque (não exige
+  // 'manageProducts' — é só leitura, mesmo raciocínio de relatórios/PDF).
+  // Exporta o catálogo INTEIRO (ativos e inativos), ignorando o filtro
+  // atual da tela — é uma cópia de backup/migração, não "o que está sendo
+  // olhado agora".
+  document.getElementById('export-csv-btn').addEventListener('click', async () => {
+    const all = await listProducts();
+    const csv = stringifyCsv(PRODUCT_CSV_COLUMNS, all.map(productToCsvRow));
+    downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  });
+
+  if (canManageProducts) {
+    const fileInput = document.getElementById('csv-import-input');
+    const progressBox = document.getElementById('csv-import-progress');
+    document.getElementById('import-csv-btn').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      e.target.value = ''; // permite escolher o MESMO arquivo de novo depois (ex: corrigir e reimportar)
+      if (!file) return;
+      progressBox.hidden = false;
+      progressBox.textContent = 'Importando…';
+      try {
+        const text = await file.text();
+        const rows = parseCsv(text);
+        if (rows.length === 0) {
+          showToast('Arquivo CSV vazio ou sem linhas de dado.', 'error');
+          return;
+        }
+        const result = await importCsvRows(ctx, rows);
+        showImportSummary(result);
+        await refresh();
+      } catch (err) {
+        showToast(err.message || 'Falha ao ler o arquivo CSV.', 'error');
+      } finally {
+        progressBox.hidden = true;
+      }
+    });
   }
 
   function wireRowActions(products) {
@@ -633,6 +677,121 @@ export async function renderProducts(container, ctx) {
     window.removeEventListener('scroll', closeOptionsMenu, true);
     closeOptionsMenu();
   };
+}
+
+// ---------- Exportar/Importar CSV ----------
+// Mesmo formato de colunas da extensão (ver utils/csv.js) — pensado pra ser
+// a ponte de migração de catálogo entre os dois produtos, já que o backup
+// de cada um não é compatível com o outro (formato interno diferente por
+// baixo: tabela SQL aqui, object store do IndexedDB lá).
+function productToCsvRow(p) {
+  return {
+    barcode: p.barcode,
+    name: p.name,
+    category: p.category,
+    unit: p.unit,
+    customUnitLabel: p.unit === 'personalizado' ? (p.customUnitLabel || '') : '',
+    price: p.price,
+    costPrice: p.costPrice,
+    quantity: p.quantity,
+    minStock: p.minStock,
+    expiryDate: p.expiryDate || '',
+    expiryPromoDays: p.expiryPromoDays ?? '',
+    promoPrice: p.promoPrice ?? '',
+    customForms: p.unit === 'personalizado' && p.customForms ? JSON.stringify(p.customForms) : '',
+  };
+}
+
+/** Processa cada linha em SEQUÊNCIA, nunca em paralelo — evita que duas
+ * linhas com o MESMO código de barras (planilha com duplicata por engano)
+ * corram a checagem de duplicidade contra o mesmo estado desatualizado e as
+ * duas tentem criar o produto ao mesmo tempo. Código de barras já
+ * cadastrado = ATUALIZA só os campos de cadastro (nome, categoria, preço,
+ * validade...); de propósito NUNCA mexe na quantidade de um produto que já
+ * existe — reimportar o mesmo arquivo (ex: só pra corrigir um preço) não
+ * pode duplicar nem resetar o estoque de quem já vende há tempo. Só produto
+ * NOVO (código de barras inédito na base) recebe a quantidade da planilha
+ * como estoque inicial, do mesmo jeito que "+ Novo produto" já faz. */
+async function importCsvRows(ctx, rows) {
+  const created = [];
+  const updated = [];
+  const errors = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // linha 1 do arquivo é o cabeçalho
+    const barcode = (row.barcode || '').trim();
+    try {
+      const name = (row.name || '').trim();
+      if (!barcode) throw new Error('código de barras vazio');
+      if (!name) throw new Error('nome vazio');
+      let category = (row.category || '').trim();
+      if (!CATEGORY_LABELS[category]) category = 'material';
+      const unit = (row.unit || '').trim() || 'un';
+      let customForms;
+      if (unit === 'personalizado' && row.customForms) {
+        try { customForms = JSON.parse(row.customForms); } catch { throw new Error('coluna customForms com JSON inválido'); }
+      }
+      const data = {
+        barcode, name, category, unit, customForms,
+        customUnitLabel: row.customUnitLabel || '',
+        price: row.price, costPrice: row.costPrice,
+        minStock: row.minStock,
+        expiryDate: row.expiryDate || '',
+        expiryPromoDays: row.expiryPromoDays,
+        promoPrice: row.promoPrice,
+      };
+      const existing = await getByBarcode(barcode);
+      if (existing) {
+        await updateProduct(existing.id, data);
+        updated.push({ rowNum, barcode, name });
+      } else {
+        const record = await createProduct(data);
+        const quantity = Number(row.quantity) || 0;
+        if (quantity > 0) {
+          await recordMovement({
+            productId: record.id, type: 'entrada', qty: quantity,
+            userId: ctx.user.id, userName: ctx.user.nome, note: 'Estoque inicial via importação CSV',
+          });
+        }
+        created.push({ rowNum, barcode, name });
+      }
+    } catch (err) {
+      errors.push({ rowNum, barcode, message: err.message });
+    }
+  }
+  if (created.length > 0 || updated.length > 0) {
+    await logAction({
+      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+      action: 'Importação CSV de produtos',
+      details: `${created.length} produto(s) criado(s), ${updated.length} atualizado(s), ${errors.length} linha(s) com erro.`,
+      entity: 'inventory', entityId: '',
+    });
+  }
+  return { created, updated, errors };
+}
+
+function showImportSummary({ created, updated, errors }) {
+  openModal({
+    title: 'Resultado da importação',
+    submitLabel: 'Fechar',
+    singleButton: true,
+    wide: errors.length > 0,
+    bodyHtml: `
+      <p><strong>${created.length}</strong> produto(s) criado(s), <strong>${updated.length}</strong> atualizado(s)${errors.length > 0 ? `, <strong>${errors.length}</strong> linha(s) com erro` : ''}.</p>
+      ${updated.length > 0 ? '<p class="text-muted" style="font-size:13px;">Produtos que já existiam (mesmo código de barras) tiveram só o cadastro atualizado — o estoque atual de cada um não foi alterado.</p>' : ''}
+      ${errors.length > 0 ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Linha</th><th>Código de barras</th><th>Erro</th></tr></thead>
+            <tbody>
+              ${errors.map((e) => `<tr><td>${e.rowNum}</td><td>${escapeHtml(e.barcode || '—')}</td><td>${escapeHtml(e.message)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+    `,
+    onSubmit: () => true,
+  });
 }
 
 /** Formulário de cadastro/edição de produto — vive fora de renderProducts
