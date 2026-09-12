@@ -900,16 +900,7 @@ a { color: var(--primary); }
   padding: 18px 20px;
   box-shadow: var(--shadow);
 }
-/* Achado do usuário (celular, Painel/Financeiro): sem min-height, um
- * rótulo mais comprido que quebra em 2 linhas ("ESTOQUE BAIXO" cabe numa
- * só, "PRODUTOS ATIVOS" às vezes não, "CONTAS VENCIDAS" quase sempre
- * quebra) deixava o número (.value) começando mais embaixo SÓ naquele
- * cartão — desalinhado dos vizinhos na mesma linha da grade, ainda mais
- * visível no celular (.stat-grid força 2 por linha logo abaixo, então o
- * vizinho de cada cartão está sempre bem colado do lado). Reserva altura
- * de 2 linhas sempre, quebre ou não — todo cartão da mesma fileira começa
- * o número na mesma altura, com rótulo de 1 ou 2 linhas. */
-.stat-card .label { font-size: 12px; line-height: 1.3; min-height: 31px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card .label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-card .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
 .stat-card .value.warn { color: var(--warning); }
 .stat-card .value.danger { color: var(--danger); }
@@ -2013,6 +2004,21 @@ input.customer-search-input:focus {
 @media (max-width: 420px) {
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .sidebar-brand .name { font-size: 14px; }
+
+  /* Achado do usuário (celular, Painel/Financeiro): sem min-height, um
+   * rótulo mais comprido que quebra em 2 linhas ("ESTOQUE BAIXO" cabe numa
+   * só, "PRODUTOS ATIVOS" às vezes não, "CONTAS VENCIDAS" quase sempre
+   * quebra) deixava o número (.value) começando mais embaixo SÓ naquele
+   * cartão — desalinhado dos vizinhos na mesma linha da grade, bem visível
+   * aqui porque .stat-grid força 2 por linha (o vizinho de cada cartão
+   * está sempre bem colado do lado). Escopado só pra esta largura, de
+   * propósito — achado de auditoria: aplicado sem media query, isso
+   * engordava TODO card em TODA largura de tela (inclusive desktop, onde
+   * os rótulos nunca quebram e a reserva de espaço não servia pra nada),
+   * destoando visivelmente do restante do design (ver extensão, que nunca
+   * teve esse problema de alinhamento por rodar sempre 1 terminal só,
+   * célular incluso). */
+  .stat-card .label { line-height: 1.3; min-height: 31px; }
 }
 
 /* ==========================================================================
