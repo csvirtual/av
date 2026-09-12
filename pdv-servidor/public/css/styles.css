@@ -2040,6 +2040,9 @@ input.customer-search-input:focus {
   #customers-table .table-wrap { display: none; }
   /* Usuários: mesma migração, mesmo motivo. */
   #users-table .table-wrap { display: none; }
+  /* Compras: mesma migração — cobre as duas abas (Pedidos/Fornecedores),
+   * que compartilham o mesmo container #tab-content. */
+  #tab-content .table-wrap { display: none; }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */

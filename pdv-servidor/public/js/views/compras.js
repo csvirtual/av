@@ -93,6 +93,7 @@ export async function renderCompras(container, ctx) {
           </table>
         </div>
       `}
+      ${renderFornecedoresCards(suppliers)}
     `;
 
     document.getElementById('new-supplier-btn').addEventListener('click', () => openSupplierModal(null));
@@ -112,6 +113,32 @@ export async function renderCompras(container, ctx) {
         openSupplierOptionsMenuFor(supplier, btn);
       });
     });
+  }
+
+  /** Contrapartida em cartão da tabela de Fornecedores, pro breakpoint de
+   * celular/tablet retrato (ver @media 860px em styles.css) — mesmos
+   * data-edit/data-options, a fiação de renderFornecedoresTab já os pega. */
+  function renderFornecedoresCards(suppliers) {
+    if (suppliers.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${suppliers.map((s) => `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(s.nome)}<small>${escapeHtml(formatPhoneBR(s.telefone) || 'sem telefone')}</small></div>
+              ${s.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">E-mail</div><div class="f-value">${escapeHtml(s.email || '—')}</div></div>
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" data-edit="${s.id}">Editar</button>
+              <button class="btn btn-ghost btn-kebab" data-options="${s.id}" aria-label="Opções">⋮</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   async function toggleSupplierActive(supplier) {
@@ -168,7 +195,17 @@ export async function renderCompras(container, ctx) {
   function closeOptionsMenu() {
     if (!openOptionsMenu) return;
     openOptionsMenu.menuEl.remove();
+    openOptionsMenu.scrimEl.remove();
     openOptionsMenu = null;
+  }
+
+  // Fundo escurecido atrás do menu — mesmo mecanismo de
+  // views/products.js#createOptionsScrim (ver comentário lá).
+  function createOptionsScrim() {
+    const scrim = document.createElement('div');
+    scrim.className = 'row-options-scrim';
+    document.body.appendChild(scrim);
+    return scrim;
   }
 
   function openSupplierOptionsMenuFor(supplier, triggerBtn) {
@@ -178,6 +215,7 @@ export async function renderCompras(container, ctx) {
       { label: 'Excluir', danger: true, run: () => removeSupplier(supplier) },
     ];
 
+    const scrim = createOptionsScrim();
     const menu = document.createElement('div');
     menu.className = 'row-options-menu';
     menu.innerHTML = items.map((item, idx) => `
@@ -200,7 +238,7 @@ export async function renderCompras(container, ctx) {
       });
     });
 
-    openOptionsMenu = { menuEl: menu, triggerBtn };
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
   }
 
   function closeOptionsMenuOnOutsideClick(e) {
@@ -316,6 +354,7 @@ export async function renderCompras(container, ctx) {
             </tbody>
           </table>
         </div>
+        ${renderPedidosCards(visible)}
         ${paginationHtml({ page: pedidosPgState.page, pageSize: pedidosPgState.pageSize, total })}
       `}
     `;
@@ -326,6 +365,31 @@ export async function renderCompras(container, ctx) {
       btn.addEventListener('click', () => openOrderDetailModal(visible.find((o) => o.id === btn.dataset.detail)));
     });
     wirePagination(content, pedidosPgState, (next) => { pedidosPgState = next; renderPedidosTab({ resetPage: false }); });
+  }
+
+  /** Contrapartida em cartão da tabela de Pedidos, mesmo padrão das outras
+   * telas — aqui só tem 1 ação (Ver detalhe), então nunca precisa de menu
+   * "Opções" separado. */
+  function renderPedidosCards(orders) {
+    if (orders.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${orders.map((o) => `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(o.supplierName)}<small>${formatDateTime(o.createdAt)}</small></div>
+              ${ORDER_STATUS_BADGE[o.status]}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Itens</div><div class="f-value">${o.items.length}</div></div>
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" data-detail="${o.id}">Ver detalhe</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function productPickerRow(idx, presetProductId = '', presetName = '', presetQty = 1, presetCost = '') {
