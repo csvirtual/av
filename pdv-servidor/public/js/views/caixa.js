@@ -207,7 +207,7 @@ async function renderOpenSession(container, ctx, session, refresh) {
       </div>
     </div>
 
-    <div class="stat-grid">
+    <div class="stat-grid" id="caixa-stat-grid">
       ${orderedMethods(expected).map((method) => `
         <div class="stat-card">
           <div class="label">${escapeHtml(method)}</div>

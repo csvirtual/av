@@ -73,7 +73,7 @@ export async function renderDashboard(container, ctx) {
       </div>
     </div>
 
-    <div class="stat-grid">
+    <div class="stat-grid" id="dashboard-stat-grid">
       <div class="stat-card" id="products-stat-card" style="cursor:pointer;">
         <div class="label">Produtos ativos</div>
         <div class="value">${activeProducts.length}</div>

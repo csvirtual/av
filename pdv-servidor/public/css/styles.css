@@ -2052,24 +2052,32 @@ input.customer-search-input:focus {
    * (Ver itens), sem menu Opções. */
   #sales-table .table-wrap { display: none; }
 
-  /* Financeiro: o resumo (A pagar/A receber/Contas vencidas) vira
-   * carrossel horizontal em vez de grade `1fr 1fr` — achado do usuário:
-   * a grade forçava 2 colunas nessa largura mesmo quando um valor grande
-   * ("R$ 1.800,00") não cabia, cortando o número no meio. Escopado em
-   * #summary-box (só Financeiro) de propósito — Painel/Caixa/Relatórios
-   * também usam .stat-grid pra outra coisa, migram na vez deles. */
-  #summary-box { position: relative; }
-  #summary-box .stat-grid {
+  /* Resumo (Financeiro/Painel/Caixa/Relatórios): vira carrossel horizontal
+   * em vez de grade `1fr 1fr` — achado do usuário no Financeiro: a grade
+   * forçava 2 colunas nessa largura mesmo quando um valor grande
+   * ("R$ 1.800,00" / "R$ 12.480,90") não cabia, cortando o cartão pra fora
+   * da tela. Confirmado com captura de tela que o mesmo bug acontece no
+   * Painel e em Relatórios (mesmo componente .stat-grid, mesmos valores
+   * grandes em dinheiro); Caixa usa o mesmo grid pra "esperado por forma
+   * de pagamento" e sofre do mesmo risco. Cada tela escopa por um id
+   * próprio (#summary-box no Financeiro, id direto no próprio grid nas
+   * outras três) pra não afetar outras grades .stat-grid fora dessas 4
+   * telas específicas. */
+  #summary-box, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid { position: relative; }
+  #summary-box .stat-grid, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid {
     display: flex;
     overflow-x: auto;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
     gap: 10px;
   }
-  #summary-box .stat-grid .stat-card { flex: 0 0 auto; min-width: 150px; scroll-snap-align: start; }
+  #summary-box .stat-grid .stat-card,
+  #dashboard-stat-grid .stat-card,
+  #caixa-stat-grid .stat-card,
+  #relatorios-stat-grid .stat-card { flex: 0 0 auto; min-width: 150px; scroll-snap-align: start; }
   /* Mesma ideia do "scroll-shadow" que .table-wrap já usa — esmaece a
    * borda pra deixar óbvio que tem mais cartão pra rolar. */
-  #summary-box::after {
+  #summary-box::after, #dashboard-stat-grid::after, #caixa-stat-grid::after, #relatorios-stat-grid::after {
     content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
     background: linear-gradient(to right, transparent, var(--bg));
     pointer-events: none;

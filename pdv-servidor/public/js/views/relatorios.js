@@ -94,7 +94,7 @@ export async function renderRelatorios(container) {
   function renderReport(r) {
     const marginPct = r.totalRevenue > 0 ? (r.totalMargin / r.totalRevenue) * 100 : 0;
     reportBox.innerHTML = `
-      <div class="stat-grid">
+      <div class="stat-grid" id="relatorios-stat-grid">
         <div class="stat-card"><div class="label">Faturamento</div><div class="value">${formatMoney(r.totalRevenue)}</div></div>
         <div class="stat-card"><div class="label">Vendas</div><div class="value">${r.totalCount}</div></div>
         <div class="stat-card"><div class="label">Ticket médio</div><div class="value">${formatMoney(r.avgTicket)}</div></div>
