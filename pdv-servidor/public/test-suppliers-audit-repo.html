@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste isolado — suppliersRepo.js + auditRepo.js (servidor)</title>
+</head>
+<body>
+<!--
+  Harness mínimo pra testar public/js/data/suppliersRepo.js e
+  auditRepo.js sozinhos, sem depender de nenhuma tela real — mesmo
+  espírito de test-session.html / test-products-repo.html.
+-->
+<script type="module">
+  import * as suppliersRepo from './js/data/suppliersRepo.js';
+  import * as auditRepo from './js/data/auditRepo.js';
+  window.__suppliersRepo = suppliersRepo;
+  window.__auditRepo = auditRepo;
+
+  window.__login = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'login falhou');
+    return body.user;
+  };
+</script>
+</body>
+</html>

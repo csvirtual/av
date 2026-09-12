@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste isolado — session.js (servidor)</title>
+</head>
+<body>
+<!--
+  Harness mínimo só pra testar public/js/session.js isoladamente, sem
+  depender de nenhuma tela real (Fase 9 ainda não portou nenhuma). Expõe
+  cada função do módulo em `window` pra um script Playwright chamar
+  direto e conferir o resultado — mesmo espírito de "prova antes de
+  seguir" das fases 1-8 (ver demo-fase*.cjs), só que testando a
+  biblioteca de sessão sozinha antes dela virar dependência de views
+  reais.
+-->
+<div id="user-id-display">null</div>
+<div id="change-count">0</div>
+<script type="module">
+  import * as session from './js/session.js';
+  window.__session = session;
+
+  const display = document.getElementById('user-id-display');
+  const countEl = document.getElementById('change-count');
+  let changeCount = 0;
+  session.onSessionUserIdChanged(async () => {
+    changeCount += 1;
+    countEl.textContent = String(changeCount);
+    display.textContent = String(await session.getSessionUserId());
+  });
+
+  window.__loginAndSetSession = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'login falhou');
+    await session.setSessionUserId(body.user.id);
+    return body.user;
+  };
+
+  display.textContent = String(await session.getSessionUserId());
+</script>
+</body>
+</html>
