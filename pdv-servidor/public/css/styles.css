@@ -1978,8 +1978,18 @@ input.customer-search-input:focus {
   .toolbar-filters .custom-select { width: auto; flex: 1 1 0; min-width: 0; }
 
   .page-header { flex-direction: column; align-items: flex-start; }
-  .page-actions { width: 100%; }
+  .page-actions { width: 100%; flex-wrap: wrap; }
   .page-actions .btn { flex: 1; }
+
+  /* Achado do usuário (celular estreito, ex: Galaxy A10s): os 3 botões do
+   * cabeçalho do Estoque (CSV, Fazer inventário, Novo produto) não cabem
+   * numa linha só nessa largura — o botão "Novo produto" (ação principal)
+   * acabava sobrando sozinho na segunda linha, atrás dos outros dois.
+   * Troca de posição com o CSV (ação secundária) pra "Novo produto" ficar
+   * em primeiro, o mais visível dos três quando quebra linha. */
+  #new-product-btn { order: 1; }
+  #inventory-btn { order: 2; }
+  #csv-menu-btn { order: 3; }
 
   /* Achado do usuário (celular): "align-items: flex-end" grudava o modal no
    * rodapé da tela (efeito "bottom sheet") — pedido explícito era o mesmo
