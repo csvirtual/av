@@ -2068,26 +2068,41 @@ input.customer-search-input:focus {
    * por cima do valor do cartão (ex: "Vendas hoje" ficando esmaecido no
    * meio do gesto). Trocado por uma seta discreta flutuante — não cobre
    * conteúdo, só indica "tem mais pra rolar" (`pointer-events: none`,
-   * nunca atrapalha o toque no cartão embaixo). */
-  #summary-box::after, #dashboard-stat-grid::after, #caixa-stat-grid::after, #relatorios-stat-grid::after {
-    content: '\203A';
+   * nunca atrapalha o toque no cartão embaixo).
+   *
+   * Achado do usuário (2ª rodada): a primeira versão usava um caractere de
+   * fonte ("›") — ficava fino, meio torto e genérico demais. Trocado por
+   * dois pseudo-elementos: ::before desenha o círculo flutuante (mesma
+   * borda/sombra dos cards, pra combinar com o resto do design), ::after
+   * desenha a seta de verdade em CSS puro (dois lados de um quadrado
+   * rotacionado 45°, o mesmo truque clássico de "chevron") na cor
+   * --primary do app — fica nítida em qualquer resolução e não depende de
+   * fonte/glifo pra ficar bonita. */
+  #summary-box::before, #dashboard-stat-grid::before, #caixa-stat-grid::before, #relatorios-stat-grid::before {
+    content: '';
     position: absolute;
     top: 50%;
     right: 6px;
     transform: translateY(-50%);
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     background: var(--surface);
     border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--text-muted);
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+  }
+  #summary-box::after, #dashboard-stat-grid::after, #caixa-stat-grid::after, #relatorios-stat-grid::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--primary);
+    border-right: 2px solid var(--primary);
+    border-radius: 1px;
+    transform: translateY(-50%) rotate(45deg);
     pointer-events: none;
   }
 }
