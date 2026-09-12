@@ -2048,6 +2048,9 @@ input.customer-search-input:focus {
   /* Carreto: mesma migração. Só tem uma ação por linha (Ver itens), então
    * o cartão não usa o menu Opções/bottom sheet — botão direto só. */
   #deliveries-table .table-wrap { display: none; }
+  /* Histórico de vendas: mesma migração. Também só uma ação por linha
+   * (Ver itens), sem menu Opções. */
+  #sales-table .table-wrap { display: none; }
 
   /* Financeiro: o resumo (A pagar/A receber/Contas vencidas) vira
    * carrossel horizontal em vez de grade `1fr 1fr` — achado do usuário:

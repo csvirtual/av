@@ -174,6 +174,32 @@ export async function renderSalesHistory(container, ctx) {
     return sale.total - sale.refundedTotal + (sale.creditInterestTotal || 0);
   }
 
+  function renderCards() {
+    return `
+      <div class="card-stack">
+        ${loadedSales.map((s) => `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${formatDateTime(s.timestamp)}<small>${escapeHtml(s.userName)}</small></div>
+              ${STATUS_BADGE[saleStatus(s)]}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Cliente</div><div class="f-value">${s.customerId ? escapeHtml(customerName(s.customerId) || 'cliente removido') : '—'}</div></div>
+              <div><div class="f-label">Itens</div><div class="f-value">${s.items.length}</div></div>
+              <div><div class="f-label">Pagamento</div><div class="f-value">${s.payments.map((p) => paymentMethodLabel(p)).join(', ') || '—'}</div></div>
+              <div><div class="f-label">Total</div><div class="f-value">
+                ${s.refundedTotal > 0 ? `<span class="text-muted" style="font-size:11px;text-decoration:line-through;">${formatMoney(s.total)}</span> ` : ''}${formatMoney(netTotal(s))}
+              </div></div>
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" data-detail="${s.id}">Ver itens</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderTable() {
     if (loadedSales.length === 0) {
       tableBox.innerHTML = '<div class="table-wrap"><div class="table-empty">Nenhuma venda encontrada para o filtro selecionado.</div></div>';
@@ -206,6 +232,7 @@ export async function renderSalesHistory(container, ctx) {
           </tbody>
         </table>
       </div>
+      ${renderCards()}
       ${hasMore ? '<div style="text-align:center;margin-top:14px;"><button class="btn btn-secondary" id="load-more-btn">Carregar mais</button></div>' : ''}
     `;
     tableBox.querySelectorAll('[data-detail]').forEach((btn) => {
