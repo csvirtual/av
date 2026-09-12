@@ -2043,6 +2043,31 @@ input.customer-search-input:focus {
   /* Compras: mesma migração — cobre as duas abas (Pedidos/Fornecedores),
    * que compartilham o mesmo container #tab-content. */
   #tab-content .table-wrap { display: none; }
+  /* Financeiro: mesma migração. */
+  #entries-table .table-wrap { display: none; }
+
+  /* Financeiro: o resumo (A pagar/A receber/Contas vencidas) vira
+   * carrossel horizontal em vez de grade `1fr 1fr` — achado do usuário:
+   * a grade forçava 2 colunas nessa largura mesmo quando um valor grande
+   * ("R$ 1.800,00") não cabia, cortando o número no meio. Escopado em
+   * #summary-box (só Financeiro) de propósito — Painel/Caixa/Relatórios
+   * também usam .stat-grid pra outra coisa, migram na vez deles. */
+  #summary-box { position: relative; }
+  #summary-box .stat-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+  }
+  #summary-box .stat-grid .stat-card { flex: 0 0 auto; min-width: 150px; scroll-snap-align: start; }
+  /* Mesma ideia do "scroll-shadow" que .table-wrap já usa — esmaece a
+   * borda pra deixar óbvio que tem mais cartão pra rolar. */
+  #summary-box::after {
+    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+    background: linear-gradient(to right, transparent, var(--bg));
+    pointer-events: none;
+  }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */

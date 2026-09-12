@@ -132,6 +132,7 @@ export async function renderFinanceiro(container, ctx) {
           </tbody>
         </table>
       </div>
+      ${renderCards(visible)}
       ${paginationHtml({ page: pgState.page, pageSize: pgState.pageSize, total })}
     `;
     tableBox.querySelectorAll('[data-pay]').forEach((btn) => {
@@ -143,8 +144,125 @@ export async function renderFinanceiro(container, ctx) {
     tableBox.querySelectorAll('[data-cancel]').forEach((btn) => {
       btn.addEventListener('click', () => cancel(visible.find((e) => e.id === btn.dataset.cancel)));
     });
+    tableBox.querySelectorAll('[data-options]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const entry = visible.find((x) => x.id === btn.dataset.options);
+        if (openOptionsMenu?.triggerBtn === btn) { closeOptionsMenu(); return; }
+        openOptionsMenuFor(cardSheetItems(entry), btn);
+      });
+    });
     wirePagination(tableBox, pgState, (next) => { pgState = next; renderTable(list); });
   }
+
+  /** Contrapartida em cartão da tabela, pro breakpoint de celular/tablet
+   * retrato (ver @media 860px em styles.css). A ação mais relevante
+   * (Registrar/Concluir pagamento, quando existe) fica como botão direto;
+   * o resto (Ver pagamentos, Cancelar) entra na folha de Opções só quando
+   * sobra mais de 1 ação — se só existe "Ver pagamentos" (conta paga,
+   * sem mais nada a fazer), fica como botão direto sozinho. */
+  function cardSheetItems(entry) {
+    const status = entryStatus(entry);
+    const canPay = status === 'pendente' || status === 'vencido' || status === 'parcial';
+    const hasPayments = paidTotal(entry) > 0.001;
+    const items = [];
+    if (canPay && hasPayments) items.push({ label: 'Ver pagamentos', run: () => openPaymentsModal(entry) });
+    if (canPay && !hasPayments) items.push({ label: 'Cancelar', danger: true, run: () => cancel(entry) });
+    return items;
+  }
+
+  function renderCards(list) {
+    if (list.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${list.map((e) => {
+          const status = entryStatus(e);
+          const canPay = status === 'pendente' || status === 'vencido' || status === 'parcial';
+          const hasPayments = paidTotal(e) > 0.001;
+          const sheetItems = cardSheetItems(e);
+          let directHtml = '';
+          if (canPay) {
+            directHtml = `<button class="btn btn-ghost" data-pay="${e.id}">${status === 'parcial' ? 'Concluir pagamento' : 'Registrar pagamento'}</button>`;
+          } else if (hasPayments) {
+            directHtml = `<button class="btn btn-ghost" data-payments="${e.id}">Ver pagamentos</button>`;
+          }
+          return `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(e.description)}<small>Vence ${formatDate(e.dueDate)}</small></div>
+              ${e.type === 'pagar' ? '<span class="badge badge-red">Pagar</span>' : '<span class="badge badge-green">Receber</span>'}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Valor</div><div class="f-value">${valueCell(e, status)}</div></div>
+              <div><div class="f-label">Status</div><div class="f-value">${STATUS_BADGE[status]}</div></div>
+            </div>
+            ${directHtml || sheetItems.length > 0 ? `
+              <div class="row-card-actions">
+                ${directHtml}
+                ${sheetItems.length > 0 ? `<button class="btn btn-ghost btn-kebab" data-options="${e.id}" aria-label="Opções">⋮</button>` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // Mesmo mecanismo de views/users.js#openOptionsMenuFor (ver comentário
+  // lá) — itens já prontos de fora (cardSheetItems acima), porque cada
+  // linha tem uma combinação diferente de ações conforme o status.
+  let openOptionsMenu = null;
+
+  function closeOptionsMenu() {
+    if (!openOptionsMenu) return;
+    openOptionsMenu.menuEl.remove();
+    openOptionsMenu.scrimEl.remove();
+    openOptionsMenu = null;
+  }
+
+  function createOptionsScrim() {
+    const scrim = document.createElement('div');
+    scrim.className = 'row-options-scrim';
+    document.body.appendChild(scrim);
+    return scrim;
+  }
+
+  function openOptionsMenuFor(items, triggerBtn) {
+    closeOptionsMenu();
+    if (items.length === 0) return;
+
+    const scrim = createOptionsScrim();
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item${item.danger ? ' danger' : ''}" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
+  }
+
+  function closeOptionsMenuOnOutsideClick(e) {
+    if (openOptionsMenu && !openOptionsMenu.menuEl.contains(e.target)) closeOptionsMenu();
+  }
+  document.addEventListener('click', closeOptionsMenuOnOutsideClick);
+  window.addEventListener('scroll', closeOptionsMenu, true);
 
   function valueCell(entry, status) {
     if (status !== 'parcial') return formatMoney(entry.amount);
@@ -384,4 +502,12 @@ export async function renderFinanceiro(container, ctx) {
   enhanceSelect(document.getElementById('status-filter'));
 
   refresh();
+
+  // Limpeza do listener em document/window do menu "Opções" — mesmo
+  // padrão de views/products.js#openOptionsMenuFor (ver comentário lá).
+  return () => {
+    document.removeEventListener('click', closeOptionsMenuOnOutsideClick);
+    window.removeEventListener('scroll', closeOptionsMenu, true);
+    closeOptionsMenu();
+  };
 }
