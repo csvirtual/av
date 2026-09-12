@@ -84,7 +84,7 @@ export async function renderUsers(container, ctx) {
     tableBox.innerHTML = `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Nome</th><th>Usuário</th><th>Perfil</th><th style="text-align:center;">Status</th><th>Cadastrado em</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>Usuário</th><th>Perfil</th><th style="text-align:center;">Status</th><th>Cadastrado em</th><th class="table-actions-col"></th></tr></thead>
           <tbody>
             ${users.map((u) => `
               <tr>
@@ -93,7 +93,7 @@ export async function renderUsers(container, ctx) {
                 <td>${isAdmin(u) ? '<span class="badge badge-gold">Administrador</span>' : '<span class="badge badge-green">Vendedor</span>'}</td>
                 <td style="text-align:center;">${u.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
                 <td>${formatDateTime(u.createdAt)}</td>
-                <td style="white-space:nowrap;">
+                <td class="table-actions-col" style="white-space:nowrap;">
                   ${isAdmin(u) || u.id === ctx.user.id ? '' : `<button class="btn btn-ghost btn-sm" data-edit="${u.id}">Editar</button>`}
                   <button class="btn btn-ghost btn-sm" data-reset="${u.id}">Redefinir senha</button>
                   ${isAdmin(u) ? '' : `<button class="btn btn-ghost btn-sm" data-toggle="${u.id}">${u.active ? 'Desativar' : 'Reativar'}</button>`}

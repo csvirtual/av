@@ -68,7 +68,7 @@ export async function renderCarreto(container, ctx) {
       <div class="utility-bar"><span class="text-muted" style="font-size:13px;">${total} carreto(s)</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Endereço</th><th>Itens</th><th>Responsável</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+          <thead><tr><th>Data/Hora</th><th>Cliente</th><th>Endereço</th><th>Itens</th><th>Responsável</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
           <tbody>
             ${visible.map((d) => `
               <tr>
@@ -78,7 +78,7 @@ export async function renderCarreto(container, ctx) {
                 <td>${d.items.length}</td>
                 <td class="text-muted">${escapeHtml(d.responsible || '—')}</td>
                 <td style="text-align:center;">${STATUS_BADGE[d.status]}</td>
-                <td><button class="btn btn-ghost btn-sm" data-detail="${d.id}">Ver itens</button></td>
+                <td class="table-actions-col"><button class="btn btn-ghost btn-sm" data-detail="${d.id}">Ver itens</button></td>
               </tr>
             `).join('')}
           </tbody>

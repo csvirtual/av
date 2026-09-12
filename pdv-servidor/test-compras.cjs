@@ -98,14 +98,18 @@ async function apiCall(page, path, opts = {}) {
   await page.click('.modal button:has-text("Cancelar")');
   await page.waitForTimeout(300);
 
-  // Inativar / reativar.
-  await page.click('tr:has-text("Fornecedor Teste") [data-toggle]');
+  // Inativar / reativar (via menu "Opções", que agrupa Inativar/Reativar + Excluir).
+  await page.click('tr:has-text("Fornecedor Teste") [data-options]');
+  await page.waitForTimeout(200);
+  await page.locator('.row-options-item:has-text("Inativar")').click();
   await page.waitForTimeout(300);
   await page.click('[data-action="ok"]');
   await page.waitForTimeout(600);
   viewText = await page.locator('#view-root').innerText();
   check('Inativar fornecedor muda status pra INATIVO', /INATIVO/i.test(viewText), viewText.slice(0, 300));
-  await page.click('tr:has-text("Fornecedor Teste") [data-toggle]');
+  await page.click('tr:has-text("Fornecedor Teste") [data-options]');
+  await page.waitForTimeout(200);
+  await page.locator('.row-options-item:has-text("Reativar")').click();
   await page.waitForTimeout(300);
   await page.click('[data-action="ok"]');
   await page.waitForTimeout(600);

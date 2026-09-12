@@ -58,6 +58,15 @@ async function sellToCustomer(page, { productName, customerName, method }) {
   await page.waitForTimeout(300);
 }
 
+/** Abre o menu "Opções" da 1ª linha da tabela e clica no item com o texto
+ * dado — mesma UI real que um usuário usa desde a consolidação dos botões
+ * de linha (Ver compras/Editar/Inativar-Reativar/Excluir) num dropdown só. */
+async function clickOptionsItem(page, itemText) {
+  await page.locator('[data-options]').first().click();
+  await page.waitForTimeout(200);
+  await page.locator(`.row-options-item:has-text("${itemText}")`).click();
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
   const page = await browser.newPage();
@@ -82,7 +91,7 @@ async function sellToCustomer(page, { productName, customerName, method }) {
   check('Cliente recém-cadastrado aparece na lista', listText.includes('Cliente Teste Clientes'));
 
   // ---------- Edição ----------
-  await page.click('[data-edit]');
+  await clickOptionsItem(page, 'Editar');
   await page.waitForTimeout(300);
   await page.fill('#f-nome', 'Cliente Teste Clientes (editado)');
   await page.click('.modal button:has-text("Salvar")');
@@ -91,13 +100,13 @@ async function sellToCustomer(page, { productName, customerName, method }) {
   check('Edição de nome reflete na lista', listText.includes('Cliente Teste Clientes (editado)'));
 
   // ---------- Inativar / reativar (confirmDialog, não confirm() nativo) ----------
-  await page.click('[data-toggle]');
+  await clickOptionsItem(page, 'Inativar');
   await page.waitForTimeout(300);
   await page.click('.modal button:has-text("Inativar")');
   await page.waitForTimeout(500);
   let row = await page.locator('tr', { hasText: 'Cliente Teste Clientes (editado)' }).innerText();
   check('Inativar cliente muda o status pra INATIVO', /INATIVO/i.test(row), row);
-  await page.click('[data-toggle]');
+  await clickOptionsItem(page, 'Reativar');
   await page.waitForTimeout(300);
   await page.click('.modal button:has-text("Reativar")');
   await page.waitForTimeout(500);
@@ -221,7 +230,7 @@ async function sellToCustomer(page, { productName, customerName, method }) {
   // ---------- Exclusão de cliente (admin tem a permissão, saldo zerado) ----------
   await page.goto(`${BASE}/#/clientes`);
   await page.waitForTimeout(500);
-  await page.click('[data-delete]');
+  await clickOptionsItem(page, 'Excluir');
   await page.waitForTimeout(300);
   await page.click('.modal button:has-text("Excluir")');
   await page.waitForTimeout(500);

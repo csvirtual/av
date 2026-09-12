@@ -1415,7 +1415,7 @@ function renderTable(products, flags) {
       <table>
         <thead>
           <tr>
-            <th style="min-width:200px;">Produto</th><th>Categoria</th><th style="text-align:center;">Código</th><th>Preço</th><th>Estoque</th><th style="text-align:center;">Status</th><th></th>
+            <th style="min-width:200px;">Produto</th><th>Categoria</th><th style="text-align:center;">Código</th><th>Preço</th><th>Estoque</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th>
           </tr>
         </thead>
         <tbody>
@@ -1429,7 +1429,7 @@ function renderTable(products, flags) {
               <td>${priceCell(p)}</td>
               <td>${formatQty(p.quantity)} ${escapeHtml(displayUnit(p))}</td>
               <td style="text-align:center;">${statusBadge(p)}</td>
-              <td style="white-space:nowrap;">
+              <td class="table-actions-col" style="white-space:nowrap;">
                 <button class="btn btn-ghost btn-sm" data-history="${p.id}">Histórico</button>
                 ${hasAnyOption ? `<button class="btn btn-ghost btn-sm" data-options="${p.id}">Opções</button>` : ''}
               </td>

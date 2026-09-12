@@ -107,7 +107,7 @@ export async function renderFinanceiro(container, ctx) {
       <div class="utility-bar"><span class="text-muted" style="font-size:13px;">${total} conta(s)</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+          <thead><tr><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th>Valor</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
           <tbody>
             ${visible.map((e) => {
               const status = entryStatus(e);
@@ -121,7 +121,7 @@ export async function renderFinanceiro(container, ctx) {
                 <td>${formatDate(e.dueDate)}</td>
                 <td>${valueCell(e, status)}</td>
                 <td style="text-align:center;">${STATUS_BADGE[status]}</td>
-                <td style="white-space:nowrap;">
+                <td class="table-actions-col" style="white-space:nowrap;">
                   ${canPay ? `<button class="btn btn-ghost btn-sm" data-pay="${e.id}">${status === 'parcial' ? 'Concluir pagamento' : 'Registrar pagamento'}</button>` : ''}
                   ${hasPayments ? `<button class="btn btn-ghost btn-sm" data-payments="${e.id}">Ver pagamentos</button>` : ''}
                   ${canPay && !hasPayments ? `<button class="btn btn-ghost btn-sm" data-cancel="${e.id}" style="color:var(--danger);">Cancelar</button>` : ''}

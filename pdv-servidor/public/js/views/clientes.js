@@ -96,19 +96,73 @@ export async function renderClientes(container, ctx) {
     tableBox.querySelectorAll('[data-detail]').forEach((btn) => {
       btn.addEventListener('click', () => openDetailModal(customers.find((c) => c.id === btn.dataset.detail)));
     });
-    tableBox.querySelectorAll('[data-purchases]').forEach((btn) => {
-      btn.addEventListener('click', () => openCustomerSalesModal(customers.find((c) => c.id === btn.dataset.purchases)));
-    });
-    tableBox.querySelectorAll('[data-edit]').forEach((btn) => {
-      btn.addEventListener('click', () => openCustomerModal(customers.find((c) => c.id === btn.dataset.edit)));
-    });
-    tableBox.querySelectorAll('[data-toggle]').forEach((btn) => {
-      btn.addEventListener('click', () => toggleActive(customers.find((c) => c.id === btn.dataset.toggle)));
-    });
-    tableBox.querySelectorAll('[data-delete]').forEach((btn) => {
-      btn.addEventListener('click', () => removeCustomer(customers.find((c) => c.id === btn.dataset.delete)));
+    tableBox.querySelectorAll('[data-options]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        // Mesmo achado de products.js: sem stopPropagation, o próprio
+        // clique já contava como "clique fora" pro listener que fecha o
+        // menu — abria e fechava no mesmíssimo clique.
+        e.stopPropagation();
+        const customer = customers.find((c) => c.id === btn.dataset.options);
+        if (openOptionsMenu?.triggerBtn === btn) { closeOptionsMenu(); return; }
+        openOptionsMenuFor(customer, btn);
+      });
     });
   }
+
+  // Menu suspenso com as ações que antes eram um botão cada (Ver compras,
+  // Editar, Inativar/Reativar, Excluir) — mesmo motivo e mesmo mecanismo
+  // de views/products.js#openOptionsMenuFor: 5 botões lado a lado nessa
+  // célula (ver achado do usuário sobre telas estreitas) deixavam a ação
+  // da linha enterrada bem longe da borda esquerda da tabela, exigindo
+  // rolagem horizontal grande pra alcançar. "Extrato" fica de fora do
+  // grupo, de propósito — é a ação mais usada no dia a dia (só consulta).
+  let openOptionsMenu = null;
+
+  function closeOptionsMenu() {
+    if (!openOptionsMenu) return;
+    openOptionsMenu.menuEl.remove();
+    openOptionsMenu = null;
+  }
+
+  function openOptionsMenuFor(customer, triggerBtn) {
+    closeOptionsMenu();
+    const items = [
+      { label: 'Ver compras', run: () => openCustomerSalesModal(customer) },
+      { label: 'Editar', run: () => openCustomerModal(customer) },
+      { label: customer.active ? 'Inativar' : 'Reativar', run: () => toggleActive(customer) },
+    ];
+    if (canDeleteCustomer) items.push({ label: 'Excluir', danger: true, run: () => removeCustomer(customer) });
+
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item${item.danger ? ' danger' : ''}" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, triggerBtn };
+  }
+
+  function closeOptionsMenuOnOutsideClick(e) {
+    if (openOptionsMenu && !openOptionsMenu.menuEl.contains(e.target)) closeOptionsMenu();
+  }
+  document.addEventListener('click', closeOptionsMenuOnOutsideClick);
+  window.addEventListener('scroll', closeOptionsMenu, true);
 
   async function toggleActive(customer) {
     const next = !customer.active;
@@ -534,7 +588,7 @@ export async function renderClientes(container, ctx) {
     return `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Nome</th><th>Telefone</th><th>Saldo devedor</th><th>Vencimento</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Saldo devedor</th><th>Vencimento</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
           <tbody>
             ${customers.map((c) => {
               const balance = balances[c.id] || 0;
@@ -546,12 +600,9 @@ export async function renderClientes(container, ctx) {
                 <td>${balance > 0.01 ? `<span class="badge badge-red">${formatMoney(balance)}</span>` : formatMoney(0)}</td>
                 <td>${c.debtDueDate ? (overdue ? `<span class="badge badge-red">Vencido em ${formatDate(c.debtDueDate)}</span>` : formatDate(c.debtDueDate)) : '—'}</td>
                 <td style="text-align:center;">${c.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
-                <td style="white-space:nowrap;">
+                <td class="table-actions-col" style="white-space:nowrap;">
                   <button class="btn btn-ghost btn-sm" data-detail="${c.id}">Extrato</button>
-                  <button class="btn btn-ghost btn-sm" data-purchases="${c.id}">Ver compras</button>
-                  <button class="btn btn-ghost btn-sm" data-edit="${c.id}">Editar</button>
-                  <button class="btn btn-ghost btn-sm" data-toggle="${c.id}">${c.active ? 'Inativar' : 'Reativar'}</button>
-                  ${canDeleteCustomer ? `<button class="btn btn-ghost btn-sm" data-delete="${c.id}" style="color:var(--danger);">Excluir</button>` : ''}
+                  <button class="btn btn-ghost btn-sm" data-options="${c.id}">Opções</button>
                 </td>
               </tr>
             `;
@@ -563,4 +614,15 @@ export async function renderClientes(container, ctx) {
   }
 
   refresh();
+
+  // Limpeza do listener em document/window do menu "Opções" — mesmo
+  // padrão de views/products.js#openOptionsMenuFor (ver comentário lá):
+  // sem isto, cada visita à tela Clientes empilharia mais um listener
+  // fantasma, já que o roteador recria a tela do zero a cada troca de
+  // menu mas nunca limpa nada em document/window sozinho.
+  return () => {
+    document.removeEventListener('click', closeOptionsMenuOnOutsideClick);
+    window.removeEventListener('scroll', closeOptionsMenu, true);
+    closeOptionsMenu();
+  };
 }

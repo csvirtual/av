@@ -186,7 +186,7 @@ export async function renderSalesHistory(container, ctx) {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Data/Hora</th><th>Vendedor</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+          <thead><tr><th>Data/Hora</th><th>Vendedor</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
           <tbody>
             ${loadedSales.map((s) => `
               <tr>
@@ -200,7 +200,7 @@ export async function renderSalesHistory(container, ctx) {
                   ${formatMoney(netTotal(s))}
                 </td>
                 <td style="text-align:center;">${STATUS_BADGE[saleStatus(s)]}</td>
-                <td><button class="btn btn-ghost btn-sm" data-detail="${s.id}">Ver itens</button></td>
+                <td class="table-actions-col"><button class="btn btn-ghost btn-sm" data-detail="${s.id}">Ver itens</button></td>
               </tr>
             `).join('')}
           </tbody>

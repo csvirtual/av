@@ -1925,6 +1925,26 @@ input.customer-search-input:focus {
    * página inteira pra rolar na horizontal (title, carrinho, pagamento,
    * tudo junto) em vez de só apertar a lista de resultados por dentro. */
   .pdv-layout { grid-template-columns: minmax(0, 1fr); }
+
+  /* Achado do usuário (celular estreito): tabelas com várias colunas
+   * (Estoque, Clientes, Usuários, Financeiro, Compras, Carreto) rolam
+   * horizontalmente dentro de .table-wrap (de propósito, ver comentário
+   * lá) — mas isso deixava a AÇÃO da linha (Opções/Editar/Ver detalhe,
+   * sempre a última coluna) bem longe da borda esquerda em telas
+   * estreitas, exigindo rolagem grande só pra alcançar. `.table-actions-
+   * col` marca exatamente essa coluna (só ela, nunca uma coluna de
+   * conteúdo de verdade tipo "Detalhes" do Log) em cada tela que tem uma
+   * — fica sempre visível, grudada na borda direita, não importa o quanto
+   * o resto da linha role. `background-color: inherit` (não um valor
+   * fixo) pra acompanhar o fundo de verdade da linha embaixo dela
+   * (normal, `:hover`, ou `.low-stock-row` do Estoque) sem destoar. */
+  .table-wrap table th.table-actions-col,
+  .table-wrap table td.table-actions-col {
+    position: sticky;
+    right: 0;
+    box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.18);
+  }
+  .table-wrap table td.table-actions-col { background-color: inherit; }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */

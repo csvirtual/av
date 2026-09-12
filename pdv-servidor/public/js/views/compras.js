@@ -75,7 +75,7 @@ export async function renderCompras(container, ctx) {
       ${suppliers.length === 0 ? '<div class="table-wrap"><div class="table-empty">Nenhum fornecedor cadastrado.</div></div>' : `
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
             <tbody>
               ${suppliers.map((s) => `
                 <tr>
@@ -83,10 +83,9 @@ export async function renderCompras(container, ctx) {
                   <td>${escapeHtml(formatPhoneBR(s.telefone) || '—')}</td>
                   <td>${escapeHtml(s.email || '—')}</td>
                   <td style="text-align:center;">${s.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
-                  <td style="white-space:nowrap;">
+                  <td class="table-actions-col" style="white-space:nowrap;">
                     <button class="btn btn-ghost btn-sm" data-edit="${s.id}">Editar</button>
-                    <button class="btn btn-ghost btn-sm" data-toggle="${s.id}">${s.active ? 'Inativar' : 'Reativar'}</button>
-                    <button class="btn btn-ghost btn-sm" data-delete="${s.id}" style="color:var(--danger);">Excluir</button>
+                    <button class="btn btn-ghost btn-sm" data-options="${s.id}">Opções</button>
                   </td>
                 </tr>
               `).join('')}
@@ -100,55 +99,115 @@ export async function renderCompras(container, ctx) {
     content.querySelectorAll('[data-edit]').forEach((btn) => {
       btn.addEventListener('click', () => openSupplierModal(suppliers.find((s) => s.id === btn.dataset.edit)));
     });
-    content.querySelectorAll('[data-toggle]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const supplier = suppliers.find((s) => s.id === btn.dataset.toggle);
-        const next = !supplier.active;
-        const ok = await confirmDialog({
-          title: next ? 'Reativar fornecedor' : 'Inativar fornecedor',
-          message: `Deseja ${next ? 'reativar' : 'inativar'} "${escapeHtml(supplier.nome)}"?`,
-          confirmLabel: next ? 'Reativar' : 'Inativar', danger: !next,
-        });
-        if (!ok) return;
-        try {
-          await setSupplierActive(supplier.id, next);
-          await logAction({
-            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-            action: next ? 'Reativação de fornecedor' : 'Inativação de fornecedor',
-            details: `Fornecedor "${supplier.nome}" ${next ? 'reativado' : 'inativado'}.`,
-            entity: 'supplier', entityId: supplier.id,
-          });
-          showToast(`Fornecedor ${next ? 'reativado' : 'inativado'}.`, 'success');
-          renderFornecedoresTab();
-        } catch (err) {
-          showToast(err.message, 'error');
-        }
-      });
-    });
-    content.querySelectorAll('[data-delete]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const supplier = suppliers.find((s) => s.id === btn.dataset.delete);
-        const ok = await confirmDialog({
-          title: 'Excluir fornecedor',
-          message: `Excluir "${escapeHtml(supplier.nome)}"? Pedidos de compra já feitos com ele não são afetados.`,
-          confirmLabel: 'Excluir', danger: true,
-        });
-        if (!ok) return;
-        try {
-          await deleteSupplier(supplier.id);
-          await logAction({
-            userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
-            action: 'Exclusão de fornecedor', details: `Fornecedor "${supplier.nome}" excluído.`,
-            entity: 'supplier', entityId: supplier.id,
-          });
-          showToast('Fornecedor excluído.', 'success');
-          renderFornecedoresTab();
-        } catch (err) {
-          showToast(err.message, 'error');
-        }
+    // "Opções" agrupa Inativar/Reativar + Excluir — mesmo motivo e mesmo
+    // mecanismo de views/products.js#openOptionsMenuFor: achado do usuário
+    // sobre telas estreitas, 3 botões lado a lado nessa célula enterravam
+    // a ação da linha bem longe da borda esquerda da tabela. "Editar" fica
+    // de fora do grupo, de propósito — é a ação mais usada no dia a dia.
+    content.querySelectorAll('[data-options]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const supplier = suppliers.find((s) => s.id === btn.dataset.options);
+        if (openOptionsMenu?.triggerBtn === btn) { closeOptionsMenu(); return; }
+        openSupplierOptionsMenuFor(supplier, btn);
       });
     });
   }
+
+  async function toggleSupplierActive(supplier) {
+    const next = !supplier.active;
+    const ok = await confirmDialog({
+      title: next ? 'Reativar fornecedor' : 'Inativar fornecedor',
+      message: `Deseja ${next ? 'reativar' : 'inativar'} "${escapeHtml(supplier.nome)}"?`,
+      confirmLabel: next ? 'Reativar' : 'Inativar', danger: !next,
+    });
+    if (!ok) return;
+    try {
+      await setSupplierActive(supplier.id, next);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: next ? 'Reativação de fornecedor' : 'Inativação de fornecedor',
+        details: `Fornecedor "${supplier.nome}" ${next ? 'reativado' : 'inativado'}.`,
+        entity: 'supplier', entityId: supplier.id,
+      });
+      showToast(`Fornecedor ${next ? 'reativado' : 'inativado'}.`, 'success');
+      renderFornecedoresTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function removeSupplier(supplier) {
+    const ok = await confirmDialog({
+      title: 'Excluir fornecedor',
+      message: `Excluir "${escapeHtml(supplier.nome)}"? Pedidos de compra já feitos com ele não são afetados.`,
+      confirmLabel: 'Excluir', danger: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteSupplier(supplier.id);
+      await logAction({
+        userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+        action: 'Exclusão de fornecedor', details: `Fornecedor "${supplier.nome}" excluído.`,
+        entity: 'supplier', entityId: supplier.id,
+      });
+      showToast('Fornecedor excluído.', 'success');
+      renderFornecedoresTab();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // Mesmo menu suspenso genérico de views/products.js#openOptionsMenuFor —
+  // guardado no escopo de fora (renderCompras), não dentro de
+  // renderFornecedoresTab, pra sobreviver a troca de aba (Pedidos ↔
+  // Fornecedores) e pra só precisar de UM listener/limpeza pra tela
+  // inteira.
+  let openOptionsMenu = null;
+
+  function closeOptionsMenu() {
+    if (!openOptionsMenu) return;
+    openOptionsMenu.menuEl.remove();
+    openOptionsMenu = null;
+  }
+
+  function openSupplierOptionsMenuFor(supplier, triggerBtn) {
+    closeOptionsMenu();
+    const items = [
+      { label: supplier.active ? 'Inativar' : 'Reativar', run: () => toggleSupplierActive(supplier) },
+      { label: 'Excluir', danger: true, run: () => removeSupplier(supplier) },
+    ];
+
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item${item.danger ? ' danger' : ''}" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, triggerBtn };
+  }
+
+  function closeOptionsMenuOnOutsideClick(e) {
+    if (openOptionsMenu && !openOptionsMenu.menuEl.contains(e.target)) closeOptionsMenu();
+  }
+  document.addEventListener('click', closeOptionsMenuOnOutsideClick);
+  window.addEventListener('scroll', closeOptionsMenu, true);
 
   function openSupplierModal(supplier) {
     const isEdit = !!supplier;
@@ -243,7 +302,7 @@ export async function renderCompras(container, ctx) {
       ${orders.length === 0 ? '<div class="table-wrap"><div class="table-empty">Nenhum pedido de compra ainda.</div></div>' : `
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Data</th><th>Fornecedor</th><th>Itens</th><th style="text-align:center;">Status</th><th></th></tr></thead>
+            <thead><tr><th>Data</th><th>Fornecedor</th><th>Itens</th><th style="text-align:center;">Status</th><th class="table-actions-col"></th></tr></thead>
             <tbody>
               ${visible.map((o) => `
                 <tr>
@@ -251,7 +310,7 @@ export async function renderCompras(container, ctx) {
                   <td>${escapeHtml(o.supplierName)}</td>
                   <td>${o.items.length}</td>
                   <td style="text-align:center;">${ORDER_STATUS_BADGE[o.status]}</td>
-                  <td><button class="btn btn-ghost btn-sm" data-detail="${o.id}">Ver detalhe</button></td>
+                  <td class="table-actions-col"><button class="btn btn-ghost btn-sm" data-detail="${o.id}">Ver detalhe</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -562,4 +621,12 @@ export async function renderCompras(container, ctx) {
   }
 
   setTab(activeTab);
+
+  // Limpeza do listener em document/window do menu "Opções" — mesmo
+  // padrão de views/products.js#openOptionsMenuFor (ver comentário lá).
+  return () => {
+    document.removeEventListener('click', closeOptionsMenuOnOutsideClick);
+    window.removeEventListener('scroll', closeOptionsMenu, true);
+    closeOptionsMenu();
+  };
 }
