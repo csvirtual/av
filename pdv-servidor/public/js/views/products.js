@@ -317,7 +317,7 @@ export async function renderProducts(container, ctx) {
   }
 
   // Fundo escurecido atrás do menu — só aparece de verdade em telas
-  // estreitas (ver .row-options-scrim no CSS, @media 860px, onde o menu
+  // estreitas (ver .row-options-scrim no CSS, @media 1024px, onde o menu
   // vira folha inferior); em tela larga fica presente no DOM mas invisível
   // (display:none), sem custo. Criado uma vez por abertura de menu — tanto
   // openOptionsMenuFor quanto openCsvMenu chamam isto antes de montar o
@@ -1460,10 +1460,10 @@ function renderTable(products, flags) {
 }
 
 /** Contrapartida em cartão de renderTable, pro breakpoint de celular/tablet
- * retrato (ver @media 860px em styles.css) — mesmos dados, mesmos
+ * (ver @media 1024px em styles.css) — mesmos dados, mesmos
  * `data-history`/`data-options` (wireRowActions já os pega automaticamente,
  * tabela e cartão juntos, sem precisar de fiação própria). Só existe
- * visualmente abaixo de 860px; o CSS que decide qual dos dois aparece. */
+ * visualmente abaixo de 1024px; o CSS que decide qual dos dois aparece. */
 function renderCards(products, flags) {
   const { canManageProducts, canAdjustStock, canToggleProduct, canDeleteProduct } = flags;
   const hasAnyOption = canManageProducts || canAdjustStock || canToggleProduct || canDeleteProduct;

@@ -126,7 +126,7 @@ export async function renderUsers(container, ctx) {
   }
 
   /** Contrapartida em cartão da tabela, pro breakpoint de celular/tablet
-   * retrato (ver @media 860px em styles.css). "Editar" é a ação mais
+   * (ver @media 1024px em styles.css). "Editar" é a ação mais
    * relevante quando existe (some pro Administrador e pra você mesmo, ver
    * condição igual à da tabela acima) — fica como botão direto; o resto
    * (Redefinir senha, sempre disponível, + Desativar/Reativar) entra no

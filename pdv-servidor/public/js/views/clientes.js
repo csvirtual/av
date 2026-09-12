@@ -129,7 +129,7 @@ export async function renderClientes(container, ctx) {
   // Fundo escurecido atrás do menu — mesmo mecanismo de
   // views/products.js#createOptionsScrim (ver comentário lá): só aparece
   // de verdade em telas estreitas, onde o menu vira folha inferior (CSS,
-  // @media 860px).
+  // @media 1024px).
   function createOptionsScrim() {
     const scrim = document.createElement('div');
     scrim.className = 'row-options-scrim';
@@ -628,7 +628,7 @@ export async function renderClientes(container, ctx) {
   }
 
   /** Contrapartida em cartão de renderTable, pro breakpoint de celular/
-   * tablet retrato (ver @media 860px em styles.css) — mesmos
+   * tablet (ver @media 1024px em styles.css) — mesmos
    * data-detail/data-options, wireRowActions já os pega automaticamente. */
   function renderCards(customers, balances) {
     if (customers.length === 0) return '';

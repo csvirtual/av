@@ -116,7 +116,7 @@ export async function renderCompras(container, ctx) {
   }
 
   /** Contrapartida em cartão da tabela de Fornecedores, pro breakpoint de
-   * celular/tablet retrato (ver @media 860px em styles.css) — mesmos
+   * celular/tablet (ver @media 1024px em styles.css) — mesmos
    * data-edit/data-options, a fiação de renderFornecedoresTab já os pega. */
   function renderFornecedoresCards(suppliers) {
     if (suppliers.length === 0) return '';

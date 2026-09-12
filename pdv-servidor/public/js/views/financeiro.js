@@ -156,7 +156,7 @@ export async function renderFinanceiro(container, ctx) {
   }
 
   /** Contrapartida em cartão da tabela, pro breakpoint de celular/tablet
-   * retrato (ver @media 860px em styles.css). A ação mais relevante
+   * (ver @media 1024px em styles.css). A ação mais relevante
    * (Registrar/Concluir pagamento, quando existe) fica como botão direto;
    * o resto (Ver pagamentos, Cancelar) entra na folha de Opções só quando
    * sobra mais de 1 ação — se só existe "Ver pagamentos" (conta paga,

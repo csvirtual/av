@@ -1943,42 +1943,28 @@ input.customer-search-input:focus {
    * página inteira pra rolar na horizontal (title, carrinho, pagamento,
    * tudo junto) em vez de só apertar a lista de resultados por dentro. */
   .pdv-layout { grid-template-columns: minmax(0, 1fr); }
-
-  /* Achado do usuário (celular estreito): tabelas com várias colunas
-   * (Estoque, Clientes, Usuários, Financeiro, Compras, Carreto) rolam
-   * horizontalmente dentro de .table-wrap (de propósito, ver comentário
-   * lá) — mas isso deixava a AÇÃO da linha (Opções/Editar/Ver detalhe,
-   * sempre a última coluna) bem longe da borda esquerda em telas
-   * estreitas, exigindo rolagem grande só pra alcançar. `.table-actions-
-   * col` marca exatamente essa coluna (só ela, nunca uma coluna de
-   * conteúdo de verdade tipo "Detalhes" do Log) em cada tela que tem uma
-   * — fica sempre visível, grudada na borda direita, não importa o quanto
-   * o resto da linha role. `background-color: inherit` (não um valor
-   * fixo) pra acompanhar o fundo de verdade da linha embaixo dela
-   * (normal, `:hover`, ou `.low-stock-row` do Estoque) sem destoar. */
-  .table-wrap table th.table-actions-col,
-  .table-wrap table td.table-actions-col {
-    position: sticky;
-    right: 0;
-    box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.18);
-  }
-  .table-wrap table td.table-actions-col { background-color: inherit; }
 }
 
-/* ---------- ~860px: tabela vira cartão (celular + tablet retrato) ----------
+/* ---------- ~1024px: tabela vira cartão (celular + tablet, retrato OU
+ * paisagem) ----------
  * Refatoração pedida pelo usuário depois de tentar só "consertar" a tabela
- * em tela estreita (sticky column acima): em vez de espremer 6+ colunas
- * numa faixa de 320-430px, cada LINHA vira um CARTÃO — nome em destaque,
- * status como selo, só os 2-3 dados que importam de relance, ação sempre
- * inteira (nunca sticky disputando espaço com o resto). Cada tela migra
- * pra esse padrão aos poucos (ver o container específico, ex:
- * #products-table abaixo); o que ainda não migrou continua na tabela de
- * sempre, sticky column incluída — nada quebra no meio da migração.
+ * em tela estreita com uma coluna de ação grudada (`sticky`) na borda
+ * direita — não resolveu de verdade, só disfarçou o aperto. Em vez de
+ * espremer 6+ colunas numa faixa estreita, cada LINHA vira um CARTÃO —
+ * nome em destaque, status como selo, só os 2-3 dados que importam de
+ * relance, ação sempre inteira (nunca sticky disputando espaço com o
+ * resto). Cada tela migra pra esse padrão aos poucos (ver o container
+ * específico, ex: #products-table abaixo); o que ainda não migrou continua
+ * na tabela de sempre — nada quebra no meio da migração.
  *
- * O corte de largura é só onde a densidade de tabela deixa de compensar:
- * ~860px cobre celular (qualquer tamanho) e tablet em pé (768/820px);
- * tablet deitado (1024px) pra cima continua com a tabela de sempre. */
-@media (max-width: 860px) {
+ * Cobre TODO tablet (768-1024px, retrato ou paisagem) e todo celular —
+ * achado do usuário: tablet deitado tinha ficado de fora da primeira
+ * versão desta migração (ainda com a coluna sticky antiga, escondida só
+ * visualmente por estar numa faixa mais larga) — corrigido pra não sobrar
+ * nenhum resquício da abordagem antiga em nenhum tamanho de tela touch.
+ * Só desktop/notebook (>1024px) continua com a tabela tradicional, onde
+ * cabe confortavelmente. */
+@media (max-width: 1024px) {
   /* O mesmo menu "Opções" (ver views/*.js#openOptionsMenuFor) vira folha
    * inferior aqui — sempre largura cheia, alvo de toque grande, gesto
    * nativo de celular — em vez de flutuar ancorado num botão pequeno que
