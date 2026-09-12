@@ -80,6 +80,7 @@ export async function renderClientes(container, ctx) {
     tableBox.innerHTML = `
       ${total > 0 ? `<div class="utility-bar"><span class="text-muted" style="font-size:13px;">${total} cliente(s)</span></div>` : ''}
       ${renderTable(visible, balances)}
+      ${renderCards(visible, balances)}
       ${paginationHtml({ page: pgState.page, pageSize: pgState.pageSize, total })}
     `;
     wireRowActions(visible);
@@ -121,7 +122,19 @@ export async function renderClientes(container, ctx) {
   function closeOptionsMenu() {
     if (!openOptionsMenu) return;
     openOptionsMenu.menuEl.remove();
+    openOptionsMenu.scrimEl.remove();
     openOptionsMenu = null;
+  }
+
+  // Fundo escurecido atrás do menu — mesmo mecanismo de
+  // views/products.js#createOptionsScrim (ver comentário lá): só aparece
+  // de verdade em telas estreitas, onde o menu vira folha inferior (CSS,
+  // @media 860px).
+  function createOptionsScrim() {
+    const scrim = document.createElement('div');
+    scrim.className = 'row-options-scrim';
+    document.body.appendChild(scrim);
+    return scrim;
   }
 
   function openOptionsMenuFor(customer, triggerBtn) {
@@ -133,6 +146,7 @@ export async function renderClientes(container, ctx) {
     ];
     if (canDeleteCustomer) items.push({ label: 'Excluir', danger: true, run: () => removeCustomer(customer) });
 
+    const scrim = createOptionsScrim();
     const menu = document.createElement('div');
     menu.className = 'row-options-menu';
     menu.innerHTML = items.map((item, idx) => `
@@ -155,7 +169,7 @@ export async function renderClientes(container, ctx) {
       });
     });
 
-    openOptionsMenu = { menuEl: menu, triggerBtn };
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
   }
 
   function closeOptionsMenuOnOutsideClick(e) {
@@ -609,6 +623,37 @@ export async function renderClientes(container, ctx) {
             }).join('')}
           </tbody>
         </table>
+      </div>
+    `;
+  }
+
+  /** Contrapartida em cartão de renderTable, pro breakpoint de celular/
+   * tablet retrato (ver @media 860px em styles.css) — mesmos
+   * data-detail/data-options, wireRowActions já os pega automaticamente. */
+  function renderCards(customers, balances) {
+    if (customers.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${customers.map((c) => {
+          const balance = balances[c.id] || 0;
+          const overdue = isDebtOverdue(c, balance);
+          return `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(c.nome)}<small>${escapeHtml(formatPhoneBR(c.telefone) || 'sem telefone')}</small></div>
+              ${c.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Saldo devedor</div><div class="f-value">${balance > 0.01 ? `<span class="badge badge-red">${formatMoney(balance)}</span>` : formatMoney(0)}</div></div>
+              ${c.debtDueDate ? `<div><div class="f-label">Vencimento</div><div class="f-value">${overdue ? `<span class="badge badge-red">Vencido em ${formatDate(c.debtDueDate)}</span>` : formatDate(c.debtDueDate)}</div></div>` : ''}
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" data-detail="${c.id}">Extrato</button>
+              <button class="btn btn-ghost btn-kebab" data-options="${c.id}" aria-label="Opções">⋮</button>
+            </div>
+          </div>
+        `;
+        }).join('')}
       </div>
     `;
   }

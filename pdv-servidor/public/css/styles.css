@@ -2036,6 +2036,8 @@ input.customer-search-input:focus {
    * ainda não migradas continuam mostrando a tabela normalmente aqui
    * dentro, sem essa regra as afetar por engano. */
   #products-table .table-wrap { display: none; }
+  /* Clientes: mesma migração, mesmo motivo. */
+  #customers-table .table-wrap { display: none; }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */
