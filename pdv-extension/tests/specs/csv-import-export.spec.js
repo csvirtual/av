@@ -181,4 +181,31 @@ test.describe('Estoque — Exportar/Importar CSV', () => {
     expect(product.supplierId).toBeNull();
     expect(product.active).toBe(true);
   });
+
+  test('Exportar CSV protege contra injeção de fórmula (nome começando com =, +, -, @)', async ({ appPage: page }) => {
+    // Achado de auditoria (Red Team): sem essa proteção, um produto
+    // cadastrado com nome `=cmd|'/c calc'!A1` saía CRU no CSV exportado —
+    // Excel/Sheets/LibreOffice interpretam isso como fórmula ao abrir o
+    // arquivo, não como texto. Mitigação: prefixo de aspas simples (padrão
+    // OWASP) força a planilha a tratar como texto puro.
+    await completeSetupWizard(page);
+    await page.evaluate(async () => {
+      const { createProduct } = await import('./js/data/productsRepo.js');
+      await createProduct({ barcode: '7891000400808', name: '=cmd|\'/c calc\'!A1', price: 10, category: 'material', unit: 'un' });
+      await createProduct({ barcode: '7891000400809', name: '+HYPERLINK("http://evil.example")', price: 10, category: 'material', unit: 'un' });
+    });
+    await goTo(page, '#/estoque');
+
+    await page.click('#csv-menu-btn');
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.click('.row-options-item:has-text("Exportar CSV")'),
+    ]);
+    const path = await download.path();
+    const text = require('fs').readFileSync(path, 'utf-8').replace(/^﻿/, '');
+    const line1 = text.split('\r\n').find((l) => l.includes('7891000400808'));
+    const line2 = text.split('\r\n').find((l) => l.includes('7891000400809'));
+    expect(line1).toContain(",'=cmd|");
+    expect(line2).toContain('\'+HYPERLINK(');
+  });
 });

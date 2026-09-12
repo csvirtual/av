@@ -9,8 +9,23 @@ export const PRODUCT_CSV_COLUMNS = [
   'expiryDate', 'expiryPromoDays', 'promoPrice', 'customForms',
 ];
 
+// Achado de auditoria (Red Team): "injeção de fórmula CSV" — um nome de
+// produto começando com =, +, -, @ ou tab sai cru no arquivo, e planilhas
+// (Excel, Google Sheets, LibreOffice) interpretam isso como FÓRMULA ao
+// abrir, não como texto — o vetor clássico usado pra rodar comando/exfiltrar
+// dado só de abrir um CSV "inocente" (reproduzido: nome `=cmd|'/c
+// calc'!A1` saía exportado sem nenhuma proteção). Prefixo de aspas simples
+// é a mitigação padrão (OWASP) — a planilha mostra o valor como texto puro
+// em vez de avaliar como fórmula, sem quebrar a estrutura do CSV em si.
+// Nenhuma coluna deste sistema começa legitimamente com esses caracteres
+// (preço/quantidade são sempre não-negativos, já validados na fonte — ver
+// finiteNonNegative em data/productsRepo.js), então isto nunca mascara um
+// valor real, só bloqueia o vetor de ataque.
+const FORMULA_INJECTION_PREFIX = /^[=+\-@\t\r]/;
+
 function csvEscape(value) {
-  const str = value === null || value === undefined ? '' : String(value);
+  let str = value === null || value === undefined ? '' : String(value);
+  if (FORMULA_INJECTION_PREFIX.test(str)) str = `'${str}`;
   return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 }
 
