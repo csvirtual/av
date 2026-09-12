@@ -5,7 +5,7 @@
 // tabela SQL aqui, object store do IndexedDB lá) não é.
 export const PRODUCT_CSV_COLUMNS = [
   'barcode', 'name', 'category', 'unit', 'customUnitLabel',
-  'price', 'costPrice', 'quantity', 'minStock',
+  'price', 'costPrice', 'quantity', 'minStock', 'supplierName', 'active',
   'expiryDate', 'expiryPromoDays', 'promoPrice', 'customForms',
 ];
 

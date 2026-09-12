@@ -230,8 +230,9 @@ export async function renderProducts(container, ctx) {
   // o catálogo INTEIRO (ativos e inativos), ignorando o filtro atual da tela
   // — é uma cópia de backup/migração, não "o que está sendo olhado agora".
   document.getElementById('export-csv-btn').addEventListener('click', async () => {
-    const all = await listProducts();
-    const csv = stringifyCsv(PRODUCT_CSV_COLUMNS, all.map(productToCsvRow));
+    const [all, suppliers] = await Promise.all([listProducts(), listSuppliers()]);
+    const supplierNameById = new Map(suppliers.map((s) => [s.id, s.nome]));
+    const csv = stringifyCsv(PRODUCT_CSV_COLUMNS, all.map((p) => productToCsvRow(p, supplierNameById)));
     downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, csv);
   });
 
@@ -674,7 +675,7 @@ export async function renderProducts(container, ctx) {
 // ser a ponte de migração de catálogo entre os dois produtos, já que o
 // backup de cada um não é compatível com o outro (formato interno
 // diferente por baixo: object store do IndexedDB aqui, tabela SQL lá).
-function productToCsvRow(p) {
+function productToCsvRow(p, supplierNameById) {
   return {
     barcode: p.barcode,
     name: p.name,
@@ -685,12 +686,19 @@ function productToCsvRow(p) {
     costPrice: p.costPrice,
     quantity: p.quantity,
     minStock: p.minStock,
+    supplierName: p.supplierId ? (supplierNameById.get(p.supplierId) || '') : '',
+    active: p.active ? 'sim' : 'não',
     expiryDate: p.expiryDate || '',
     expiryPromoDays: p.expiryPromoDays ?? '',
     promoPrice: p.promoPrice ?? '',
     customForms: p.unit === CUSTOM_UNIT_VALUE && p.customForms ? JSON.stringify(p.customForms) : '',
   };
 }
+
+// Valores que a coluna "active" reconhece como "inativo" — qualquer outra
+// coisa (incluindo em branco) vira ativo, o mesmo padrão de "+ Novo
+// produto" (todo produto novo nasce ativo por padrão).
+const INACTIVE_MARKERS = new Set(['não', 'nao', 'false', '0', 'inativo']);
 
 /** Processa cada linha em SEQUÊNCIA, nunca em paralelo — evita que duas
  * linhas com o MESMO código de barras (planilha com duplicata por engano)
@@ -706,6 +714,13 @@ async function importCsvRows(ctx, rows) {
   const created = [];
   const updated = [];
   const errors = [];
+  const warnings = [];
+  const canToggleActive = userCan(ctx.user, 'toggleProduct');
+  // Buscado uma vez só (não a cada linha) — casamento por NOME é
+  // case-insensitive/trim, já que é gente digitando numa planilha, não um
+  // valor escolhido de um <select> como no cadastro manual.
+  const suppliers = await listSuppliers();
+  const supplierIdByName = new Map(suppliers.map((s) => [s.nome.trim().toLowerCase(), s.id]));
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNum = i + 2; // linha 1 do arquivo é o cabeçalho
@@ -721,8 +736,15 @@ async function importCsvRows(ctx, rows) {
       if (unit === CUSTOM_UNIT_VALUE && row.customForms) {
         try { customForms = JSON.parse(row.customForms); } catch { throw new Error('coluna customForms com JSON inválido'); }
       }
+      const supplierNameRaw = (row.supplierName || '').trim();
+      let supplierId = null;
+      if (supplierNameRaw) {
+        supplierId = supplierIdByName.get(supplierNameRaw.toLowerCase()) || null;
+        if (!supplierId) warnings.push({ rowNum, barcode, message: `fornecedor "${supplierNameRaw}" não encontrado — deixado em branco` });
+      }
+      const wantActive = !INACTIVE_MARKERS.has((row.active || '').trim().toLowerCase());
       const data = {
-        barcode, name, category, unit, customForms,
+        barcode, name, category, unit, customForms, supplierId,
         customUnitLabel: row.customUnitLabel || '',
         price: row.price, costPrice: row.costPrice,
         minStock: row.minStock,
@@ -733,6 +755,10 @@ async function importCsvRows(ctx, rows) {
       const existing = await getByBarcode(barcode);
       if (existing) {
         await updateProduct(existing.id, data);
+        if (wantActive !== existing.active) {
+          if (canToggleActive) await setProductActive(existing.id, wantActive);
+          else warnings.push({ rowNum, barcode, message: 'sem permissão para ativar/inativar — status mantido' });
+        }
         updated.push({ rowNum, barcode, name });
       } else {
         const record = await createProduct(data);
@@ -742,6 +768,10 @@ async function importCsvRows(ctx, rows) {
             productId: record.id, type: 'entrada', qty: quantity,
             userId: ctx.user.id, userName: ctx.user.nome, note: 'Estoque inicial via importação CSV',
           });
+        }
+        if (!wantActive) {
+          if (canToggleActive) await setProductActive(record.id, false);
+          else warnings.push({ rowNum, barcode, message: 'sem permissão para ativar/inativar — produto criado ativo' });
         }
         created.push({ rowNum, barcode, name });
       }
@@ -757,15 +787,15 @@ async function importCsvRows(ctx, rows) {
       entity: 'inventory', entityId: '',
     });
   }
-  return { created, updated, errors };
+  return { created, updated, errors, warnings };
 }
 
-function showImportSummary({ created, updated, errors }) {
+function showImportSummary({ created, updated, errors, warnings }) {
   openModal({
     title: 'Resultado da importação',
     submitLabel: 'Fechar',
     singleButton: true,
-    wide: errors.length > 0,
+    wide: errors.length > 0 || warnings.length > 0,
     bodyHtml: `
       <p><strong>${created.length}</strong> produto(s) criado(s), <strong>${updated.length}</strong> atualizado(s)${errors.length > 0 ? `, <strong>${errors.length}</strong> linha(s) com erro` : ''}.</p>
       ${updated.length > 0 ? '<p class="text-muted" style="font-size:13px;">Produtos que já existiam (mesmo código de barras) tiveram só o cadastro atualizado — o estoque atual de cada um não foi alterado.</p>' : ''}
@@ -775,6 +805,17 @@ function showImportSummary({ created, updated, errors }) {
             <thead><tr><th>Linha</th><th>Código de barras</th><th>Erro</th></tr></thead>
             <tbody>
               ${errors.map((e) => `<tr><td>${e.rowNum}</td><td>${escapeHtml(e.barcode || '—')}</td><td>${escapeHtml(e.message)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+      ${warnings.length > 0 ? `
+        <p class="text-muted" style="font-size:13px;margin-top:10px;">${warnings.length} aviso(s) — o produto foi processado mesmo assim, só com essa ressalva:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Linha</th><th>Código de barras</th><th>Aviso</th></tr></thead>
+            <tbody>
+              ${warnings.map((w) => `<tr><td>${w.rowNum}</td><td>${escapeHtml(w.barcode || '—')}</td><td>${escapeHtml(w.message)}</td></tr>`).join('')}
             </tbody>
           </table>
         </div>
