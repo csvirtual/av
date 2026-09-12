@@ -128,6 +128,11 @@ repo (ver `server.js`).
 - `demo-fase*.cjs` — scripts que dirigem a UI de teste via Playwright pra
   gerar as capturas em `demo-screenshots/`, prova visual de cada fase
   funcionando com duas máquinas isoladas vendo o mesmo dado.
+- `test-css-parity.cjs` — guarda-corpo de **paridade visual** com a extensão
+  (ver `CLAUDE.md` na raiz do repo pra regra completa). Diferente dos
+  outros `test-*.cjs`: não sobe servidor nenhum, só lê os dois arquivos CSS
+  e compara. Rodar antes de qualquer commit que toque `public/css/styles.css`:
+  `node test-css-parity.cjs`.
 
 ## Próximo passo recomendado
 
