@@ -103,6 +103,7 @@ export async function renderUsers(container, ctx) {
           </tbody>
         </table>
       </div>
+      ${renderCards(users)}
     `;
 
     tableBox.querySelectorAll('[data-edit]').forEach((btn) => {
@@ -114,7 +115,118 @@ export async function renderUsers(container, ctx) {
     tableBox.querySelectorAll('[data-reset]').forEach((btn) => {
       btn.addEventListener('click', () => openResetModal(users.find((u) => u.id === btn.dataset.reset)));
     });
+    tableBox.querySelectorAll('[data-options]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const user = users.find((u) => u.id === btn.dataset.options);
+        if (openOptionsMenu?.triggerBtn === btn) { closeOptionsMenu(); return; }
+        openOptionsMenuFor(cardSheetItems(user), btn);
+      });
+    });
   }
+
+  /** Contrapartida em cartão da tabela, pro breakpoint de celular/tablet
+   * retrato (ver @media 860px em styles.css). "Editar" é a ação mais
+   * relevante quando existe (some pro Administrador e pra você mesmo, ver
+   * condição igual à da tabela acima) — fica como botão direto; o resto
+   * (Redefinir senha, sempre disponível, + Desativar/Reativar) entra no
+   * menu "Opções" só quando sobra mais de 1 ação, senão fica igual à
+   * tabela: um botão direto só. */
+  function cardSheetItems(u) {
+    const canEdit = !isAdmin(u) && u.id !== ctx.user.id;
+    const canToggle = !isAdmin(u);
+    const items = [];
+    if (canEdit) items.push({ label: 'Redefinir senha', run: () => openResetModal(u) });
+    if (canToggle) items.push({ label: u.active ? 'Desativar' : 'Reativar', danger: u.active, run: () => toggleUser(u) });
+    return items;
+  }
+
+  function renderCards(users) {
+    if (users.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${users.map((u) => {
+          const canEdit = !isAdmin(u) && u.id !== ctx.user.id;
+          const sheetItems = cardSheetItems(u);
+          const directLabel = canEdit ? 'Editar' : 'Redefinir senha';
+          const directAttr = canEdit ? `data-edit="${u.id}"` : `data-reset="${u.id}"`;
+          return `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(u.nome)}<small>@${escapeHtml(u.username)}</small></div>
+              ${u.active ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Perfil</div><div class="f-value">${isAdmin(u) ? '<span class="badge badge-gold">Administrador</span>' : '<span class="badge badge-green">Vendedor</span>'}</div></div>
+              <div><div class="f-label">Cadastrado em</div><div class="f-value">${formatDateTime(u.createdAt)}</div></div>
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" ${directAttr}>${directLabel}</button>
+              ${sheetItems.length > 0 ? `<button class="btn btn-ghost btn-kebab" data-options="${u.id}" aria-label="Opções">⋮</button>` : ''}
+            </div>
+          </div>
+        `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // Mesmo mecanismo de views/products.js#openOptionsMenuFor (ver comentário
+  // lá) — só que os itens já vêm prontos de fora (cardSheetItems acima),
+  // em vez de montados aqui dentro, porque cada linha de Usuários tem uma
+  // combinação diferente de ações conforme for Administrador/você
+  // mesmo/outro vendedor.
+  let openOptionsMenu = null;
+
+  function closeOptionsMenu() {
+    if (!openOptionsMenu) return;
+    openOptionsMenu.menuEl.remove();
+    openOptionsMenu.scrimEl.remove();
+    openOptionsMenu = null;
+  }
+
+  function createOptionsScrim() {
+    const scrim = document.createElement('div');
+    scrim.className = 'row-options-scrim';
+    document.body.appendChild(scrim);
+    return scrim;
+  }
+
+  function openOptionsMenuFor(items, triggerBtn) {
+    closeOptionsMenu();
+    if (items.length === 0) return;
+
+    const scrim = createOptionsScrim();
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item${item.danger ? ' danger' : ''}" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
+  }
+
+  function closeOptionsMenuOnOutsideClick(e) {
+    if (openOptionsMenu && !openOptionsMenu.menuEl.contains(e.target)) closeOptionsMenu();
+  }
+  document.addEventListener('click', closeOptionsMenuOnOutsideClick);
+  window.addEventListener('scroll', closeOptionsMenu, true);
 
   function openEditUserModal(user) {
     openModal({
@@ -283,4 +395,12 @@ export async function renderUsers(container, ctx) {
   });
 
   refresh();
+
+  // Limpeza do listener em document/window do menu "Opções" — mesmo padrão
+  // de views/products.js#openOptionsMenuFor (ver comentário lá).
+  return () => {
+    document.removeEventListener('click', closeOptionsMenuOnOutsideClick);
+    window.removeEventListener('scroll', closeOptionsMenu, true);
+    closeOptionsMenu();
+  };
 }
