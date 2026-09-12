@@ -25,9 +25,10 @@ test.describe('Estoque — Exportar/Importar CSV', () => {
     }, { productId });
     await goTo(page, '#/estoque');
 
+    await page.click('#csv-menu-btn');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.click('#export-csv-btn'),
+      page.click('.row-options-item:has-text("Exportar CSV")'),
     ]);
     const path = await download.path();
     const text = require('fs').readFileSync(path, 'utf-8').replace(/^﻿/, '');

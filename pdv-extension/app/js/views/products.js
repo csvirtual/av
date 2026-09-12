@@ -96,8 +96,7 @@ export async function renderProducts(container, ctx) {
         <div class="desc">Material de construção e mercearia — visão geral do que a loja tem disponível.</div>
       </div>
       <div class="page-actions">
-        <button class="btn btn-secondary" id="export-csv-btn">Exportar CSV</button>
-        ${canManageProducts ? '<button class="btn btn-secondary" id="import-csv-btn">Importar CSV</button>' : ''}
+        <button class="btn btn-secondary" id="csv-menu-btn">CSV ▾</button>
         ${canAdjustStock ? '<button class="btn btn-secondary" id="inventory-btn">Fazer inventário</button>' : ''}
         ${canManageProducts ? '<button class="btn" id="new-product-btn">+ Novo produto</button>' : ''}
       </div>
@@ -229,40 +228,52 @@ export async function renderProducts(container, ctx) {
   // 'manageProducts' — é só leitura, mesmo raciocínio de relatórios). Exporta
   // o catálogo INTEIRO (ativos e inativos), ignorando o filtro atual da tela
   // — é uma cópia de backup/migração, não "o que está sendo olhado agora".
-  document.getElementById('export-csv-btn').addEventListener('click', async () => {
+  async function runExportCsv() {
     const [all, suppliers] = await Promise.all([listProducts(), listSuppliers()]);
     const supplierNameById = new Map(suppliers.map((s) => [s.id, s.nome]));
     const csv = stringifyCsv(PRODUCT_CSV_COLUMNS, all.map((p) => productToCsvRow(p, supplierNameById)));
     downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
+  const csvFileInput = document.getElementById('csv-import-input');
+  const csvProgressBox = document.getElementById('csv-import-progress');
+  function runImportCsv() { csvFileInput.click(); }
+  csvFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // permite escolher o MESMO arquivo de novo depois (ex: corrigir e reimportar)
+    if (!file) return;
+    csvProgressBox.hidden = false;
+    csvProgressBox.textContent = 'Importando…';
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) {
+        showToast('Arquivo CSV vazio ou sem linhas de dado.', 'error');
+        return;
+      }
+      const result = await importCsvRows(ctx, rows);
+      showImportSummary(result);
+      await refresh();
+    } catch (err) {
+      showToast(err.message || 'Falha ao ler o arquivo CSV.', 'error');
+    } finally {
+      csvProgressBox.hidden = true;
+    }
   });
 
-  if (canManageProducts) {
-    const fileInput = document.getElementById('csv-import-input');
-    const progressBox = document.getElementById('csv-import-progress');
-    document.getElementById('import-csv-btn').addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      e.target.value = ''; // permite escolher o MESMO arquivo de novo depois (ex: corrigir e reimportar)
-      if (!file) return;
-      progressBox.hidden = false;
-      progressBox.textContent = 'Importando…';
-      try {
-        const text = await file.text();
-        const rows = parseCsv(text);
-        if (rows.length === 0) {
-          showToast('Arquivo CSV vazio ou sem linhas de dado.', 'error');
-          return;
-        }
-        const result = await importCsvRows(ctx, rows);
-        showImportSummary(result);
-        await refresh();
-      } catch (err) {
-        showToast(err.message || 'Falha ao ler o arquivo CSV.', 'error');
-      } finally {
-        progressBox.hidden = true;
-      }
-    });
-  }
+  // Um botão só ("CSV ▾") em vez de dois separados — achado do usuário: com
+  // os 4 botões do cabeçalho (export, import, inventário, novo produto)
+  // lado a lado, título + descrição + botões não cabiam mais numa linha só
+  // em telas comuns, e a faixa de botões inteira caía pra debaixo do
+  // título (`.page-header` tem `flex-wrap: wrap`). Reaproveita o mesmo
+  // menu suspenso de "Opções" de cada linha (mesmo estado `openOptionsMenu`,
+  // mesmas classes `.row-options-menu`/`.row-options-item`, mesmo fechamento
+  // por clique fora), só que ancorado no botão do cabeçalho.
+  document.getElementById('csv-menu-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (openOptionsMenu?.triggerBtn === e.currentTarget) { closeOptionsMenu(); return; }
+    openCsvMenu(e.currentTarget);
+  });
 
   function wireRowActions(products) {
     tableBox.querySelectorAll('[data-options]').forEach((btn) => {
@@ -334,6 +345,39 @@ export async function renderProducts(container, ctx) {
     menu.style.left = `${rect.right - menu.offsetWidth}px`;
     // Linha perto do rodapé da tela: o menu nasceria cortado embaixo —
     // reabre pra CIMA do botão em vez de embaixo, só nesse caso.
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, triggerBtn };
+  }
+
+  // Mesmo mecanismo de openOptionsMenuFor acima, só que com 2 itens fixos
+  // (exportar sempre disponível, importar só com 'manageProducts') em vez
+  // de montados por produto.
+  function openCsvMenu(triggerBtn) {
+    closeOptionsMenu();
+    const items = [{ label: 'Exportar CSV', run: runExportCsv }];
+    if (canManageProducts) items.push({ label: 'Importar CSV', run: runImportCsv });
+
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
     if (menu.getBoundingClientRect().bottom > window.innerHeight) {
       menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
     }
