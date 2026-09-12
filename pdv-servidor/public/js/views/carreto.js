@@ -54,6 +54,30 @@ export async function renderCarreto(container, ctx) {
     renderTable(filtered);
   }
 
+  function renderCards(list) {
+    if (list.length === 0) return '';
+    return `
+      <div class="card-stack">
+        ${list.map((d) => `
+          <div class="row-card">
+            <div class="row-card-head">
+              <div class="row-card-title">${escapeHtml(d.customerName)}<small>${formatDateTime(d.createdAt)}</small></div>
+              ${STATUS_BADGE[d.status]}
+            </div>
+            <div class="row-card-meta">
+              <div><div class="f-label">Endereço</div><div class="f-value">${escapeHtml(d.address || '—')}</div></div>
+              <div><div class="f-label">Itens</div><div class="f-value">${d.items.length}</div></div>
+              <div><div class="f-label">Responsável</div><div class="f-value">${escapeHtml(d.responsible || '—')}</div></div>
+            </div>
+            <div class="row-card-actions">
+              <button class="btn btn-ghost" data-detail="${d.id}">Ver itens</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderTable(list) {
     if (list.length === 0) {
       tableBox.innerHTML = '<div class="table-wrap"><div class="table-empty">Nenhum carreto encontrado para o filtro selecionado.</div></div>';
@@ -84,6 +108,7 @@ export async function renderCarreto(container, ctx) {
           </tbody>
         </table>
       </div>
+      ${renderCards(visible)}
       ${paginationHtml({ page: pgState.page, pageSize: pgState.pageSize, total })}
     `;
     tableBox.querySelectorAll('[data-detail]').forEach((btn) => {
