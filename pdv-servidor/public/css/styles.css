@@ -1000,6 +1000,24 @@ tbody tr:hover { background: var(--surface-alt); }
 }
 .row-options-item:hover { background: var(--surface-alt); }
 .row-options-item.danger { color: var(--danger); }
+/* Fundo escurecido atrás do menu "Opções" — some no desktop (`display:
+ * none`), só existe visualmente em telas estreitas (ver @media 860px
+ * abaixo, onde o menu vira folha inferior). Criado/removido junto com o
+ * próprio menu em cada views/*.js#openOptionsMenuFor — ver comentário lá. */
+.row-options-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  display: none;
+  background: rgba(15, 25, 20, 0.45);
+}
+
+/* Grade de cartões que substitui a tabela em tela estreita (ver @media
+ * 860px abaixo) — escondida por padrão aqui fora do media: sem isto, um
+ * <div> sem nenhum display declarado nasce `block` (visível) por padrão,
+ * e a grade de cartões apareceria JUNTO da tabela em qualquer largura,
+ * não só abaixo do corte. */
+.card-stack { display: none; }
 
 /* Paginação numerada + seletor de quantidade (ver components/pagination.js) */
 .pagination-bar { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 16px; }
@@ -1945,6 +1963,79 @@ input.customer-search-input:focus {
     box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.18);
   }
   .table-wrap table td.table-actions-col { background-color: inherit; }
+}
+
+/* ---------- ~860px: tabela vira cartão (celular + tablet retrato) ----------
+ * Refatoração pedida pelo usuário depois de tentar só "consertar" a tabela
+ * em tela estreita (sticky column acima): em vez de espremer 6+ colunas
+ * numa faixa de 320-430px, cada LINHA vira um CARTÃO — nome em destaque,
+ * status como selo, só os 2-3 dados que importam de relance, ação sempre
+ * inteira (nunca sticky disputando espaço com o resto). Cada tela migra
+ * pra esse padrão aos poucos (ver o container específico, ex:
+ * #products-table abaixo); o que ainda não migrou continua na tabela de
+ * sempre, sticky column incluída — nada quebra no meio da migração.
+ *
+ * O corte de largura é só onde a densidade de tabela deixa de compensar:
+ * ~860px cobre celular (qualquer tamanho) e tablet em pé (768/820px);
+ * tablet deitado (1024px) pra cima continua com a tabela de sempre. */
+@media (max-width: 860px) {
+  /* O mesmo menu "Opções" (ver views/*.js#openOptionsMenuFor) vira folha
+   * inferior aqui — sempre largura cheia, alvo de toque grande, gesto
+   * nativo de celular — em vez de flutuar ancorado num botão pequeno que
+   * podia nascer cortado perto da borda da tela. O JS que cria/posiciona
+   * o menu não muda nada: `!important` aqui sobrescreve o `top`/`left`
+   * que ele grava inline (ver comentário em openOptionsMenuFor sobre por
+   * que a posição é calculada em JS, não em CSS puro — continua válido
+   * pra telas largas, só que agora tem um "modo celular" por cima). */
+  .row-options-scrim { display: block; }
+  .row-options-menu {
+    position: fixed !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto;
+    min-width: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+  }
+  .row-options-item { padding: 13px 14px; font-size: 14.5px; }
+
+  /* Grade de cartões: 1 coluna em celular, 2 em tablet retrato — sozinha,
+   * sem media query extra, porque minmax(280px, 1fr) já força isso pela
+   * largura disponível (280×2 + gap não cabe abaixo de ~600px). Cada tela
+   * usa as MESMAS classes (.card-stack/.row-card/...) — só o conteúdo de
+   * dentro muda por tela, ver a função de render correspondente. */
+  .card-stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .row-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 13px 14px; position: relative; overflow: hidden;
+  }
+  /* Mesmo espírito de .low-stock-row na tabela — nunca um fundo inteiro
+   * (destoava demais num cartão pequeno), uma faixa na borda basta. */
+  .row-card.low-stock { border-left: 4px solid var(--danger); padding-left: 11px; }
+  .row-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .row-card-title { font-weight: 700; font-size: 14.5px; line-height: 1.3; }
+  .row-card-title small { display: block; font-weight: 500; font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+  .row-card-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px 12px; margin-bottom: 12px; }
+  /* min-width:0 deixa a coluna da grade encolher/quebrar em vez de
+   * empurrar o cartão pra fora da tela quando o conteúdo é comprido (ex:
+   * um selo "Próximo da validade" numa faixa de 92px). */
+  .row-card-meta > div { min-width: 0; }
+  .row-card-meta .f-label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); font-weight: 700; }
+  .row-card-meta .f-value { font-size: 13.5px; font-weight: 600; margin-top: 2px; }
+  .row-card-meta .badge { white-space: normal; text-align: left; }
+  .row-card-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .row-card-actions .btn { flex: 1; padding: 9px 10px; font-size: 12.5px; }
+  .row-card-actions .btn-kebab { flex: 0 0 auto; width: 38px; padding: 0; }
+
+  /* Estoque: tabela sai, cartões entram. Escopado no container da tela
+   * (não em .table-wrap/.card-stack soltos) de propósito — outras telas
+   * ainda não migradas continuam mostrando a tabela normalmente aqui
+   * dentro, sem essa regra as afetar por engano. */
+  #products-table .table-wrap { display: none; }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */

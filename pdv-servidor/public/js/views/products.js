@@ -167,9 +167,11 @@ export async function renderProducts(container, ctx) {
     if (pgState.page > totalPages) pgState.page = totalPages;
     const start = (pgState.page - 1) * pgState.pageSize;
     const visible = products.slice(start, start + pgState.pageSize);
+    const flags = { canManageProducts, canAdjustStock, canToggleProduct, canDeleteProduct };
     tableBox.innerHTML = `
       ${total > 0 ? `<div class="utility-bar"><span class="text-muted" style="font-size:13px;">${total} produto(s)</span></div>` : ''}
-      ${renderTable(visible, { canManageProducts, canAdjustStock, canToggleProduct, canDeleteProduct })}
+      ${renderTable(visible, flags)}
+      ${renderCards(visible, flags)}
       ${paginationHtml({ page: pgState.page, pageSize: pgState.pageSize, total })}
     `;
     wireRowActions(products);
@@ -310,7 +312,21 @@ export async function renderProducts(container, ctx) {
   function closeOptionsMenu() {
     if (!openOptionsMenu) return;
     openOptionsMenu.menuEl.remove();
+    openOptionsMenu.scrimEl.remove();
     openOptionsMenu = null;
+  }
+
+  // Fundo escurecido atrás do menu — só aparece de verdade em telas
+  // estreitas (ver .row-options-scrim no CSS, @media 860px, onde o menu
+  // vira folha inferior); em tela larga fica presente no DOM mas invisível
+  // (display:none), sem custo. Criado uma vez por abertura de menu — tanto
+  // openOptionsMenuFor quanto openCsvMenu chamam isto antes de montar o
+  // próprio menu.
+  function createOptionsScrim() {
+    const scrim = document.createElement('div');
+    scrim.className = 'row-options-scrim';
+    document.body.appendChild(scrim);
+    return scrim;
   }
 
   function openOptionsMenuFor(product, triggerBtn) {
@@ -322,6 +338,7 @@ export async function renderProducts(container, ctx) {
     if (canDeleteProduct) items.push({ label: 'Excluir', danger: true, run: () => removeProduct(product) });
     if (items.length === 0) return;
 
+    const scrim = createOptionsScrim();
     const menu = document.createElement('div');
     menu.className = 'row-options-menu';
     menu.innerHTML = items.map((item, idx) => `
@@ -355,7 +372,7 @@ export async function renderProducts(container, ctx) {
       });
     });
 
-    openOptionsMenu = { menuEl: menu, triggerBtn };
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
   }
 
   // Mesmo mecanismo de openOptionsMenuFor acima, só que com 2 itens fixos
@@ -366,6 +383,7 @@ export async function renderProducts(container, ctx) {
     const items = [{ label: 'Exportar CSV', run: runExportCsv }];
     if (canManageProducts) items.push({ label: 'Importar CSV', run: runImportCsv });
 
+    const scrim = createOptionsScrim();
     const menu = document.createElement('div');
     menu.className = 'row-options-menu';
     menu.innerHTML = items.map((item, idx) => `
@@ -388,7 +406,7 @@ export async function renderProducts(container, ctx) {
       });
     });
 
-    openOptionsMenu = { menuEl: menu, triggerBtn };
+    openOptionsMenu = { menuEl: menu, scrimEl: scrim, triggerBtn };
   }
 
   // Fecha o menu com um clique em qualquer outro lugar da tela, ou ao
@@ -1437,6 +1455,38 @@ function renderTable(products, flags) {
           `).join('')}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+/** Contrapartida em cartão de renderTable, pro breakpoint de celular/tablet
+ * retrato (ver @media 860px em styles.css) — mesmos dados, mesmos
+ * `data-history`/`data-options` (wireRowActions já os pega automaticamente,
+ * tabela e cartão juntos, sem precisar de fiação própria). Só existe
+ * visualmente abaixo de 860px; o CSS que decide qual dos dois aparece. */
+function renderCards(products, flags) {
+  const { canManageProducts, canAdjustStock, canToggleProduct, canDeleteProduct } = flags;
+  const hasAnyOption = canManageProducts || canAdjustStock || canToggleProduct || canDeleteProduct;
+  if (products.length === 0) return '';
+  return `
+    <div class="card-stack">
+      ${products.map((p) => `
+        <div class="row-card${p.active && p.quantity <= p.minStock ? ' low-stock' : ''}">
+          <div class="row-card-head">
+            <div class="row-card-title">${escapeHtml(p.name)}<small>${p.barcodeIsInternal ? 'código interno' : escapeHtml(p.barcode)}</small></div>
+            ${statusBadge(p)}
+          </div>
+          <div class="row-card-meta">
+            <div><div class="f-label">Categoria</div><div class="f-value">${categoryLabel(p.category)}</div></div>
+            <div><div class="f-label">Preço</div><div class="f-value">${priceCell(p)}</div></div>
+            <div><div class="f-label">Estoque</div><div class="f-value">${formatQty(p.quantity)} ${escapeHtml(displayUnit(p))}</div></div>
+          </div>
+          <div class="row-card-actions">
+            <button class="btn btn-ghost" data-history="${p.id}">Histórico</button>
+            ${hasAnyOption ? `<button class="btn btn-ghost btn-kebab" data-options="${p.id}" aria-label="Opções">⋮</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
     </div>
   `;
 }
