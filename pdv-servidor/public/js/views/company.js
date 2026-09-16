@@ -169,7 +169,7 @@ export async function renderCompany(container, ctx) {
           <div class="radio-field-row">
             <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
               <input type="radio" name="caixaMode" id="caixaModeUnico" value="unico" ${caixaConfig.caixaMode !== 'porOperador' ? 'checked' : ''}>
-              Único (um caixa aberto por vez, pra loja toda)
+              Único (um caixa aberto para toda a loja)
             </label>
           </div>
           <div class="radio-field-row" style="margin-bottom:6px;">
