@@ -289,6 +289,19 @@ select, input[type="date"] {
 }
 .delete-btn:hover { background: var(--danger); color: #fff; }
 
+.keygen-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.keygen-btn:hover { background: var(--surface-alt); }
+
 /* Canto inferior direito, mesmo padrão de public/css/styles.css
    #toast-root (o resto do PDV inteiro usa esse canto) — não o superior,
    que além de fugir do padrão colidia visualmente com o botão de tema. */

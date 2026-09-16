@@ -224,6 +224,46 @@
   }
   adminUsernameEl.addEventListener('click', openAccountModal);
 
+  // Achado do usuário: quis um "gerador de chaves" dentro do painel — mas
+  // a chave PRIVADA nunca pode morar num servidor exposto na internet
+  // (quem invadir o painel forjaria chave válida pra qualquer CNPJ, sem
+  // limite e sem deixar rastro). O meio-termo combinado: nenhuma chave
+  // nasce aqui, só um atalho pra copiar o CNPJ certo da loja certa, pra
+  // colar na ferramenta local (fora deste sistema) que já gera as chaves.
+  function openKeygenModal(tenant) {
+    const cnpj = tenant.cnpj || '';
+    openModal({
+      title: 'Copiar dados p/ gerar chave',
+      submitLabel: cnpj ? 'Copiar CNPJ' : 'Fechar',
+      singleButton: !cnpj,
+      bodyHtml: `
+        <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px;line-height:1.5;">
+          A chave de ativação é gerada numa ferramenta separada, no seu computador — por segurança, nunca aqui no painel.
+          ${cnpj ? 'Copie o CNPJ abaixo e cole lá.' : 'Essa loja ainda não cadastrou um CNPJ (a própria loja precisa preencher em "Dados da loja" antes).'}
+        </p>
+        <div class="field">
+          <label>Loja</label>
+          <input type="text" value="${escapeHtml(tenant.nomeFantasia || tenant.razaoSocial || tenant.slug)}" readonly>
+        </div>
+        ${cnpj ? `
+          <div class="field">
+            <label>CNPJ</label>
+            <input type="text" class="keygen-cnpj-input" value="${escapeHtml(cnpj)}" readonly>
+          </div>
+        ` : ''}
+      `,
+      onSubmit: async () => {
+        if (!cnpj) return true;
+        try {
+          await navigator.clipboard.writeText(cnpj);
+          toast('CNPJ copiado.', 'success');
+        } catch {
+          toast('Não deu pra copiar automaticamente — selecione o CNPJ e copie manualmente.', 'error');
+        }
+      },
+    });
+  }
+
   function dateInputValue(expiresAt) {
     if (!expiresAt) return '';
     const d = new Date(expiresAt);
@@ -239,6 +279,8 @@
       row.querySelector('.tenant-slug').textContent = tenant.slug;
       row.querySelector('.tenant-cnpj').textContent = tenant.cnpj || '-';
       row.querySelector('.tenant-created').textContent = tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('pt-BR') : '-';
+
+      row.querySelector('.keygen-btn').addEventListener('click', () => openKeygenModal(tenant));
 
       const statusSelect = row.querySelector('.tenant-status');
       for (const status of validStatuses) {
