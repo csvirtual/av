@@ -432,11 +432,21 @@
   // quando chega a zero.
   const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
   let lockoutTimer = null;
+  // Achado do usuário: proteção contra força bruta — cada novo bloqueio
+  // (lib/loginLockout.js#PROGRESSIVE_NAMESPACES) dobra de duração a partir
+  // do anterior, podendo passar bem de 60s. Formata em minutos quando
+  // passa de 1 minuto, senão "612s" fica ilegível na tela.
+  function formatCountdown(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return sec > 0 ? `${min}min ${sec}s` : `${min}min`;
+  }
   function startLockoutCountdown(remainingMs) {
     if (lockoutTimer) clearInterval(lockoutTimer);
     let remaining = Math.ceil(remainingMs / 1000);
     loginSubmitBtn.disabled = true;
-    const render = () => { loginError.textContent = `Muitas tentativas incorretas. Aguarde ${remaining}s antes de tentar de novo.`; };
+    const render = () => { loginError.textContent = `Muitas tentativas incorretas. Aguarde ${formatCountdown(remaining)} antes de tentar de novo.`; };
     render();
     lockoutTimer = setInterval(() => {
       remaining -= 1;

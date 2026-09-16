@@ -9,7 +9,20 @@
 const MAX_ATTEMPTS = 2;
 const LOCK_DURATION_MS = 60 * 1000;
 
-const state = new Map(); // "namespace:usernameLower" -> { failedAttempts, lockedUntil }
+// Achado do usuário: o Painel de Controle (admin.<domínio>) fica exposto na
+// internet, diferente do login normal da loja (rede interna) — um
+// bloqueio fixo de 60s não desanima um ataque de força bruta de verdade,
+// só o deixa mais lento. Nesses namespaces, cada NOVO bloqueio (depois que
+// o anterior já venceu e a pessoa errou de novo) dobra de duração a partir
+// do último — 60s, 2min, 4min, 8min... até o teto abaixo — em vez de
+// voltar sempre pro mesmo 60s. Escopado por namespace (não pro login da
+// loja nem pras confirmações de senha pontuais, ver comentário de keyFor)
+// porque escalar ali também puniria um vendedor comum que só errou a
+// senha por engano, sem ataque nenhum por trás.
+const PROGRESSIVE_NAMESPACES = new Set(['platform-admin']);
+const MAX_LOCK_DURATION_MS = 30 * 60 * 1000;
+
+const state = new Map(); // "namespace:usernameLower" -> { failedAttempts, lockedUntil, lockCount }
 
 // Achado de auditoria (Fase 9, ao portar passwordConfirm.js): sem
 // `namespace`, um vendedor errando a senha de admin 2x no modal de
@@ -42,17 +55,26 @@ export function getLoginLockState(username, namespace) {
 
 /** Registra uma tentativa incorreta e devolve o novo estado. Ao atingir
  * MAX_ATTEMPTS, calcula o bloqueio; se o bloqueio anterior já tinha vencido,
- * começa a contagem de novo. */
+ * começa a contagem de novo (com duração maior que da última vez, nos
+ * namespaces em PROGRESSIVE_NAMESPACES — ver comentário lá em cima). */
 export function recordFailedLogin(username, namespace) {
   const key = keyFor(username, namespace);
-  const prev = state.get(key) || { failedAttempts: 0, lockedUntil: null };
+  const prev = state.get(key) || { failedAttempts: 0, lockedUntil: null, lockCount: 0 };
   const activelyLocked = prev.lockedUntil && prev.lockedUntil > Date.now();
   if (activelyLocked) return toState(prev); // defensivo — não deveria ser alcançável normalmente
 
   const lockExpired = !!(prev.lockedUntil && prev.lockedUntil <= Date.now());
   const failedAttempts = lockExpired ? 1 : (prev.failedAttempts || 0) + 1;
-  const lockedUntil = failedAttempts >= MAX_ATTEMPTS ? Date.now() + LOCK_DURATION_MS : null;
-  const next = { failedAttempts, lockedUntil };
+  let lockCount = prev.lockCount || 0;
+  let lockedUntil = null;
+  if (failedAttempts >= MAX_ATTEMPTS) {
+    lockCount += 1;
+    const duration = PROGRESSIVE_NAMESPACES.has(namespace)
+      ? Math.min(LOCK_DURATION_MS * 2 ** (lockCount - 1), MAX_LOCK_DURATION_MS)
+      : LOCK_DURATION_MS;
+    lockedUntil = Date.now() + duration;
+  }
+  const next = { failedAttempts, lockedUntil, lockCount };
   state.set(key, next);
   return toState(next);
 }
