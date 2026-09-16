@@ -111,7 +111,7 @@ try {
   setTenantStatus(slugExpirado, 'ativo', new Date(Date.now() - 86400000).toISOString());
   const expiradoResp = await request(`${slugExpirado}.${DOMAIN}`, { reqPath: '/api/status' });
   check('loja "ativo" com expires_at no passado é bloqueada com 403', expiradoResp.status === 403, expiradoResp.status);
-  check('mensagem de bloqueio menciona expiração', /expirou/i.test(expiradoResp.body?.error || ''), JSON.stringify(expiradoResp.body));
+  check('mensagem de bloqueio menciona vencimento', /vencida/i.test(expiradoResp.body?.error || ''), JSON.stringify(expiradoResp.body));
 
   // Ativo com vencimento no futuro — continua liberado.
   setTenantStatus(slugAtivoOk, 'ativo', new Date(Date.now() + 30 * 86400000).toISOString());

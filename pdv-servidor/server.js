@@ -142,9 +142,9 @@ function resolveTenantRowFromHostname(hostname) {
 // bloqueia Host desconhecido (etapa 3) — sem precisar de outra chamada
 // de rede nem duplicar a checagem em cada rota.
 function tenantAccessBlockedReason(tenant) {
-  if (tenant.status === 'cancelado') return 'Esta loja foi cancelada. Entre em contato com o suporte.';
-  if (tenant.status === 'suspenso') return 'Esta loja está com a assinatura suspensa. Entre em contato com o suporte.';
-  if (tenant.expires_at != null && Date.now() > tenant.expires_at) return 'A assinatura desta loja expirou. Entre em contato com o suporte.';
+  if (tenant.status === 'cancelado') return 'Assinatura cancelada.';
+  if (tenant.status === 'suspenso') return 'Assinatura suspensa.';
+  if (tenant.expires_at != null && Date.now() > tenant.expires_at) return 'Assinatura vencida.';
   return null;
 }
 
