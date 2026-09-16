@@ -1,10 +1,10 @@
 // Notificações rápidas no canto inferior direito da tela (sucesso/erro),
 // usadas em todas as views para dar feedback de ações (venda registrada,
-// erro de validação...). Ficam visíveis por 5s por padrão — dá pra passar
+// erro de validação...). Ficam visíveis por 7s por padrão — dá pra passar
 // uma duração diferente pra um aviso específico que precise de mais tempo.
 import { icon } from './icon.js';
 
-const DEFAULT_DURATION_MS = 5000;
+const DEFAULT_DURATION_MS = 7000;
 
 // `message` aceita uma string simples (a maioria das chamadas) OU uma
 // lista de partes — [{ text }, { icon: 'warning' }, { text }, ...] — pra
