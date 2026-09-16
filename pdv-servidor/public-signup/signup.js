@@ -41,10 +41,15 @@
         const res = await fetch(`/api/signup/check-slug/${encodeURIComponent(slug)}`);
         const data = await res.json();
         if (data.available) {
-          slugFeedback.textContent = `Disponível: ${slug}.${baseHost}`;
+          slugFeedback.textContent = 'Endereço disponível';
           slugFeedback.className = 'feedback ok';
         } else {
-          slugFeedback.textContent = data.reason || 'Este endereço não está disponível.';
+          // Achado do usuário: a razão completa (mesma frase que já
+          // aparece de novo embaixo do botão se a pessoa tentar enviar
+          // mesmo assim) ficava repetida na tela — aqui, enquanto ainda
+          // está digitando, só o rótulo curto; o motivo detalhado (já
+          // em uso, formato inválido, etc.) só precisa aparecer uma vez.
+          slugFeedback.textContent = 'Endereço indisponível';
           slugFeedback.className = 'feedback bad';
         }
       } catch {
