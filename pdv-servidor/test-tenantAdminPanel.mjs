@@ -194,6 +194,38 @@ try {
 
   const lixeiraAfterRestore = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
   check('loja restaurada some da lixeira', !lixeiraAfterRestore.body.trashed?.some((t) => t.slug === slugA), JSON.stringify(lixeiraAfterRestore.body.trashed));
+
+  // --- Lixeira: exclusão definitiva ---
+  const del2 = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir loja A de novo (pra testar a exclusão definitiva)', del2.status === 200, JSON.stringify(del2.body));
+
+  const lixeiraBeforePurge = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  const trashEntry2 = lixeiraBeforePurge.body.trashed?.find((t) => t.slug === slugA);
+  check('loja excluída de novo aparece na lixeira', !!trashEntry2, JSON.stringify(lixeiraBeforePurge.body.trashed));
+
+  const purgeNoAuth = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}` });
+  check('excluir definitivamente sem sessão retorna 401', purgeNoAuth.status === 401, purgeNoAuth.status);
+
+  const purgeNoPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie });
+  check('excluir definitivamente sem senha é rejeitado (400)', purgeNoPassword.status === 400, JSON.stringify(purgeNoPassword.body));
+
+  const purgeWrongPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie, body: { password: 'senha-errada-com-certeza' } });
+  check('excluir definitivamente com senha errada é rejeitado (400)', purgeWrongPassword.status === 400, JSON.stringify(purgeWrongPassword.body));
+
+  const stillInTrashAfterFailedPurge = fs.existsSync(path.join(__dirname, 'tenants', '_lixeira', trashEntry2.entry));
+  check('pasta continua na lixeira depois das tentativas de exclusão definitiva com senha errada/faltando', stillInTrashAfterFailedPurge, stillInTrashAfterFailedPurge);
+
+  const purge = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir definitivamente com senha certa funciona', purge.status === 200 && purge.body.ok === true, JSON.stringify(purge.body));
+
+  const goneFromDisk = !fs.existsSync(path.join(__dirname, 'tenants', '_lixeira', trashEntry2.entry));
+  check('pasta some do disco de verdade depois da exclusão definitiva', goneFromDisk, goneFromDisk);
+
+  const lixeiraAfterPurge = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  check('item purgado some da listagem da lixeira', !lixeiraAfterPurge.body.trashed?.some((t) => t.entry === trashEntry2.entry), JSON.stringify(lixeiraAfterPurge.body.trashed));
+
+  const purgeAlreadyGone = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir definitivamente uma entrada que já não existe mais é rejeitado (400)', purgeAlreadyGone.status === 400, JSON.stringify(purgeAlreadyGone.body));
 } finally {
   controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(adminUsername.toLowerCase());
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugA);

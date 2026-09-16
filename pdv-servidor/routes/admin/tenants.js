@@ -6,7 +6,7 @@
 import { Router } from 'express';
 import {
   listTenants, setTenantStatus, deleteTenant, VALID_TENANT_STATUSES,
-  listTrashedTenants, restoreTenant,
+  listTrashedTenants, restoreTenant, purgeTrashedTenant,
 } from '../../control/db.js';
 import { verifyPlatformAdminPassword } from '../../lib/platformAdminAuth.js';
 
@@ -69,6 +69,22 @@ router.post('/lixeira/:entry/restore', (req, res) => {
   try {
     const restored = restoreTenant(req.params.entry);
     res.json({ tenant: publicTenant(restored) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Exclusão DEFINITIVA — mesma reconfirmação de senha do DELETE /:slug
+// acima (namespace de bloqueio compartilhado entre as duas: são a mesma
+// classe de ação destrutiva, ver lib/platformAdminAuth.js).
+router.delete('/lixeira/:entry', async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password) throw new Error('Informe sua senha pra confirmar a exclusão definitiva.');
+    const confirmed = await verifyPlatformAdminPassword(req.platformAdmin?.username_lower, password);
+    if (!confirmed) throw new Error('Senha incorreta.');
+    purgeTrashedTenant(req.params.entry);
+    res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

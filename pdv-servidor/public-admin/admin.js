@@ -94,6 +94,39 @@
     return { close, modalEl };
   }
 
+  // Ação destrutiva + reconfirmação da PRÓPRIA senha do admin logado (mesmo
+  // raciocínio do fechamento de caixa) — usado tanto por excluir loja
+  // quanto por excluir definitivamente um item da lixeira.
+  function openPasswordConfirmModal({ title, message, submitLabel = 'Confirmar', onConfirm }) {
+    let errorEl, passwordInput;
+    openModal({
+      title,
+      danger: true,
+      submitLabel,
+      bodyHtml: `
+        <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px;line-height:1.5;">${message}</p>
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Confirme sua senha</label>
+        <input type="password" class="confirm-password-input" autocomplete="current-password" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;box-sizing:border-box;background:var(--surface);color:var(--text);">
+        <p class="confirm-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin:8px 0 0;"></p>
+      `,
+      onMount: (modalEl) => {
+        errorEl = modalEl.querySelector('.confirm-error');
+        passwordInput = modalEl.querySelector('.confirm-password-input');
+        passwordInput.focus();
+      },
+      onSubmit: async () => {
+        const password = passwordInput.value;
+        if (!password) { errorEl.textContent = 'Informe sua senha.'; return false; }
+        try {
+          await onConfirm(password);
+        } catch (err) {
+          errorEl.textContent = err.message;
+          return false;
+        }
+      },
+    });
+  }
+
   let validStatuses = ['trial', 'ativo', 'suspenso', 'cancelado'];
 
   function toast(message, kind) {
@@ -181,36 +214,14 @@
         // demais pra só um clique de confirmação: pede a PRÓPRIA senha do
         // admin logado (mesmo raciocínio do fechamento de caixa), conferida
         // no servidor (routes/admin/tenants.js).
-        let errorEl, passwordInput;
-        openModal({
+        openPasswordConfirmModal({
           title: 'Excluir loja',
-          danger: true,
           submitLabel: 'Excluir',
-          bodyHtml: `
-            <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px;line-height:1.5;">
-              Excluir a loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})?
-              Os dados saem da lista e a loja deixa de responder. A pasta vai pra lixeira — dá pra restaurar depois por lá.
-            </p>
-            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Confirme sua senha</label>
-            <input type="password" class="delete-password-input" autocomplete="current-password" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;box-sizing:border-box;background:var(--surface);color:var(--text);">
-            <p class="delete-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin:8px 0 0;"></p>
-          `,
-          onMount: (modalEl) => {
-            errorEl = modalEl.querySelector('.delete-error');
-            passwordInput = modalEl.querySelector('.delete-password-input');
-            passwordInput.focus();
-          },
-          onSubmit: async () => {
-            const password = passwordInput.value;
-            if (!password) { errorEl.textContent = 'Informe sua senha.'; return false; }
-            try {
-              await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
-              toast(`Loja "${tenant.slug}" excluída.`, 'success');
-              loadTenants();
-            } catch (err) {
-              errorEl.textContent = err.message;
-              return false;
-            }
+          message: `Excluir a loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})? Os dados saem da lista e a loja deixa de responder. A pasta vai pra lixeira — dá pra restaurar depois por lá.`,
+          onConfirm: async (password) => {
+            await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
+            toast(`Loja "${tenant.slug}" excluída.`, 'success');
+            loadTenants();
           },
         });
       });
@@ -258,7 +269,10 @@
               <div class="lixeira-slug">${escapeHtml(item.slug)}</div>
               <div class="lixeira-date">Excluída em ${escapeHtml(formatTrashDate(item.deletedAt))}</div>
             </div>
-            <button type="button" class="restore-btn">Restaurar</button>
+            <div class="lixeira-row-actions">
+              <button type="button" class="restore-btn">Restaurar</button>
+              <button type="button" class="purge-btn">Excluir definitivamente</button>
+            </div>
           `;
           row.querySelector('.restore-btn').addEventListener('click', async () => {
             try {
@@ -269,6 +283,22 @@
             } catch (err) {
               toast(err.message, 'error');
             }
+          });
+          row.querySelector('.purge-btn').addEventListener('click', () => {
+            // Diferente de excluir (que ainda vai pra lixeira), isto é
+            // definitivo — apaga o .sqlite3 de verdade (control/db.js#purgeTrashedTenant),
+            // por isso reconfirma a senha de novo, mesmo já estando dentro
+            // de um fluxo que começou com uma confirmação de senha.
+            openPasswordConfirmModal({
+              title: 'Excluir definitivamente',
+              submitLabel: 'Excluir definitivamente',
+              message: `Excluir <strong>"${escapeHtml(item.slug)}"</strong> definitivamente? Isto apaga os dados da loja de vez — depois disso não tem mais lixeira, não tem como desfazer.`,
+              onConfirm: async (password) => {
+                await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
+                toast(`"${item.slug}" excluído definitivamente.`, 'success');
+                refresh();
+              },
+            });
           });
           listEl.appendChild(row);
         }

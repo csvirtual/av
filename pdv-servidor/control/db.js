@@ -188,3 +188,15 @@ export function restoreTenant(entry) {
   `).run(tenant);
   return getTenantBySlug(slug);
 }
+
+/** Exclusão DEFINITIVA de um item da lixeira — apaga a pasta (e o
+ * `.sqlite3` dentro dela) de verdade, sem volta. Diferente de deleteTenant
+ * (que só move pra lixeira), esta é destrutiva mesmo — routes/admin/tenants.js
+ * exige a mesma reconfirmação de senha do admin antes de chamar. Lança se
+ * a entrada não existir na lixeira. */
+export function purgeTrashedTenant(entry) {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  const target = path.join(trashDir, entry);
+  if (!fs.existsSync(target)) throw new Error(`Não encontrado na lixeira: "${entry}".`);
+  fs.rmSync(target, { recursive: true, force: true });
+}
