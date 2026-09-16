@@ -4,16 +4,20 @@
 // routes/audit.js.
 import { db } from '../db/index.js';
 
-const insertStmt = db.prepare(`
+const INSERT_SQL = `
   INSERT INTO audit_log (id, timestamp, user_id, data) VALUES (@id, @timestamp, @userId, @data)
-`);
+`;
 
-export function logAction({ userId, userName, role, action, details = '', entity = '', entityId = '' }) {
+// `targetDb` opcional em todo este arquivo (etapa 5 do roteiro multi-tenant,
+// ver artifact "PDV Multi-Tenant") — normalmente req.db, resolvido pelo
+// tenant da requisição. Sem ele (todo call site de hoje), grava no banco
+// fixo do processo, comportamento idêntico a sempre.
+export function logAction({ userId, userName, role, action, details = '', entity = '', entityId = '' }, targetDb = db) {
   const record = {
     id: crypto.randomUUID(),
     timestamp: Date.now(),
     userId, userName, role, action, details, entity, entityId,
   };
-  insertStmt.run({ id: record.id, timestamp: record.timestamp, userId: record.userId, data: JSON.stringify(record) });
+  targetDb.prepare(INSERT_SQL).run({ id: record.id, timestamp: record.timestamp, userId: record.userId, data: JSON.stringify(record) });
   return record;
 }

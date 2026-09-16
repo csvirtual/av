@@ -5,14 +5,18 @@
 // caixa zerando a taxa de fidelidade configurada antes).
 import { db } from '../db/index.js';
 
-const getConfigStmt = db.prepare('SELECT data FROM company WHERE id = ?');
-const upsertConfigStmt = db.prepare(`
+const GET_SQL = 'SELECT data FROM company WHERE id = ?';
+const UPSERT_SQL = `
   INSERT INTO company (id, data) VALUES ('config', @data)
   ON CONFLICT(id) DO UPDATE SET data = excluded.data
-`);
+`;
 
-export function getConfig() {
-  const row = getConfigStmt.get('config');
+// `targetDb` opcional em todo este arquivo (etapa 5 do roteiro multi-tenant,
+// ver artifact "PDV Multi-Tenant") — normalmente req.db, resolvido pelo
+// tenant da requisição. Sem ele (todo call site de hoje), lê/grava no
+// banco fixo do processo, comportamento idêntico a sempre.
+export function getConfig(targetDb = db) {
+  const row = targetDb.prepare(GET_SQL).get('config');
   if (!row) return {};
   try {
     return JSON.parse(row.data);
@@ -21,8 +25,8 @@ export function getConfig() {
   }
 }
 
-export function updateConfig(partial) {
-  const merged = { ...getConfig(), ...partial };
-  upsertConfigStmt.run({ data: JSON.stringify(merged) });
+export function updateConfig(partial, targetDb = db) {
+  const merged = { ...getConfig(targetDb), ...partial };
+  targetDb.prepare(UPSERT_SQL).run({ data: JSON.stringify(merged) });
   return merged;
 }

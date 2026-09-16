@@ -23,8 +23,8 @@ export const BACKUP_TABLES = [
   'deliveries', 'store_credits',
 ];
 
-function tableColumns(table) {
-  return db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+function tableColumns(targetDb, table) {
+  return targetDb.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
 }
 
 /** Lê todas as tabelas de backup e monta o payload (ainda sem cifrar).
@@ -42,21 +42,30 @@ function tableColumns(table) {
  * consistente no primeiro `SELECT` e mantém até o fim da função, sem travar
  * nenhum escritor concorrente (leitores em WAL nunca bloqueiam escritores,
  * nem o contrário). */
-export const buildBackupPayload = db.transaction(() => {
-  const tables = {};
-  for (const table of BACKUP_TABLES) {
-    tables[table] = db.prepare(`SELECT * FROM ${table}`).all();
-  }
-  return { backupFormatVersion: BACKUP_FORMAT_VERSION, exportedAt: new Date().toISOString(), tables };
-});
+// `targetDb` opcional em todo este arquivo (etapa 5 do roteiro
+// multi-tenant, ver artifact "PDV Multi-Tenant") — normalmente req.db,
+// resolvido pelo tenant da requisição. Sem ele (todo call site de hoje),
+// continua operando no banco fixo do processo, comportamento idêntico a
+// sempre. `db.transaction(fn)` prende a função a UMA conexão específica —
+// por isso isto virou uma função normal que monta e já invoca a transação
+// a cada chamada, em vez de uma constante pré-montada uma única vez.
+export function buildBackupPayload(targetDb = db) {
+  return targetDb.transaction(() => {
+    const tables = {};
+    for (const table of BACKUP_TABLES) {
+      tables[table] = targetDb.prepare(`SELECT * FROM ${table}`).all();
+    }
+    return { backupFormatVersion: BACKUP_FORMAT_VERSION, exportedAt: new Date().toISOString(), tables };
+  })();
+}
 
 /** Quantos registros existem HOJE em cada tabela — pra mostrar "o que vai
  * ser substituído" antes de uma restauração, junto com a contagem de cada
  * tabela do arquivo (ver routes/backup.js). */
-export function getCurrentCounts() {
+export function getCurrentCounts(targetDb = db) {
   const counts = {};
   for (const table of BACKUP_TABLES) {
-    counts[table] = db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get().c;
+    counts[table] = targetDb.prepare(`SELECT COUNT(*) as c FROM ${table}`).get().c;
   }
   return counts;
 }
@@ -68,25 +77,27 @@ export function getCurrentCounts() {
  * coluna que não existe mais), a transação inteira desfaz e o banco volta
  * exatamente pro estado de antes — nunca fica com algumas tabelas já
  * trocadas e outras ainda com os dados antigos. */
-export const applyBackupPayload = db.transaction((payload) => {
-  for (const table of BACKUP_TABLES) {
-    const rows = payload.tables?.[table] || [];
-    db.prepare(`DELETE FROM ${table}`).run();
-    if (rows.length === 0) continue;
-    const cols = tableColumns(table);
-    const placeholders = cols.map((c) => `@${c}`).join(', ');
-    const insertStmt = db.prepare(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`);
-    for (const row of rows) {
-      // Só usa as colunas que a tabela ATUAL conhece — um backup mais
-      // antigo (de antes de uma coluna nova existir) não pode falhar por
-      // faltar uma chave; um backup mais novo (com uma coluna que esta
-      // versão não tem) não pode tentar inserir uma coluna inexistente.
-      const params = {};
-      for (const c of cols) params[c] = row[c] !== undefined ? row[c] : null;
-      insertStmt.run(params);
+export function applyBackupPayload(payload, targetDb = db) {
+  return targetDb.transaction(() => {
+    for (const table of BACKUP_TABLES) {
+      const rows = payload.tables?.[table] || [];
+      targetDb.prepare(`DELETE FROM ${table}`).run();
+      if (rows.length === 0) continue;
+      const cols = tableColumns(targetDb, table);
+      const placeholders = cols.map((c) => `@${c}`).join(', ');
+      const insertStmt = targetDb.prepare(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`);
+      for (const row of rows) {
+        // Só usa as colunas que a tabela ATUAL conhece — um backup mais
+        // antigo (de antes de uma coluna nova existir) não pode falhar por
+        // faltar uma chave; um backup mais novo (com uma coluna que esta
+        // versão não tem) não pode tentar inserir uma coluna inexistente.
+        const params = {};
+        for (const c of cols) params[c] = row[c] !== undefined ? row[c] : null;
+        insertStmt.run(params);
+      }
     }
-  }
-});
+  })();
+}
 
 // ---------- Reiniciar operação (zerar dados de teste/transição) ----------
 // Portado de data/backupRepo.js#resetOperationalData da extensão: depois de
@@ -127,9 +138,11 @@ export const RESET_TABLES = [
  * routes/backup.js). Tudo dentro de UMA ÚNICA transação, mesmo raciocínio
  * de applyBackupPayload() acima: ou zera tudo da lista, ou (numa falha no
  * meio do caminho) não muda nada — nunca fica pela metade. */
-export const resetOperationalData = db.transaction(() => {
-  for (const table of RESET_TABLES) db.prepare(`DELETE FROM ${table}`).run();
-  db.prepare('DELETE FROM idempotency_keys').run();
-});
+export function resetOperationalData(targetDb = db) {
+  return targetDb.transaction(() => {
+    for (const table of RESET_TABLES) targetDb.prepare(`DELETE FROM ${table}`).run();
+    targetDb.prepare('DELETE FROM idempotency_keys').run();
+  })();
+}
 
 export { BACKUP_FORMAT_VERSION };

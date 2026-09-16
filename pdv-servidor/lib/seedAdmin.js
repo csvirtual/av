@@ -11,8 +11,15 @@ import { hashPassword } from './auth.js';
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'admin123'; // troque depois de logar pela primeira vez
 
-export async function ensureAdminUser() {
-  const existing = db.prepare('SELECT 1 FROM users WHERE username_lower = ?').get(ADMIN_USERNAME);
+// `targetDb` opcional (etapa 5 do roteiro multi-tenant, ver artifact "PDV
+// Multi-Tenant") — normalmente req.db, resolvido pelo tenant da
+// requisição. Sem ele (todo call site de hoje), semeia no banco fixo do
+// processo, comportamento idêntico a sempre. Note: scripts/createTenant.js
+// tem sua PRÓPRIA cópia mínima desta lógica (seedAdminInto), porque
+// precisa semear um banco de tenant que nem existe no pool ainda — ver o
+// comentário lá.
+export async function ensureAdminUser(targetDb = db) {
+  const existing = targetDb.prepare('SELECT 1 FROM users WHERE username_lower = ?').get(ADMIN_USERNAME);
   if (existing) return false;
 
   const { salt, hash } = await hashPassword(ADMIN_PASSWORD);
@@ -38,7 +45,7 @@ export async function ensureAdminUser() {
     mustChangePassword: true,
     createdAt: Date.now(),
   };
-  db.prepare('INSERT INTO users (id, username_lower, data) VALUES (?, ?, ?)')
+  targetDb.prepare('INSERT INTO users (id, username_lower, data) VALUES (?, ?, ?)')
     .run(user.id, user.usernameLower, JSON.stringify(user));
 
   console.log(`Usuário criado: username="${ADMIN_USERNAME}" senha="${ADMIN_PASSWORD}" (troque depois de testar).`);

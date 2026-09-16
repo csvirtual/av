@@ -15,21 +15,25 @@
 import { db } from '../db/index.js';
 import { getConfig } from './companyConfig.js';
 
-const getOpenGlobalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1");
-const getOpenByTerminalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1");
-const getOpenByUserStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1");
+const GET_OPEN_GLOBAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1";
+const GET_OPEN_BY_TERMINAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1";
+const GET_OPEN_BY_USER_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1";
 
-export function getCaixaMode() {
-  const mode = getConfig().caixaMode;
+// `targetDb` opcional em todo este arquivo (etapa 5 do roteiro multi-tenant,
+// ver artifact "PDV Multi-Tenant") — normalmente req.db, resolvido pelo
+// tenant da requisição. Sem ele (todo call site de hoje), lê o banco fixo
+// do processo, comportamento idêntico a sempre.
+export function getCaixaMode(targetDb = db) {
+  const mode = getConfig(targetDb).caixaMode;
   return mode === 'porTerminal' || mode === 'porOperador' ? mode : 'unico';
 }
 
-export function resolveOpenSession(terminalId, userId) {
-  const mode = getCaixaMode();
+export function resolveOpenSession(terminalId, userId, targetDb = db) {
+  const mode = getCaixaMode(targetDb);
   const row = mode === 'porTerminal'
-    ? (terminalId ? getOpenByTerminalStmt.get(terminalId) : undefined)
+    ? (terminalId ? targetDb.prepare(GET_OPEN_BY_TERMINAL_SQL).get(terminalId) : undefined)
     : mode === 'porOperador'
-      ? (userId ? getOpenByUserStmt.get(userId) : undefined)
-      : getOpenGlobalStmt.get();
+      ? (userId ? targetDb.prepare(GET_OPEN_BY_USER_SQL).get(userId) : undefined)
+      : targetDb.prepare(GET_OPEN_GLOBAL_SQL).get();
   return row ? JSON.parse(row.data) : null;
 }

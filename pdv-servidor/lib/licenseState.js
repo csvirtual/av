@@ -7,14 +7,18 @@
 import { db } from '../db/index.js';
 import { verifyLicenseKey, TRIAL_DURATION_MS } from './license.js';
 
-const getStmt = db.prepare('SELECT data FROM license_state WHERE id = ?');
-const upsertStmt = db.prepare(`
+const GET_SQL = 'SELECT data FROM license_state WHERE id = ?';
+const UPSERT_SQL = `
   INSERT INTO license_state (id, data) VALUES ('state', @data)
   ON CONFLICT(id) DO UPDATE SET data = excluded.data
-`);
+`;
 
-function getState() {
-  const row = getStmt.get('state');
+// `targetDb` opcional em todo este arquivo (etapa 5 do roteiro multi-tenant,
+// ver artifact "PDV Multi-Tenant") — normalmente req.db, resolvido pelo
+// tenant da requisição. Sem ele (todo call site de hoje), lê/grava no
+// banco fixo do processo, comportamento idêntico a sempre.
+function getState(targetDb) {
+  const row = targetDb.prepare(GET_SQL).get('state');
   if (!row) return {};
   try {
     return JSON.parse(row.data);
@@ -23,9 +27,9 @@ function getState() {
   }
 }
 
-function setState(partial) {
-  const merged = { ...getState(), ...partial };
-  upsertStmt.run({ data: JSON.stringify(merged) });
+function setState(partial, targetDb) {
+  const merged = { ...getState(targetDb), ...partial };
+  targetDb.prepare(UPSERT_SQL).run({ data: JSON.stringify(merged) });
   return merged;
 }
 
@@ -38,16 +42,16 @@ function setState(partial) {
  * funcionalidade), então não há "instalação já existente" pra
  * grandfather — a partir de agora, todo primeiro arranque começa o
  * relógio. */
-export function markTrialStartIfNeeded() {
-  const state = getState();
+export function markTrialStartIfNeeded(targetDb = db) {
+  const state = getState(targetDb);
   if (state.trialStartedAt) return;
-  setState({ trialStartedAt: Date.now() });
+  setState({ trialStartedAt: Date.now() }, targetDb);
 }
 
 /** Estado completo de licenciamento, já resolvido contra o CNPJ atual da
  * loja — mesmo contrato de getLicenseStatus() da extensão. */
-export async function getLicenseStatus(cnpj) {
-  const state = getState();
+export async function getLicenseStatus(cnpj, targetDb = db) {
+  const state = getState(targetDb);
   // Achado do usuário: uma chave definitiva guardada que pára de bater com
   // o CNPJ atual (ex: restaurou um backup com um CNPJ diferente do que
   // estava quando a chave foi ativada — `company` está em BACKUP_TABLES,
@@ -78,6 +82,6 @@ export async function getLicenseStatus(cnpj) {
     : { active: true, tipo: 'trial', expiraEm: state.trialStartedAt + TRIAL_DURATION_MS, keyIssue };
 }
 
-export function setStoredActivationKey(keyString) {
-  setState({ activationKey: keyString });
+export function setStoredActivationKey(keyString, targetDb = db) {
+  setState({ activationKey: keyString }, targetDb);
 }

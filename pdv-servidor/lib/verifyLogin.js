@@ -9,7 +9,7 @@ import { db } from '../db/index.js';
 import { verifyPasswordHash } from './auth.js';
 import { getLoginLockState, recordFailedLogin, clearLoginLock } from './loginLockout.js';
 
-const findByUsernameStmt = db.prepare('SELECT data FROM users WHERE username_lower = ?');
+const FIND_BY_USERNAME_SQL = 'SELECT data FROM users WHERE username_lower = ?';
 
 // Achado de auditoria (P3): salt/hash fixos, só pra pagar o MESMO custo de
 // PBKDF2 (150 mil iterações) quando o usuário não existe ou está inativo —
@@ -24,11 +24,15 @@ const findByUsernameStmt = db.prepare('SELECT data FROM users WHERE username_low
 const DUMMY_SALT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 const DUMMY_HASH = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
 
-export async function verifyLogin(username, password, { namespace } = {}) {
+// `targetDb` opcional (etapa 5 do roteiro multi-tenant, ver artifact "PDV
+// Multi-Tenant") — normalmente req.db, resolvido pelo tenant da
+// requisição. Sem ele (todo call site de hoje), lê o banco fixo do
+// processo, comportamento idêntico a sempre.
+export async function verifyLogin(username, password, { namespace } = {}, targetDb = db) {
   const lockState = getLoginLockState(username, namespace);
   if (lockState.remainingMs > 0) return null;
 
-  const row = findByUsernameStmt.get(String(username || '').trim().toLowerCase());
+  const row = targetDb.prepare(FIND_BY_USERNAME_SQL).get(String(username || '').trim().toLowerCase());
   if (!row) {
     await verifyPasswordHash(password, DUMMY_SALT, DUMMY_HASH);
     recordFailedLogin(username, namespace);
