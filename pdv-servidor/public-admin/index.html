@@ -20,43 +20,60 @@
   <div id="toast-root" aria-live="polite"></div>
 
   <div id="login-screen" class="screen">
-    <form id="login-form" class="login-card">
-      <h1>Painel da plataforma</h1>
-      <p class="subtitle">PDV - C&amp;S Virtual — administração das lojas</p>
-      <label for="login-username">Usuário</label>
-      <input id="login-username" name="username" type="text" autocomplete="username" required>
-      <label for="login-password">Senha</label>
-      <input id="login-password" name="password" type="password" autocomplete="current-password" required>
-      <button type="submit">Entrar</button>
-      <p id="login-error" class="error" role="alert"></p>
-    </form>
+    <main class="auth-screen">
+      <form id="login-form" class="auth-card">
+        <div class="auth-brand">
+          <span class="dot" aria-hidden="true"></span>
+          <span>PDV - C&amp;S Virtual (multi-terminal)</span>
+        </div>
+        <h1>Painel da plataforma</h1>
+        <p class="subtitle">Administração das lojas cadastradas.</p>
+        <div class="field">
+          <label for="login-username">Usuário</label>
+          <input id="login-username" name="username" type="text" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Senha</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn-submit">Entrar</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </main>
   </div>
 
   <div id="app-screen" class="screen" hidden>
-    <header>
-      <h1>Lojas</h1>
-      <div class="header-actions">
-        <span id="admin-username"></span>
-        <button id="logout-btn" type="button" class="ghost">Sair</button>
-      </div>
-    </header>
-    <main>
-      <table id="tenants-table">
-        <thead>
-          <tr>
-            <th>Loja</th>
-            <th>Slug</th>
-            <th>CNPJ</th>
-            <th>Status</th>
-            <th>Vencimento</th>
-            <th>Criada em</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="tenants-body"></tbody>
-      </table>
-      <p id="empty-state" hidden>Nenhuma loja cadastrada ainda.</p>
-    </main>
+    <div class="page-shell">
+      <header class="page-header">
+        <div>
+          <h1>Lojas</h1>
+          <p class="desc">Todas as lojas cadastradas na plataforma.</p>
+        </div>
+        <div class="header-actions">
+          <span id="admin-username" class="admin-username"></span>
+          <button id="logout-btn" type="button" class="btn-secondary btn-sm">Sair</button>
+        </div>
+      </header>
+      <main>
+        <div class="table-wrap">
+          <table id="tenants-table">
+            <thead>
+              <tr>
+                <th>Loja</th>
+                <th>Slug</th>
+                <th>CNPJ</th>
+                <th>Status</th>
+                <th>Vencimento</th>
+                <th>Criada em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tenants-body"></tbody>
+          </table>
+        </div>
+        <p id="empty-state" class="table-empty" hidden>Nenhuma loja cadastrada ainda.</p>
+      </main>
+    </div>
   </div>
 
   <template id="tenant-row-template">

@@ -1,106 +1,235 @@
+/* Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+ * mesmos tokens de cor/tipografia/sombra de public/css/styles.css
+ * (:root, .auth-screen, .auth-card, .page-header, .table-wrap) —
+ * copiados pra este bundle separado (public-admin/ é servido isolado de
+ * public/, ver server.js) em vez de importados, pra manter o painel
+ * autocontido. Resultado: mesma "cara" do resto do PDV (login com fundo
+ * em degradê, tabelas com o mesmo cabeçalho/zebra, mesmos botões), em vez
+ * de um visual clean genérico à parte. */
 :root {
-  --brand: #145333;
-  --brand-dark: #0d3a24;
   --bg: #f4f6f5;
-  --card-bg: #ffffff;
-  --border: #dde3e0;
-  --text: #1f2b26;
-  --text-muted: #5b6b64;
+  --surface: #ffffff;
+  --surface-alt: #eef1f0;
+  --border: #dde3e1;
+  --text: #1c2523;
+  --text-muted: #62716d;
+  --primary: #145333;
+  --primary-dark: #0d3b24;
+  --primary-light: #e4f0e9;
   --danger: #b3261e;
+  --danger-dark: #8f1e18;
+  --danger-light: #fbe9e7;
+  --success: #1a7a45;
+  --success-light: #e4f0e9;
+  --warning: #a6650f;
+  --warning-light: #fbeecd;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(20, 30, 27, 0.08), 0 1px 2px rgba(20, 30, 27, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+  --scroll-shadow: rgba(20, 30, 27, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101613;
+    --surface: #1a221e;
+    --surface-alt: #212b25;
+    --border: #34413a;
+    --text: #e9efec;
+    --text-muted: #93a89e;
+    --primary: #2f9d6b;
+    --primary-dark: #0d2b1c;
+    --primary-light: rgba(47, 157, 107, 0.18);
+    --danger: #e5645a;
+    --danger-dark: #b23a30;
+    --danger-light: rgba(229, 100, 90, 0.18);
+    --success: #3fae6c;
+    --success-light: rgba(47, 157, 107, 0.18);
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+    --scroll-shadow: rgba(0, 0, 0, 0.5);
+  }
 }
 
 * { box-sizing: border-box; }
 
+html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); }
+
 body {
-  margin: 0;
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
-  background: var(--bg);
   color: var(--text);
 }
 
-.screen { min-height: 100vh; }
+a { color: var(--primary); }
 
-.login-card {
-  max-width: 360px;
-  margin: 12vh auto 0;
-  padding: 32px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+/* ---------- Tela de login ---------- */
+.auth-screen {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--primary-dark), var(--primary) 65%);
+  padding: 32px 16px;
 }
 
-.login-card h1 { margin: 0 0 4px; font-size: 20px; color: var(--brand-dark); }
-.login-card .subtitle { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }
-.login-card label { font-size: 13px; font-weight: 600; margin-top: 8px; }
-.login-card input {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 14px;
+.auth-card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 400px;
+  padding: 36px 40px;
 }
-.login-card button {
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: none;
-  border-radius: 8px;
-  background: var(--brand);
-  color: #fff;
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.auth-brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.auth-brand span:last-child {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.auth-card h1 { font-size: 22px; margin: 10px 0 4px; text-wrap: balance; }
+.auth-card p.subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.field input {
+  padding: 9px 11px;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
   font-size: 14px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.btn-submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
 }
-.login-card button:hover { background: var(--brand-dark); }
-.login-card .error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 8px 0 0; }
+.btn-submit:hover { background: var(--primary-dark); }
+.btn-submit:active { transform: translateY(1px); }
 
-header {
+.error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 10px 0 0; text-align: center; }
+
+/* ---------- Painel (lista de lojas) ---------- */
+.page-shell { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  background: var(--brand);
-  color: #fff;
+  margin-bottom: 22px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-header h1 { margin: 0; font-size: 18px; }
-.header-actions { display: flex; align-items: center; gap: 12px; font-size: 13px; }
-.header-actions button.ghost {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.6);
-  color: #fff;
-  padding: 6px 12px;
-  border-radius: 6px;
+.page-header h1 { font-size: 21px; margin: 0; }
+.page-header .desc { color: var(--text-muted); font-size: 13px; margin: 2px 0 0; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.admin-username { font-size: 13px; color: var(--text-muted); }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
-.header-actions button.ghost:hover { background: rgba(255,255,255,0.15); }
+.btn-secondary:hover { background: var(--surface-alt); }
+.btn-sm { padding: 7px 14px; font-size: 13px; }
 
-main { padding: 24px; }
-
-table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-th, td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
-th { background: #eef2f0; color: var(--text-muted); font-weight: 600; }
-tr:last-child td { border-bottom: none; }
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  background-repeat: no-repeat;
+  background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-attachment: local, local, scroll, scroll;
+  background-image:
+    linear-gradient(to right, var(--surface) 30%, transparent),
+    linear-gradient(to left, var(--surface) 30%, transparent),
+    linear-gradient(to right, var(--scroll-shadow), transparent),
+    linear-gradient(to left, var(--scroll-shadow), transparent);
+}
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th {
+  text-align: left;
+  padding: 11px 14px;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-alt); }
+.table-empty { padding: 32px; text-align: center; color: var(--text-muted); }
 
 select, input[type="date"] {
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
   font-size: 13px;
 }
 
 .save-btn {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: none;
-  border-radius: 6px;
-  background: var(--brand);
+  border-radius: var(--radius-sm);
+  background: var(--primary);
   color: #fff;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
-.save-btn:hover { background: var(--brand-dark); }
-
-#empty-state { color: var(--text-muted); text-align: center; margin-top: 40px; }
+.save-btn:hover { background: var(--primary-dark); }
 
 #toast-root {
   position: fixed;
@@ -113,11 +242,16 @@ select, input[type="date"] {
 }
 .toast {
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--text);
   color: #fff;
   font-size: 13px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-md);
 }
 .toast.error { background: var(--danger); }
-.toast.success { background: var(--brand); }
+.toast.success { background: var(--primary); }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 28px 24px; }
+  .page-shell { padding: 20px 16px 40px; }
+}
