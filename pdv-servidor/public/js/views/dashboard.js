@@ -113,7 +113,6 @@ export async function renderDashboard(container, ctx) {
         </div>
       ` : ''}
     </div>
-    <div class="carousel-hint">Arraste para o lado para ver mais »</div>
 
     <div class="card" style="margin-bottom:20px;">
       <p class="section-title mt-0">Últimas vendas</p>

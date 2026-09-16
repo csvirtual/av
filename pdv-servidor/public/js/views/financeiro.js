@@ -90,7 +90,6 @@ export async function renderFinanceiro(container, ctx) {
         <div class="stat-card"><div class="label">A receber (pendente)</div><div class="value">${formatMoney(aReceber)}</div></div>
         <div class="stat-card"><div class="label">Contas vencidas</div><div class="value ${vencidas > 0 ? 'danger' : ''}">${vencidas}</div></div>
       </div>
-      <div class="carousel-hint">Arraste para o lado para ver mais »</div>
     `;
   }
 

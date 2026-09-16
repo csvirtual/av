@@ -215,7 +215,6 @@ async function renderOpenSession(container, ctx, session, refresh) {
         </div>
       `).join('')}
     </div>
-    <div class="carousel-hint">Arraste para o lado para ver mais »</div>
 
     <div class="card">
       <p class="section-title mt-0">Sangrias e suprimentos</p>
