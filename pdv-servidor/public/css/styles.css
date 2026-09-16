@@ -2049,6 +2049,7 @@ input.customer-search-input:focus {
    * próprio (#summary-box no Financeiro, id direto no próprio grid nas
    * outras três) pra não afetar outras grades .stat-grid fora dessas 4
    * telas específicas. */
+  #summary-box, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid { position: relative; }
   #summary-box .stat-grid, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid {
     display: flex;
     overflow-x: auto;
@@ -2060,16 +2061,13 @@ input.customer-search-input:focus {
   #dashboard-stat-grid .stat-card,
   #caixa-stat-grid .stat-card,
   #relatorios-stat-grid .stat-card { flex: 0 0 auto; min-width: 150px; scroll-snap-align: start; }
-  /* Achado do usuário: tanto o degradê original quanto a seta flutuante que
-   * tentou substituí-lo ficavam com um pseudo-elemento `position: absolute`
-   * grudado na borda direita da TELA (não do conteúdo) — como o círculo/
-   * degradê ficava por CIMA de qualquer cartão que passasse por baixo dele
-   * durante o gesto de arrastar, sempre pintava um véu ou desenho estranho
-   * em cima do valor (ex: "Vendas hoje" esmaecido no meio do scroll). Depois
-   * de duas tentativas de consertar esse overlay, o pedido do usuário foi
-   * tirar o indicador de vez — o próprio cartão cortado na borda (parte da
-   * largura visível, parte não) já avisa sozinho que dá pra rolar mais,
-   * sem precisar de nenhum elemento extra por cima do conteúdo. */
+  /* Mesma ideia do "scroll-shadow" que .table-wrap já usa — esmaece a
+   * borda pra deixar óbvio que tem mais cartão pra rolar. */
+  #summary-box::after, #dashboard-stat-grid::after, #caixa-stat-grid::after, #relatorios-stat-grid::after {
+    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+    background: linear-gradient(to right, transparent, var(--bg));
+    pointer-events: none;
+  }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */
