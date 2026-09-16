@@ -55,19 +55,26 @@ const RESERVED_SLUGS = new Set([
   'www', 'app', 'api', 'admin', 'painel', 'suporte', 'mail', 'ftp', 'static', 'ws',
 ]);
 
+// Achado do usuário (teste manual da etapa 9): "slug" é jargão de
+// programador — o cadastro self-service (routes/signup.js) usa este
+// MESMO validador pra dar feedback em tempo real pra quem não é técnico
+// (o rótulo do campo já diz "Endereço da sua loja"). Mensagens em
+// "endereço" servem os dois públicos igual bem — quem usa a CLI entende
+// perfeitamente, e quem preenche o formulário não esbarra em termo
+// técnico nenhum.
 function validateSlug(slug) {
   if (typeof slug !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
-    throw new Error(`Slug inválido: "${slug}". Use só letras minúsculas, números e hífen (ex: "loja-silva").`);
+    throw new Error(`Endereço inválido: "${slug}". Use só letras minúsculas, números e hífen (ex: "loja-silva").`);
   }
   if (slug.length < 3 || slug.length > 30) {
-    throw new Error(`Slug "${slug}" precisa ter entre 3 e 30 caracteres.`);
+    throw new Error(`O endereço "${slug}" precisa ter entre 3 e 30 caracteres.`);
   }
   if (RESERVED_SLUGS.has(slug)) {
-    throw new Error(`Slug "${slug}" é reservado pelo próprio sistema — escolha outro.`);
+    throw new Error(`O endereço "${slug}" é reservado pelo próprio sistema — escolha outro.`);
   }
   const existing = controlDb.prepare('SELECT 1 FROM tenants WHERE slug = ?').get(slug);
   if (existing) {
-    throw new Error(`Já existe uma loja cadastrada com o slug "${slug}".`);
+    throw new Error(`Já existe uma loja cadastrada com esse endereço — escolha outro.`);
   }
 }
 
