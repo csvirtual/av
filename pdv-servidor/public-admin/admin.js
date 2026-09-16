@@ -134,7 +134,7 @@
     el.className = 'toast' + (kind ? ' ' + kind : '');
     el.textContent = message;
     toastRoot.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+    setTimeout(() => el.remove(), 7000);
   }
 
   async function api(path, options) {

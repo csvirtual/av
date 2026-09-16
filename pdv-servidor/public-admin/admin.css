@@ -283,9 +283,12 @@ select, input[type="date"] {
 }
 .delete-btn:hover { background: var(--danger); color: #fff; }
 
+/* Canto inferior direito, mesmo padrão de public/css/styles.css
+   #toast-root (o resto do PDV inteiro usa esse canto) — não o superior,
+   que além de fugir do padrão colidia visualmente com o botão de tema. */
 #toast-root {
   position: fixed;
-  top: 16px;
+  bottom: 16px;
   right: 16px;
   display: flex;
   flex-direction: column;

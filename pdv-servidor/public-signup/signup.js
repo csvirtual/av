@@ -43,7 +43,7 @@
     el.className = 'toast error';
     el.textContent = message;
     toastRoot.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
+    setTimeout(() => el.remove(), 7000);
   }
 
   // Só deixa digitar o formato que um slug pode ter — mesma validação de
