@@ -52,7 +52,12 @@ process.on('uncaughtException', (err) => {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3131;
-const getUserByIdStmt = db.prepare('SELECT data FROM users WHERE id = ?');
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais um prepared statement pré-montado — o middleware de
+// sessão abaixo prepara contra req.db (o tenant da requisição) quando
+// existir, senão contra o banco fixo do processo, comportamento idêntico
+// a antes desta etapa.
+const GET_USER_BY_ID_SQL = 'SELECT data FROM users WHERE id = ?';
 
 // Achado de auditoria (P3): duas instâncias de `node server.js` abertas por
 // engano no mesmo computador (ex.: um atalho clicado duas vezes) apontando
@@ -158,13 +163,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // GET /api/auth/me, ver routes/auth.js) já cai em 401 sozinha, sem
 // precisar de nenhuma checagem extra em cada rota individual.
 app.use((req, res, next) => {
-  req.userId = resolveSession(req.cookies?.session) || null;
+  req.userId = resolveSession(req.cookies?.session, req.db) || null;
   req.userName = null;
   req.userRole = null;
   req.userPermissions = null;
   req.mustChangePassword = false;
   if (req.userId) {
-    const row = getUserByIdStmt.get(req.userId);
+    const row = (req.db || db).prepare(GET_USER_BY_ID_SQL).get(req.userId);
     const u = row ? JSON.parse(row.data) : null;
     if (u && u.active) {
       req.userName = u.nome;
@@ -224,8 +229,8 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
   if (!req.path.startsWith('/api/')) return next();
   try {
-    const cnpj = getConfig().cnpj || '';
-    const status = await getLicenseStatus(cnpj);
+    const cnpj = getConfig(req.db).cnpj || '';
+    const status = await getLicenseStatus(cnpj, req.db);
     if (status.active) return next();
     res.status(403).json({ error: 'A licença deste sistema expirou. Ative uma chave nova em Dados da loja → Licença.', licenseExpired: true });
   } catch (err) {

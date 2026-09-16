@@ -9,8 +9,13 @@ import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 
 const router = Router();
 
-const findById = db.prepare('SELECT * FROM users WHERE id = ?');
-const updateUserData = db.prepare('UPDATE users SET data = @data WHERE id = @id');
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const FIND_BY_ID_SQL = 'SELECT * FROM users WHERE id = ?';
+const UPDATE_USER_DATA_SQL = 'UPDATE users SET data = @data WHERE id = @id';
 
 function publicUser(row) {
   const u = JSON.parse(row.data);
@@ -24,6 +29,7 @@ function publicUser(row) {
 
 router.post('/login', async (req, res) => {
   try {
+    const targetDb = req.db || db;
     const { username, password } = req.body || {};
     if (!String(username || '').trim() || !password) {
       return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
@@ -45,9 +51,9 @@ router.post('/login', async (req, res) => {
     // usersRepo.js#verifyLogin da extensão: diferenciar isso por fora
     // permitiria enumerar quais contas existem só pelo comportamento do
     // login).
-    const user = await verifyLogin(username, password);
+    const user = await verifyLogin(username, password, {}, targetDb);
     if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-    const row = findById.get(user.id);
+    const row = targetDb.prepare(FIND_BY_ID_SQL).get(user.id);
 
     // Achado do usuário: até aqui, todo login herdava a MESMA rota
     // (#hash) que quem usou este navegador por último estava vendo — se
@@ -68,10 +74,10 @@ router.post('/login', async (req, res) => {
     const firstLogin = !user.hasSeenAjuda;
     if (firstLogin) {
       user.hasSeenAjuda = true;
-      updateUserData.run({ id: user.id, data: JSON.stringify(user) });
+      targetDb.prepare(UPDATE_USER_DATA_SQL).run({ id: user.id, data: JSON.stringify(user) });
     }
 
-    const token = createSession(user.id);
+    const token = createSession(user.id, targetDb);
     // Achado de auditoria (P3): `secure` fixo em `false` deixaria o cookie de
     // sessão trafegando sem essa proteção mesmo em quem hospeda isto atrás de
     // HTTPS (ex.: GoDaddy/preview, que fala HTTPS com o navegador e repassa
@@ -89,7 +95,7 @@ router.post('/login', async (req, res) => {
       secure: isHttps,
       maxAge: 12 * 60 * 60 * 1000,
     });
-    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id });
+    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Login', details: '', entity: 'user', entityId: user.id }, targetDb);
     res.json({ user: publicUser(row), firstLogin });
   } catch (err) {
     // Achado de auditoria (auditoria de prontidão pra produção): esta rota
@@ -119,7 +125,7 @@ router.post('/verify', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
     }
-    const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' });
+    const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' }, req.db || db);
     if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
     res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
   } catch (err) {
@@ -130,14 +136,14 @@ router.post('/verify', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  destroySession(req.cookies?.session);
+  destroySession(req.cookies?.session, req.db);
   res.clearCookie('session');
   res.json({ ok: true });
 });
 
 router.get('/me', (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
-  const row = findById.get(req.userId);
+  const row = (req.db || db).prepare(FIND_BY_ID_SQL).get(req.userId);
   if (!row) return res.status(401).json({ error: 'Não autenticado.' });
   res.json({ user: publicUser(row) });
 });
@@ -153,6 +159,7 @@ router.get('/me', (req, res) => {
 router.post('/change-password', async (req, res) => {
   try {
     if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
+    const targetDb = req.db || db;
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
@@ -160,7 +167,7 @@ router.post('/change-password', async (req, res) => {
     if (newPassword.length < MIN_USER_PASSWORD_LENGTH) {
       return res.status(400).json({ error: `A nova senha precisa ter pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.` });
     }
-    const row = findById.get(req.userId);
+    const row = targetDb.prepare(FIND_BY_ID_SQL).get(req.userId);
     if (!row) return res.status(401).json({ error: 'Não autenticado.' });
     const user = JSON.parse(row.data);
     const ok = await verifyPasswordHash(currentPassword, user.passwordSalt, user.passwordHash);
@@ -172,8 +179,8 @@ router.post('/change-password', async (req, res) => {
     user.passwordSalt = salt;
     user.passwordHash = hash;
     user.mustChangePassword = false;
-    updateUserData.run({ id: user.id, data: JSON.stringify(user) });
-    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Troca de senha', details: 'Senha própria alterada.', entity: 'user', entityId: user.id });
+    targetDb.prepare(UPDATE_USER_DATA_SQL).run({ id: user.id, data: JSON.stringify(user) });
+    logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Troca de senha', details: 'Senha própria alterada.', entity: 'user', entityId: user.id }, targetDb);
     res.json({ user: publicUser({ data: JSON.stringify(user) }) });
   } catch (err) {
     console.error('[erro inesperado] POST /api/auth/change-password:', err);

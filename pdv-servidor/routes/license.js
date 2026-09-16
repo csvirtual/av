@@ -18,9 +18,9 @@ const router = Router();
 
 router.get('/status', async (req, res) => {
   try {
-    const cfg = getConfig();
+    const cfg = getConfig(req.db);
     const cnpj = cfg.cnpj || '';
-    const status = await getLicenseStatus(cnpj);
+    const status = await getLicenseStatus(cnpj, req.db);
     // Achado do usuário: a tela de bloqueio (public/js/app.js#renderLicenseBlockedScreen)
     // roda ANTES de qualquer login — chamar GET /api/company (que exige
     // sessão) pra montar a mensagem de contato do suporte sempre dava 401
@@ -40,7 +40,7 @@ router.get('/status', async (req, res) => {
 
 router.post('/activate', async (req, res) => {
   try {
-    const cnpj = getConfig().cnpj || '';
+    const cnpj = getConfig(req.db).cnpj || '';
     const result = await verifyLicenseKey(req.body?.key, cnpj);
     // Mesmo achado de auditoria da extensão (ver app.js#renderLicenseBlockedScreen
     // e views/company.js): um código de liberação de CNPJ (tipo
@@ -53,14 +53,14 @@ router.post('/activate', async (req, res) => {
       const reason = result.valid ? 'Esse código não é uma chave de ativação (é um código de outro tipo).' : result.reason;
       return res.status(400).json({ error: reason });
     }
-    setStoredActivationKey(String(req.body.key).trim());
+    setStoredActivationKey(String(req.body.key).trim(), req.db);
     logAction({
       userId: req.userId || null, userName: req.userName || 'Ativação (tela de bloqueio)', role: req.userRole || 'admin',
       action: 'Chave de ativação aplicada',
       details: `Licença ativada (tipo: ${result.tipo}) para o CNPJ ${cnpj || '(ainda não cadastrado)'}.`,
       entity: 'license', entityId: 'main',
-    });
-    const status = await getLicenseStatus(cnpj);
+    }, req.db);
+    const status = await getLicenseStatus(cnpj, req.db);
     res.json(status);
   } catch (err) {
     console.error('[erro inesperado] POST /api/license/activate:', err);

@@ -57,7 +57,7 @@ function readCompanyInfo(cfg) {
   };
 }
 
-function readPolicies(cfg) {
+function readPolicies(cfg, targetDb) {
   const vendorMaxDiscountPercent = Number(cfg.vendorMaxDiscountPercent);
   const ci = cfg.creditInterest || {};
   return {
@@ -84,12 +84,12 @@ function readPolicies(cfg) {
     // "Dados da loja" ainda pra notar a falta. Read-only aqui de propósito
     // (escrita continua só em routes/loyalty.js, fonte única da regra de
     // negócio de fidelidade).
-    loyaltyPointsPerReal: getLoyaltyConfig().pointsPerReal,
+    loyaltyPointsPerReal: getLoyaltyConfig(targetDb).pointsPerReal,
   };
 }
 
 router.get('/', (req, res) => {
-  const cfg = getConfig();
+  const cfg = getConfig(req.db);
   // Formato: os campos ficam soltos na raiz (não aninhados em `policies`
   // nem em `company`) — igual sempre foi vendorMaxDiscountPercent, e agora
   // os dados cadastrais também: data/companyRepo.js#getCompany() da
@@ -97,12 +97,12 @@ router.get('/', (req, res) => {
   // direto na raiz; o wrapper cliente (public/js/data/companyRepo.js) que
   // reagrupa isso em `{ ...info, policies }` ao montar o objeto pra view,
   // não esta rota.
-  res.json({ ...readCompanyInfo(cfg), ...readPolicies(cfg) });
+  res.json({ ...readCompanyInfo(cfg), ...readPolicies(cfg, req.db) });
 });
 
 router.put('/', requirePermission('empresa'), async (req, res) => {
   const body = req.body || {};
-  let cfg = getConfig();
+  let cfg = getConfig(req.db);
   const patch = {};
 
   try {
@@ -151,7 +151,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     // único ponto de cessão do event loop já passou — daqui pra baixo, o
     // resto do handler roda 100% síncrono até `updateConfig`, então não há
     // mais nenhuma janela de corrida.
-    cfg = getConfig();
+    cfg = getConfig(req.db);
 
     if (body.razaoSocial !== undefined) patch.razaoSocial = String(body.razaoSocial).trim();
     if (body.nomeFantasia !== undefined) patch.nomeFantasia = String(body.nomeFantasia).trim();
@@ -221,7 +221,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
       };
     }
 
-    const updated = updateConfig(patch);
+    const updated = updateConfig(patch, req.db);
     // Achado (Fase 9, ao ligar atualização em tempo real no PDV): política
     // de desconto/juro nunca avisava ninguém quando mudava — um vendedor
     // com o PDV aberto só veria o valor novo depois de um F5 manual,
@@ -230,7 +230,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     // do cliente, ver achado de segurança da Fase 9 anterior). Avisado
     // agora igual ao resto.
     broadcast('company-changed', {});
-    res.json({ ...readCompanyInfo(updated), ...readPolicies(updated) });
+    res.json({ ...readCompanyInfo(updated), ...readPolicies(updated, req.db) });
   } catch (err) {
     console.error('[erro inesperado] PUT /api/company:', err);
     res.status(500).json({ error: 'Erro inesperado ao salvar. Tente novamente.' });
