@@ -75,11 +75,21 @@ export async function getLicenseStatus(cnpj, targetDb = db) {
     keyIssue = result.reason;
   }
 
-  if (!state.trialStartedAt) return { active: true, tipo: 'sem-trial', keyIssue }; // nunca deveria acontecer (markTrialStartIfNeeded roda todo arranque), mas nunca bloqueia por segurança
-  const expired = (Date.now() - state.trialStartedAt) > TRIAL_DURATION_MS;
+  // Achado do usuário (etapa 9, multi-tenant): markTrialStartIfNeeded() só
+  // era chamado UMA VEZ, no arranque do servidor (ver server.js), contra
+  // o banco FIXO de db/index.js — nunca contra o banco de CADA loja em
+  // modo multi-tenant (cada tenant abre o próprio arquivo só quando a
+  // primeira requisição pra ele chega, bem depois do arranque). Sem isso,
+  // toda loja nova ficava presa pra sempre em "sem-trial" (mostrado na
+  // tela como "Sem restrição de licença", como se o trial de 7 dias nunca
+  // tivesse existido). Inicia aqui, lazy, na primeira LEITURA de status
+  // — cobre os dois modos (legado e multi-tenant) sem depender de nenhum
+  // outro ponto do código lembrar de chamar isto no momento certo.
+  const trialStartedAt = state.trialStartedAt || setState({ trialStartedAt: Date.now() }, targetDb).trialStartedAt;
+  const expired = (Date.now() - trialStartedAt) > TRIAL_DURATION_MS;
   return expired
     ? { active: false, tipo: 'trial-expirado', keyIssue }
-    : { active: true, tipo: 'trial', expiraEm: state.trialStartedAt + TRIAL_DURATION_MS, keyIssue };
+    : { active: true, tipo: 'trial', expiraEm: trialStartedAt + TRIAL_DURATION_MS, keyIssue };
 }
 
 export function setStoredActivationKey(keyString, targetDb = db) {
