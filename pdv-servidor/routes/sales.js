@@ -13,7 +13,7 @@ import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
-import { pointsBalance, creditBalance, listLoyaltyLedger, insertLoyaltyStmt, insertCreditStmt } from '../lib/loyaltyLedger.js';
+import { pointsBalance, creditBalance, listLoyaltyLedger, insertLoyaltyEntry, insertCreditEntry } from '../lib/loyaltyLedger.js';
 import { getConfig } from '../lib/companyConfig.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
 import { userCan } from '../lib/permissions.js';
@@ -21,29 +21,34 @@ import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS } from 
 
 const router = Router();
 
-const getProductStmt = db.prepare('SELECT * FROM products WHERE id = ?');
-const getCustomerStmt = db.prepare('SELECT data FROM customers WHERE id = ?');
-const listDebtLedgerStmt = db.prepare('SELECT data FROM customer_debts WHERE customer_id = ?');
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const GET_PRODUCT_SQL = 'SELECT * FROM products WHERE id = ?';
+const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
+const LIST_DEBT_LEDGER_SQL = 'SELECT data FROM customer_debts WHERE customer_id = ?';
 // Achado de auditoria (P1, Red Team, Fase 11): saldo devedor sempre
 // recalculado do extrato (customer_debts), nunca um número em cache — mesmo
 // princípio de creditBalance()/pointsBalance() (lib/loyaltyLedger.js), que
 // já são à prova de double-spend por construção. Cópia local da mesma
 // função de routes/customers.js#customerBalance (não exportada de lá,
 // mesmo padrão de cada rota ter sua própria versão da query).
-function customerDebtBalance(customerId) {
-  return listDebtLedgerStmt.all(customerId).map((r) => JSON.parse(r.data))
+function customerDebtBalance(customerId, targetDb) {
+  return targetDb.prepare(LIST_DEBT_LEDGER_SQL).all(customerId).map((r) => JSON.parse(r.data))
     .reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
 }
-const updateProductStmt = db.prepare(`
+const UPDATE_PRODUCT_SQL = `
   UPDATE products SET name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data WHERE id = @id
-`);
-const insertSaleStmt = db.prepare(`
+`;
+const INSERT_SALE_SQL = `
   INSERT INTO sales (id, timestamp, user_id, customer_id, data) VALUES (@id, @timestamp, @userId, @customerId, @data)
-`);
-const getSaleStmt = db.prepare('SELECT * FROM sales WHERE id = ?');
-const updateSaleStmt = db.prepare('UPDATE sales SET customer_id = @customerId, data = @data WHERE id = @id');
-const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
-const insertDebtEntryStmt = db.prepare('INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)');
+`;
+const GET_SALE_SQL = 'SELECT * FROM sales WHERE id = ?';
+const UPDATE_SALE_SQL = 'UPDATE sales SET customer_id = @customerId, data = @data WHERE id = @id';
+const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
+const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
 // Achado de auditoria (P1, Red Team, Fase 7): venda e estorno mudavam
 // `product.quantity` direto (saveProduct) sem NUNCA gravar em
 // `stock_movements` — só o ajuste manual/inventário (routes/products.js)
@@ -55,10 +60,10 @@ const insertDebtEntryStmt = db.prepare('INSERT INTO customer_debts (id, customer
 // type, qty — delta com sinal, userId, userName, note, timestamp), só que
 // gravado AQUI DENTRO da mesma transação da venda/estorno (nunca uma
 // chamada separada), pra continuar atômico.
-const insertMovementStmt = db.prepare('INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)');
-function recordStockMovement({ productId, type, qty, userId, userName, note }) {
+const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
+function recordStockMovement({ productId, type, qty, userId, userName, note }, targetDb) {
   const record = { id: crypto.randomUUID(), productId, type, qty, userId, userName, note: note || '', timestamp: Date.now() };
-  insertMovementStmt.run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
+  targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
 }
 
 const FIADO_METHOD = 'Fiado';
@@ -83,8 +88,8 @@ function rowToSale(row) {
 function rowToProduct(row) {
   return JSON.parse(row.data);
 }
-function saveProduct(product) {
-  updateProductStmt.run({
+function saveProduct(product, targetDb) {
+  targetDb.prepare(UPDATE_PRODUCT_SQL).run({
     id: product.id, nameLower: product.nameLower, active: product.active ? 1 : 0,
     updatedAt: Date.now(), data: JSON.stringify(product),
   });
@@ -97,11 +102,12 @@ const PAYMENT_TOLERANCE = 0.01;
  * suficiente, a transação inteira desfaz sozinha (nenhum produto fica
  * debitado pela metade). `db.transaction()` do better-sqlite3 já cuida
  * do BEGIN/COMMIT/ROLLBACK; só precisa lançar uma exceção pra abortar. */
-const commitSale = db.transaction((input) => {
+function commitSale(input, targetDb) {
+  return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.
   if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
+  targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
 
   // Gerado aqui (não só lá embaixo no objeto `sale`) pra já existir a
   // tempo de referenciar na nota do movimento de estoque de cada item,
@@ -112,7 +118,7 @@ const commitSale = db.transaction((input) => {
   let itemsDiscountTotal = 0;
 
   for (const rawItem of input.items) {
-    const row = getProductStmt.get(rawItem.productId);
+    const row = targetDb.prepare(GET_PRODUCT_SQL).get(rawItem.productId);
     if (!row) throw new Error(`Produto não encontrado: ${rawItem.productId}`);
     const product = rowToProduct(row);
     if (!product.active) throw new Error(`Produto inativo: ${product.name}`);
@@ -156,8 +162,8 @@ const commitSale = db.transaction((input) => {
     });
 
     product.quantity -= stockQty;
-    saveProduct(product);
-    recordStockMovement({ productId: product.id, type: 'venda', qty: -stockQty, userId: input.userId, userName: input.userName, note: `Venda ${saleId}` });
+    saveProduct(product, targetDb);
+    recordStockMovement({ productId: product.id, type: 'venda', qty: -stockQty, userId: input.userId, userName: input.userName, note: `Venda ${saleId}` }, targetDb);
   }
 
   if (items.length === 0) throw new Error('A venda precisa ter ao menos um item.');
@@ -175,7 +181,7 @@ const commitSale = db.transaction((input) => {
   const bypassDiscountCap = userCan(input.actingRole, input.actingPermissions, 'unlimitedDiscount');
   let discountApprovedBy = null;
   if (!bypassDiscountCap) {
-    const maxPercent = Number(getConfig().vendorMaxDiscountPercent ?? 10);
+    const maxPercent = Number(getConfig(targetDb).vendorMaxDiscountPercent ?? 10);
     if (totalDiscountPercent > maxPercent + 0.001) {
       if (!input.discountApprovalProvided) {
         throw new Error(`Esse desconto passa do limite de ${maxPercent}% — peça a autorização de um administrador.`);
@@ -197,7 +203,7 @@ const commitSale = db.transaction((input) => {
   // (getConfig(), nunca de nada que o pedido tenha mandado) — o valor que
   // a tela mostrou antes de finalizar era só uma prévia usando a mesma
   // fórmula, quem decide de verdade é sempre o servidor.
-  const companyPolicies = getConfig();
+  const companyPolicies = getConfig(targetDb);
   const payments = (input.payments || []).map((p) => {
     // Achado de auditoria (P1, Red Team): nenhuma das duas checagens
     // existia antes — um `method` inventado entrava direto no ledger, e um
@@ -240,10 +246,10 @@ const commitSale = db.transaction((input) => {
   // agora conferido aqui (`fiadoLimitOverrideConfirmed`), não só confiado
   // de quem chamou.
   if (fiadoTotal > 0) {
-    const customerRow = getCustomerStmt.get(input.customerId);
+    const customerRow = targetDb.prepare(GET_CUSTOMER_SQL).get(input.customerId);
     const customer = customerRow ? JSON.parse(customerRow.data) : null;
     if (customer && customer.creditLimit > 0) {
-      const newBalance = customerDebtBalance(input.customerId) + fiadoTotal;
+      const newBalance = customerDebtBalance(input.customerId, targetDb) + fiadoTotal;
       if (newBalance > customer.creditLimit + 0.001 && !input.fiadoLimitOverrideConfirmed) {
         throw new Error(`Com essa venda, "${customer.nome}" vai ficar devendo ${newBalance.toFixed(2)}, acima do limite de ${customer.creditLimit.toFixed(2)} cadastrado — confirme que quer vender fiado mesmo assim.`);
       }
@@ -258,13 +264,13 @@ const commitSale = db.transaction((input) => {
   const creditPayment = payments.filter((p) => p.method === CREDIT_METHOD).reduce((s, p) => s + p.amount, 0);
   if (creditPayment > 0) {
     if (!input.customerId) throw new Error('Selecione um cliente para usar crédito de troca.');
-    const available = creditBalance(input.customerId);
+    const available = creditBalance(input.customerId, targetDb);
     if (creditPayment > available + CREDIT_TOLERANCE) {
       throw new Error(`O cliente só tem ${available.toFixed(2)} de crédito de troca disponível.`);
     }
   }
 
-  const openSession = resolveOpenSession(input.terminalId, input.userId);
+  const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
   const sale = {
     id: saleId,
     timestamp: Date.now(),
@@ -283,7 +289,7 @@ const commitSale = db.transaction((input) => {
     refunds: [],
     cashSessionId: openSession ? openSession.id : null,
   };
-  insertSaleStmt.run({ id: sale.id, timestamp: sale.timestamp, userId: sale.userId, customerId: sale.customerId, data: JSON.stringify(sale) });
+  targetDb.prepare(INSERT_SALE_SQL).run({ id: sale.id, timestamp: sale.timestamp, userId: sale.userId, customerId: sale.customerId, data: JSON.stringify(sale) });
 
   // Lança a dívida de fiado no MESMO commit da venda — uma venda com parte
   // em "Fiado" sem nenhuma dívida lançada no extrato do cliente seria
@@ -294,7 +300,7 @@ const commitSale = db.transaction((input) => {
       saleId: sale.id, paymentMethod: null, cashSessionId: sale.cashSessionId,
       note: '', userId: input.userId, userName: input.userName, timestamp: sale.timestamp,
     };
-    insertDebtEntryStmt.run({ id: debtEntry.id, customerId: debtEntry.customerId, timestamp: debtEntry.timestamp, data: JSON.stringify(debtEntry) });
+    targetDb.prepare(INSERT_DEBT_ENTRY_SQL).run({ id: debtEntry.id, customerId: debtEntry.customerId, timestamp: debtEntry.timestamp, data: JSON.stringify(debtEntry) });
   }
 
   // Consome o crédito de troca usado nesta venda (extrato, não um saldo
@@ -304,12 +310,12 @@ const commitSale = db.transaction((input) => {
       id: crypto.randomUUID(), customerId: sale.customerId, type: 'uso', amount: creditPayment,
       note: 'Usado como pagamento em venda', saleId: sale.id, userId: input.userId, userName: input.userName, timestamp: sale.timestamp,
     };
-    insertCreditStmt.run({ id: creditEntry.id, customerId: creditEntry.customerId, timestamp: creditEntry.timestamp, data: JSON.stringify(creditEntry) });
+    insertCreditEntry(creditEntry, targetDb);
   }
 
   // Pontos de fidelidade ganhos nesta venda (se configurado e a venda tiver
   // cliente) — mesma transação, mesmo raciocínio do fiado/crédito acima.
-  const { pointsPerReal } = getLoyaltyConfig();
+  const { pointsPerReal } = getLoyaltyConfig(targetDb);
   if (sale.customerId && pointsPerReal > 0) {
     const loyaltyPoints = Math.floor(total * pointsPerReal);
     if (loyaltyPoints > 0) {
@@ -317,11 +323,12 @@ const commitSale = db.transaction((input) => {
         id: crypto.randomUUID(), customerId: sale.customerId, type: 'ganho', points: loyaltyPoints,
         saleId: sale.id, note: '', userId: input.userId, userName: input.userName, timestamp: sale.timestamp,
       };
-      insertLoyaltyStmt.run({ id: loyaltyEntry.id, customerId: loyaltyEntry.customerId, timestamp: loyaltyEntry.timestamp, data: JSON.stringify(loyaltyEntry) });
+      insertLoyaltyEntry(loyaltyEntry, targetDb);
     }
   }
   return sale;
-});
+  })();
+}
 
 router.post('/', async (req, res) => {
   try {
@@ -343,7 +350,7 @@ router.post('/', async (req, res) => {
       ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, actingPermissions: req.userPermissions,
       discountApprovalProvided, approvedAdminId,
-    });
+    }, req.db || db);
     broadcast('sales-changed', { reason: 'created', id: sale.id });
     broadcast('products-changed', { reason: 'sale' });
     if (sale.customerId) broadcast('customers-changed', { reason: 'sale', id: sale.customerId });
@@ -357,6 +364,7 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/', (req, res) => {
+  const targetDb = req.db || db;
   const { sellerId, customerId, fromTs, toTs, limit = 50, afterTs, afterId } = req.query;
   const lim = Math.min(200, Number(limit) || 50);
 
@@ -373,7 +381,7 @@ router.get('/', (req, res) => {
   sql += ' ORDER BY timestamp DESC, id DESC LIMIT ?';
   params.push(lim + 1);
 
-  const rows = db.prepare(sql).all(...params);
+  const rows = targetDb.prepare(sql).all(...params);
   const hasMore = rows.length > lim;
   const page = rows.slice(0, lim).map(rowToSale);
   const last = page[page.length - 1];
@@ -386,7 +394,7 @@ router.get('/', (req, res) => {
   if (customerId) { countSql += ' AND customer_id = ?'; countParams.push(customerId); }
   if (fromTs) { countSql += ' AND timestamp >= ?'; countParams.push(Number(fromTs)); }
   if (toTs) { countSql += ' AND timestamp <= ?'; countParams.push(Number(toTs)); }
-  const summary = db.prepare(countSql).get(...countParams);
+  const summary = targetDb.prepare(countSql).get(...countParams);
 
   res.json({
     items: page, hasMore,
@@ -396,7 +404,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const row = getSaleStmt.get(req.params.id);
+  const row = (req.db || db).prepare(GET_SALE_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Venda não encontrada.' });
   res.json({ sale: rowToSale(row) });
 });
@@ -404,12 +412,13 @@ router.get('/:id', (req, res) => {
 /** Estorno (total ou parcial) — mesma ideia de atomicidade do commitSale:
  * conferir, marcar qtyRefunded e devolver ao estoque tudo dentro de uma
  * transação só. */
-const commitRefund = db.transaction((input) => {
+function commitRefund(input, targetDb) {
+  return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.
   if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  const row = getSaleStmt.get(input.saleId);
+  targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+  const row = targetDb.prepare(GET_SALE_SQL).get(input.saleId);
   if (!row) throw new Error('Venda não encontrada.');
   const sale = rowToSale(row);
   if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo do estorno.');
@@ -443,12 +452,12 @@ const commitRefund = db.transaction((input) => {
     totalRefunded += (item.lineTotal / item.qty) * qty;
     refundedItems.push({ productId: item.productId, name: item.name, qty });
 
-    const prodRow = getProductStmt.get(item.productId);
+    const prodRow = targetDb.prepare(GET_PRODUCT_SQL).get(item.productId);
     if (prodRow) {
       const product = rowToProduct(prodRow);
       product.quantity += qty;
-      saveProduct(product);
-      recordStockMovement({ productId: product.id, type: 'estorno', qty, userId: input.userId, userName: input.userName, note: `Estorno da venda ${sale.id}` });
+      saveProduct(product, targetDb);
+      recordStockMovement({ productId: product.id, type: 'estorno', qty, userId: input.userId, userName: input.userName, note: `Estorno da venda ${sale.id}` }, targetDb);
     }
   }
   if (refundedItems.length === 0) throw new Error('Marque ao menos um item para estornar.');
@@ -459,7 +468,7 @@ const commitRefund = db.transaction((input) => {
   // com o caixa de hoje aberto). computeExpectedAmounts (routes/cash.js) usa
   // isso pra saber em qual fechamento esse dinheiro que sai da gaveta entra
   // na conferência.
-  const openSession = resolveOpenSession(input.terminalId, input.userId);
+  const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
   const refund = {
     id: crypto.randomUUID(), timestamp: Date.now(), userId: input.userId, userName: input.userName,
     reason: input.reason.trim(), totalRefunded, items: refundedItems,
@@ -469,7 +478,7 @@ const commitRefund = db.transaction((input) => {
   };
   sale.refundedTotal += totalRefunded;
   sale.refunds.push(refund);
-  updateSaleStmt.run({ id: sale.id, customerId: sale.customerId, data: JSON.stringify(sale) });
+  targetDb.prepare(UPDATE_SALE_SQL).run({ id: sale.id, customerId: sale.customerId, data: JSON.stringify(sale) });
 
   // Estornar uma venda paga (total ou parcialmente) em fiado precisa reduzir
   // a dívida do cliente proporcionalmente — devolver a mercadoria mas
@@ -488,7 +497,7 @@ const commitRefund = db.transaction((input) => {
         saleId: sale.id, refundId: refund.id, paymentMethod: null, cashSessionId: null,
         note: 'Redução de dívida por estorno de venda', userId: input.userId, userName: input.userName, timestamp: Date.now(),
       };
-      insertDebtEntryStmt.run({ id: debtEntry.id, customerId: debtEntry.customerId, timestamp: debtEntry.timestamp, data: JSON.stringify(debtEntry) });
+      targetDb.prepare(INSERT_DEBT_ENTRY_SQL).run({ id: debtEntry.id, customerId: debtEntry.customerId, timestamp: debtEntry.timestamp, data: JSON.stringify(debtEntry) });
     }
   }
 
@@ -504,7 +513,7 @@ const commitRefund = db.transaction((input) => {
       note: `Crédito de troca gerado pelo estorno de uma venda`, saleId: sale.id, refundId: refund.id,
       userId: input.userId, userName: input.userName, timestamp: Date.now(),
     };
-    insertCreditStmt.run({ id: creditEntry.id, customerId: creditEntry.customerId, timestamp: creditEntry.timestamp, data: JSON.stringify(creditEntry) });
+    insertCreditEntry(creditEntry, targetDb);
   }
 
   // Reverte proporcionalmente os pontos de fidelidade ganhos por esta
@@ -512,7 +521,7 @@ const commitRefund = db.transaction((input) => {
   // Fica negativo se ele já tiver resgatado esses pontos antes do estorno;
   // mesmo compromisso adotado por qualquer programa de fidelidade real.
   if (sale.customerId && sale.total > 0) {
-    const pointsEarned = listLoyaltyLedger(sale.customerId)
+    const pointsEarned = listLoyaltyLedger(sale.customerId, targetDb)
       .filter((e) => e.saleId === sale.id && e.type === 'ganho')
       .reduce((s, e) => s + e.points, 0);
     if (pointsEarned > 0) {
@@ -522,12 +531,13 @@ const commitRefund = db.transaction((input) => {
           id: crypto.randomUUID(), customerId: sale.customerId, type: 'estorno', points: pointsToReverse,
           saleId: sale.id, note: '', userId: input.userId, userName: input.userName, timestamp: Date.now(),
         };
-        insertLoyaltyStmt.run({ id: loyaltyEntry.id, customerId: loyaltyEntry.customerId, timestamp: loyaltyEntry.timestamp, data: JSON.stringify(loyaltyEntry) });
+        insertLoyaltyEntry(loyaltyEntry, targetDb);
       }
     }
   }
   return { sale, debtReduced };
-});
+  })();
+}
 
 router.post('/:id/refund', async (req, res) => {
   try {
@@ -552,7 +562,7 @@ router.post('/:id/refund', async (req, res) => {
     const { sale, debtReduced } = commitRefund({
       ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, approvedAdminId,
-    });
+    }, req.db || db);
     broadcast('sales-changed', { reason: 'refunded', id: sale.id });
     broadcast('products-changed', { reason: 'refund' });
     if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId });

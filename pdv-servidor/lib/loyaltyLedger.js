@@ -7,20 +7,24 @@ import { db } from '../db/index.js';
 
 const LIST_LOYALTY_SQL = 'SELECT data FROM loyalty_entries WHERE customer_id = ? ORDER BY timestamp DESC';
 const LIST_CREDITS_SQL = 'SELECT data FROM store_credits WHERE customer_id = ? ORDER BY timestamp DESC';
-// insertLoyaltyStmt/insertCreditStmt continuam exportados como statements
-// crus (não convertidos nesta fatia da etapa 5 do roteiro multi-tenant) —
-// são importados e chamados direto (`insertLoyaltyStmt.run(...)`) por
-// routes/sales.js e routes/loyalty.js, então dar a eles um `targetDb`
-// opcional exigiria mudar esses dois call sites JUNTO, o que quebraria a
-// promessa desta fatia de não tocar rota nenhuma ainda. Ficam pra quando
-// essas duas rotas forem convertidas.
-export const insertLoyaltyStmt = db.prepare('INSERT INTO loyalty_entries (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)');
-export const insertCreditStmt = db.prepare('INSERT INTO store_credits (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)');
+const INSERT_LOYALTY_SQL = 'INSERT INTO loyalty_entries (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
+const INSERT_CREDIT_SQL = 'INSERT INTO store_credits (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
 
-// `targetDb` opcional nas quatro funções abaixo (etapa 5 do roteiro
+// `targetDb` opcional em todas as funções abaixo (etapa 5 do roteiro
 // multi-tenant, ver artifact "PDV Multi-Tenant") — normalmente req.db,
 // resolvido pelo tenant da requisição. Sem ele (todo call site de hoje),
-// lê o banco fixo do processo, comportamento idêntico a sempre.
+// opera no banco fixo do processo, comportamento idêntico a sempre.
+// insertLoyaltyEntry/insertCreditEntry substituem os antigos
+// insertLoyaltyStmt/insertCreditStmt (statements crus pré-montados) agora
+// que routes/sales.js e routes/loyalty.js, os únicos dois call sites,
+// também foram convertidos nesta mesma fatia.
+export function insertLoyaltyEntry(record, targetDb = db) {
+  targetDb.prepare(INSERT_LOYALTY_SQL).run({ id: record.id, customerId: record.customerId, timestamp: record.timestamp, data: JSON.stringify(record) });
+}
+
+export function insertCreditEntry(record, targetDb = db) {
+  targetDb.prepare(INSERT_CREDIT_SQL).run({ id: record.id, customerId: record.customerId, timestamp: record.timestamp, data: JSON.stringify(record) });
+}
 export function listLoyaltyLedger(customerId, targetDb = db) {
   return targetDb.prepare(LIST_LOYALTY_SQL).all(customerId).map((r) => JSON.parse(r.data));
 }
