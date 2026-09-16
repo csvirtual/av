@@ -148,6 +148,42 @@ function tenantAccessBlockedReason(tenant) {
   return null;
 }
 
+function escapeBlockedPageHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Achado do usuário: a página de bloqueio deixava a loja sem nenhum jeito
+// de agir, só um aviso — precisa dos mesmos botões de contato (WhatsApp e
+// e-mail) que já existem em public/js/components/supportContact.js pro
+// resto do app, com a mesma mensagem pré-preenchida (nome da loja e CNPJ,
+// quando dá pra saber quais são). Ícones copiados literalmente de
+// components/icon.js (`whatsapp`/`mail`) — mesma técnica do ícone de
+// aviso abaixo, porque esta página não pode depender de nenhum arquivo
+// externo (ver comentário de renderTenantBlockedPage).
+const SUPPORT_WHATSAPP = '5571986461027';
+const SUPPORT_EMAIL = 'csvirtual.av@gmail.com';
+function renderTenantContactButtons(message, tenant) {
+  const lines = [`Olá! Uso o sistema PDV - C&S Virtual e preciso de ajuda: ${message}`];
+  if (tenant) {
+    lines.push('', `Loja: ${tenant.nome_fantasia || tenant.razao_social || '(não identificada)'}`, `CNPJ: ${tenant.cnpj || '(não identificado)'}`);
+  }
+  const contactMessage = lines.join('\n');
+  const waHref = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(contactMessage)}`;
+  const mailHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('PDV - C&S Virtual: preciso de ajuda')}&body=${encodeURIComponent(contactMessage)}`;
+  return `
+    <p class="contact-hint">Precisa de ajuda? Fale com o suporte.</p>
+    <div class="contact-row">
+      <a class="contact-btn" href="${waHref}" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="wa-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#32D96A"/><stop offset="100%" stop-color="#1EAE53"/></linearGradient></defs><circle cx="12" cy="12" r="10" fill="url(#wa-grad)"/><path d="M12 5.3a6.7 6.7 0 00-5.72 10.15L5.4 18.7l3.34-.88A6.7 6.7 0 1012 5.3z" fill="#fff"/><path d="M9.06 8.4c.24-.53.49-.54.72-.55.19-.01.4-.01.58.01.2.02.47-.08.73.55.28.65.92 2.27 1 2.43.09.17.14.36.02.57-.11.22-.17.34-.33.53-.17.19-.35.42-.5.57-.17.17-.34.35-.15.68.2.34.88 1.44 1.89 2.33 1.3 1.15 2.39 1.51 2.73 1.68.34.17.54.15.74-.08.2-.24.86-1 1.09-1.34.23-.34.47-.28.78-.17.32.12 2.02.95 2.36 1.12.34.17.56.26.65.4.08.15.08.85-.2 1.66-.29.82-1.64 1.6-2.29 1.68-.58.08-1.3.11-2.1-.14-.48-.15-1.09-.35-1.88-.69-3.31-1.43-5.47-4.77-5.64-5-.17-.22-1.35-1.79-1.35-3.42 0-1.63.85-2.42 1.15-2.75z" fill="#1EAE53"/></svg>
+        <span>WhatsApp</span>
+      </a>
+      <a class="contact-btn" href="${mailHref}">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mail-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6EA8FF"/><stop offset="100%" stop-color="#3F7FF0"/></linearGradient></defs><rect x="2" y="4" width="20" height="16" rx="4.5" fill="url(#mail-grad)"/><path d="M2.6 6.3l8.75 6.9c.38.3.92.3 1.3 0l8.75-6.9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>E-mail</span>
+      </a>
+    </div>`;
+}
+
 // Achado do usuário (print): a tela de "loja não encontrada"/"loja
 // suspensa" saía como TEXTO PURO (res.send de uma string vira
 // text/html sem nenhum estilo — fonte padrão do navegador, sem cor, sem
@@ -157,7 +193,7 @@ function tenantAccessBlockedReason(tenant) {
 // abaixo é 100% autocontida (mesmos tokens de cor copiados de
 // public-signup/signup.css, mesmo ícone de aviso de components/icon.js)
 // — nasce e morre sem depender de nenhum outro arquivo.
-function renderTenantBlockedPage(message) {
+function renderTenantBlockedPage(message, tenant) {
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -169,12 +205,16 @@ function renderTenantBlockedPage(message) {
     --bg: #f4f6f5; --surface: #ffffff; --text: #1c2523; --text-muted: #62716d;
     --primary: #145333; --primary-dark: #0d3b24;
     --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+    --contact-border: rgba(20, 83, 51, 0.15);
+    --contact-hover: rgba(20, 83, 51, 0.08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #101613; --surface: #1a221e; --text: #e9efec; --text-muted: #93a89e;
       --primary: #2f9d6b; --primary-dark: #0d2b1c;
       --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+      --contact-border: rgba(233, 239, 236, 0.15);
+      --contact-hover: rgba(47, 157, 107, 0.18);
     }
   }
   * { box-sizing: border-box; }
@@ -197,13 +237,24 @@ function renderTenantBlockedPage(message) {
   }
   h1 { font-size: 20px; margin: 14px 0 8px; text-wrap: balance; }
   p { color: var(--text-muted); font-size: 14px; margin: 0; line-height: 1.5; }
+  .contact-hint { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--contact-border); font-size: 13px; }
+  .contact-row { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .contact-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--bg); border: 1px solid var(--contact-border);
+    color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600;
+    transition: background 0.15s ease;
+  }
+  .contact-btn:hover { background: var(--contact-hover); }
 </style>
 </head>
 <body>
   <div class="card">
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
     <h1>Loja indisponível</h1>
-    <p>${message.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</p>
+    <p>${escapeBlockedPageHtml(message)}</p>
+    ${renderTenantContactButtons(message, tenant)}
   </div>
 </body>
 </html>
@@ -213,9 +264,9 @@ function renderTenantBlockedPage(message) {
 // API (fetch de JS que já tenha carregado) precisa continuar recebendo
 // JSON, não HTML — só a NAVEGAÇÃO de página (o que o navegador mostra na
 // aba) usa a página estilizada acima.
-function sendTenantBlocked(req, res, status, message) {
+function sendTenantBlocked(req, res, status, message, tenant) {
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
-  res.status(status).type('html').send(renderTenantBlockedPage(message));
+  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant));
 }
 // Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
@@ -266,7 +317,7 @@ app.use((req, res, next) => {
   }
   const blockedReason = tenantAccessBlockedReason(tenant);
   if (blockedReason) {
-    return sendTenantBlocked(req, res, 403, blockedReason);
+    return sendTenantBlocked(req, res, 403, blockedReason, tenant);
   }
   req.tenantId = tenant.id;
   req.db = getTenantDb(tenant.id);

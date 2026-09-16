@@ -94,6 +94,12 @@ try {
   const suspensoStatic = await request(`${slugSuspenso}.${DOMAIN}`, { reqPath: '/index.html' });
   check('loja "suspenso" também bloqueada pra estático (nada carrega, nem a página)', suspensoStatic.status === 403, suspensoStatic.status);
   check('bloqueio de página (não-API) devolve HTML estilizado, não texto puro', typeof suspensoStatic.body === 'string' && suspensoStatic.body.includes('<html') && /suspensa/i.test(suspensoStatic.body), suspensoStatic.body?.slice(0, 120));
+  // Achado do usuário: a página de bloqueio precisa de um jeito de agir —
+  // botões de WhatsApp e e-mail pra contato com o suporte, com a mensagem
+  // já pré-preenchida com o nome da loja e o CNPJ.
+  check('página de bloqueio tem botão de WhatsApp com o número certo', suspensoStatic.body.includes('https://wa.me/5571986461027?text='), suspensoStatic.body.match(/href="([^"]*wa\.me[^"]*)"/)?.[1]);
+  check('página de bloqueio tem botão de e-mail com o endereço certo', suspensoStatic.body.includes('mailto:csvirtual.av@gmail.com?subject='), suspensoStatic.body.match(/href="(mailto:[^"]*)"/)?.[1]);
+  check('mensagem pré-preenchida inclui o nome da loja', suspensoStatic.body.includes(encodeURIComponent(`Loja: Assinatura ${slugSuspenso}`)), null);
 
   // Cancelado.
   setTenantStatus(slugCancelado, 'cancelado');
