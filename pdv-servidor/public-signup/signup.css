@@ -1,0 +1,89 @@
+:root {
+  --brand: #145333;
+  --brand-dark: #0d3a24;
+  --bg: #f4f6f5;
+  --card-bg: #ffffff;
+  --border: #dde3e0;
+  --text: #1f2b26;
+  --text-muted: #5b6b64;
+  --danger: #b3261e;
+  --ok: #146c43;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px; }
+
+.signup-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signup-card h1 { margin: 0 0 4px; font-size: 22px; color: var(--brand-dark); }
+.signup-card .subtitle { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }
+.signup-card label { font-size: 13px; font-weight: 600; margin-top: 12px; }
+.signup-card input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.slug-row { display: flex; align-items: center; gap: 6px; }
+.slug-row input { flex: 1; min-width: 0; }
+#slug-domain { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
+.feedback { font-size: 12px; min-height: 16px; margin: 4px 0 0; }
+.feedback.ok { color: var(--ok); }
+.feedback.bad { color: var(--danger); }
+
+.signup-card button {
+  margin-top: 20px;
+  padding: 12px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.signup-card button:hover { background: var(--brand-dark); }
+.signup-card button:disabled { opacity: 0.6; cursor: default; }
+.signup-card .error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 8px 0 0; }
+
+#success-card a { font-size: 16px; font-weight: 600; color: var(--brand); }
+
+#toast-root {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.toast {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.toast.error { background: var(--danger); }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV Multi-Tenant — Criar minha loja</title>
+<link rel="stylesheet" href="signup.css">
+</head>
+<body>
+  <!--
+    Etapa 9 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+    cadastro self-service — formulário público, sem login, que provisiona
+    uma loja nova (routes/signup.js -> scripts/createTenant.js#createNewTenant,
+    mesma função da CLI). De propósito sem cobrança nenhuma: toda loja
+    nasce em "trial". Sem contrapartida na extensão — tela nova, fora da
+    regra de paridade visual do CLAUDE.md (que vale só pra telas que
+    existem nos dois produtos).
+  -->
+  <div id="toast-root" aria-live="polite"></div>
+
+  <main id="signup-screen">
+    <form id="signup-form" class="signup-card">
+      <h1>Criar minha loja</h1>
+      <p class="subtitle">PDV Multi-Tenant — comece grátis, sem cartão de crédito.</p>
+
+      <label for="nome-fantasia">Nome da loja</label>
+      <input id="nome-fantasia" name="nomeFantasia" type="text" maxlength="120" required>
+
+      <label for="razao-social">Razão social</label>
+      <input id="razao-social" name="razaoSocial" type="text" maxlength="120" required>
+
+      <label for="slug">Endereço da sua loja</label>
+      <div class="slug-row">
+        <input id="slug" name="slug" type="text" maxlength="30" required autocomplete="off" spellcheck="false">
+        <span id="slug-domain"></span>
+      </div>
+      <p id="slug-feedback" class="feedback"></p>
+
+      <button type="submit">Criar loja grátis</button>
+      <p id="signup-error" class="error" role="alert"></p>
+    </form>
+
+    <div id="success-card" class="signup-card" hidden>
+      <h1>Loja criada!</h1>
+      <p>Sua loja já está pronta em:</p>
+      <p><a id="success-link" href="#" target="_blank" rel="noopener"></a></p>
+      <p>Entre com o usuário <strong>admin</strong> e a senha
+        <strong>admin123</strong> — você vai precisar trocar essa senha no
+        primeiro login.</p>
+    </div>
+  </main>
+
+  <script src="signup.js"></script>
+</body>
+</html>
