@@ -38,6 +38,16 @@ porque já se repetiu mais de uma vez e não deveria ser esquecido. Se
 alguma dessas falhas voltar a acontecer isolada (não só numa bateria
 completa), é hora de investigar a fundo.
 
+**Modo multi-tenant (SaaS), além do single-tenant descrito acima** — ver
+seção "Modo multi-tenant (SaaS)" no final deste README: um único processo
+`node server.js`, com `MULTI_TENANT_DOMAIN` configurada, serve VÁRIAS
+lojas ao mesmo tempo, cada uma com seu próprio banco `.sqlite3`
+(isolamento físico, não `tenant_id` numa tabela compartilhada), resolvida
+por subdomínio (`lojax.<dominio>`). Etapas 1-8 do roteiro completas e
+testadas; sem `MULTI_TENANT_DOMAIN` (o caso de toda instalação single-
+tenant existente, tudo documentado acima), o comportamento é idêntico ao
+de sempre — este modo é inteiramente opt-in.
+
 ## Roteiro — 10 fases
 
 | # | Fase | Status |
@@ -1507,3 +1517,119 @@ lacunas de uso descobertas na prática.
   /api/loyalty/config`) — texto ajustado pra não apontar um caminho
   que não existe, telinha em si fica pra outra hora. Suíte oficial
   (`test-personalizacao-ajuda.cjs`, 16 asserções) continua verde.
+
+## Modo multi-tenant (SaaS) — roteiro completo (16/set)
+
+Transformação do produto single-tenant descrito acima (uma instalação =
+uma loja) num modo opcional onde um único processo `node server.js`
+hospeda VÁRIAS lojas ao mesmo tempo, cada uma resolvida pelo subdomínio
+do pedido (`lojax.<dominio>` → banco `dados-da-loja.sqlite3` da loja X).
+Decisão de arquitetura ("Estratégia B", documentada num artifact à parte
+— "PDV Multi-Tenant"): **um arquivo `.sqlite3` inteiro por loja**, nunca
+uma tabela compartilhada com `tenant_id` — o isolamento é físico (dois
+arquivos diferentes no disco), não lógico (uma cláusula `WHERE` que um
+bug poderia esquecer). `db/schema.sql` (schema de CADA loja) não mudou
+uma linha — é o mesmo schema single-tenant, só que agora pode existir
+repetido, um arquivo por loja.
+
+**Continua 100% opt-in.** Sem a variável de ambiente `MULTI_TENANT_DOMAIN`
+definida — o caso de toda instalação single-tenant existente, incluindo
+tudo documentado nas seções acima — o comportamento observável é idêntico
+ao de sempre, byte a byte: nenhuma rota muda de forma, nenhum teste da
+suíte original precisou mudar. Cada etapa do roteiro abaixo foi construída
+e testada com essa premissa como critério de aceite.
+
+| # | Etapa | O que faz |
+|---|-------|-----------|
+| 1 | Banco de controle | `control/plataforma.sqlite3` (schema próprio, `control/schema.sql`) — tabela `tenants` (slug, razão social, CNPJ, status, plano, caminho do banco, vencimento) e `platform_admins`. Provisionamento via CLI, `scripts/createTenant.js --new`/`--from-existing`. |
+| 2 | Pool de conexões | `db/index.js` vira um `Map<tenantId, conexão>` (`getTenantDb`), abrindo cada banco de loja só uma vez, reaproveitado entre requisições. `db/connection.js#openTenantConnection` (aplica schema + migrações) usado tanto pelo pool quanto pelo script de provisionamento — nenhuma lógica duplicada. |
+| 3 | Resolução por Host | Middleware em `server.js`: `lojax.<MULTI_TENANT_DOMAIN>` → slug `lojax` → tenant no banco de controle → `req.tenantId`/`req.db` prontos pra requisição inteira. Host desconhecido (fora do domínio, ou slug não cadastrado) → `404`. |
+| 4 | Prova de isolamento físico | Dois tenants provisionados de verdade, mesma bateria de requisições HTTP concorrentes — confirma que Host errado nunca enxerga dado do outro. |
+| 5 | Conversão de `routes/*.js` + `lib/*.js` | Todo `db.prepare(...)` fixo virou `(req.db \|\| db).prepare(...)` — cada rota lê/escreve o banco do TENANT da requisição, com fallback pro banco fixo do processo quando não há multi-tenant configurada (mesmo comportamento de sempre). Maior etapa do roteiro, feita em 8 fatias pequenas e testáveis (5a-5h), uma por grupo de rotas. |
+| 6 | WebSocket por tenant | `lib/broadcast.js`: `Set` único de conexões vira `Map<tenantId, Set>` — um terminal da Loja A nunca recebe aviso de tempo real de uma mudança na Loja B. |
+| 7 | Assinatura controlada pela plataforma | `tenants.status`/`expires_at` no banco de controle — uma loja "suspenso"/"cancelado"/vencida é bloqueada com `403` ANTES de qualquer rota (HTTP e WebSocket), independente do mecanismo de trial/chave de ativação de cada loja (que continua existindo por baixo, é o licenciamento do produto on-premise). |
+| 8 | Painel de Super Admin | `admin.<MULTI_TENANT_DOMAIN>` — SPA mínima (login + tabela de lojas com status/vencimento editáveis), autenticação própria (`platform_admins`, cookie `admin_session`, nunca confundido com sessão de loja). Mesma função (`control/db.js#setTenantStatus`) usada tanto pela CLI quanto pelo painel — nenhuma lógica duplicada. |
+
+Cada etapa tem seu próprio `test-tenant*.mjs` (raiz de `pdv-servidor/`),
+rodando contra um servidor real com `MULTI_TENANT_DOMAIN` configurada,
+via requisições HTTP cruas (`node:http`, não `fetch` — o Fetch do
+navegador proíbe scripts de sobrescrever o cabeçalho `Host`, que é
+exatamente o que esses testes precisam simular duas "lojas" diferentes
+batendo no mesmo `localhost`): `test-createTenant.mjs`,
+`test-getTenantDb.mjs`, `test-tenantResolver.mjs`,
+`test-tenantIsolation.mjs`, `test-tenantAuthRoutes.mjs`,
+`test-tenantCashRoutes.mjs`, `test-tenantMiscRoutes.mjs`,
+`test-tenantFinanceRoutes.mjs`, `test-tenantProductsUsersRoutes.mjs`,
+`test-tenantBackupRoutes.mjs`, `test-tenantSalesLoyaltyRoutes.mjs`,
+`test-tenantWebSocket.mjs`, `test-tenantSubscriptionGate.mjs`,
+`test-tenantAdminPanel.mjs`.
+
+### Como rodar em modo multi-tenant
+
+```
+cd pdv-servidor
+npm install
+MULTI_TENANT_DOMAIN=meudominio.com.br node server.js
+```
+
+Provisionar uma loja nova (CLI — não existe cadastro self-service ainda,
+ver "O que falta" abaixo):
+
+```
+node scripts/createTenant.js --new lojax "Loja X Comércio LTDA" "Loja X"
+```
+
+Cria `tenants/lojax/dados-da-loja.sqlite3` (schema aplicado, usuário
+`admin`/`admin123` com troca de senha obrigatória no primeiro login) e
+registra a loja no banco de controle com status `trial`, sem vencimento.
+Acessível em `http://lojax.meudominio.com.br:3131` (com DNS/proxy reais
+na frente, sem porta — ver "O que falta").
+
+Adotar um banco `.sqlite3` já existente (ex: migrar uma instalação
+single-tenant pra dentro do SaaS):
+
+```
+node scripts/createTenant.js --from-existing lojax /caminho/dados-da-loja.sqlite3
+```
+
+Faz uma cópia de segurança (`.bak`) do arquivo original antes de tocar
+nele, garante que o WAL foi gravado, e MOVE o arquivo pra dentro da nova
+estrutura de pastas — nenhum dado é reescrito.
+
+Suspender, cancelar, reativar ou mudar o vencimento de uma loja (mesma
+função por trás da CLI e do painel de Super Admin):
+
+```
+node scripts/createTenant.js --set-status lojax suspenso
+node scripts/createTenant.js --set-status lojax ativo 2026-12-31
+node scripts/createTenant.js --set-status lojax ativo null   # remove o vencimento
+```
+
+Criar (ou redefinir a senha de) um administrador da plataforma — quem
+acessa o painel de Super Admin:
+
+```
+node scripts/seedPlatformAdmin.js meuusuario "senha-com-8-ou-mais-caracteres"
+```
+
+Painel em `http://admin.meudominio.com.br:3131` — login, tabela de todas
+as lojas cadastradas, status e vencimento editáveis por linha.
+
+### O que falta pra produção de verdade
+
+Fora do roteiro de código acima (que está completo, etapas 1-8 testadas)
+e fora do que dá pra fazer só com acesso a este repositório:
+
+- **DNS wildcard + TLS** (`*.meudominio.com.br` apontando pro servidor +
+  certificado de verdade) — infraestrutura de quem hospeda, não código
+  deste repositório. Sem isso, o modo multi-tenant só funciona testado
+  localmente (como os `test-tenant*.mjs` fazem, com `Host` forjado
+  direto contra `127.0.0.1`).
+- **Cobrança/pagamento automático** — hoje suspender/reativar uma loja é
+  sempre manual (CLI ou painel), sem integração com nenhum gateway
+  (Stripe, Pagar.me, etc.) que marque `status`/`expires_at` sozinho
+  quando alguém paga ou atrasa. `tenants.plano` é só um texto genérico,
+  de propósito, esperando essa decisão (ver `control/schema.sql`).
+- **Cadastro self-service** — criar uma loja nova exige acesso à máquina
+  onde o servidor roda (CLI); não existe formulário público nem fluxo de
+  "assinar agora" que provisione uma loja sozinho.
