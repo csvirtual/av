@@ -1,0 +1,204 @@
+// Provisiona uso multi-tenant (Estratégia B — ver artifact "PDV
+// Multi-Tenant"): cria um banco de loja novo, do zero, OU adota um banco
+// `.sqlite3` já em uso (ex: a instalação atual, de loja única) — e
+// registra a loja no banco de controle (control/plataforma.sqlite3).
+//
+// Etapa 1 do roteiro: só esta ferramenta existe por enquanto. Nenhuma rota
+// HTTP chama isto, e server.js/db/index.js/routes/*.js ainda não sabem que
+// "tenant" existe — nada muda no PDV rodando hoje. Isolado de propósito:
+// abre a conexão do banco-alvo diretamente (`new Database(...)`), nunca via
+// o singleton de db/index.js (que aponta sempre pro mesmo arquivo fixo).
+//
+// Uso:
+//   node scripts/createTenant.js --new <slug> "<Razão Social>" "<Nome Fantasia>"
+//   node scripts/createTenant.js --from-existing <slug> <caminho-do-sqlite3> ["<Razão Social>"] ["<Nome Fantasia>"]
+//
+//   --new             cria um banco vazio (mesmo db/schema.sql de sempre) +
+//                     usuário admin inicial (mesma credencial padrão de
+//                     sempre: admin/admin123, com troca obrigatória no
+//                     primeiro login — ver lib/seedAdmin.js).
+//   --from-existing   adota um banco `.sqlite3` já em uso: faz uma cópia de
+//                     segurança (.bak) do arquivo original ao lado dele,
+//                     garante que o conteúdo do WAL foi gravado no arquivo
+//                     principal, e MOVE o arquivo pra dentro da nova
+//                     estrutura de pastas — sem alterar uma linha do
+//                     conteúdo dele. Se razão social/nome fantasia não
+//                     forem passados, tenta ler da própria tabela `company`
+//                     do banco adotado.
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { controlDb } from '../control/db.js';
+import { hashPassword } from '../lib/auth.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = path.join(__dirname, '..');
+const TENANTS_DIR = path.join(ROOT_DIR, 'tenants');
+const SCHEMA_SQL = fs.readFileSync(path.join(ROOT_DIR, 'db', 'schema.sql'), 'utf8');
+
+// Mesma lista citada no artifact (§3) — nome de loja não pode colidir com
+// um subdomínio que o próprio sistema vai reservar pra rotas administrativas
+// (ex: admin.<dominio>, api.<dominio>) quando a resolução por Host entrar
+// numa etapa futura do roteiro.
+const RESERVED_SLUGS = new Set([
+  'www', 'app', 'api', 'admin', 'painel', 'suporte', 'mail', 'ftp', 'static', 'ws',
+]);
+
+function validateSlug(slug) {
+  if (typeof slug !== 'string' || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) {
+    throw new Error(`Slug inválido: "${slug}". Use só letras minúsculas, números e hífen (ex: "loja-silva").`);
+  }
+  if (slug.length < 3 || slug.length > 30) {
+    throw new Error(`Slug "${slug}" precisa ter entre 3 e 30 caracteres.`);
+  }
+  if (RESERVED_SLUGS.has(slug)) {
+    throw new Error(`Slug "${slug}" é reservado pelo próprio sistema — escolha outro.`);
+  }
+  const existing = controlDb.prepare('SELECT 1 FROM tenants WHERE slug = ?').get(slug);
+  if (existing) {
+    throw new Error(`Já existe uma loja cadastrada com o slug "${slug}".`);
+  }
+}
+
+function seedAdminInto(tenantDb) {
+  // Duplicata mínima e proposital de lib/seedAdmin.js#ensureAdminUser: aquela
+  // função está amarrada ao singleton de db/index.js (import fixo), então
+  // não dá pra chamá-la contra um banco de tenant recém-criado sem antes
+  // fazer db/index.js virar getTenantDb() — mudança que só entra numa etapa
+  // futura do roteiro (etapa 1 não altera nenhum arquivo existente). Mesma
+  // credencial padrão, mesmo mustChangePassword forçado no primeiro login.
+  return hashPassword('admin123').then(({ salt, hash }) => {
+    const user = {
+      id: crypto.randomUUID(),
+      nome: 'Administrador',
+      username: 'admin',
+      usernameLower: 'admin',
+      role: 'admin',
+      permissions: {},
+      passwordSalt: salt,
+      passwordHash: hash,
+      active: true,
+      hasSeenAjuda: false,
+      mustChangePassword: true,
+      createdAt: Date.now(),
+    };
+    tenantDb.prepare('INSERT INTO users (id, username_lower, data) VALUES (?, ?, ?)')
+      .run(user.id, user.usernameLower, JSON.stringify(user));
+  });
+}
+
+function readCompanyConfig(tenantDb) {
+  try {
+    const row = tenantDb.prepare("SELECT data FROM company WHERE id = 'config'").get();
+    return row ? JSON.parse(row.data) : {};
+  } catch {
+    return {};
+  }
+}
+
+function registerTenant({ slug, razaoSocial, nomeFantasia, cnpj, dbPath, status }) {
+  const tenant = {
+    id: crypto.randomUUID(),
+    slug,
+    razaoSocial: razaoSocial || slug,
+    nomeFantasia: nomeFantasia || slug,
+    cnpj: cnpj || null,
+    status,
+    dbPath,
+    createdAt: Date.now(),
+  };
+  controlDb.prepare(`
+    INSERT INTO tenants (id, slug, razao_social, nome_fantasia, cnpj, status, plano, db_path, created_at, expires_at)
+    VALUES (@id, @slug, @razaoSocial, @nomeFantasia, @cnpj, @status, @status, @dbPath, @createdAt, NULL)
+  `).run(tenant);
+  return tenant;
+}
+
+async function createNewTenant(slug, razaoSocial, nomeFantasia) {
+  validateSlug(slug);
+  const tenantDir = path.join(TENANTS_DIR, slug);
+  const dbPath = path.join(tenantDir, 'dados-da-loja.sqlite3');
+  fs.mkdirSync(tenantDir, { recursive: true });
+
+  const tenantDb = new Database(dbPath);
+  tenantDb.pragma('journal_mode = WAL');
+  tenantDb.pragma('foreign_keys = ON');
+  tenantDb.exec(SCHEMA_SQL);
+  await seedAdminInto(tenantDb);
+  tenantDb.close();
+
+  const tenant = registerTenant({ slug, razaoSocial, nomeFantasia, cnpj: null, dbPath, status: 'trial' });
+  console.log(`Loja "${slug}" criada (nova, vazia) em ${dbPath}`);
+  console.log(`Usuário criado: username="admin" senha="admin123" (troque no primeiro login).`);
+  return tenant;
+}
+
+function adoptExistingTenant(slug, sourcePath, razaoSocialArg, nomeFantasiaArg) {
+  validateSlug(slug);
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Arquivo não encontrado: ${sourcePath}`);
+  }
+
+  // Sanity check: precisa parecer um banco deste sistema (tabela `users`
+  // existe), não qualquer `.sqlite3` qualquer.
+  const probe = new Database(sourcePath, { readonly: true });
+  const looksValid = probe.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+  if (!looksValid) {
+    probe.close();
+    throw new Error(`"${sourcePath}" não parece um banco de dados deste sistema (tabela "users" não encontrada).`);
+  }
+  const existingConfig = readCompanyConfig(probe);
+  probe.close();
+
+  // Cópia de segurança antes de qualquer coisa tocar o arquivo original.
+  const backupPath = `${sourcePath}.bak-${Date.now()}`;
+  fs.copyFileSync(sourcePath, backupPath);
+  console.log(`Cópia de segurança criada em ${backupPath}`);
+
+  // Garante que tudo que está no WAL foi gravado no arquivo principal antes
+  // de mover — senão o arquivo movido pode ficar sem as escritas mais
+  // recentes (que ficariam pra trás, no -wal antigo).
+  const checkpoint = new Database(sourcePath);
+  checkpoint.pragma('wal_checkpoint(TRUNCATE)');
+  checkpoint.close();
+
+  const tenantDir = path.join(TENANTS_DIR, slug);
+  const dbPath = path.join(tenantDir, 'dados-da-loja.sqlite3');
+  fs.mkdirSync(tenantDir, { recursive: true });
+  fs.renameSync(sourcePath, dbPath);
+
+  const razaoSocial = razaoSocialArg || existingConfig.razaoSocial;
+  const nomeFantasia = nomeFantasiaArg || existingConfig.nomeFantasia;
+  const cnpj = existingConfig.cnpj || null;
+  const tenant = registerTenant({ slug, razaoSocial, nomeFantasia, cnpj, dbPath, status: 'ativo' });
+  console.log(`Loja "${slug}" adotada: ${sourcePath} -> ${dbPath}`);
+  return tenant;
+}
+
+async function main() {
+  const [mode, ...rest] = process.argv.slice(2);
+  if (mode === '--new') {
+    const [slug, razaoSocial, nomeFantasia] = rest;
+    if (!slug) throw new Error('Uso: node scripts/createTenant.js --new <slug> "<Razão Social>" "<Nome Fantasia>"');
+    await createNewTenant(slug, razaoSocial, nomeFantasia);
+  } else if (mode === '--from-existing') {
+    const [slug, sourcePath, razaoSocial, nomeFantasia] = rest;
+    if (!slug || !sourcePath) throw new Error('Uso: node scripts/createTenant.js --from-existing <slug> <caminho-do-sqlite3> ["<Razão Social>"] ["<Nome Fantasia>"]');
+    adoptExistingTenant(slug, sourcePath, razaoSocial, nomeFantasia);
+  } else {
+    throw new Error('Uso: node scripts/createTenant.js --new|--from-existing ...');
+  }
+  process.exit(0);
+}
+
+// Só roda main() quando chamado direto (`node scripts/createTenant.js`) —
+// os testes importam createNewTenant/adoptExistingTenant sem disparar a CLI.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((err) => {
+    console.error('Falha:', err.message);
+    process.exit(1);
+  });
+}
+
+export { createNewTenant, adoptExistingTenant, validateSlug, RESERVED_SLUGS };
