@@ -16,18 +16,23 @@ import { logAction } from '../lib/audit.js';
 
 const router = Router();
 
-const insertUserStmt = db.prepare('INSERT INTO users (id, username_lower, data) VALUES (@id, @usernameLower, @data)');
-const updateUserStmt = db.prepare('UPDATE users SET data = @data WHERE id = @id');
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const INSERT_USER_SQL = 'INSERT INTO users (id, username_lower, data) VALUES (@id, @usernameLower, @data)';
+const UPDATE_USER_SQL = 'UPDATE users SET data = @data WHERE id = @id';
 // Só usado no PUT /:id, que agora também pode mudar o login (ver abaixo) —
 // `username_lower` é uma COLUNA própria (não só um campo dentro do JSON de
-// `data`), usada pra achar a conta no login (ver findByUsernameStmt.js/
+// `data`), usada pra achar a conta no login (ver GET_USER_BY_USERNAME_SQL/
 // verifyLogin.js). Gravar só `data` e esquecer desta coluna deixaria o
 // login antigo continuando a funcionar (e o novo, não) — sempre as duas
 // juntas, na mesma escrita.
-const updateUserFullStmt = db.prepare('UPDATE users SET data = @data, username_lower = @usernameLower WHERE id = @id');
-const getUserStmt = db.prepare('SELECT data FROM users WHERE id = ?');
-const findByUsernameStmt = db.prepare('SELECT data FROM users WHERE username_lower = ?');
-const listUsersStmt = db.prepare('SELECT data FROM users');
+const UPDATE_USER_FULL_SQL = 'UPDATE users SET data = @data, username_lower = @usernameLower WHERE id = @id';
+const GET_USER_SQL = 'SELECT data FROM users WHERE id = ?';
+const GET_USER_BY_USERNAME_SQL = 'SELECT data FROM users WHERE username_lower = ?';
+const LIST_USERS_SQL = 'SELECT data FROM users';
 
 function rowToUser(row) { return JSON.parse(row.data); }
 function publicUser(u) { return { id: u.id, nome: u.nome, username: u.username, role: u.role, permissions: u.permissions, active: u.active, createdAt: u.createdAt }; }
@@ -37,17 +42,18 @@ router.get('/permission-defs', (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  const users = listUsersStmt.all().map(rowToUser).sort((a, b) => a.createdAt - b.createdAt);
+  const users = (req.db || db).prepare(LIST_USERS_SQL).all().map(rowToUser).sort((a, b) => a.createdAt - b.createdAt);
   res.json({ users: users.map(publicUser) });
 });
 
 router.post('/', async (req, res) => {
   try {
+    const targetDb = req.db || db;
     const nome = (req.body.nome || '').trim();
     const username = (req.body.username || '').trim();
     const usernameLower = username.toLowerCase();
     if (!usernameLower) throw new Error('Nome de usuário é obrigatório.');
-    if (findByUsernameStmt.get(usernameLower)) throw new Error('Já existe um usuário com esse nome de login.');
+    if (targetDb.prepare(GET_USER_BY_USERNAME_SQL).get(usernameLower)) throw new Error('Já existe um usuário com esse nome de login.');
     if (!req.body.password || req.body.password.length < MIN_USER_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.`);
 
     // Um vendedor com 'usuarios' só repassa os poderes que ele mesmo possui —
@@ -69,12 +75,12 @@ router.post('/', async (req, res) => {
       hasSeenAjuda: false,
       createdAt: Date.now(),
     };
-    insertUserStmt.run({ id: user.id, usernameLower: user.usernameLower, data: JSON.stringify(user) });
+    targetDb.prepare(INSERT_USER_SQL).run({ id: user.id, usernameLower: user.usernameLower, data: JSON.stringify(user) });
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Cadastro de usuário', details: `Vendedor "${user.nome}" (${user.username}) cadastrado.`,
       entity: 'user', entityId: user.id,
-    });
+    }, targetDb);
     broadcast('users-changed', { reason: 'created', id: user.id });
     res.status(201).json({ user: publicUser(user) });
   } catch (err) {
@@ -86,7 +92,8 @@ router.put('/:id', (req, res) => {
   if (req.params.id === req.userId) {
     return res.status(400).json({ error: 'Você não pode editar as próprias permissões — peça pra outra pessoa com acesso a Usuários fazer isso.' });
   }
-  const row = getUserStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_USER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Usuário não encontrado.' });
   try {
     const user = rowToUser(row);
@@ -110,7 +117,7 @@ router.put('/:id', (req, res) => {
       if (!username) throw new Error('Usuário de login é obrigatório.');
       const usernameLower = username.toLowerCase();
       if (usernameLower !== user.usernameLower) {
-        const existing = findByUsernameStmt.get(usernameLower);
+        const existing = targetDb.prepare(GET_USER_BY_USERNAME_SQL).get(usernameLower);
         if (existing && rowToUser(existing).id !== user.id) {
           throw new Error('Já existe um usuário com esse nome de login.');
         }
@@ -134,12 +141,12 @@ router.put('/:id', (req, res) => {
         user.permissions = next;
       }
     }
-    updateUserFullStmt.run({ id: user.id, usernameLower: user.usernameLower, data: JSON.stringify(user) });
+    targetDb.prepare(UPDATE_USER_FULL_SQL).run({ id: user.id, usernameLower: user.usernameLower, data: JSON.stringify(user) });
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Edição de usuário', details: `Cadastro de "${user.nome}" (${user.username}) atualizado.`,
       entity: 'user', entityId: user.id,
-    });
+    }, targetDb);
     broadcast('users-changed', { reason: 'updated', id: user.id });
     res.json({ user: publicUser(user) });
   } catch (err) {
@@ -151,31 +158,34 @@ router.put('/:id', (req, res) => {
  * sistema fica num beco sem saída administrativo (nenhum jeito de reativar
  * ninguém). Checagem e gravação na mesma transação, mesmo padrão do resto
  * do sistema. */
-const commitSetActive = db.transaction((input) => {
-  const row = getUserStmt.get(input.id);
-  if (!row) throw new Error('Usuário não encontrado.');
-  const user = rowToUser(row);
-  if (!input.active && user.role === 'admin') {
-    const all = listUsersStmt.all().map(rowToUser);
-    const otherActiveAdmins = all.some((u) => u.id !== user.id && u.role === 'admin' && u.active);
-    if (!otherActiveAdmins) {
-      throw new Error('Não é possível desativar o único Administrador Geral ativo — o sistema ficaria sem nenhum admin.');
+function commitSetActive(input, targetDb) {
+  return targetDb.transaction(() => {
+    const row = targetDb.prepare(GET_USER_SQL).get(input.id);
+    if (!row) throw new Error('Usuário não encontrado.');
+    const user = rowToUser(row);
+    if (!input.active && user.role === 'admin') {
+      const all = targetDb.prepare(LIST_USERS_SQL).all().map(rowToUser);
+      const otherActiveAdmins = all.some((u) => u.id !== user.id && u.role === 'admin' && u.active);
+      if (!otherActiveAdmins) {
+        throw new Error('Não é possível desativar o único Administrador Geral ativo — o sistema ficaria sem nenhum admin.');
+      }
     }
-  }
-  user.active = input.active;
-  updateUserStmt.run({ id: user.id, data: JSON.stringify(user) });
-  return user;
-});
+    user.active = input.active;
+    targetDb.prepare(UPDATE_USER_SQL).run({ id: user.id, data: JSON.stringify(user) });
+    return user;
+  })();
+}
 
 router.post('/:id/ativo', (req, res) => {
   try {
-    const user = commitSetActive({ id: req.params.id, active: !!req.body.active });
+    const targetDb = req.db || db;
+    const user = commitSetActive({ id: req.params.id, active: !!req.body.active }, targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: user.active ? 'Reativação de usuário' : 'Desativação de usuário',
       details: `Conta de "${user.nome}" (${user.username}) ${user.active ? 'reativada' : 'desativada'}.`,
       entity: 'user', entityId: user.id,
-    });
+    }, targetDb);
     broadcast('users-changed', { reason: 'active-toggled', id: user.id });
     res.json({ user: publicUser(user) });
   } catch (err) {
@@ -184,7 +194,8 @@ router.post('/:id/ativo', (req, res) => {
 });
 
 router.post('/:id/redefinir-senha', async (req, res) => {
-  const row = getUserStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_USER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Usuário não encontrado.' });
   try {
     const user = rowToUser(row);
@@ -218,12 +229,12 @@ router.post('/:id/redefinir-senha', async (req, res) => {
     const { salt, hash } = await hashPassword(req.body.newPassword);
     user.passwordSalt = salt;
     user.passwordHash = hash;
-    updateUserStmt.run({ id: user.id, data: JSON.stringify(user) });
+    targetDb.prepare(UPDATE_USER_SQL).run({ id: user.id, data: JSON.stringify(user) });
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Redefinição de senha', details: `Senha de "${user.nome}" (${user.username}) redefinida.`,
       entity: 'user', entityId: user.id,
-    });
+    }, targetDb);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

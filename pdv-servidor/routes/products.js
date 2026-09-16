@@ -18,21 +18,26 @@ import { requirePermission } from '../lib/permissions.js';
 
 const router = Router();
 
-const insertStmt = db.prepare(`
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const INSERT_PRODUCT_SQL = `
   INSERT INTO products (id, barcode, name_lower, active, updated_at, data)
   VALUES (@id, @barcode, @nameLower, @active, @updatedAt, @data)
-`);
-const updateStmt = db.prepare(`
+`;
+const UPDATE_PRODUCT_SQL = `
   UPDATE products SET barcode = @barcode, name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data
   WHERE id = @id
-`);
-const getByIdStmt = db.prepare('SELECT * FROM products WHERE id = ?');
-const getByBarcodeStmt = db.prepare('SELECT * FROM products WHERE barcode = ?');
-const listStmt = db.prepare('SELECT * FROM products ORDER BY name_lower ASC');
-const deleteStmt = db.prepare('DELETE FROM products WHERE id = ?');
-const insertMovementStmt = db.prepare('INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)');
-const listMovementsStmt = db.prepare('SELECT * FROM stock_movements WHERE product_id = ? ORDER BY timestamp DESC');
-const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
+`;
+const GET_BY_ID_SQL = 'SELECT * FROM products WHERE id = ?';
+const GET_BY_BARCODE_SQL = 'SELECT * FROM products WHERE barcode = ?';
+const LIST_PRODUCTS_SQL = 'SELECT * FROM products ORDER BY name_lower ASC';
+const DELETE_PRODUCT_SQL = 'DELETE FROM products WHERE id = ?';
+const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
+const LIST_MOVEMENTS_SQL = 'SELECT * FROM stock_movements WHERE product_id = ? ORDER BY timestamp DESC';
+const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToProduct(row) {
   return JSON.parse(row.data);
@@ -82,12 +87,12 @@ function resolveCustomUnitFields(body) {
 }
 
 router.get('/', (req, res) => {
-  const rows = listStmt.all();
+  const rows = (req.db || db).prepare(LIST_PRODUCTS_SQL).all();
   res.json({ products: rows.map(rowToProduct) });
 });
 
 router.get('/by-barcode/:barcode', (req, res) => {
-  const row = getByBarcodeStmt.get(String(req.params.barcode || '').trim());
+  const row = (req.db || db).prepare(GET_BY_BARCODE_SQL).get(String(req.params.barcode || '').trim());
   res.json({ product: row ? rowToProduct(row) : null });
 });
 
@@ -98,15 +103,16 @@ router.get('/by-barcode/:barcode', (req, res) => {
 // catálogo entre montar o carrinho e finalizar" em vez de erro) — um 404
 // aqui viraria uma exceção não tratada quando essa tela for portada.
 router.get('/:id', (req, res) => {
-  const row = getByIdStmt.get(req.params.id);
+  const row = (req.db || db).prepare(GET_BY_ID_SQL).get(req.params.id);
   res.json({ product: row ? rowToProduct(row) : null });
 });
 
 router.post('/', requirePermission('manageProducts'), (req, res) => {
+  const targetDb = req.db || db;
   const body = req.body || {};
   const barcode = String(body.barcode || '').trim();
   if (!barcode) return res.status(400).json({ error: 'Código de barras é obrigatório.' });
-  if (getByBarcodeStmt.get(barcode)) {
+  if (targetDb.prepare(GET_BY_BARCODE_SQL).get(barcode)) {
     return res.status(409).json({ error: 'Já existe um produto com esse código de barras.' });
   }
   let unitFields;
@@ -156,7 +162,7 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
   // colidir com o UNIQUE de `barcode` na tabela (db/schema.sql), devolve o
   // mesmo 409 amigável em vez de deixar o erro cru estourar como 500.
   try {
-    insertStmt.run({
+    targetDb.prepare(INSERT_PRODUCT_SQL).run({
       id: product.id, barcode: product.barcode, nameLower: product.nameLower,
       active: 1, updatedAt: product.updatedAt, data: JSON.stringify(product),
     });
@@ -171,13 +177,14 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
 });
 
 router.put('/:id', requirePermission('manageProducts'), (req, res) => {
-  const row = getByIdStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   const existing = rowToProduct(row);
   const body = req.body || {};
 
   if (body.barcode) {
-    const other = getByBarcodeStmt.get(String(body.barcode).trim());
+    const other = targetDb.prepare(GET_BY_BARCODE_SQL).get(String(body.barcode).trim());
     if (other) {
       const otherProduct = rowToProduct(other);
       if (otherProduct.id !== existing.id) return res.status(409).json({ error: 'Já existe um produto com esse código de barras.' });
@@ -236,7 +243,7 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
   // um eventual 500 cru por um 409 amigável se o UNIQUE de `barcode` colidir
   // mesmo assim.
   try {
-    updateStmt.run({
+    targetDb.prepare(UPDATE_PRODUCT_SQL).run({
       id: updated.id, barcode: updated.barcode, nameLower: updated.nameLower,
       active: updated.active ? 1 : 0, updatedAt: updated.updatedAt, data: JSON.stringify(updated),
     });
@@ -255,11 +262,12 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
 // estado final, não "inverte o que estiver lá agora" (evita corrida entre
 // duas abas clicando quase junto acabarem se cancelando).
 router.post('/:id/active', requirePermission('toggleProduct'), (req, res) => {
-  const row = getByIdStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   const existing = rowToProduct(row);
   const updated = { ...existing, active: !!req.body?.active, updatedAt: Date.now() };
-  updateStmt.run({
+  targetDb.prepare(UPDATE_PRODUCT_SQL).run({
     id: updated.id, barcode: updated.barcode, nameLower: updated.nameLower,
     active: updated.active ? 1 : 0, updatedAt: updated.updatedAt, data: JSON.stringify(updated),
   });
@@ -268,9 +276,10 @@ router.post('/:id/active', requirePermission('toggleProduct'), (req, res) => {
 });
 
 router.delete('/:id', requirePermission('deleteProduct'), (req, res) => {
-  const row = getByIdStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
-  deleteStmt.run(req.params.id);
+  targetDb.prepare(DELETE_PRODUCT_SQL).run(req.params.id);
   broadcast('products-changed', { reason: 'deleted', id: req.params.id });
   res.json({ ok: true });
 });
@@ -309,36 +318,38 @@ router.delete('/:id', requirePermission('deleteProduct'), (req, res) => {
 // classe de bug que cash.js#commitAdjustment já fecha pra retificação de
 // caixa, replicado aqui.
 const STOCK_RECONCILE_TOLERANCE = 0.0001;
-const commitMovement = db.transaction((input) => {
-  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
-  // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now()); // estoura (UNIQUE) se repetido
-  const row = getByIdStmt.get(input.productId);
-  if (!row) throw new Error('Produto não encontrado.');
-  const product = rowToProduct(row);
-  if (input.expectedQuantity !== null && input.expectedQuantity !== undefined) {
-    const expected = Number(input.expectedQuantity);
-    if (Number.isFinite(expected) && Math.abs(product.quantity - expected) > STOCK_RECONCILE_TOLERANCE) {
-      throw new Error(`O estoque de "${product.name}" mudou desde que a contagem foi feita (outra venda ou ajuste aconteceu nesse meio-tempo) — recontar e reabrir o inventário.`);
+function commitMovement(input, targetDb) {
+  return targetDb.transaction(() => {
+    // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+    // routes/deliveries.js#commitDelivery pro raciocínio completo.
+    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now()); // estoura (UNIQUE) se repetido
+    const row = targetDb.prepare(GET_BY_ID_SQL).get(input.productId);
+    if (!row) throw new Error('Produto não encontrado.');
+    const product = rowToProduct(row);
+    if (input.expectedQuantity !== null && input.expectedQuantity !== undefined) {
+      const expected = Number(input.expectedQuantity);
+      if (Number.isFinite(expected) && Math.abs(product.quantity - expected) > STOCK_RECONCILE_TOLERANCE) {
+        throw new Error(`O estoque de "${product.name}" mudou desde que a contagem foi feita (outra venda ou ajuste aconteceu nesse meio-tempo) — recontar e reabrir o inventário.`);
+      }
     }
-  }
-  const newQuantity = product.quantity + input.qty;
-  if (newQuantity < 0) throw new Error(`Estoque insuficiente de "${product.name}".`);
-  product.quantity = newQuantity;
-  product.updatedAt = Date.now();
-  updateStmt.run({
-    id: product.id, barcode: product.barcode, nameLower: product.nameLower,
-    active: product.active ? 1 : 0, updatedAt: product.updatedAt, data: JSON.stringify(product),
-  });
-  const record = {
-    id: crypto.randomUUID(), productId: input.productId, type: input.type,
-    qty: input.qty, userId: input.userId, userName: input.userName,
-    note: input.note || '', timestamp: Date.now(),
-  };
-  insertMovementStmt.run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
-  return { product, record };
-});
+    const newQuantity = product.quantity + input.qty;
+    if (newQuantity < 0) throw new Error(`Estoque insuficiente de "${product.name}".`);
+    product.quantity = newQuantity;
+    product.updatedAt = Date.now();
+    targetDb.prepare(UPDATE_PRODUCT_SQL).run({
+      id: product.id, barcode: product.barcode, nameLower: product.nameLower,
+      active: product.active ? 1 : 0, updatedAt: product.updatedAt, data: JSON.stringify(product),
+    });
+    const record = {
+      id: crypto.randomUUID(), productId: input.productId, type: input.type,
+      qty: input.qty, userId: input.userId, userName: input.userName,
+      note: input.note || '', timestamp: Date.now(),
+    };
+    targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
+    return { product, record };
+  })();
+}
 
 router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
   const body = req.body || {};
@@ -351,7 +362,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
       productId: req.params.id, type: body.type || 'ajuste', qty, note: body.note || '',
       userId: req.userId, userName: req.userName, dedupeKey: body.dedupeKey || null,
       expectedQuantity: body.expectedQuantity ?? null,
-    });
+    }, req.db || db);
     broadcast('products-changed', { reason: 'stock-adjusted', id: product.id });
     res.status(201).json({ product, movement: record });
   } catch (err) {
@@ -363,7 +374,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
 });
 
 router.get('/:id/movimentos', (req, res) => {
-  const rows = listMovementsStmt.all(req.params.id);
+  const rows = (req.db || db).prepare(LIST_MOVEMENTS_SQL).all(req.params.id);
   res.json({ movements: rows.map((r) => JSON.parse(r.data)) });
 });
 
