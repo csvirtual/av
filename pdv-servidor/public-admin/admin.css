@@ -255,7 +255,13 @@ select, input[type="date"] {
   font-size: 13px;
 }
 
-.tenant-actions { display: flex; gap: 8px; white-space: nowrap; }
+/* Achado do usuário: a última coluna (sem cabeçalho escrito) fica mais
+   larga que os botões, e sem justify-content eles ficavam colados na
+   ESQUERDA dessa célula — sobrando um vão vazio à direita, enquanto "Loja"
+   já fica colado na borda esquerda da primeira célula. justify-content:
+   flex-end cola os botões na borda direita também, mesma distância da
+   borda (14px de padding da célula) dos dois lados. */
+.tenant-actions { display: flex; justify-content: flex-end; gap: 8px; white-space: nowrap; }
 
 .save-btn {
   padding: 6px 14px;
