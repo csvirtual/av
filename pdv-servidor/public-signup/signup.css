@@ -159,7 +159,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   margin: 0 0 16px;
 }
-.success-card h1 { margin: 0 0 4px; }
+.success-card h1 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 .success-card p.subtitle { margin: 0 0 20px; }
 .success-link-btn {
   display: inline-block;
