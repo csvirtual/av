@@ -178,7 +178,7 @@ export async function renderCompany(container, ctx) {
               Por vendedor (cada um abre e fecha o próprio caixa)
             </label>
           </div>
-          <span class="hint" style="display:block;margin:0 0 16px;">O estoque continua o mesmo pra todo mundo nos dois modos — só muda quem pode mexer em qual caixa.</span>
+          <span class="hint" style="display:block;margin:0 0 16px;">O estoque continua o mesmo pra todo mundo nos dois modos — só muda a forma de abrir e fechar o caixa.</span>
 
           <p class="section-title">Juros no parcelamento do cartão de crédito</p>
           <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
