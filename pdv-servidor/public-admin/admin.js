@@ -47,11 +47,11 @@
   // este bundle é autocontido, ver comentário no topo do arquivo, então
   // não importa de lá). Usado pela confirmação de exclusão (com campo de
   // senha) e pela lista da lixeira.
-  function openModal({ title, bodyHtml, onMount, onSubmit, submitLabel = 'Salvar', cancelLabel = 'Cancelar', danger = false, singleButton = false }) {
+  function openModal({ title, bodyHtml, onMount, onSubmit, submitLabel = 'Salvar', cancelLabel = 'Cancelar', danger = false, singleButton = false, wide = false }) {
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     backdrop.innerHTML = `
-      <div class="modal">
+      <div class="modal${wide ? ' wide' : ''}">
         <h2>${escapeHtml(title)}</h2>
         <div class="modal-body">${bodyHtml}</div>
         <div class="modal-actions">
@@ -310,6 +310,7 @@
       title: 'Lixeira',
       submitLabel: 'Fechar',
       singleButton: true,
+      wide: true,
       bodyHtml: '<div class="lixeira-list"></div>',
       onMount: (modalEl) => {
         listEl = modalEl.querySelector('.lixeira-list');
