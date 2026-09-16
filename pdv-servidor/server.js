@@ -177,7 +177,7 @@ function renderTenantContactButtons(message, tenant) {
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="wa-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#32D96A"/><stop offset="100%" stop-color="#1EAE53"/></linearGradient></defs><circle cx="12" cy="12" r="10" fill="url(#wa-grad)"/><path d="M12 5.3a6.7 6.7 0 00-5.72 10.15L5.4 18.7l3.34-.88A6.7 6.7 0 1012 5.3z" fill="#fff"/><path d="M9.06 8.4c.24-.53.49-.54.72-.55.19-.01.4-.01.58.01.2.02.47-.08.73.55.28.65.92 2.27 1 2.43.09.17.14.36.02.57-.11.22-.17.34-.33.53-.17.19-.35.42-.5.57-.17.17-.34.35-.15.68.2.34.88 1.44 1.89 2.33 1.3 1.15 2.39 1.51 2.73 1.68.34.17.54.15.74-.08.2-.24.86-1 1.09-1.34.23-.34.47-.28.78-.17.32.12 2.02.95 2.36 1.12.34.17.56.26.65.4.08.15.08.85-.2 1.66-.29.82-1.64 1.6-2.29 1.68-.58.08-1.3.11-2.1-.14-.48-.15-1.09-.35-1.88-.69-3.31-1.43-5.47-4.77-5.64-5-.17-.22-1.35-1.79-1.35-3.42 0-1.63.85-2.42 1.15-2.75z" fill="#1EAE53"/></svg>
         <span>WhatsApp</span>
       </a>
-      <a class="contact-btn" href="${mailHref}">
+      <a class="contact-btn" href="${mailHref}" target="_blank" rel="noopener">
         <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mail-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6EA8FF"/><stop offset="100%" stop-color="#3F7FF0"/></linearGradient></defs><rect x="2" y="4" width="20" height="16" rx="4.5" fill="url(#mail-grad)"/><path d="M2.6 6.3l8.75 6.9c.38.3.92.3 1.3 0l8.75-6.9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>E-mail</span>
       </a>
