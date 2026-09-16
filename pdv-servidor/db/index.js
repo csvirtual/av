@@ -1,49 +1,53 @@
-import Database from 'better-sqlite3';
-import fs from 'node:fs';
+// Ponto de entrada pro banco de UM tenant. Desde a etapa 2 do roteiro
+// multi-tenant (ver artifact "PDV Multi-Tenant"), na prática um pool
+// cacheado (getTenantDb) por cima de db/connection.js#openTenantConnection
+// — a lógica de aplicar schema.sql + migrações mudou de lugar, mas é
+// idêntica.
+//
+// `db` (o export de sempre) continua existindo e continua síncrono/pronto
+// na hora do import — TODO o resto do código (14 arquivos de routes/*.js +
+// praticamente todo lib/*.js) ainda importa `{ db }` direto e faz
+// `db.prepare(...)` no topo do próprio módulo, então isso não pode virar
+// assíncrono nem preguiçoso sem quebrar tudo — essa troca só acontece numa
+// etapa futura do roteiro (routes/*.js passando a usar req.db, resolvido
+// por requisição). Por enquanto `db` resolve SEMPRE o mesmo tenant fixo: o
+// indicado pela variável de ambiente TENANT_ID, ou — se ela não estiver
+// definida, que é o caso de toda instalação de hoje — o arquivo
+// dados-da-loja.sqlite3 de sempre, no mesmo lugar de sempre. Nada muda pra
+// quem não optou em multi-tenant.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { controlDb } from '../control/db.js';
+import { openTenantConnection } from './connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', 'dados-da-loja.sqlite3');
+const LEGACY_DB_PATH = path.join(__dirname, '..', 'dados-da-loja.sqlite3');
+// Chave interna do pool pro caso "sem multi-tenant configurado" — nunca é
+// um id de tenant de verdade (esses são uuids), então não colide.
+const LEGACY_TENANT_KEY = '__legacy__';
 
-export const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-// Achado de auditoria (P3): sem isto, better-sqlite3 lança SQLITE_BUSY na
-// hora se o arquivo estiver momentaneamente travado por outro processo
-// (ex.: uma ferramenta externa abrindo o .sqlite3 pra inspeção, ou uma
-// segunda instância do servidor rodando por engano — ver o lockfile de PID
-// em server.js, que existe justamente pra isso não acontecer). 5s de espera
-// automática antes de desistir é imperceptível pra quem está operando o
-// caixa e evita um erro 500 espúrio nesse tipo de colisão passageira.
-db.pragma('busy_timeout = 5000');
+const pool = new Map();
 
-const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-db.exec(schema);
-
-// CREATE TABLE IF NOT EXISTS não adiciona coluna nova a uma tabela que já
-// existia de uma versão anterior — cobre isso na mão pra não perder o banco
-// de uma loja já em uso.
-const cashSessionsCols = db.prepare('PRAGMA table_info(cash_sessions)').all().map((c) => c.name);
-if (!cashSessionsCols.includes('terminal_id')) {
-  db.exec('ALTER TABLE cash_sessions ADD COLUMN terminal_id TEXT');
+function resolveDbPath(tenantId) {
+  if (tenantId === LEGACY_TENANT_KEY) return LEGACY_DB_PATH;
+  const row = controlDb.prepare('SELECT db_path FROM tenants WHERE id = ?').get(tenantId);
+  if (!row) throw new Error(`Tenant desconhecido: "${tenantId}".`);
+  return row.db_path;
 }
-// Pedido do usuário: modo de caixa "por vendedor" (além de "único" e
-// "porTerminal" já existentes) — cada operador abre/fecha o seu, estoque
-// continua compartilhado. Precisa de uma coluna própria pra achar "o caixa
-// aberto deste usuário" e pro índice único abaixo (mesma ideia de
-// idx_cashsessions_open_terminal_unique, agora por user_id). Criado aqui
-// (não em schema.sql) de propósito: db.exec(schema) já rodou ANTES deste
-// bloco — um CREATE INDEX ali dentro apontando pra uma coluna que só passa
-// a existir DEPOIS deste ALTER quebraria justamente no banco de uma loja
-// já em uso, que é o caso que este bloco inteiro existe pra proteger.
-if (!cashSessionsCols.includes('user_id')) {
-  db.exec('ALTER TABLE cash_sessions ADD COLUMN user_id TEXT');
+
+/** Devolve a conexão do tenant pedido, abrindo (e aplicando schema +
+ * migrações) só na primeira vez — chamadas seguintes pro mesmo tenantId
+ * reusam a mesma conexão cacheada, nunca reabrem o arquivo. */
+export function getTenantDb(tenantId) {
+  const cached = pool.get(tenantId);
+  if (cached) return cached;
+  const conn = openTenantConnection(resolveDbPath(tenantId));
+  pool.set(tenantId, conn);
+  return conn;
 }
-db.exec(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_cashsessions_open_user_unique
-  ON cash_sessions(user_id) WHERE status = 'aberto' AND user_id IS NOT NULL
-`);
+
+const FIXED_TENANT_ID = process.env.TENANT_ID || LEGACY_TENANT_KEY;
+export const db = getTenantDb(FIXED_TENANT_ID);
 
 // Achado de auditoria (P4): cada chamada mutadora precisa de `dedupeKey`
 // (ver rotas em routes/*.js) e cada uma grava uma linha nova em

@@ -3,11 +3,12 @@
 // `.sqlite3` já em uso (ex: a instalação atual, de loja única) — e
 // registra a loja no banco de controle (control/plataforma.sqlite3).
 //
-// Etapa 1 do roteiro: só esta ferramenta existe por enquanto. Nenhuma rota
-// HTTP chama isto, e server.js/db/index.js/routes/*.js ainda não sabem que
-// "tenant" existe — nada muda no PDV rodando hoje. Isolado de propósito:
-// abre a conexão do banco-alvo diretamente (`new Database(...)`), nunca via
-// o singleton de db/index.js (que aponta sempre pro mesmo arquivo fixo).
+// Nenhuma rota HTTP chama isto ainda — só entra numa etapa futura do
+// roteiro, junto do painel de Super Admin. Reaproveita
+// db/connection.js#openTenantConnection (mesma função que db/index.js usa
+// desde a etapa 2) pra aplicar schema.sql + migrações — nunca o singleton
+// `db` de db/index.js (que aponta sempre pro tenant fixo de hoje, nunca
+// pro arquivo que este script está provisionando/adotando).
 //
 // Uso:
 //   node scripts/createTenant.js --new <slug> "<Razão Social>" "<Nome Fantasia>"
@@ -30,12 +31,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { controlDb } from '../control/db.js';
+import { openTenantConnection } from '../db/connection.js';
 import { hashPassword } from '../lib/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.join(__dirname, '..');
 const TENANTS_DIR = path.join(ROOT_DIR, 'tenants');
-const SCHEMA_SQL = fs.readFileSync(path.join(ROOT_DIR, 'db', 'schema.sql'), 'utf8');
 
 // Mesma lista citada no artifact (§3) — nome de loja não pode colidir com
 // um subdomínio que o próprio sistema vai reservar pra rotas administrativas
@@ -62,12 +63,11 @@ function validateSlug(slug) {
 }
 
 function seedAdminInto(tenantDb) {
-  // Duplicata mínima e proposital de lib/seedAdmin.js#ensureAdminUser: aquela
-  // função está amarrada ao singleton de db/index.js (import fixo), então
-  // não dá pra chamá-la contra um banco de tenant recém-criado sem antes
-  // fazer db/index.js virar getTenantDb() — mudança que só entra numa etapa
-  // futura do roteiro (etapa 1 não altera nenhum arquivo existente). Mesma
-  // credencial padrão, mesmo mustChangePassword forçado no primeiro login.
+  // Duplicata mínima e proposital de lib/seedAdmin.js#ensureAdminUser:
+  // aquela função sempre semeia no tenant FIXO de db/index.js (`db`, o
+  // singleton) — nunca dá pra reusá-la aqui, porque este script está
+  // sempre semeando um banco de tenant DIFERENTE daquele. Mesma credencial
+  // padrão, mesmo mustChangePassword forçado no primeiro login.
   return hashPassword('admin123').then(({ salt, hash }) => {
     const user = {
       id: crypto.randomUUID(),
@@ -119,12 +119,8 @@ async function createNewTenant(slug, razaoSocial, nomeFantasia) {
   validateSlug(slug);
   const tenantDir = path.join(TENANTS_DIR, slug);
   const dbPath = path.join(tenantDir, 'dados-da-loja.sqlite3');
-  fs.mkdirSync(tenantDir, { recursive: true });
 
-  const tenantDb = new Database(dbPath);
-  tenantDb.pragma('journal_mode = WAL');
-  tenantDb.pragma('foreign_keys = ON');
-  tenantDb.exec(SCHEMA_SQL);
+  const tenantDb = openTenantConnection(dbPath);
   await seedAdminInto(tenantDb);
   tenantDb.close();
 
@@ -167,6 +163,11 @@ function adoptExistingTenant(slug, sourcePath, razaoSocialArg, nomeFantasiaArg) 
   const dbPath = path.join(tenantDir, 'dados-da-loja.sqlite3');
   fs.mkdirSync(tenantDir, { recursive: true });
   fs.renameSync(sourcePath, dbPath);
+
+  // Garante schema + migrações em dia mesmo se o banco adotado vier de uma
+  // versão bem mais antiga do sistema (ex: sem a coluna user_id de
+  // cash_sessions) — mesma função que db/index.js usa pro tenant fixo.
+  openTenantConnection(dbPath).close();
 
   const razaoSocial = razaoSocialArg || existingConfig.razaoSocial;
   const nomeFantasia = nomeFantasiaArg || existingConfig.nomeFantasia;
