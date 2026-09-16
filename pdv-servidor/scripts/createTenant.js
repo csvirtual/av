@@ -70,7 +70,7 @@ function validateSlug(slug) {
     throw new Error(`O endereço "${slug}" precisa ter entre 3 e 30 caracteres.`);
   }
   if (RESERVED_SLUGS.has(slug)) {
-    throw new Error(`O endereço "${slug}" é reservado pelo próprio sistema — escolha outro.`);
+    throw new Error(`O endereço "${slug}" é reservado pelo próprio sistema. Escolha outro.`);
   }
   const existing = controlDb.prepare('SELECT 1 FROM tenants WHERE slug = ?').get(slug);
   if (existing) {

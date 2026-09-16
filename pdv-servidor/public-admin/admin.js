@@ -175,8 +175,8 @@
       const row = rowTemplate.content.firstElementChild.cloneNode(true);
       row.querySelector('.tenant-name').textContent = tenant.nomeFantasia || tenant.razaoSocial || tenant.slug;
       row.querySelector('.tenant-slug').textContent = tenant.slug;
-      row.querySelector('.tenant-cnpj').textContent = tenant.cnpj || '—';
-      row.querySelector('.tenant-created').textContent = tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('pt-BR') : '—';
+      row.querySelector('.tenant-cnpj').textContent = tenant.cnpj || '-';
+      row.querySelector('.tenant-created').textContent = tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString('pt-BR') : '-';
 
       const statusSelect = row.querySelector('.tenant-status');
       for (const status of validStatuses) {
@@ -217,7 +217,7 @@
         openPasswordConfirmModal({
           title: 'Excluir loja',
           submitLabel: 'Excluir',
-          message: `Excluir a loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})? Os dados saem da lista e a loja deixa de responder. A pasta vai pra lixeira — dá pra restaurar depois por lá.`,
+          message: `Excluir a loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})? Os dados saem da lista e a loja deixa de responder. A pasta vai pra lixeira, dá pra restaurar depois por lá.`,
           onConfirm: async (password) => {
             await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
             toast(`Loja "${tenant.slug}" excluída.`, 'success');
@@ -241,7 +241,7 @@
   }
 
   function formatTrashDate(ts) {
-    return ts ? new Date(ts).toLocaleString('pt-BR') : '—';
+    return ts ? new Date(ts).toLocaleString('pt-BR') : '-';
   }
 
   // Achado do usuário: excluir precisa ter pra onde voltar — a lixeira
@@ -292,7 +292,7 @@
             openPasswordConfirmModal({
               title: 'Excluir definitivamente',
               submitLabel: 'Excluir definitivamente',
-              message: `Excluir <strong>"${escapeHtml(item.slug)}"</strong> definitivamente? Isto apaga os dados da loja de vez — depois disso não tem mais lixeira, não tem como desfazer.`,
+              message: `Excluir <strong>"${escapeHtml(item.slug)}"</strong> definitivamente? Isto apaga os dados da loja de vez. Depois disso não tem mais lixeira, não tem como desfazer.`,
               onConfirm: async (password) => {
                 await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
                 toast(`"${item.slug}" excluído definitivamente.`, 'success');

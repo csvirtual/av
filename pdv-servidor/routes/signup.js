@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
     const rate = checkSignupRateLimit(req.ip);
     if (!rate.allowed) {
       return res.status(429).json({
-        error: `Muitos cadastros a partir deste endereço — aguarde ${Math.ceil(rate.remainingMs / 60000)}min antes de tentar de novo.`,
+        error: `Muitos cadastros a partir deste endereço. Aguarde ${Math.ceil(rate.remainingMs / 60000)}min antes de tentar de novo.`,
       });
     }
     const slug = String(req.body?.slug || '').trim().toLowerCase();
