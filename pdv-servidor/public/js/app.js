@@ -899,7 +899,7 @@ function renderMustChangePasswordScreen(user) {
         <h1 style="font-size:18px;margin:0 0 14px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Troque a senha padrão</h1>
         <p style="margin:0 0 18px;text-align:center;">Esta conta (<strong>${escapeHtml(user.username)}</strong>) ainda está com a senha padrão de instalação. Troque agora antes de continuar.</p>
         <form id="change-password-form" novalidate>
-          <div id="change-password-error"></div>
+          <div id="change-password-error" style="text-align:center;"></div>
           <div class="field">
             <label for="current-password">Senha atual</label>
             <input id="current-password" type="password" autocomplete="current-password" autofocus required>
