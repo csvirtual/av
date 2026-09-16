@@ -280,8 +280,14 @@ app.use('/api/company', requireAuth, companyRoutes);
 app.use('/api/backup', requireAuth, requirePermission('backup'), backupRoutes);
 app.use('/api/reports', requireAuth, requirePermission('relatorios'), reportsRoutes);
 
+// `tenantId`: diagnóstico pra etapa 4 do roteiro multi-tenant (ver artifact
+// "PDV Multi-Tenant") — nenhuma rota de negócio lê req.tenantId/req.db
+// ainda (só entra na etapa 5), então esta é, por enquanto, a ÚNICA forma
+// de provar via HTTP de verdade que a resolução por Host (etapa 3) está
+// funcionando ponta a ponta, sem precisar esperar a conversão das rotas.
+// `null` sem MULTI_TENANT_DOMAIN (mesmo comportamento de sempre).
 app.get('/api/status', (req, res) => {
-  res.json({ ok: true, autenticado: !!req.userId });
+  res.json({ ok: true, autenticado: !!req.userId, tenantId: req.tenantId || null });
 });
 
 const httpServer = createServer(app);
