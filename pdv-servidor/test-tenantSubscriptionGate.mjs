@@ -85,21 +85,27 @@ try {
   setTenantStatus(slugSuspenso, 'suspenso');
   const suspensoResp = await request(`${slugSuspenso}.${DOMAIN}`, { reqPath: '/api/status' });
   check('loja "suspenso" bloqueada com 403', suspensoResp.status === 403, suspensoResp.status);
-  check('mensagem de bloqueio menciona suspensão', /suspensa/i.test(String(suspensoResp.body)), suspensoResp.body);
+  // Achado do usuário (print): a resposta de bloqueio saía como TEXTO PURO
+  // sem nenhum estilo — server.js#sendTenantBlocked agora devolve JSON
+  // (pra rota de API, exatamente como antes em formato mas não mais em
+  // corpo cru) OU uma página HTML própria, autocontida, no mesmo padrão
+  // visual do resto do PDV (pra navegação de página).
+  check('mensagem de bloqueio (JSON, rota de API) menciona suspensão', /suspensa/i.test(suspensoResp.body?.error || ''), JSON.stringify(suspensoResp.body));
   const suspensoStatic = await request(`${slugSuspenso}.${DOMAIN}`, { reqPath: '/index.html' });
   check('loja "suspenso" também bloqueada pra estático (nada carrega, nem a página)', suspensoStatic.status === 403, suspensoStatic.status);
+  check('bloqueio de página (não-API) devolve HTML estilizado, não texto puro', typeof suspensoStatic.body === 'string' && suspensoStatic.body.includes('<html') && /suspensa/i.test(suspensoStatic.body), suspensoStatic.body?.slice(0, 120));
 
   // Cancelado.
   setTenantStatus(slugCancelado, 'cancelado');
   const canceladoResp = await request(`${slugCancelado}.${DOMAIN}`, { reqPath: '/api/status' });
   check('loja "cancelado" bloqueada com 403', canceladoResp.status === 403, canceladoResp.status);
-  check('mensagem de bloqueio menciona cancelamento', /cancelada/i.test(String(canceladoResp.body)), canceladoResp.body);
+  check('mensagem de bloqueio menciona cancelamento', /cancelada/i.test(canceladoResp.body?.error || ''), JSON.stringify(canceladoResp.body));
 
   // Expirado — status "ativo", mas expires_at no passado.
   setTenantStatus(slugExpirado, 'ativo', new Date(Date.now() - 86400000).toISOString());
   const expiradoResp = await request(`${slugExpirado}.${DOMAIN}`, { reqPath: '/api/status' });
   check('loja "ativo" com expires_at no passado é bloqueada com 403', expiradoResp.status === 403, expiradoResp.status);
-  check('mensagem de bloqueio menciona expiração', /expirou/i.test(String(expiradoResp.body)), expiradoResp.body);
+  check('mensagem de bloqueio menciona expiração', /expirou/i.test(expiradoResp.body?.error || ''), JSON.stringify(expiradoResp.body));
 
   // Ativo com vencimento no futuro — continua liberado.
   setTenantStatus(slugAtivoOk, 'ativo', new Date(Date.now() + 30 * 86400000).toISOString());

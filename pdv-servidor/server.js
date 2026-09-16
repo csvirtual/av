@@ -147,6 +147,76 @@ function tenantAccessBlockedReason(tenant) {
   if (tenant.expires_at != null && Date.now() > tenant.expires_at) return 'A assinatura desta loja expirou. Entre em contato com o suporte.';
   return null;
 }
+
+// Achado do usuário (print): a tela de "loja não encontrada"/"loja
+// suspensa" saía como TEXTO PURO (res.send de uma string vira
+// text/html sem nenhum estilo — fonte padrão do navegador, sem cor, sem
+// nada do PDV) — porque este middleware roda ANTES de qualquer arquivo
+// estático, inclusive o CSS: linkar public/css/styles.css aqui não
+// funcionaria, essa mesma requisição também seria bloqueada. A página
+// abaixo é 100% autocontida (mesmos tokens de cor copiados de
+// public-signup/signup.css, mesmo ícone de aviso de components/icon.js)
+// — nasce e morre sem depender de nenhum outro arquivo.
+function renderTenantBlockedPage(message) {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV - C&amp;S Virtual: Loja indisponível</title>
+<style>
+  :root {
+    --bg: #f4f6f5; --surface: #ffffff; --text: #1c2523; --text-muted: #62716d;
+    --primary: #145333; --primary-dark: #0d3b24;
+    --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101613; --surface: #1a221e; --text: #e9efec; --text-muted: #93a89e;
+      --primary: #2f9d6b; --primary-dark: #0d2b1c;
+      --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, var(--primary-dark), var(--primary) 65%);
+    padding: 32px 16px;
+  }
+  .card {
+    background: var(--surface);
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    width: 100%; max-width: 420px;
+    padding: 36px 40px;
+    text-align: center;
+  }
+  h1 { font-size: 20px; margin: 14px 0 8px; text-wrap: balance; }
+  p { color: var(--text-muted); font-size: 14px; margin: 0; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
+    <h1>Loja indisponível</h1>
+    <p>${message.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</p>
+  </div>
+</body>
+</html>
+`;
+}
+
+// API (fetch de JS que já tenha carregado) precisa continuar recebendo
+// JSON, não HTML — só a NAVEGAÇÃO de página (o que o navegador mostra na
+// aba) usa a página estilizada acima.
+function sendTenantBlocked(req, res, status, message) {
+  if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
+  res.status(status).type('html').send(renderTenantBlockedPage(message));
+}
 // Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
 // ver scripts/createTenant.js) do painel de Super Admin — nunca pode ser
@@ -192,11 +262,11 @@ app.use((req, res, next) => {
   if (!MULTI_TENANT_DOMAIN || req.isPlatformAdminHost || req.isSignupHost) return next();
   const tenant = resolveTenantRowFromHostname(req.hostname);
   if (!tenant) {
-    return res.status(404).send('Loja não encontrada.');
+    return sendTenantBlocked(req, res, 404, 'Loja não encontrada.');
   }
   const blockedReason = tenantAccessBlockedReason(tenant);
   if (blockedReason) {
-    return res.status(403).send(blockedReason);
+    return sendTenantBlocked(req, res, 403, blockedReason);
   }
   req.tenantId = tenant.id;
   req.db = getTenantDb(tenant.id);
