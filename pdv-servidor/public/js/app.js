@@ -897,7 +897,7 @@ function renderMustChangePasswordScreen(user) {
       <div class="card" style="max-width:420px;">
         <div style="text-align:center;margin-bottom:6px;">${icon('warning', { size: 34 })}</div>
         <h1 style="font-size:18px;margin:0 0 14px;text-align:center;text-transform:uppercase;letter-spacing:0.4px;">Troque a senha padrão</h1>
-        <p style="margin:0 0 18px;text-align:center;">Esta conta (<strong>${escapeHtml(user.username)}</strong>) ainda está com a senha padrão de instalação. Troque agora antes de continuar. É rápido, só desta vez.</p>
+        <p style="margin:0 0 18px;text-align:center;">Esta conta (<strong>${escapeHtml(user.username)}</strong>) ainda está com a senha padrão de instalação. Troque agora antes de continuar.</p>
         <form id="change-password-form" novalidate>
           <div id="change-password-error"></div>
           <div class="field">
