@@ -100,6 +100,7 @@ export async function renderRelatorios(container) {
         <div class="stat-card"><div class="label">Ticket médio</div><div class="value">${formatMoney(r.avgTicket)}</div></div>
         <div class="stat-card"><div class="label">Margem estimada</div><div class="value">${formatMoney(r.totalMargin)} <span class="text-muted" style="font-size:13px;">(${marginPct.toFixed(1)}%)</span></div></div>
       </div>
+      <div class="carousel-hint">Arraste para o lado para ver mais »</div>
 
       <div class="card" style="margin-bottom:20px;">
         <p class="section-title mt-0">Vendas por vendedor</p>

@@ -1019,6 +1019,12 @@ tbody tr:hover { background: var(--surface-alt); }
  * não só abaixo do corte. */
 .card-stack { display: none; }
 
+/* Aviso "arraste pro lado" do carrossel de resumo (Financeiro/Painel/
+ * Caixa/Relatórios) — mesmo motivo do .card-stack acima: escondido aqui
+ * fora do media pra não aparecer em telas largas, onde o resumo é uma
+ * grade normal (sem scroll horizontal, nada pra "arrastar"). */
+.carousel-hint { display: none; }
+
 /* Paginação numerada + seletor de quantidade (ver components/pagination.js) */
 .pagination-bar { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 16px; }
 .pg-size-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -2055,6 +2061,11 @@ input.customer-search-input:focus {
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
     gap: 10px;
+    /* Encolhe o respiro padrão de 24px (ver .stat-grid fora do media) —
+     * o .carousel-hint logo abaixo já cuida do espaçamento antes da
+     * próxima seção; sem isto o aviso nasceria longe demais dos cartões,
+     * parecendo pertencer à seção seguinte em vez de ao carrossel. */
+    margin-bottom: 6px;
   }
   #summary-box .stat-grid .stat-card,
   #dashboard-stat-grid .stat-card,
@@ -2069,7 +2080,22 @@ input.customer-search-input:focus {
    * de duas tentativas de consertar esse overlay, o pedido do usuário foi
    * tirar o indicador de vez — o próprio cartão cortado na borda (parte da
    * largura visível, parte não) já avisa sozinho que dá pra rolar mais,
-   * sem precisar de nenhum elemento extra por cima do conteúdo. */
+   * sem precisar de nenhum elemento extra por cima do conteúdo.
+   *
+   * Achado do usuário (2ª rodada): nem sempre sobra um cartão cortado pra
+   * avisar — quando os cartões visíveis cabem certinho na largura da tela
+   * (ex: só 2 cartões que somados batem quase exato com os ~343px úteis
+   * do celular), não sobra nenhuma pista visual de que existe mais
+   * conteúdo pra rolar. Corrigido com um aviso de texto (.carousel-hint,
+   * markup em cada view/*.js, logo depois do grid) — abaixo da fileira de
+   * cartões, FORA da área de scroll, então nunca sobrepõe nem esmaece
+   * nenhum valor (diferente das duas tentativas anteriores). */
+  .carousel-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 18px;
+  }
 }
 
 /* ---------- ~900px: menu lateral vira gaveta deslizante ---------- */
