@@ -8,7 +8,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 
 import { db, sweepOldIdempotencyKeys, getTenantDb } from './db/index.js';
-import { controlDb, getTenantBySlug } from './control/db.js';
+import { controlDb, getTenantBySlug, autoSuspendExpiredTrial } from './control/db.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
 import { getConfig } from './lib/companyConfig.js';
@@ -407,6 +407,14 @@ app.use(async (req, res, next) => {
     const cnpj = getConfig(req.db).cnpj || '';
     const status = await getLicenseStatus(cnpj, req.db);
     if (status.active) return next();
+    // Achado do usuário: quando o período de teste de 7 dias acaba, a
+    // loja deve suspender também na PLATAFORMA — este é o gate que de
+    // fato bloqueia toda rota de API assim que a licença fica inativa
+    // (routes/license.js#/status, o outro lugar que dispara a mesma
+    // função, está fora deste gate de propósito — precisa continuar
+    // alcançável mesmo bloqueado). Só mexe se o status atual for "trial"
+    // (ver control/db.js#autoSuspendExpiredTrial); idempotente.
+    if (req.tenantId) autoSuspendExpiredTrial(req.tenantId);
     res.status(403).json({ error: 'A licença deste sistema expirou. Ative uma chave nova em Dados da loja → Licença.', licenseExpired: true });
   } catch (err) {
     console.error('[erro inesperado] gate de licença:', err);

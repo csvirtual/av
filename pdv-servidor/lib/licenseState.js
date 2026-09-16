@@ -95,3 +95,15 @@ export async function getLicenseStatus(cnpj, targetDb = db) {
 export function setStoredActivationKey(keyString, targetDb = db) {
   setState({ activationKey: keyString }, targetDb);
 }
+
+/** Reinicia o relógio do período de teste de 7 dias — usado quando o Super
+ * Admin seleciona "trial" no Painel de Controle e salva (ver
+ * routes/admin/tenants.js), pra "renovar" uma loja que tinha sido
+ * suspensa automaticamente por trial vencido (ver
+ * control/db.js#autoSuspendExpiredTrial). Não mexe numa chave de
+ * ativação eventualmente guardada — ela continua tendo prioridade em
+ * getLicenseStatus() se ainda for válida, então reiniciar o relógio de
+ * trial é inofensivo nesse caso (nunca é lido). */
+export function restartTrial(targetDb = db) {
+  setState({ trialStartedAt: Date.now() }, targetDb);
+}

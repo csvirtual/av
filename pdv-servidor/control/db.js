@@ -119,6 +119,20 @@ export function setTenantStatus(slug, status, expiresAtArg) {
   return getTenantBySlug(slug);
 }
 
+/** Achado do usuário: quando o período de teste de 7 dias de uma loja
+ * acaba (lib/licenseState.js#getLicenseStatus, checado a cada
+ * GET /api/license/status — mesmo gatilho preguiçoso do relógio de
+ * trial), a loja deve suspender também na PLATAFORMA, não só ficar
+ * bloqueada no PDV dela. Chamado por routes/license.js. Só mexe se o
+ * status atual for exatamente "trial" — nunca pisa em
+ * "ativo"/"suspenso"/"cancelado" definidos manualmente (esses já
+ * bloqueiam por conta própria, ou são uma decisão do Super Admin que
+ * este gatilho automático não deve sobrescrever). Idempotente: chamar
+ * de novo depois que já suspendeu não faz nada (o WHERE já não bate). */
+export function autoSuspendExpiredTrial(tenantId) {
+  controlDb.prepare("UPDATE tenants SET status = 'suspenso' WHERE id = ? AND status = 'trial'").run(tenantId);
+}
+
 /** Exclui uma loja da plataforma — usado pelo painel de Super Admin (etapa
  * 8, ver routes/admin/tenants.js). Nunca apaga o arquivo `.sqlite3` de
  * verdade: mesma cautela de scripts/createTenant.js#adoptExistingTenant

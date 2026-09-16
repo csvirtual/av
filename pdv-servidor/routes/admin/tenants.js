@@ -9,6 +9,8 @@ import {
   listTrashedTenants, restoreTenant, purgeTrashedTenant,
 } from '../../control/db.js';
 import { verifyPlatformAdminPassword } from '../../lib/platformAdminAuth.js';
+import { getTenantDb } from '../../db/index.js';
+import { restartTrial } from '../../lib/licenseState.js';
 
 const router = Router();
 
@@ -32,6 +34,15 @@ router.post('/:slug/status', (req, res) => {
     const { status, expiresAt } = req.body || {};
     if (!status) throw new Error('Informe o novo status.');
     const updated = setTenantStatus(req.params.slug, status, expiresAt === undefined ? undefined : expiresAt);
+    // Achado do usuário: selecionar "trial" aqui e salvar deve "renovar" a
+    // loja — reinicia o relógio de 7 dias do período de teste dela (ver
+    // lib/licenseState.js#restartTrial), senão o próprio auto-suspenso
+    // (control/db.js#autoSuspendExpiredTrial, disparado na primeira
+    // requisição de licença que ela fizer) suspenderia de novo quase na
+    // hora, o "trial" nunca teria efeito nenhum de verdade.
+    if (status === 'trial') {
+      restartTrial(getTenantDb(updated.id));
+    }
     res.json({ tenant: publicTenant(updated) });
   } catch (err) {
     res.status(400).json({ error: err.message });

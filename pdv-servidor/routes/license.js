@@ -13,6 +13,7 @@ import { getLicenseStatus, setStoredActivationKey } from '../lib/licenseState.js
 import { verifyLicenseKey } from '../lib/license.js';
 import { logAction } from '../lib/audit.js';
 import { BUILD_VERSION } from '../lib/buildVersion.js';
+import { autoSuspendExpiredTrial } from '../control/db.js';
 
 const router = Router();
 
@@ -21,6 +22,15 @@ router.get('/status', async (req, res) => {
     const cfg = getConfig(req.db);
     const cnpj = cfg.cnpj || '';
     const status = await getLicenseStatus(cnpj, req.db);
+    // Achado do usuário: quando o período de teste de 7 dias acaba, a loja
+    // deve suspender também na PLATAFORMA (não só no PDV dela) — sem
+    // isso, o Painel de Controle continuava mostrando "trial" pra sempre,
+    // mesmo com a loja já bloqueada por dentro. Só mexe se o status
+    // atual for "trial" (ver control/db.js#autoSuspendExpiredTrial) —
+    // nunca roda em modo legado de loja única (sem req.tenantId).
+    if (status.tipo === 'trial-expirado' && req.tenantId) {
+      autoSuspendExpiredTrial(req.tenantId);
+    }
     // Achado do usuário: a tela de bloqueio (public/js/app.js#renderLicenseBlockedScreen)
     // roda ANTES de qualquer login — chamar GET /api/company (que exige
     // sessão) pra montar a mensagem de contato do suporte sempre dava 401
