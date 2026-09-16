@@ -29,7 +29,7 @@ router.post('/', (req, res) => {
     userId: req.userId, userName: req.userName, role: req.userRole,
     action: String(body.action || ''), details: String(body.details || ''),
     entity: String(body.entity || ''), entityId: String(body.entityId || ''),
-  });
+  }, req.db);
   res.status(201).json({ entry: record });
 });
 
@@ -47,14 +47,14 @@ router.post('/', (req, res) => {
  * combinações, nunca precisando materializar a tabela inteira — mesmo
  * espírito de app/js/data/auditRepo.js#listAuditLogPage da extensão
  * (dbScanByIndex: range no índice + predicado por linha + corte cedo). */
-const scanStmt = db.prepare(`
+const SCAN_SQL = `
   SELECT id, timestamp, data FROM audit_log
   WHERE (@userId IS NULL OR user_id = @userId)
     AND (@fromTs IS NULL OR timestamp >= @fromTs)
     AND (@toTs IS NULL OR timestamp <= @toTs)
     AND (@afterTs IS NULL OR timestamp < @afterTs OR (timestamp = @afterTs AND id < @afterId))
   ORDER BY timestamp DESC, id DESC
-`);
+`;
 
 router.get('/', requirePermission('logs'), (req, res) => {
   const { role, userId, term, fromTs, toTs, limit = 50, afterKey, afterId } = req.query;
@@ -71,7 +71,7 @@ router.get('/', requirePermission('logs'), (req, res) => {
 
   const items = [];
   let hasMore = false;
-  for (const row of scanStmt.iterate(params)) {
+  for (const row of (req.db || db).prepare(SCAN_SQL).iterate(params)) {
     const entry = JSON.parse(row.data);
     if (role && entry.role !== role) continue;
     if (termLower && !`${entry.action} ${entry.details}`.toLowerCase().includes(termLower)) continue;

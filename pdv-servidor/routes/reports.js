@@ -16,11 +16,16 @@ import { db } from '../db/index.js';
 
 const router = Router();
 
-const listSalesInRangeStmt = db.prepare(`
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — o handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const LIST_SALES_IN_RANGE_SQL = `
   SELECT data FROM sales
   WHERE (@from IS NULL OR timestamp >= @from) AND (@to IS NULL OR timestamp <= @to)
-`);
-const listProductsStmt = db.prepare('SELECT data FROM products');
+`;
+const LIST_PRODUCTS_SQL = 'SELECT data FROM products';
 
 function netSaleTotal(sale) {
   return sale.total - sale.refundedTotal;
@@ -30,10 +35,11 @@ function netSaleTotalWithInterest(sale) {
 }
 
 router.get('/vendas', (req, res) => {
+  const targetDb = req.db || db;
   const from = req.query.from != null && req.query.from !== '' ? Number(req.query.from) : null;
   const to = req.query.to != null && req.query.to !== '' ? Number(req.query.to) : null;
 
-  const products = listProductsStmt.all().map((r) => JSON.parse(r.data));
+  const products = targetDb.prepare(LIST_PRODUCTS_SQL).all().map((r) => JSON.parse(r.data));
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]));
 
   const bySellerMap = {};
@@ -41,7 +47,7 @@ router.get('/vendas', (req, res) => {
   let totalRevenue = 0;
   let totalCount = 0;
 
-  const sales = listSalesInRangeStmt.all({ from, to }).map((r) => JSON.parse(r.data));
+  const sales = targetDb.prepare(LIST_SALES_IN_RANGE_SQL).all({ from, to }).map((r) => JSON.parse(r.data));
   for (const s of sales) {
     if (!bySellerMap[s.userId]) bySellerMap[s.userId] = { userId: s.userId, userName: s.userName, revenue: 0, count: 0 };
     bySellerMap[s.userId].revenue += netSaleTotalWithInterest(s);
