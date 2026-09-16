@@ -43,7 +43,7 @@ seção "Modo multi-tenant (SaaS)" no final deste README: um único processo
 `node server.js`, com `MULTI_TENANT_DOMAIN` configurada, serve VÁRIAS
 lojas ao mesmo tempo, cada uma com seu próprio banco `.sqlite3`
 (isolamento físico, não `tenant_id` numa tabela compartilhada), resolvida
-por subdomínio (`lojax.<dominio>`). Etapas 1-8 do roteiro completas e
+por subdomínio (`lojax.<dominio>`). Etapas 1-9 do roteiro completas e
 testadas; sem `MULTI_TENANT_DOMAIN` (o caso de toda instalação single-
 tenant existente, tudo documentado acima), o comportamento é idêntico ao
 de sempre — este modo é inteiramente opt-in.
@@ -1549,6 +1549,7 @@ e testada com essa premissa como critério de aceite.
 | 6 | WebSocket por tenant | `lib/broadcast.js`: `Set` único de conexões vira `Map<tenantId, Set>` — um terminal da Loja A nunca recebe aviso de tempo real de uma mudança na Loja B. |
 | 7 | Assinatura controlada pela plataforma | `tenants.status`/`expires_at` no banco de controle — uma loja "suspenso"/"cancelado"/vencida é bloqueada com `403` ANTES de qualquer rota (HTTP e WebSocket), independente do mecanismo de trial/chave de ativação de cada loja (que continua existindo por baixo, é o licenciamento do produto on-premise). |
 | 8 | Painel de Super Admin | `admin.<MULTI_TENANT_DOMAIN>` — SPA mínima (login + tabela de lojas com status/vencimento editáveis), autenticação própria (`platform_admins`, cookie `admin_session`, nunca confundido com sessão de loja). Mesma função (`control/db.js#setTenantStatus`) usada tanto pela CLI quanto pelo painel — nenhuma lógica duplicada. |
+| 9 | Cadastro self-service | Domínio-base (`<MULTI_TENANT_DOMAIN>`, sem subdomínio) — formulário público, sem login, que provisiona uma loja nova em "trial" na hora (mesma `createNewTenant` da CLI). Trava de taxa por IP (`lib/signupRateLimit.js`) contra abuso trivial. De propósito SEM cobrança nenhuma — ver "O que falta" abaixo. |
 
 Cada etapa tem seu próprio `test-tenant*.mjs` (raiz de `pdv-servidor/`),
 rodando contra um servidor real com `MULTI_TENANT_DOMAIN` configurada,
@@ -1562,7 +1563,7 @@ batendo no mesmo `localhost`): `test-createTenant.mjs`,
 `test-tenantFinanceRoutes.mjs`, `test-tenantProductsUsersRoutes.mjs`,
 `test-tenantBackupRoutes.mjs`, `test-tenantSalesLoyaltyRoutes.mjs`,
 `test-tenantWebSocket.mjs`, `test-tenantSubscriptionGate.mjs`,
-`test-tenantAdminPanel.mjs`.
+`test-tenantAdminPanel.mjs`, `test-tenantSignup.mjs`.
 
 ### Como rodar em modo multi-tenant
 
@@ -1572,8 +1573,8 @@ npm install
 MULTI_TENANT_DOMAIN=meudominio.com.br node server.js
 ```
 
-Provisionar uma loja nova (CLI — não existe cadastro self-service ainda,
-ver "O que falta" abaixo):
+Provisionar uma loja nova pela CLI (equivalente ao que o formulário
+público de cadastro faz sozinho, ver logo abaixo):
 
 ```
 node scripts/createTenant.js --new lojax "Loja X Comércio LTDA" "Loja X"
@@ -1584,6 +1585,13 @@ Cria `tenants/lojax/dados-da-loja.sqlite3` (schema aplicado, usuário
 registra a loja no banco de controle com status `trial`, sem vencimento.
 Acessível em `http://lojax.meudominio.com.br:3131` (com DNS/proxy reais
 na frente, sem porta — ver "O que falta").
+
+Ou deixar quem quiser criar a própria loja sozinho, sem CLI nenhuma: o
+domínio-base (`http://meudominio.com.br:3131`, sem subdomínio) serve um
+formulário público (nome da loja, razão social, endereço/slug desejado,
+com verificação de disponibilidade em tempo real) que provisiona a MESMA
+coisa por baixo (`routes/signup.js` → `createNewTenant`) — toda loja
+nasce em `trial`, sem cobrança nenhuma.
 
 Adotar um banco `.sqlite3` já existente (ex: migrar uma instalação
 single-tenant pra dentro do SaaS):
@@ -1617,7 +1625,7 @@ as lojas cadastradas, status e vencimento editáveis por linha.
 
 ### O que falta pra produção de verdade
 
-Fora do roteiro de código acima (que está completo, etapas 1-8 testadas)
+Fora do roteiro de código acima (que está completo, etapas 1-9 testadas)
 e fora do que dá pra fazer só com acesso a este repositório:
 
 - **DNS wildcard + TLS** (`*.meudominio.com.br` apontando pro servidor +
@@ -1628,8 +1636,17 @@ e fora do que dá pra fazer só com acesso a este repositório:
 - **Cobrança/pagamento automático** — hoje suspender/reativar uma loja é
   sempre manual (CLI ou painel), sem integração com nenhum gateway
   (Stripe, Pagar.me, etc.) que marque `status`/`expires_at` sozinho
-  quando alguém paga ou atrasa. `tenants.plano` é só um texto genérico,
-  de propósito, esperando essa decisão (ver `control/schema.sql`).
-- **Cadastro self-service** — criar uma loja nova exige acesso à máquina
-  onde o servidor roda (CLI); não existe formulário público nem fluxo de
-  "assinar agora" que provisione uma loja sozinho.
+  quando alguém paga ou atrasa; o cadastro self-service (etapa 9) cria
+  toda loja em `trial`, sem cobrar nada. `tenants.plano` é só um texto
+  genérico, de propósito, esperando essa decisão (ver
+  `control/schema.sql`).
+- **`trust proxy` não habilitado** — decisão de propósito já documentada
+  em `server.js` desde antes da etapa 9 (nada mais no servidor lia
+  `req.ip`/`req.secure` até o cadastro self-service usar `req.ip` pra
+  limitar taxa por IP, `lib/signupRateLimit.js`). Atrás de um proxy
+  reverso comum (Nginx, Cloudflare) sem esse cabeçalho configurado, todo
+  pedido chega com o mesmo IP (o do proxy) — quem hospedar isto atrás de
+  um proxy precisa habilitar `trust proxy` conscientemente (mudaria o
+  que `req.ip`/`req.secure` significam no servidor inteiro, não só na
+  trava de cadastro — por isso não é uma decisão que este código deveria
+  tomar sozinho).
