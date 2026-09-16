@@ -22,3 +22,13 @@ controlDb.pragma('busy_timeout = 5000');
 
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 controlDb.exec(schema);
+
+const getTenantBySlugStmt = controlDb.prepare('SELECT * FROM tenants WHERE slug = ?');
+
+/** Usado pelo middleware de resolução por Host (etapa 3 do roteiro
+ * multi-tenant, ver server.js) e por scripts/createTenant.js — devolve
+ * `null` (nunca lança) quando o slug não está cadastrado, pra quem chama
+ * decidir o que fazer (normalmente: 404). */
+export function getTenantBySlug(slug) {
+  return getTenantBySlugStmt.get(slug) || null;
+}

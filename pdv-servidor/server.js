@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import fs from 'node:fs';
 
-import { db, sweepOldIdempotencyKeys } from './db/index.js';
+import { db, sweepOldIdempotencyKeys, getTenantDb } from './db/index.js';
+import { getTenantBySlug } from './control/db.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
 import { getConfig } from './lib/companyConfig.js';
@@ -90,6 +91,35 @@ process.on('exit', releaseProcessLock);
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+
+// Etapa 3 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+// resolve o tenant pelo subdomínio do Host (ex: lojax.<MULTI_TENANT_DOMAIN>
+// -> slug "lojax"), ANTES de qualquer outro gate — se o Host não apontar
+// pra uma loja cadastrada, a requisição nem chega perto de rota nenhuma.
+// Sem MULTI_TENANT_DOMAIN definida — o caso de toda instalação de hoje —
+// este middleware não faz nada (nem olha o Host), e o comportamento
+// observável continua idêntico a antes desta etapa: nenhuma rota consome
+// req.tenantId/req.db ainda (isso só entra numa etapa futura do roteiro,
+// junto da troca de routes/*.js pra usar req.db em vez do `db` fixo);
+// aqui eles só ficam prontos, resolvidos uma vez por requisição.
+const MULTI_TENANT_DOMAIN = process.env.MULTI_TENANT_DOMAIN || null;
+app.use((req, res, next) => {
+  if (!MULTI_TENANT_DOMAIN) return next();
+  const suffix = `.${MULTI_TENANT_DOMAIN}`;
+  // endsWith(suffix) já rejeita o domínio-base sozinho (sem subdomínio):
+  // "pdv-csvirtual.com.br" não termina em ".pdv-csvirtual.com.br".
+  if (!req.hostname || !req.hostname.endsWith(suffix)) {
+    return res.status(404).send('Loja não encontrada.');
+  }
+  const slug = req.hostname.slice(0, -suffix.length);
+  const tenant = getTenantBySlug(slug);
+  if (!tenant) {
+    return res.status(404).send('Loja não encontrada.');
+  }
+  req.tenantId = tenant.id;
+  req.db = getTenantDb(tenant.id);
+  next();
+});
 
 // Achado de auditoria (P3): public/test*.html são páginas de prova das
 // telas (usadas pelos test-*.cjs deste repo, ver run_all.sh no
