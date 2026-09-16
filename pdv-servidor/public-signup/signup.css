@@ -27,8 +27,12 @@
   --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
 }
 
+/* [data-theme] permite o botão .theme-toggle sobrepor a preferência do
+ * sistema operacional com uma escolha explícita — guardado por
+ * :not([data-theme="light"]) pra uma escolha explícita de claro vencer o
+ * SO quando o SO estiver em escuro (mesmo padrão de public/js/theme.js). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #101613;
     --surface: #1a221e;
     --surface-alt: #212b25;
@@ -46,6 +50,24 @@
     --warning-light: rgba(217, 154, 53, 0.18);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #101613;
+  --surface: #1a221e;
+  --surface-alt: #212b25;
+  --border: #34413a;
+  --text: #e9efec;
+  --text-muted: #93a89e;
+  --primary: #2f9d6b;
+  --primary-dark: #0d2b1c;
+  --primary-light: rgba(47, 157, 107, 0.18);
+  --danger: #e5645a;
+  --danger-light: rgba(229, 100, 90, 0.18);
+  --success: #3fae6c;
+  --success-light: rgba(47, 157, 107, 0.18);
+  --warning: #d99a35;
+  --warning-light: rgba(217, 154, 53, 0.18);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -224,6 +246,29 @@ body {
   box-shadow: var(--shadow-md);
 }
 .toast.error { background: var(--danger); }
+
+/* Botão discreto de claro/escuro — canto da tela, sempre visível mas sem
+ * chamar atenção (sem texto, mesmo cartão branco/escuro do resto da UI). */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  z-index: 900;
+}
+.theme-toggle:hover { background: var(--surface-alt); color: var(--text); }
+.theme-toggle svg { display: block; }
 
 @media (max-width: 480px) {
   .auth-card { padding: 28px 24px; }

@@ -1,6 +1,30 @@
 // Etapa 9 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // vanilla JS puro, sem build nenhum — mesmo estilo de public-admin/admin.js.
 (function () {
+  // Botão discreto de claro/escuro — mesma chave de localStorage do resto
+  // do PDV (public/js/theme.js), só que sozinho aqui em vez de um mecanismo
+  // de 3 opções (claro/escuro/automático) como em personalizacao.js: essa
+  // tela não tem uma seção de configurações pra abrigar isso, só o ícone.
+  const THEME_KEY = 'theme.preference';
+  const SUN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const MOON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 14.5A8.5 8.5 0 019.5 4 8.5 8.5 0 1020 14.5z" fill="currentColor"/></svg>';
+  const themeToggle = document.getElementById('theme-toggle');
+  function currentTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function renderThemeToggle() {
+    themeToggle.innerHTML = currentTheme() === 'dark' ? SUN : MOON;
+  }
+  themeToggle.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(THEME_KEY, next);
+    document.documentElement.setAttribute('data-theme', next);
+    renderThemeToggle();
+  });
+  renderThemeToggle();
+
   const form = document.getElementById('signup-form');
   const successCard = document.getElementById('success-card');
   const successLink = document.getElementById('success-link');

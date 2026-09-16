@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDV - C&amp;S Virtual — Criar minha loja</title>
+<script>
+  // Aplica o tema salvo ANTES do CSS renderizar, pra não piscar no tema
+  // errado por uma fração de segundo (mesma chave "theme.preference" de
+  // public/js/theme.js — cada origem tem seu próprio localStorage, então
+  // isso não "puxa" a preferência de outra tela, só reaproveita o nome
+  // pra quem já conhece o padrão do resto do PDV).
+  (function () {
+    try {
+      var v = localStorage.getItem('theme.preference');
+      if (v === 'dark' || v === 'light') document.documentElement.setAttribute('data-theme', v);
+    } catch {}
+  })();
+</script>
 <link rel="stylesheet" href="signup.css">
 </head>
 <body>
@@ -20,6 +33,8 @@
     public-signup/ autocontido.
   -->
   <div id="toast-root" aria-live="polite"></div>
+
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
 
   <main class="auth-screen">
     <form id="signup-form" class="auth-card">
