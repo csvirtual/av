@@ -286,7 +286,7 @@
       for (const status of validStatuses) {
         const opt = document.createElement('option');
         opt.value = status;
-        opt.textContent = status;
+        opt.textContent = status.charAt(0).toUpperCase() + status.slice(1);
         if (status === tenant.status) opt.selected = true;
         statusSelect.appendChild(opt);
       }
