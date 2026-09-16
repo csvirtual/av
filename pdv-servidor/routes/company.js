@@ -13,6 +13,7 @@ import { broadcast } from '../lib/broadcast.js';
 import { verifyLicenseKey } from '../lib/license.js';
 import { onlyDigits, formatCnpj, isValidCnpj, formatCep, isValidCep, isValidEmail } from '../lib/companyValidation.js';
 import { UFS } from '../lib/ufs.js';
+import { syncTenantCompanyInfo } from '../control/db.js';
 
 const router = Router();
 
@@ -230,6 +231,12 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     // do cliente, ver achado de segurança da Fase 9 anterior). Avisado
     // agora igual ao resto.
     broadcast('company-changed', {}, req.tenantId);
+    // Achado do usuário: CNPJ/nome preenchidos aqui não apareciam no
+    // Painel de Controle (etapa 8) — só existe req.tenantId em modo
+    // multi-tenant (ver server.js#resolveTenantRowFromHostname).
+    if (req.tenantId) {
+      syncTenantCompanyInfo(req.tenantId, { cnpj: updated.cnpj, razaoSocial: updated.razaoSocial, nomeFantasia: updated.nomeFantasia });
+    }
     res.json({ ...readCompanyInfo(updated), ...readPolicies(updated, req.db) });
   } catch (err) {
     console.error('[erro inesperado] PUT /api/company:', err);

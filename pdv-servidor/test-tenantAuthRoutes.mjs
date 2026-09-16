@@ -45,7 +45,7 @@ function request(hostHeader, { method = 'GET', reqPath = '/api/status', body, co
 }
 
 const { createNewTenant } = await import('./scripts/createTenant.js');
-const { controlDb } = await import('./control/db.js');
+const { controlDb, listTenants } = await import('./control/db.js');
 const Database = (await import('better-sqlite3')).default;
 
 const suffix = Date.now();
@@ -99,6 +99,22 @@ try {
   const getB = await request(hostB, { reqPath: '/api/company', cookie: loginB.cookie });
   check('GET /api/company da loja A devolve o nome fantasia dela', getA.body.nomeFantasia === 'Loja A', getA.body.nomeFantasia);
   check('GET /api/company da loja B devolve o nome fantasia dela (não o de A)', getB.body.nomeFantasia === 'Loja B', getB.body.nomeFantasia);
+
+  // Achado do usuário: CNPJ/razão social/nome fantasia preenchidos aqui
+  // (banco da PRÓPRIA loja) não apareciam no Painel de Controle (banco de
+  // CONTROLE, control/plataforma.sqlite3) — control/db.js#syncTenantCompanyInfo,
+  // chamado por routes/company.js depois de cada PUT bem-sucedido, resolve
+  // isso. Confirma que cada loja sincronizou os dados DELA, sem vazar pra
+  // linha da outra.
+  const controlRowA = controlDb.prepare('SELECT cnpj, razao_social, nome_fantasia FROM tenants WHERE slug = ?').get(slugA);
+  const controlRowB = controlDb.prepare('SELECT cnpj, razao_social, nome_fantasia FROM tenants WHERE slug = ?').get(slugB);
+  check('CNPJ da loja A sincronizou com o banco de controle', controlRowA.cnpj === '11.444.777/0001-61', controlRowA.cnpj);
+  check('razão social/nome fantasia da loja A sincronizaram com o banco de controle', controlRowA.razao_social === 'Loja A LTDA' && controlRowA.nome_fantasia === 'Loja A', JSON.stringify(controlRowA));
+  check('CNPJ da loja B sincronizou com o banco de controle (não o de A)', controlRowB.cnpj === '11.222.333/0001-81', controlRowB.cnpj);
+  check('razão social/nome fantasia da loja B sincronizaram com o banco de controle (não os de A)', controlRowB.razao_social === 'Loja B LTDA' && controlRowB.nome_fantasia === 'Loja B', JSON.stringify(controlRowB));
+
+  const panelA = listTenants().find((t) => t.slug === slugA);
+  check('loja A aparece no Painel de Controle com o CNPJ/nome que ela mesma cadastrou', panelA?.cnpj === '11.444.777/0001-61' && panelA?.nome_fantasia === 'Loja A', JSON.stringify(panelA));
 
   // O cookie de sessão é host-only (sem Domain wildcard) — o navegador já
   // garante isso sozinho; aqui simulamos o "e se alguém tentasse mandar o

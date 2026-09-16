@@ -53,6 +53,32 @@ export function listTenants() {
   return controlDb.prepare(LIST_TENANTS_SQL).all();
 }
 
+/** Achado do usuário: CNPJ/razão social/nome fantasia preenchidos pela
+ * própria loja em "Dados da loja" (routes/company.js) ficavam só no banco
+ * DELA — nunca voltavam pro banco de controle, então o Painel de Controle
+ * continuava mostrando o que existia na hora em que a loja foi criada
+ * (normalmente vazio, ver scripts/createTenant.js#createNewTenant) pra
+ * sempre, mesmo depois do lojista preencher tudo certinho. Chamado por
+ * routes/company.js depois de CADA salvamento bem-sucedido. Só atualiza
+ * os campos passados como string não-vazia (nunca apaga um dado do painel
+ * por causa de um campo que a loja deixou em branco); nunca lança — um
+ * CNPJ colidindo com o de outra loja (UNIQUE, ver schema.sql) não pode
+ * derrubar o salvamento da PRÓPRIA loja, só deixa o painel sem
+ * sincronizar dessa vez. */
+export function syncTenantCompanyInfo(tenantId, { cnpj, razaoSocial, nomeFantasia } = {}) {
+  const updates = {};
+  if (cnpj) updates.cnpj = cnpj;
+  if (razaoSocial) updates.razao_social = razaoSocial;
+  if (nomeFantasia) updates.nome_fantasia = nomeFantasia;
+  if (Object.keys(updates).length === 0) return;
+  try {
+    const setClause = Object.keys(updates).map((col) => `${col} = @${col}`).join(', ');
+    controlDb.prepare(`UPDATE tenants SET ${setClause} WHERE id = @id`).run({ ...updates, id: tenantId });
+  } catch (err) {
+    console.error('[erro inesperado] sincronizar dados da loja com o painel de controle:', err);
+  }
+}
+
 /** Muda status/vencimento de uma loja já cadastrada — é o mecanismo de
  * controle da PLATAFORMA sobre a assinatura de uma loja (suspender por
  * inadimplência, cancelar, reativar, ajustar vencimento), independente do
