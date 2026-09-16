@@ -117,24 +117,44 @@ const MULTI_TENANT_DOMAIN = process.env.MULTI_TENANT_DOMAIN || null;
 // configurada mas o hostname não bate com nenhuma loja; devolve
 // `undefined` quando MULTI_TENANT_DOMAIN nem está configurada (nenhum
 // tenant pra resolver, comportamento idêntico a antes desta etapa).
-function resolveTenantIdFromHostname(hostname) {
+function resolveTenantRowFromHostname(hostname) {
   if (!MULTI_TENANT_DOMAIN) return undefined;
   const suffix = `.${MULTI_TENANT_DOMAIN}`;
   // endsWith(suffix) já rejeita o domínio-base sozinho (sem subdomínio):
   // "pdv-csvirtual.com.br" não termina em ".pdv-csvirtual.com.br".
   if (!hostname || !hostname.endsWith(suffix)) return null;
   const slug = hostname.slice(0, -suffix.length);
-  const tenant = getTenantBySlug(slug);
-  return tenant ? tenant.id : null;
+  return getTenantBySlug(slug);
+}
+// Etapa 7 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+// licença/assinatura, no modo SaaS, é controlada pela PLATAFORMA
+// (tenants.status/expires_at no banco de controle), não mais só pelo
+// mecanismo de trial/chave de ativação por loja (lib/licenseState.js,
+// que continua existindo e funcionando exatamente como antes — é o
+// mecanismo de licenciamento do produto single-tenant/on-premise, e
+// segue valendo por baixo mesmo numa loja SaaS). Uma loja com assinatura
+// suspensa/cancelada/vencida é bloqueada aqui, ANTES de qualquer rota
+// (inclusive estáticos e login) — mesmo ponto de entrada único que já
+// bloqueia Host desconhecido (etapa 3) — sem precisar de outra chamada
+// de rede nem duplicar a checagem em cada rota.
+function tenantAccessBlockedReason(tenant) {
+  if (tenant.status === 'cancelado') return 'Esta loja foi cancelada. Entre em contato com o suporte.';
+  if (tenant.status === 'suspenso') return 'Esta loja está com a assinatura suspensa. Entre em contato com o suporte.';
+  if (tenant.expires_at != null && Date.now() > tenant.expires_at) return 'A assinatura desta loja expirou. Entre em contato com o suporte.';
+  return null;
 }
 app.use((req, res, next) => {
   if (!MULTI_TENANT_DOMAIN) return next();
-  const tenantId = resolveTenantIdFromHostname(req.hostname);
-  if (!tenantId) {
+  const tenant = resolveTenantRowFromHostname(req.hostname);
+  if (!tenant) {
     return res.status(404).send('Loja não encontrada.');
   }
-  req.tenantId = tenantId;
-  req.db = getTenantDb(tenantId);
+  const blockedReason = tenantAccessBlockedReason(tenant);
+  if (blockedReason) {
+    return res.status(403).send(blockedReason);
+  }
+  req.tenantId = tenant.id;
+  req.db = getTenantDb(tenant.id);
   next();
 });
 
@@ -318,16 +338,19 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 // lib/broadcast.js#LEGACY_TENANT_KEY), comportamento idêntico a antes
 // desta etapa. Com MULTI_TENANT_DOMAIN configurada, um Host que não bate
 // com nenhuma loja cadastrada tem a conexão fechada na hora — mesma regra
-// de acesso que já vale pra HTTP (404 "Loja não encontrada").
+// de acesso que já vale pra HTTP (404 "Loja não encontrada"). Etapa 7:
+// mesmo raciocínio pra uma loja com assinatura suspensa/cancelada/vencida
+// (tenantAccessBlockedReason) — sem mensagem de erro no protocolo
+// WebSocket (não dá pra mandar um corpo como no 403 HTTP), só fecha.
 wss.on('connection', (ws, req) => {
   if (MULTI_TENANT_DOMAIN) {
     const hostname = (req.headers.host || '').split(':')[0];
-    const tenantId = resolveTenantIdFromHostname(hostname);
-    if (!tenantId) {
+    const tenant = resolveTenantRowFromHostname(hostname);
+    if (!tenant || tenantAccessBlockedReason(tenant)) {
       ws.close();
       return;
     }
-    registerClient(ws, tenantId);
+    registerClient(ws, tenant.id);
     return;
   }
   registerClient(ws);
