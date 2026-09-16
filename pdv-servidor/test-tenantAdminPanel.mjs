@@ -56,6 +56,9 @@ const suffix = Date.now();
 const adminUsername = `super-${suffix}`;
 const adminPassword = 'senha-super-admin-123';
 await seedPlatformAdmin(adminUsername, adminPassword);
+// POST /api/admin/account (trocar usuário/senha pelo painel) pode renomear
+// a conta de teste — o finally precisa saber o nome FINAL pra limpar certo.
+let finalAdminUsername = adminUsername;
 
 const slugA = `panel-a-${suffix}`;
 const tenantA = await createNewTenant(slugA, 'Painel Tenant A', 'Painel Tenant A');
@@ -226,8 +229,45 @@ try {
 
   const purgeAlreadyGone = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie, body: { password: currentAdminPassword } });
   check('excluir definitivamente uma entrada que já não existe mais é rejeitado (400)', purgeAlreadyGone.status === 400, JSON.stringify(purgeAlreadyGone.body));
+
+  // --- Trocar o próprio usuário/senha (clique no nome, no painel) ---
+  const accountNoAuth = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', body: { currentPassword: currentAdminPassword, newPassword: 'nao-importa-123456' } });
+  check('trocar usuário/senha sem sessão retorna 401', accountNoAuth.status === 401, accountNoAuth.status);
+
+  const accountWrongCurrent = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', cookie: adminCookie, body: { currentPassword: 'senha-errada-com-certeza', newPassword: 'nova-senha-valida-999' } });
+  check('trocar senha com senha atual errada é rejeitado (400)', accountWrongCurrent.status === 400, JSON.stringify(accountWrongCurrent.body));
+
+  const accountNothingToChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', cookie: adminCookie, body: { currentPassword: currentAdminPassword } });
+  check('trocar sem informar novo usuário/senha é rejeitado (400)', accountNothingToChange.status === 400, JSON.stringify(accountNothingToChange.body));
+
+  const accountShortPassword = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', cookie: adminCookie, body: { currentPassword: currentAdminPassword, newPassword: '123' } });
+  check('trocar pra senha curta demais é rejeitado (400)', accountShortPassword.status === 400, JSON.stringify(accountShortPassword.body));
+
+  const newAdminPassword = 'senha-trocada-pelo-painel-456';
+  const accountPasswordChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', cookie: adminCookie, body: { currentPassword: currentAdminPassword, newPassword: newAdminPassword } });
+  check('trocar só a senha funciona', accountPasswordChange.status === 200 && accountPasswordChange.body.admin?.username === adminUsername, JSON.stringify(accountPasswordChange.body));
+
+  const loginOldPasswordAfterChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/login', body: { username: adminUsername, password: currentAdminPassword } });
+  check('depois de trocar pelo painel, a senha antiga para de funcionar', loginOldPasswordAfterChange.status === 401, loginOldPasswordAfterChange.status);
+
+  const loginNewPasswordAfterChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/login', body: { username: adminUsername, password: newAdminPassword } });
+  check('depois de trocar pelo painel, a senha nova funciona', loginNewPasswordAfterChange.status === 200, loginNewPasswordAfterChange.status);
+
+  const newAdminUsername = `${adminUsername}-renomeado`;
+  const accountUsernameChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', cookie: adminCookie, body: { currentPassword: newAdminPassword, newUsername: newAdminUsername } });
+  check('trocar só o usuário funciona', accountUsernameChange.status === 200 && accountUsernameChange.body.admin?.username === newAdminUsername, JSON.stringify(accountUsernameChange.body));
+  finalAdminUsername = newAdminUsername;
+
+  const meAfterUsernameChange = await request(ADMIN_HOST, { reqPath: '/api/admin/me', cookie: adminCookie });
+  check('sessão continua válida depois de trocar o usuário (não precisa logar de novo)', meAfterUsernameChange.status === 200 && meAfterUsernameChange.body.admin?.username === newAdminUsername, JSON.stringify(meAfterUsernameChange.body));
+
+  const loginOldUsernameAfterChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/login', body: { username: adminUsername, password: newAdminPassword } });
+  check('depois de renomear, o usuário antigo não loga mais', loginOldUsernameAfterChange.status === 401, loginOldUsernameAfterChange.status);
+
+  const loginNewUsernameAfterChange = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/login', body: { username: newAdminUsername, password: newAdminPassword } });
+  check('login com o usuário novo funciona', loginNewUsernameAfterChange.status === 200, loginNewUsernameAfterChange.status);
 } finally {
-  controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(adminUsername.toLowerCase());
+  controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(finalAdminUsername.toLowerCase());
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugA);
   fs.rmSync(path.join(__dirname, 'tenants', slugA), { recursive: true, force: true });
   // A exclusão pelo painel move a pasta pra tenants/_lixeira/<slug>-<ts> em

@@ -7,8 +7,9 @@
 // contra o banco de controle (nunca `req.db`: não existe "tenant" pra um
 // admin da plataforma, é um único banco pro sistema inteiro).
 import { controlDb } from '../control/db.js';
-import { verifyPasswordHash } from './auth.js';
+import { hashPassword, verifyPasswordHash } from './auth.js';
 import { getLoginLockState, recordFailedLogin, clearLoginLock } from './loginLockout.js';
+import { MIN_USER_PASSWORD_LENGTH } from './permissions.js';
 
 const FIND_BY_USERNAME_SQL = 'SELECT * FROM platform_admins WHERE username_lower = ?';
 
@@ -68,4 +69,44 @@ export async function verifyPlatformAdminPassword(username, password) {
 
 export function getPlatformAdminById(id) {
   return controlDb.prepare('SELECT id, username_lower, active FROM platform_admins WHERE id = ?').get(id) || null;
+}
+
+/** Achado do usuário: precisava dar pra trocar o próprio usuário/senha do
+ * painel sem passar pelo terminal (scripts/seedPlatformAdmin.js exigia
+ * acesso à máquina — bom pra criar a PRIMEIRA conta, ruim pro dia a dia).
+ * Exige a senha atual (mesma reconfirmação e mesmo namespace de bloqueio
+ * por força bruta de verifyPlatformAdminPassword acima — mesma classe de
+ * ação sensível). `newUsername`/`newPassword` são opcionais, mas pelo
+ * menos um precisa vir preenchido. Lança se a senha atual estiver errada,
+ * o novo usuário já existir, ou a nova senha for curta demais. */
+export async function updatePlatformAdminAccount(adminId, { currentPassword, newUsername, newPassword }) {
+  const admin = getPlatformAdminById(adminId);
+  if (!admin || !admin.active) throw new Error('Não autenticado.');
+  if (!currentPassword) throw new Error('Informe sua senha atual pra confirmar.');
+  const confirmed = await verifyPlatformAdminPassword(admin.username_lower, currentPassword);
+  if (!confirmed) throw new Error('Senha atual incorreta.');
+
+  const updates = {};
+  const usernameLower = newUsername != null ? String(newUsername).trim().toLowerCase() : '';
+  if (usernameLower && usernameLower !== admin.username_lower) {
+    const existing = controlDb.prepare(FIND_BY_USERNAME_SQL).get(usernameLower);
+    if (existing) throw new Error(`Já existe um administrador com o usuário "${usernameLower}".`);
+    updates.username_lower = usernameLower;
+  }
+  if (newPassword) {
+    if (newPassword.length < MIN_USER_PASSWORD_LENGTH) {
+      throw new Error(`A nova senha precisa ter pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres.`);
+    }
+    const { salt, hash } = await hashPassword(newPassword);
+    updates.password_salt = salt;
+    updates.password_hash = hash;
+  }
+  if (Object.keys(updates).length === 0) {
+    throw new Error('Informe um novo usuário ou uma nova senha.');
+  }
+
+  const setClause = Object.keys(updates).map((col) => `${col} = @${col}`).join(', ');
+  controlDb.prepare(`UPDATE platform_admins SET ${setClause} WHERE id = @id`).run({ ...updates, id: adminId });
+  const updated = getPlatformAdminById(adminId);
+  return { id: updated.id, username: updated.username_lower };
 }

@@ -155,12 +155,74 @@
     appScreen.hidden = true;
   }
 
+  let currentAdmin = null;
   function showApp(admin) {
+    currentAdmin = admin;
     loginScreen.hidden = true;
     appScreen.hidden = false;
     adminUsernameEl.textContent = admin.username;
     loadTenants();
   }
+
+  // Achado do usuário: clicar no próprio nome deveria dar a opção de
+  // trocar usuário/senha, sem precisar do terminal.
+  function openAccountModal() {
+    let errorEl, usernameInput, newPasswordInput, confirmPasswordInput, currentPasswordInput;
+    openModal({
+      title: 'Trocar usuário/senha',
+      submitLabel: 'Salvar',
+      bodyHtml: `
+        <div class="field">
+          <label>Usuário</label>
+          <input type="text" class="account-username-input" autocomplete="username" value="${escapeHtml(currentAdmin.username)}">
+        </div>
+        <div class="field">
+          <label>Nova senha</label>
+          <input type="password" class="account-new-password-input" autocomplete="new-password" placeholder="Deixe em branco pra manter a atual">
+        </div>
+        <div class="field">
+          <label>Confirmar nova senha</label>
+          <input type="password" class="account-confirm-password-input" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label>Sua senha atual</label>
+          <input type="password" class="account-current-password-input" autocomplete="current-password" placeholder="Obrigatória pra confirmar">
+        </div>
+        <p class="confirm-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin:0;"></p>
+      `,
+      onMount: (modalEl) => {
+        errorEl = modalEl.querySelector('.confirm-error');
+        usernameInput = modalEl.querySelector('.account-username-input');
+        newPasswordInput = modalEl.querySelector('.account-new-password-input');
+        confirmPasswordInput = modalEl.querySelector('.account-confirm-password-input');
+        currentPasswordInput = modalEl.querySelector('.account-current-password-input');
+        usernameInput.focus();
+      },
+      onSubmit: async () => {
+        const newUsername = usernameInput.value.trim();
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        const currentPassword = currentPasswordInput.value;
+        if (!currentPassword) { errorEl.textContent = 'Informe sua senha atual.'; return false; }
+        if (newPassword && newPassword !== confirmPassword) { errorEl.textContent = 'As duas senhas novas não são iguais.'; return false; }
+        const usernameChanged = newUsername && newUsername.toLowerCase() !== currentAdmin.username.toLowerCase();
+        if (!usernameChanged && !newPassword) { errorEl.textContent = 'Informe um novo usuário ou uma nova senha.'; return false; }
+        try {
+          const body = { currentPassword };
+          if (usernameChanged) body.newUsername = newUsername;
+          if (newPassword) body.newPassword = newPassword;
+          const data = await api('/api/admin/account', { method: 'POST', body: JSON.stringify(body) });
+          currentAdmin = data.admin;
+          adminUsernameEl.textContent = data.admin.username;
+          toast('Dados da conta atualizados.', 'success');
+        } catch (err) {
+          errorEl.textContent = err.message;
+          return false;
+        }
+      },
+    });
+  }
+  adminUsernameEl.addEventListener('click', openAccountModal);
 
   function dateInputValue(expiresAt) {
     if (!expiresAt) return '';

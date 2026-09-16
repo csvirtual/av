@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { controlDb } from '../../control/db.js';
 import { createSession, destroySession, resolveSession } from '../../lib/session.js';
-import { verifyPlatformAdminLogin, getPlatformAdminLoginLockState, getPlatformAdminById } from '../../lib/platformAdminAuth.js';
+import { verifyPlatformAdminLogin, getPlatformAdminLoginLockState, getPlatformAdminById, updatePlatformAdminAccount } from '../../lib/platformAdminAuth.js';
 
 const router = Router();
 
@@ -54,6 +54,23 @@ router.get('/me', (req, res) => {
   const admin = adminId ? getPlatformAdminById(adminId) : null;
   if (!admin || !admin.active) return res.status(401).json({ error: 'Não autenticado.' });
   res.json({ admin: { id: admin.id, username: admin.username_lower } });
+});
+
+// Achado do usuário: clicar no próprio nome deveria dar a opção de trocar
+// usuário/senha, sem precisar do terminal (scripts/seedPlatformAdmin.js
+// resolvia isso antes, mas só pra quem tem acesso à máquina onde o
+// servidor roda). Exige reconfirmar a senha atual — mesma lógica de
+// lib/platformAdminAuth.js#updatePlatformAdminAccount.
+router.post('/account', async (req, res) => {
+  try {
+    const adminId = resolveSession(req.cookies?.admin_session, controlDb);
+    if (!adminId) return res.status(401).json({ error: 'Não autenticado.' });
+    const { currentPassword, newUsername, newPassword } = req.body || {};
+    const admin = await updatePlatformAdminAccount(adminId, { currentPassword, newUsername, newPassword });
+    res.json({ admin });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 export default router;

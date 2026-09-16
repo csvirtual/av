@@ -179,7 +179,19 @@ a { color: var(--primary); }
 .page-header h1 { font-size: 21px; margin: 0; }
 .page-header .desc { color: var(--text-muted); font-size: 13px; margin: 2px 0 0; }
 .header-actions { display: flex; align-items: center; gap: 12px; }
-.admin-username { font-size: 13px; color: var(--text-muted); }
+.admin-username {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  font-family: inherit;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+.admin-username:hover { color: var(--text); text-decoration-color: var(--text-muted); }
 
 .btn-secondary {
   display: inline-flex;
