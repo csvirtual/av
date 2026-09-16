@@ -14,39 +14,56 @@
     mesma função da CLI). De propósito sem cobrança nenhuma: toda loja
     nasce em "trial". Sem contrapartida na extensão — tela nova, fora da
     regra de paridade visual do CLAUDE.md (que vale só pra telas que
-    existem nos dois produtos).
+    existem nos dois produtos) — mas usando o mesmo "molde" visual do
+    login (.auth-screen/.auth-card em public/css/styles.css), só copiado
+    pra este bundle separado em vez de importado, pra manter
+    public-signup/ autocontido.
   -->
   <div id="toast-root" aria-live="polite"></div>
 
-  <main id="signup-screen">
-    <form id="signup-form" class="signup-card">
-      <h1>Criar minha loja</h1>
-      <p class="subtitle">PDV Multi-Tenant — comece grátis, sem cartão de crédito.</p>
-
-      <label for="nome-fantasia">Nome da loja</label>
-      <input id="nome-fantasia" name="nomeFantasia" type="text" maxlength="120" required>
-
-      <label for="razao-social">Razão social</label>
-      <input id="razao-social" name="razaoSocial" type="text" maxlength="120" required>
-
-      <label for="slug">Endereço da sua loja</label>
-      <div class="slug-row">
-        <input id="slug" name="slug" type="text" maxlength="30" required autocomplete="off" spellcheck="false">
-        <span id="slug-domain"></span>
+  <main class="auth-screen">
+    <form id="signup-form" class="auth-card">
+      <div class="auth-brand">
+        <span class="dot" aria-hidden="true"></span>
+        <span>PDV Multi-Tenant</span>
       </div>
-      <p id="slug-feedback" class="feedback"></p>
+      <h1>Criar minha loja</h1>
+      <p class="subtitle">Comece grátis, sem cartão de crédito — sua loja fica pronta na hora.</p>
 
-      <button type="submit">Criar loja grátis</button>
+      <div class="field">
+        <label for="nome-fantasia">Nome da loja</label>
+        <input id="nome-fantasia" name="nomeFantasia" type="text" maxlength="120" placeholder="Ex: Mercadinho da Ana" required>
+      </div>
+
+      <div class="field">
+        <label for="razao-social">Razão social</label>
+        <input id="razao-social" name="razaoSocial" type="text" maxlength="120" placeholder="Ex: Ana Comércio de Alimentos LTDA" required>
+      </div>
+
+      <div class="field">
+        <label for="slug">Endereço da sua loja</label>
+        <div class="slug-row">
+          <input id="slug" name="slug" type="text" maxlength="30" placeholder="minhaloja" autocomplete="off" spellcheck="false" required>
+          <span id="slug-domain" class="slug-domain"></span>
+        </div>
+        <p id="slug-feedback" class="feedback" role="status"></p>
+      </div>
+
+      <button type="submit" class="btn-submit">Criar loja grátis</button>
       <p id="signup-error" class="error" role="alert"></p>
     </form>
 
-    <div id="success-card" class="signup-card" hidden>
+    <div id="success-card" class="auth-card" hidden>
+      <div class="success-icon" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <h1>Loja criada!</h1>
-      <p>Sua loja já está pronta em:</p>
-      <p><a id="success-link" href="#" target="_blank" rel="noopener"></a></p>
-      <p>Entre com o usuário <strong>admin</strong> e a senha
-        <strong>admin123</strong> — você vai precisar trocar essa senha no
-        primeiro login.</p>
+      <p class="subtitle">Sua loja já está pronta em:</p>
+      <p class="success-url"><a id="success-link" href="#" target="_blank" rel="noopener"></a></p>
+      <p class="hint-block">
+        Entre com o usuário <strong>admin</strong> e a senha <strong>admin123</strong>
+        — você vai precisar trocar essa senha no primeiro login.
+      </p>
     </div>
   </main>
 
