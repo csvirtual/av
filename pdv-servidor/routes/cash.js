@@ -21,27 +21,32 @@ const router = Router();
 const CREDIT_METHOD = 'Crédito de troca';
 const FIADO_METHOD = 'Fiado';
 
-const getOpenGlobalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1");
-const getOpenByTerminalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1");
-const getOpenByUserStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1");
-const getSessionByIdStmt = db.prepare('SELECT * FROM cash_sessions WHERE id = ?');
-const insertSessionStmt = db.prepare(`
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const GET_OPEN_GLOBAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1";
+const GET_OPEN_BY_TERMINAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1";
+const GET_OPEN_BY_USER_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1";
+const GET_SESSION_BY_ID_SQL = 'SELECT * FROM cash_sessions WHERE id = ?';
+const INSERT_SESSION_SQL = `
   INSERT INTO cash_sessions (id, opened_at, status, terminal_id, user_id, data) VALUES (@id, @openedAt, 'aberto', @terminalId, @userId, @data)
-`);
-const updateSessionStmt = db.prepare('UPDATE cash_sessions SET status = @status, data = @data WHERE id = @id');
-const listSessionsStmt = db.prepare('SELECT * FROM cash_sessions ORDER BY opened_at DESC LIMIT ?');
-const insertMovementStmt = db.prepare(`
+`;
+const UPDATE_SESSION_SQL = 'UPDATE cash_sessions SET status = @status, data = @data WHERE id = @id';
+const LIST_SESSIONS_SQL = 'SELECT * FROM cash_sessions ORDER BY opened_at DESC LIMIT ?';
+const INSERT_MOVEMENT_SQL = `
   INSERT INTO cash_movements (id, session_id, timestamp, data) VALUES (@id, @sessionId, @timestamp, @data)
-`);
-const listMovementsStmt = db.prepare('SELECT data FROM cash_movements WHERE session_id = ? ORDER BY timestamp DESC');
-const listAllSalesStmt = db.prepare('SELECT data FROM sales');
-const listAllDebtsStmt = db.prepare('SELECT data FROM customer_debts');
-const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
+`;
+const LIST_MOVEMENTS_SQL = 'SELECT data FROM cash_movements WHERE session_id = ? ORDER BY timestamp DESC';
+const LIST_ALL_SALES_SQL = 'SELECT data FROM sales';
+const LIST_ALL_DEBTS_SQL = 'SELECT data FROM customer_debts';
+const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToSession(row) { return JSON.parse(row.data); }
 
 router.get('/config', (req, res) => {
-  res.json({ caixaMode: getCaixaMode() });
+  res.json({ caixaMode: getCaixaMode(req.db) });
 });
 
 // Achado de auditoria (P2): sem isto, qualquer vendedor autenticado
@@ -55,34 +60,35 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
   if (mode !== 'unico' && mode !== 'porTerminal' && mode !== 'porOperador') {
     return res.status(400).json({ error: 'Modo de caixa inválido.' });
   }
-  updateConfig({ caixaMode: mode });
+  updateConfig({ caixaMode: mode }, req.db);
   broadcast('cash-config-changed', { caixaMode: mode });
   res.json({ caixaMode: mode });
 });
 
 router.get('/open', (req, res) => {
-  const mode = getCaixaMode();
-  const session = resolveOpenSession(req.terminalId, req.userId);
+  const mode = getCaixaMode(req.db);
+  const session = resolveOpenSession(req.terminalId, req.userId, req.db);
   res.json({ mode, session });
 });
 
 router.get('/sessions', (req, res) => {
   const lim = Math.min(200, Number(req.query.limit) || 50);
-  const rows = listSessionsStmt.all(lim);
+  const rows = (req.db || db).prepare(LIST_SESSIONS_SQL).all(lim);
   res.json({ items: rows.map(rowToSession) });
 });
 
 router.get('/sessions/:id', (req, res) => {
-  const row = getSessionByIdStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Caixa não encontrado.' });
   const session = rowToSession(row);
-  const movements = listMovementsStmt.all(req.params.id).map((r) => JSON.parse(r.data));
+  const movements = targetDb.prepare(LIST_MOVEMENTS_SQL).all(req.params.id).map((r) => JSON.parse(r.data));
   // Pra sessão fechada o "esperado" já foi congelado em session.expectedAmounts
   // no momento do fechamento — recalcular aqui de novo poderia divergir (ex:
   // um estorno de outra venda registrado depois, já contra outra sessão).
   // Só recalcula "ao vivo" pra sessão ainda ABERTA, pra alimentar a prévia
   // no modal de fechamento antes de confirmar.
-  const expected = session.status === 'aberto' ? computeExpectedAmounts(session) : session.expectedAmounts;
+  const expected = session.status === 'aberto' ? computeExpectedAmounts(session, targetDb) : session.expectedAmounts;
   res.json({ session, movements, expected });
 });
 
@@ -93,52 +99,54 @@ router.get('/sessions/:id', (req, res) => {
  * caixa" (ou duas pessoas em terminais/contas diferentes num modo
  * compartilhado) podia ler "nenhuma aberta" duas vezes antes de qualquer
  * uma gravar, e abrir duas sessões ao mesmo tempo. */
-const openCashSession = db.transaction((input) => {
-  const mode = getCaixaMode();
-  if (mode === 'porTerminal' && !input.terminalId) {
-    throw new Error('Terminal não identificado — recarregue a página e tente de novo.');
-  }
-  const existing = mode === 'porTerminal'
-    ? getOpenByTerminalStmt.get(input.terminalId)
-    : mode === 'porOperador'
-      ? getOpenByUserStmt.get(input.userId)
-      : getOpenGlobalStmt.get();
-  if (existing) {
-    throw new Error(mode === 'porTerminal'
-      ? 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.'
+function openCashSession(input, targetDb) {
+  return targetDb.transaction(() => {
+    const mode = getCaixaMode(targetDb);
+    if (mode === 'porTerminal' && !input.terminalId) {
+      throw new Error('Terminal não identificado — recarregue a página e tente de novo.');
+    }
+    const existing = mode === 'porTerminal'
+      ? targetDb.prepare(GET_OPEN_BY_TERMINAL_SQL).get(input.terminalId)
       : mode === 'porOperador'
-        ? 'Você já tem um caixa aberto. Feche-o antes de abrir um novo.'
-        : 'Já existe um caixa aberto. Feche-o antes de abrir um novo.');
-  }
-  const parsedOpening = Number(input.openingAmount);
-  if (!Number.isFinite(parsedOpening) || parsedOpening < 0) {
-    throw new Error('Informe um valor de abertura válido.');
-  }
-  const terminalId = mode === 'porTerminal' ? input.terminalId : null;
-  const userId = mode === 'porOperador' ? input.userId : null;
-  const session = {
-    id: crypto.randomUUID(),
-    status: 'aberto',
-    mode,
-    terminalId,
-    terminalName: mode === 'porTerminal' ? (input.terminalName || null) : null,
-    openedBy: { userId: input.userId, userName: input.userName },
-    openedAt: Date.now(),
-    openingAmount: parsedOpening,
-    closedBy: null,
-    closedAt: null,
-    countedAmounts: null,
-    expectedAmounts: null,
-    difference: null,
-    closingNotes: '',
-  };
-  insertSessionStmt.run({ id: session.id, openedAt: session.openedAt, terminalId, userId, data: JSON.stringify(session) });
-  return session;
-});
+        ? targetDb.prepare(GET_OPEN_BY_USER_SQL).get(input.userId)
+        : targetDb.prepare(GET_OPEN_GLOBAL_SQL).get();
+    if (existing) {
+      throw new Error(mode === 'porTerminal'
+        ? 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.'
+        : mode === 'porOperador'
+          ? 'Você já tem um caixa aberto. Feche-o antes de abrir um novo.'
+          : 'Já existe um caixa aberto. Feche-o antes de abrir um novo.');
+    }
+    const parsedOpening = Number(input.openingAmount);
+    if (!Number.isFinite(parsedOpening) || parsedOpening < 0) {
+      throw new Error('Informe um valor de abertura válido.');
+    }
+    const terminalId = mode === 'porTerminal' ? input.terminalId : null;
+    const userId = mode === 'porOperador' ? input.userId : null;
+    const session = {
+      id: crypto.randomUUID(),
+      status: 'aberto',
+      mode,
+      terminalId,
+      terminalName: mode === 'porTerminal' ? (input.terminalName || null) : null,
+      openedBy: { userId: input.userId, userName: input.userName },
+      openedAt: Date.now(),
+      openingAmount: parsedOpening,
+      closedBy: null,
+      closedAt: null,
+      countedAmounts: null,
+      expectedAmounts: null,
+      difference: null,
+      closingNotes: '',
+    };
+    targetDb.prepare(INSERT_SESSION_SQL).run({ id: session.id, openedAt: session.openedAt, terminalId, userId, data: JSON.stringify(session) });
+    return session;
+  })();
+}
 
 router.post('/open', (req, res) => {
   try {
-    const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId });
+    const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, req.db || db);
     broadcast('cash-changed', { reason: 'opened', id: session.id });
     res.status(201).json({ session });
   } catch (err) {
@@ -170,32 +178,34 @@ function assertCanOperateSession(req, session) {
   throw Object.assign(new Error('Este caixa é de outro operador — só quem abriu (ou um administrador) pode mexer nele.'), { status: 403 });
 }
 
-const commitMovement = db.transaction((input) => {
-  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
-  // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  const row = getSessionByIdStmt.get(input.sessionId);
-  if (!row) throw new Error('Caixa não encontrado.');
-  const session = rowToSession(row);
-  assertCanOperateSession(input, session);
-  if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
-  if (input.type !== 'sangria' && input.type !== 'suprimento') throw new Error('Tipo de movimento inválido.');
-  if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo do movimento de caixa.');
-  const value = Number(input.amount);
-  if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor maior que zero.');
+function commitMovement(input, targetDb) {
+  return targetDb.transaction(() => {
+    // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+    // routes/deliveries.js#commitDelivery pro raciocínio completo.
+    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(input.sessionId);
+    if (!row) throw new Error('Caixa não encontrado.');
+    const session = rowToSession(row);
+    assertCanOperateSession(input, session);
+    if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
+    if (input.type !== 'sangria' && input.type !== 'suprimento') throw new Error('Tipo de movimento inválido.');
+    if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo do movimento de caixa.');
+    const value = Number(input.amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor maior que zero.');
 
-  const movement = {
-    id: crypto.randomUUID(), sessionId: session.id, type: input.type, amount: value,
-    reason: input.reason.trim(), userId: input.userId, userName: input.userName, timestamp: Date.now(),
-  };
-  insertMovementStmt.run({ id: movement.id, sessionId: session.id, timestamp: movement.timestamp, data: JSON.stringify(movement) });
-  return movement;
-});
+    const movement = {
+      id: crypto.randomUUID(), sessionId: session.id, type: input.type, amount: value,
+      reason: input.reason.trim(), userId: input.userId, userName: input.userName, timestamp: Date.now(),
+    };
+    targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: movement.id, sessionId: session.id, timestamp: movement.timestamp, data: JSON.stringify(movement) });
+    return movement;
+  })();
+}
 
 router.post('/sessions/:id/movimento', (req, res) => {
   try {
-    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole });
+    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
     broadcast('cash-changed', { reason: 'movement', id: movement.sessionId });
     res.status(201).json({ movement });
   } catch (err) {
@@ -219,60 +229,62 @@ router.post('/sessions/:id/movimento', (req, res) => {
  * transação (dado mais fresco possível) não vai mais bater com o que o
  * navegador achava, e a retificação é rejeitada em vez de aplicada sobre
  * base desatualizada. */
-const commitAdjustment = db.transaction((input) => {
-  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
-  // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
-  if (!['abertura', 'sangria', 'suprimento'].includes(input.targetType)) {
-    throw new Error('Tipo de retificação inválido.');
-  }
-  if (input.targetType !== 'abertura' && !input.targetMovementId) {
-    throw new Error('Selecione qual lançamento está sendo corrigido.');
-  }
-  if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo da retificação.');
-  const original = Number(input.originalAmount);
-  const corrected = Number(input.correctedAmount);
-  if (!Number.isFinite(original) || !Number.isFinite(corrected) || corrected < 0) {
-    throw new Error('Informe um valor corrigido válido.');
-  }
-  if (corrected === original) throw new Error('O valor corrigido é igual ao valor atual — nada a retificar.');
+function commitAdjustment(input, targetDb) {
+  return targetDb.transaction(() => {
+    // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+    // routes/deliveries.js#commitDelivery pro raciocínio completo.
+    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    if (!['abertura', 'sangria', 'suprimento'].includes(input.targetType)) {
+      throw new Error('Tipo de retificação inválido.');
+    }
+    if (input.targetType !== 'abertura' && !input.targetMovementId) {
+      throw new Error('Selecione qual lançamento está sendo corrigido.');
+    }
+    if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo da retificação.');
+    const original = Number(input.originalAmount);
+    const corrected = Number(input.correctedAmount);
+    if (!Number.isFinite(original) || !Number.isFinite(corrected) || corrected < 0) {
+      throw new Error('Informe um valor corrigido válido.');
+    }
+    if (corrected === original) throw new Error('O valor corrigido é igual ao valor atual — nada a retificar.');
 
-  const row = getSessionByIdStmt.get(input.sessionId);
-  if (!row) throw new Error('Caixa não encontrado.');
-  const session = rowToSession(row);
-  assertCanOperateSession(input, session);
-  if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
+    const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(input.sessionId);
+    if (!row) throw new Error('Caixa não encontrado.');
+    const session = rowToSession(row);
+    assertCanOperateSession(input, session);
+    if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
 
-  const currentMovements = listMovementsStmt.all(session.id).map((r) => JSON.parse(r.data));
-  const currentEffective = input.targetType === 'abertura'
-    ? effectiveAmount('abertura', session.openingAmount, currentMovements)
-    : (() => {
-        const base = currentMovements.find((m) => m.id === input.targetMovementId && (m.type === 'sangria' || m.type === 'suprimento'));
-        if (!base) return null;
-        return effectiveAmount(input.targetType, base.amount, currentMovements, input.targetMovementId);
-      })();
-  if (currentEffective === null) {
-    throw new Error('O lançamento que você está corrigindo não foi encontrado — pode já ter sido retificado por outra pessoa. Atualize a tela e tente de novo.');
-  }
-  if (Math.abs(currentEffective - original) > 0.005) {
-    throw new Error('O valor mudou desde que essa correção foi aberta (outra retificação pode ter sido lançada nesse meio-tempo). Atualize a tela e tente de novo.');
-  }
+    const currentMovements = targetDb.prepare(LIST_MOVEMENTS_SQL).all(session.id).map((r) => JSON.parse(r.data));
+    const currentEffective = input.targetType === 'abertura'
+      ? effectiveAmount('abertura', session.openingAmount, currentMovements)
+      : (() => {
+          const base = currentMovements.find((m) => m.id === input.targetMovementId && (m.type === 'sangria' || m.type === 'suprimento'));
+          if (!base) return null;
+          return effectiveAmount(input.targetType, base.amount, currentMovements, input.targetMovementId);
+        })();
+    if (currentEffective === null) {
+      throw new Error('O lançamento que você está corrigindo não foi encontrado — pode já ter sido retificado por outra pessoa. Atualize a tela e tente de novo.');
+    }
+    if (Math.abs(currentEffective - original) > 0.005) {
+      throw new Error('O valor mudou desde que essa correção foi aberta (outra retificação pode ter sido lançada nesse meio-tempo). Atualize a tela e tente de novo.');
+    }
 
-  const dinheiroDelta = input.targetType === 'sangria' ? -(corrected - original) : (corrected - original);
-  const movement = {
-    id: crypto.randomUUID(), sessionId: session.id, type: 'ajuste', amount: dinheiroDelta,
-    targetType: input.targetType, targetMovementId: input.targetType === 'abertura' ? null : input.targetMovementId,
-    originalAmount: original, correctedAmount: corrected, reason: input.reason.trim(),
-    userId: input.userId, userName: input.userName, timestamp: Date.now(),
-  };
-  insertMovementStmt.run({ id: movement.id, sessionId: session.id, timestamp: movement.timestamp, data: JSON.stringify(movement) });
-  return movement;
-});
+    const dinheiroDelta = input.targetType === 'sangria' ? -(corrected - original) : (corrected - original);
+    const movement = {
+      id: crypto.randomUUID(), sessionId: session.id, type: 'ajuste', amount: dinheiroDelta,
+      targetType: input.targetType, targetMovementId: input.targetType === 'abertura' ? null : input.targetMovementId,
+      originalAmount: original, correctedAmount: corrected, reason: input.reason.trim(),
+      userId: input.userId, userName: input.userName, timestamp: Date.now(),
+    };
+    targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: movement.id, sessionId: session.id, timestamp: movement.timestamp, data: JSON.stringify(movement) });
+    return movement;
+  })();
+}
 
 router.post('/sessions/:id/retificar', (req, res) => {
   try {
-    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole });
+    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
     broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId });
     res.status(201).json({ movement });
   } catch (err) {
@@ -291,11 +303,11 @@ router.post('/sessions/:id/retificar', (req, res) => {
  * sessão (de qualquer cliente, não só de vendas de hoje — quitar uma dívida
  * antiga põe dinheiro na gaveta de HOJE do mesmo jeito). Mesma lógica de
  * cashRepo.js#computeExpectedAmounts da extensão. */
-function computeExpectedAmounts(session) {
-  const allSales = listAllSalesStmt.all().map((r) => JSON.parse(r.data));
+function computeExpectedAmounts(session, targetDb = db) {
+  const allSales = targetDb.prepare(LIST_ALL_SALES_SQL).all().map((r) => JSON.parse(r.data));
   const sessionSales = allSales.filter((s) => s.cashSessionId === session.id);
-  const movements = listMovementsStmt.all(session.id).map((r) => JSON.parse(r.data));
-  const debtPayments = listAllDebtsStmt.all().map((r) => JSON.parse(r.data))
+  const movements = targetDb.prepare(LIST_MOVEMENTS_SQL).all(session.id).map((r) => JSON.parse(r.data));
+  const debtPayments = targetDb.prepare(LIST_ALL_DEBTS_SQL).all().map((r) => JSON.parse(r.data))
     .filter((e) => e.type === 'pagamento' && e.cashSessionId === session.id);
 
   const expected = { Dinheiro: session.openingAmount };
@@ -355,6 +367,7 @@ function effectiveAmount(targetType, baseAmount, movements, targetMovementId = n
 
 router.post('/sessions/:id/fechar', async (req, res) => {
   try {
+    const targetDb = req.db || db;
     // Achado de auditoria (P1, Red Team): a tela (views/caixa.js) já pede
     // "usuário e senha de qualquer conta ativa" antes de fechar — mas essa
     // senha nunca era enviada nem conferida por esta rota, só ficava presa
@@ -370,12 +383,12 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     if (!confirmUsername || !confirmPassword) {
       return res.status(400).json({ error: 'Informe usuário e senha pra confirmar o fechamento.' });
     }
-    const confirmedUser = await verifyLogin(confirmUsername, confirmPassword, { namespace: 'confirmPassword' });
+    const confirmedUser = await verifyLogin(confirmUsername, confirmPassword, { namespace: 'confirmPassword' }, targetDb);
     if (!confirmedUser) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
     }
 
-    const row = getSessionByIdStmt.get(req.params.id);
+    const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Caixa não encontrado.' });
     const session = rowToSession(row);
     assertCanOperateSession(req, session);
@@ -385,7 +398,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     // gravação (que precisa ser síncrona e rápida). A proteção contra
     // fechar a mesma sessão duas vezes concorrentemente é a re-checagem de
     // `status` dentro da transação abaixo, com o registro mais atual.
-    const expectedAmounts = computeExpectedAmounts(session);
+    const expectedAmounts = computeExpectedAmounts(session, targetDb);
     const counted = {};
     for (const [method, value] of Object.entries(req.body.countedAmounts || {})) {
       const parsed = Number(value);
@@ -393,8 +406,8 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     }
     const difference = (counted.Dinheiro ?? 0) - (expectedAmounts.Dinheiro ?? 0);
 
-    const closeCashSession = db.transaction(() => {
-      const current = rowToSession(getSessionByIdStmt.get(session.id));
+    const closeCashSession = targetDb.transaction(() => {
+      const current = rowToSession(targetDb.prepare(GET_SESSION_BY_ID_SQL).get(session.id));
       if (current.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
       const closed = {
         ...current,
@@ -406,7 +419,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
         difference,
         closingNotes: (req.body.closingNotes || '').trim(),
       };
-      updateSessionStmt.run({ id: closed.id, status: 'fechado', data: JSON.stringify(closed) });
+      targetDb.prepare(UPDATE_SESSION_SQL).run({ id: closed.id, status: 'fechado', data: JSON.stringify(closed) });
       return closed;
     });
     const closed = closeCashSession();
@@ -444,9 +457,9 @@ router.post('/backup-fechamento', async (req, res) => {
     // (MIN_USER_PASSWORD_LENGTH). Exigir 8 aqui rejeitaria, sem motivo,
     // contas com senha de 6-7 caracteres que já passaram no cadastro.
     if (!password || password.length < MIN_USER_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_USER_PASSWORD_LENGTH} caracteres pra proteger o backup.`);
-    const payload = buildBackupPayload();
+    const payload = buildBackupPayload(req.db);
     const envelope = await encryptPayload(payload, password);
-    updateConfig({ lastBackupAt: Date.now() });
+    updateConfig({ lastBackupAt: Date.now() }, req.db);
     res.json({ envelope });
   } catch (err) {
     res.status(400).json({ error: err.message });
