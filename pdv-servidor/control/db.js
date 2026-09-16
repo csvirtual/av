@@ -32,3 +32,61 @@ const getTenantBySlugStmt = controlDb.prepare('SELECT * FROM tenants WHERE slug 
 export function getTenantBySlug(slug) {
   return getTenantBySlugStmt.get(slug) || null;
 }
+
+// Etapa 7 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): status
+// válidos de uma loja, mesma lista documentada acima na coluna
+// `tenants.status` — server.js#tenantAccessBlockedReason bloqueia toda
+// requisição de uma loja "suspenso" ou "cancelado", ou com `expires_at` no
+// passado (qualquer que seja o status).
+export const VALID_TENANT_STATUSES = new Set(['trial', 'ativo', 'suspenso', 'cancelado']);
+
+const LIST_TENANTS_SQL = 'SELECT * FROM tenants ORDER BY created_at DESC';
+
+/** Todas as lojas cadastradas, mais recente primeiro — usado pelo painel de
+ * Super Admin (etapa 8, ver routes/admin/tenants.js) e por scripts de
+ * diagnóstico. Nunca inclui o `db_path` fora do necessário (a linha inteira
+ * da tabela já não tem segredo nenhum — nem senha de loja nenhuma mora
+ * aqui, ver control/schema.sql). */
+export function listTenants() {
+  return controlDb.prepare(LIST_TENANTS_SQL).all();
+}
+
+/** Muda status/vencimento de uma loja já cadastrada — é o mecanismo de
+ * controle da PLATAFORMA sobre a assinatura de uma loja (suspender por
+ * inadimplência, cancelar, reativar, ajustar vencimento), independente do
+ * mecanismo de trial/chave de ativação de cada loja (lib/licenseState.js,
+ * que continua existindo e funcionando por baixo — ver comentário em
+ * server.js#tenantAccessBlockedReason). Usado tanto pela CLI
+ * (scripts/createTenant.js --set-status) quanto pelo painel de Super Admin
+ * (routes/admin/tenants.js).
+ *
+ * `expiresAtArg`: `undefined` mantém o vencimento atual sem mexer; `null`
+ * ou a string `'null'` remove o vencimento (sem data, plano manual); uma
+ * string ISO ou um timestamp numérico define a nova data. Lança se o
+ * status for inválido, a loja não existir, ou a data não puder ser
+ * interpretada. */
+export function setTenantStatus(slug, status, expiresAtArg) {
+  if (!VALID_TENANT_STATUSES.has(status)) {
+    throw new Error(`Status inválido: "${status}". Use um de: ${[...VALID_TENANT_STATUSES].join(', ')}.`);
+  }
+  const tenant = getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Loja não encontrada: "${slug}".`);
+
+  let expiresAt = tenant.expires_at;
+  if (expiresAtArg !== undefined) {
+    if (expiresAtArg === null || expiresAtArg === 'null' || expiresAtArg === '') {
+      expiresAt = null;
+    } else if (typeof expiresAtArg === 'number') {
+      expiresAt = expiresAtArg;
+    } else {
+      const parsed = Date.parse(expiresAtArg);
+      if (Number.isNaN(parsed)) {
+        throw new Error(`Data de vencimento inválida: "${expiresAtArg}" (use um formato ISO, ex: "2026-12-31", ou "null" pra remover).`);
+      }
+      expiresAt = parsed;
+    }
+  }
+
+  controlDb.prepare('UPDATE tenants SET status = ?, expires_at = ? WHERE slug = ?').run(status, expiresAt, slug);
+  return getTenantBySlug(slug);
+}

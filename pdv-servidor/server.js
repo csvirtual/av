@@ -8,7 +8,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 
 import { db, sweepOldIdempotencyKeys, getTenantDb } from './db/index.js';
-import { getTenantBySlug } from './control/db.js';
+import { controlDb, getTenantBySlug } from './control/db.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
 import { getConfig } from './lib/companyConfig.js';
@@ -30,6 +30,8 @@ import companyRoutes from './routes/company.js';
 import licenseRoutes from './routes/license.js';
 import backupRoutes from './routes/backup.js';
 import reportsRoutes from './routes/reports.js';
+import adminAuthRoutes from './routes/admin/auth.js';
+import adminTenantsRoutes from './routes/admin/tenants.js';
 import { requirePermission } from './lib/permissions.js';
 
 // Achado de auditoria (auditoria de prontidão pra produção): rede de
@@ -143,8 +145,33 @@ function tenantAccessBlockedReason(tenant) {
   if (tenant.expires_at != null && Date.now() > tenant.expires_at) return 'A assinatura desta loja expirou. Entre em contato com o suporte.';
   return null;
 }
+// Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+// admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
+// ver scripts/createTenant.js) do painel de Super Admin — nunca pode ser
+// uma loja de verdade, então nem entra na resolução de tenant abaixo.
+// Bloqueio simétrico, dos dois lados: (a) toda rota de LOJA (/api/* fora
+// de /api/admin) chegando com o Host do painel — sem isso, um `req.db`
+// indefinido cairia no fallback `db` (o banco fixo do processo, ver
+// routes/*.js#`req.db || db`) e o painel acabaria lendo/escrevendo a loja
+// LEGADA por acidente; (b) toda rota do PAINEL (/api/admin/*) chegando
+// por qualquer OUTRO Host — sem isso, `/api/admin/tenants` seria
+// alcançável (e autenticável, bastando o cookie certo) por qualquer
+// subdomínio de loja, não só pelo domínio reservado do painel.
+const ADMIN_HOSTNAME = MULTI_TENANT_DOMAIN ? `admin.${MULTI_TENANT_DOMAIN}` : null;
 app.use((req, res, next) => {
-  if (!MULTI_TENANT_DOMAIN) return next();
+  if (!ADMIN_HOSTNAME) return next();
+  const isAdminHost = req.hostname === ADMIN_HOSTNAME;
+  const isAdminPath = req.path.startsWith('/api/admin');
+  if (isAdminHost) {
+    req.isPlatformAdminHost = true;
+    if (req.path.startsWith('/api/') && !isAdminPath) return res.status(404).send('Não encontrado.');
+    return next();
+  }
+  if (isAdminPath) return res.status(404).send('Não encontrado.');
+  next();
+});
+app.use((req, res, next) => {
+  if (!MULTI_TENANT_DOMAIN || req.isPlatformAdminHost) return next();
   const tenant = resolveTenantRowFromHostname(req.hostname);
   if (!tenant) {
     return res.status(404).send('Loja não encontrada.');
@@ -170,7 +197,16 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): o
+// painel de Super Admin é uma SPA totalmente separada (pasta própria,
+// public-admin/) — nunca a mesma servida pra uma loja, mesmo raciocínio
+// do gate acima que já isola o resto do pipeline por Host.
+const storeStaticMiddleware = express.static(path.join(__dirname, 'public'));
+const adminStaticMiddleware = express.static(path.join(__dirname, 'public-admin'));
+app.use((req, res, next) => {
+  if (req.isPlatformAdminHost) return adminStaticMiddleware(req, res, next);
+  storeStaticMiddleware(req, res, next);
+});
 
 // Preenche req.userId/userName/userRole a partir do cookie de sessão — não
 // bloqueia rota nenhuma sozinho (algumas, como /api/auth/login, precisam
@@ -195,6 +231,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 // GET /api/auth/me, ver routes/auth.js) já cai em 401 sozinha, sem
 // precisar de nenhuma checagem extra em cada rota individual.
 app.use((req, res, next) => {
+  // Etapa 8 do roteiro multi-tenant: sessão de LOJA não existe no
+  // subdomínio do Super Admin (que tem a própria, ver routes/admin/auth.js
+  // e o cookie `admin_session`) — sem este corte, `req.db` indefinido
+  // cairia no fallback `db` (banco fixo do processo) só pra descobrir que
+  // não há cookie `session` nenhum ali mesmo; pular é só mais direto.
+  if (req.isPlatformAdminHost) return next();
   req.userId = resolveSession(req.cookies?.session, req.db) || null;
   req.userName = null;
   req.userRole = null;
@@ -238,6 +280,7 @@ function requireAuth(req, res, next) {
 // ser testado — isto aqui é a garantia real, que vale mesmo pra quem
 // ignorar a tela e chamar a API direto.
 app.use((req, res, next) => {
+  if (req.isPlatformAdminHost) return next();
   if (!req.mustChangePassword) return next();
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
   if (!req.path.startsWith('/api/')) return next();
@@ -258,6 +301,12 @@ app.use((req, res, next) => {
 // consegue at least deixar alguém entrar pra ativar uma chave nova) e
 // /api/license (já pública de propósito, ver routes/license.js).
 app.use(async (req, res, next) => {
+  // Etapa 8 do roteiro multi-tenant: o gate de licença é sobre a
+  // ASSINATURA DE UMA LOJA (lib/licenseState.js) — não existe "loja" no
+  // subdomínio do Super Admin, então nada aqui se aplica (o controle
+  // sobre uma loja específica já é feito pela etapa 7, no middleware de
+  // resolução por Host, antes de chegar até aqui).
+  if (req.isPlatformAdminHost) return next();
   if (req.path.startsWith('/api/auth') || req.path.startsWith('/api/license')) return next();
   if (!req.path.startsWith('/api/')) return next();
   try {
@@ -275,6 +324,20 @@ app.use(async (req, res, next) => {
     next();
   }
 });
+
+// Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): API do
+// painel de Super Admin — só alcançável pelo subdomínio reservado
+// (bloqueado nos outros hosts lá em cima, no primeiro `app.use` deste
+// arquivo). `requireAdminAuth` é local (não `requireAuth`, que confere
+// `req.userId` — sessão de LOJA; aqui é sempre sessão de PLATAFORMA,
+// contra `controlDb`, nunca `req.db`).
+function requireAdminAuth(req, res, next) {
+  const adminId = resolveSession(req.cookies?.admin_session, controlDb);
+  if (!adminId) return res.status(401).json({ error: 'Não autenticado.' });
+  next();
+}
+app.use('/api/admin', adminAuthRoutes);
+app.use('/api/admin/tenants', requireAdminAuth, adminTenantsRoutes);
 
 app.use('/api/auth', authRoutes);
 // SEM requireAuth de propósito — ver comentário no topo de routes/license.js:

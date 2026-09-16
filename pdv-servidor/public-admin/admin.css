@@ -1,0 +1,123 @@
+:root {
+  --brand: #145333;
+  --brand-dark: #0d3a24;
+  --bg: #f4f6f5;
+  --card-bg: #ffffff;
+  --border: #dde3e0;
+  --text: #1f2b26;
+  --text-muted: #5b6b64;
+  --danger: #b3261e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.screen { min-height: 100vh; }
+
+.login-card {
+  max-width: 360px;
+  margin: 12vh auto 0;
+  padding: 32px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-card h1 { margin: 0 0 4px; font-size: 20px; color: var(--brand-dark); }
+.login-card .subtitle { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }
+.login-card label { font-size: 13px; font-weight: 600; margin-top: 8px; }
+.login-card input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.login-card button {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-card button:hover { background: var(--brand-dark); }
+.login-card .error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 8px 0 0; }
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--brand);
+  color: #fff;
+}
+header h1 { margin: 0; font-size: 18px; }
+.header-actions { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.header-actions button.ghost {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.6);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.header-actions button.ghost:hover { background: rgba(255,255,255,0.15); }
+
+main { padding: 24px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
+th { background: #eef2f0; color: var(--text-muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+
+select, input[type="date"] {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.save-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.save-btn:hover { background: var(--brand-dark); }
+
+#empty-state { color: var(--text-muted); text-align: center; margin-top: 40px; }
+
+#toast-root {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.toast {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.toast.error { background: var(--danger); }
+.toast.success { background: var(--brand); }

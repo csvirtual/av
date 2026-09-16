@@ -41,3 +41,17 @@ CREATE TABLE IF NOT EXISTS platform_admins (
   active         INTEGER NOT NULL DEFAULT 1,
   created_at     INTEGER NOT NULL
 );
+
+-- Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): sessão
+-- de login do painel de Super Admin — mesmo formato EXATO da tabela
+-- `sessions` de cada loja (db/schema.sql), de propósito: lib/session.js
+-- (createSession/resolveSession/destroySession) já é agnóstico de banco
+-- (recebe `targetDb` por parâmetro) e de quem é o `user_id` — reaproveitado
+-- aqui tal como está, passando `controlDb` no lugar do banco de uma loja,
+-- sem duplicar nenhuma lógica de sessão/expiração/TTL.
+CREATE TABLE IF NOT EXISTS sessions (
+  token        TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);

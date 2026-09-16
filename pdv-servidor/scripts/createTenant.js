@@ -39,7 +39,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { controlDb } from '../control/db.js';
+import { controlDb, setTenantStatus, VALID_TENANT_STATUSES } from '../control/db.js';
 import { openTenantConnection } from '../db/connection.js';
 import { hashPassword } from '../lib/auth.js';
 
@@ -186,39 +186,6 @@ function adoptExistingTenant(slug, sourcePath, razaoSocialArg, nomeFantasiaArg) 
   return tenant;
 }
 
-// Etapa 7 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): status
-// válidos, mesma lista documentada em control/schema.sql (coluna
-// `tenants.status`) — server.js#tenantAccessBlockedReason bloqueia toda
-// requisição de uma loja "suspenso" ou "cancelado", ou com `expires_at` no
-// passado (qualquer que seja o status).
-const VALID_TENANT_STATUSES = new Set(['trial', 'ativo', 'suspenso', 'cancelado']);
-
-function setTenantStatus(slug, status, expiresAtArg) {
-  if (!VALID_TENANT_STATUSES.has(status)) {
-    throw new Error(`Status inválido: "${status}". Use um de: ${[...VALID_TENANT_STATUSES].join(', ')}.`);
-  }
-  const tenant = controlDb.prepare('SELECT * FROM tenants WHERE slug = ?').get(slug);
-  if (!tenant) throw new Error(`Loja não encontrada: "${slug}".`);
-
-  let expiresAt = tenant.expires_at;
-  if (expiresAtArg !== undefined) {
-    if (expiresAtArg === 'null' || expiresAtArg === '') {
-      expiresAt = null;
-    } else {
-      const parsed = Date.parse(expiresAtArg);
-      if (Number.isNaN(parsed)) {
-        throw new Error(`Data de vencimento inválida: "${expiresAtArg}" (use um formato ISO, ex: "2026-12-31", ou "null" pra remover).`);
-      }
-      expiresAt = parsed;
-    }
-  }
-
-  controlDb.prepare('UPDATE tenants SET status = ?, expires_at = ? WHERE slug = ?').run(status, expiresAt, slug);
-  const updated = controlDb.prepare('SELECT * FROM tenants WHERE slug = ?').get(slug);
-  console.log(`Loja "${slug}": status = "${updated.status}", expires_at = ${updated.expires_at ? new Date(updated.expires_at).toISOString() : 'null'}`);
-  return updated;
-}
-
 async function main() {
   const [mode, ...rest] = process.argv.slice(2);
   if (mode === '--new') {
@@ -232,7 +199,8 @@ async function main() {
   } else if (mode === '--set-status') {
     const [slug, status, expiresAt] = rest;
     if (!slug || !status) throw new Error('Uso: node scripts/createTenant.js --set-status <slug> <trial|ativo|suspenso|cancelado> [data-ISO-de-vencimento|null]');
-    setTenantStatus(slug, status, expiresAt);
+    const updated = setTenantStatus(slug, status, expiresAt);
+    console.log(`Loja "${slug}": status = "${updated.status}", expires_at = ${updated.expires_at ? new Date(updated.expires_at).toISOString() : 'null'}`);
   } else {
     throw new Error('Uso: node scripts/createTenant.js --new|--from-existing|--set-status ...');
   }
