@@ -218,6 +218,8 @@ select, input[type="date"] {
   font-size: 13px;
 }
 
+.tenant-actions { display: flex; gap: 8px; white-space: nowrap; }
+
 .save-btn {
   padding: 6px 14px;
   border: none;
@@ -230,6 +232,19 @@ select, input[type="date"] {
   transition: background 0.15s ease;
 }
 .save-btn:hover { background: var(--primary-dark); }
+
+.delete-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.delete-btn:hover { background: var(--danger); color: #fff; }
 
 #toast-root {
   position: fixed;

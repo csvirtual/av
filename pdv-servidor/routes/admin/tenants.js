@@ -4,7 +4,7 @@
 // Mesma função de verdade (control/db.js#setTenantStatus), nenhuma lógica
 // duplicada — só um jeito novo (autenticado, pela rede) de chamá-la.
 import { Router } from 'express';
-import { listTenants, setTenantStatus, VALID_TENANT_STATUSES } from '../../control/db.js';
+import { listTenants, setTenantStatus, deleteTenant, VALID_TENANT_STATUSES } from '../../control/db.js';
 
 const router = Router();
 
@@ -29,6 +29,15 @@ router.post('/:slug/status', (req, res) => {
     if (!status) throw new Error('Informe o novo status.');
     const updated = setTenantStatus(req.params.slug, status, expiresAt === undefined ? undefined : expiresAt);
     res.json({ tenant: publicTenant(updated) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.delete('/:slug', (req, res) => {
+  try {
+    const deleted = deleteTenant(req.params.slug);
+    res.json({ tenant: publicTenant(deleted) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

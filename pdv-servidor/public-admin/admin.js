@@ -93,6 +93,24 @@
         }
       });
 
+      row.querySelector('.delete-btn').addEventListener('click', async () => {
+        const nome = tenant.nomeFantasia || tenant.razaoSocial || tenant.slug;
+        // window.confirm em vez de um modal próprio: painel de uma tela só,
+        // sem componente de modal nenhum (nem importado de public/js/, ver
+        // comentário no topo do arquivo) — pra uma ação rara e destrutiva
+        // como esta, o confirm nativo já resolve sem precisar construir uma
+        // UI só pra isso.
+        const ok = window.confirm(`Excluir a loja "${nome}" (${tenant.slug})?\n\nOs dados saem da lista e a loja deixa de responder. Isto não pode ser desfeito por aqui.`);
+        if (!ok) return;
+        try {
+          await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE' });
+          toast(`Loja "${tenant.slug}" excluída.`, 'success');
+          loadTenants();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+
       tenantsBody.appendChild(row);
     }
   }

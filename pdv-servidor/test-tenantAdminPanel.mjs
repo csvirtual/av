@@ -134,10 +134,43 @@ try {
   check('logout do painel funciona', logout.status === 200, logout.status);
   const meAfterLogout = await request(ADMIN_HOST, { reqPath: '/api/admin/me', cookie: newPasswordLogin.cookie });
   check('sessão do painel invalidada depois do logout', meAfterLogout.status === 401, meAfterLogout.status);
+
+  // --- Excluir loja ---
+  const deleteNoAuth = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}` });
+  check('excluir loja sem sessão retorna 401', deleteNoAuth.status === 401, deleteNoAuth.status);
+
+  const deleteUnknown = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/nao-existe-${suffix}`, cookie: adminCookie });
+  check('excluir loja inexistente é rejeitado (400)', deleteUnknown.status === 400, JSON.stringify(deleteUnknown.body));
+
+  const del = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie });
+  check('excluir loja A pelo painel funciona', del.status === 200 && del.body.tenant?.slug === slugA, JSON.stringify(del.body));
+
+  const listAfterDelete = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants', cookie: adminCookie });
+  check('loja excluída some da listagem', !listAfterDelete.body.tenants?.some((t) => t.slug === slugA), JSON.stringify(listAfterDelete.body.tenants?.map((t) => t.slug)));
+
+  const blockedAfterDelete = await request(hostA, { reqPath: '/api/status' });
+  check('loja excluída deixa de responder (404, resolveTenantRowFromHostname não acha mais)', blockedAfterDelete.status === 404, blockedAfterDelete.status);
+
+  const { getTenantBySlug } = await import('./control/db.js');
+  check('loja excluída some do banco de controle', getTenantBySlug(slugA) === null, getTenantBySlug(slugA));
+
+  const tenantDirGone = !fs.existsSync(path.join(__dirname, 'tenants', slugA));
+  const trashDirHasIt = fs.existsSync(path.join(__dirname, 'tenants', '_lixeira')) &&
+    fs.readdirSync(path.join(__dirname, 'tenants', '_lixeira')).some((name) => name.startsWith(`${slugA}-`));
+  check('pasta da loja saiu de tenants/<slug> e foi pra tenants/_lixeira (nunca apagada de verdade)', tenantDirGone && trashDirHasIt, `gone=${tenantDirGone} trashed=${trashDirHasIt}`);
 } finally {
   controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(adminUsername.toLowerCase());
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugA);
   fs.rmSync(path.join(__dirname, 'tenants', slugA), { recursive: true, force: true });
+  // A exclusão pelo painel move a pasta pra tenants/_lixeira/<slug>-<ts> em
+  // vez de apagar (ver control/db.js#deleteTenant) — limpa também esses
+  // restos daqui, senão a lixeira acumula lixo de teste a cada rodada.
+  const lixeiraDir = path.join(__dirname, 'tenants', '_lixeira');
+  if (fs.existsSync(lixeiraDir)) {
+    for (const name of fs.readdirSync(lixeiraDir)) {
+      if (name.startsWith(`${slugA}-`)) fs.rmSync(path.join(lixeiraDir, name), { recursive: true, force: true });
+    }
+  }
 }
 
 console.log('\n' + (results.every(Boolean) ? 'TUDO OK' : 'ALGO FALHOU'));

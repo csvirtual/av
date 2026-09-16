@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONTROL_DB_PATH = path.join(__dirname, 'plataforma.sqlite3');
+const TENANTS_DIR = path.join(__dirname, '..', 'tenants');
 
 export const controlDb = new Database(CONTROL_DB_PATH);
 controlDb.pragma('journal_mode = WAL');
@@ -89,4 +90,28 @@ export function setTenantStatus(slug, status, expiresAtArg) {
 
   controlDb.prepare('UPDATE tenants SET status = ?, expires_at = ? WHERE slug = ?').run(status, expiresAt, slug);
   return getTenantBySlug(slug);
+}
+
+/** Exclui uma loja da plataforma — usado pelo painel de Super Admin (etapa
+ * 8, ver routes/admin/tenants.js). Nunca apaga o arquivo `.sqlite3` de
+ * verdade: mesma cautela de scripts/createTenant.js#adoptExistingTenant
+ * (que também nunca sobrescreve/some com dado da loja sem antes guardar
+ * uma cópia) — move a pasta inteira da loja pra uma "lixeira" dentro de
+ * tenants/, com o slug + timestamp no nome pra nunca colidir com uma
+ * exclusão anterior. Dá pra recuperar manualmente movendo a pasta de volta
+ * e recadastrando com `--from-existing`, caso alguém exclua a loja errada
+ * sem querer. Lança se a loja não existir. */
+export function deleteTenant(slug) {
+  const tenant = getTenantBySlug(slug);
+  if (!tenant) throw new Error(`Loja não encontrada: "${slug}".`);
+
+  const tenantDir = path.dirname(tenant.db_path);
+  if (fs.existsSync(tenantDir)) {
+    const trashDir = path.join(TENANTS_DIR, '_lixeira');
+    fs.mkdirSync(trashDir, { recursive: true });
+    fs.renameSync(tenantDir, path.join(trashDir, `${slug}-${Date.now()}`));
+  }
+
+  controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slug);
+  return tenant;
 }
