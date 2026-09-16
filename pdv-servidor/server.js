@@ -108,21 +108,33 @@ app.use(cookieParser());
 // junto da troca de routes/*.js pra usar req.db em vez do `db` fixo);
 // aqui eles só ficam prontos, resolvidos uma vez por requisição.
 const MULTI_TENANT_DOMAIN = process.env.MULTI_TENANT_DOMAIN || null;
-app.use((req, res, next) => {
-  if (!MULTI_TENANT_DOMAIN) return next();
+// Etapa 6 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+// mesma resolução Host -> tenant usada pelo middleware HTTP logo abaixo,
+// extraída em função à parte pra também servir a conexão WebSocket (ver
+// wss.on('connection', ...) mais adiante) — os dois pontos de entrada
+// precisam resolver o tenant do mesmo jeito. Devolve `null` (loja
+// desconhecida/domínio errado) sempre que MULTI_TENANT_DOMAIN está
+// configurada mas o hostname não bate com nenhuma loja; devolve
+// `undefined` quando MULTI_TENANT_DOMAIN nem está configurada (nenhum
+// tenant pra resolver, comportamento idêntico a antes desta etapa).
+function resolveTenantIdFromHostname(hostname) {
+  if (!MULTI_TENANT_DOMAIN) return undefined;
   const suffix = `.${MULTI_TENANT_DOMAIN}`;
   // endsWith(suffix) já rejeita o domínio-base sozinho (sem subdomínio):
   // "pdv-csvirtual.com.br" não termina em ".pdv-csvirtual.com.br".
-  if (!req.hostname || !req.hostname.endsWith(suffix)) {
-    return res.status(404).send('Loja não encontrada.');
-  }
-  const slug = req.hostname.slice(0, -suffix.length);
+  if (!hostname || !hostname.endsWith(suffix)) return null;
+  const slug = hostname.slice(0, -suffix.length);
   const tenant = getTenantBySlug(slug);
-  if (!tenant) {
+  return tenant ? tenant.id : null;
+}
+app.use((req, res, next) => {
+  if (!MULTI_TENANT_DOMAIN) return next();
+  const tenantId = resolveTenantIdFromHostname(req.hostname);
+  if (!tenantId) {
     return res.status(404).send('Loja não encontrada.');
   }
-  req.tenantId = tenant.id;
-  req.db = getTenantDb(tenant.id);
+  req.tenantId = tenantId;
+  req.db = getTenantDb(tenantId);
   next();
 });
 
@@ -297,7 +309,29 @@ app.get('/api/status', (req, res) => {
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-wss.on('connection', (ws) => registerClient(ws));
+// Etapa 6 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): o
+// upgrade do WebSocket não passa pelos middlewares do Express acima — o
+// `req` aqui é o http.IncomingMessage cru do handshake, então o tenant
+// precisa ser resolvido de novo a partir do Host dele (mesma função usada
+// pelo middleware HTTP). Sem MULTI_TENANT_DOMAIN, `tenantId` fica
+// `undefined` pra toda conexão — mesma sala única de sempre (ver
+// lib/broadcast.js#LEGACY_TENANT_KEY), comportamento idêntico a antes
+// desta etapa. Com MULTI_TENANT_DOMAIN configurada, um Host que não bate
+// com nenhuma loja cadastrada tem a conexão fechada na hora — mesma regra
+// de acesso que já vale pra HTTP (404 "Loja não encontrada").
+wss.on('connection', (ws, req) => {
+  if (MULTI_TENANT_DOMAIN) {
+    const hostname = (req.headers.host || '').split(':')[0];
+    const tenantId = resolveTenantIdFromHostname(hostname);
+    if (!tenantId) {
+      ws.close();
+      return;
+    }
+    registerClient(ws, tenantId);
+    return;
+  }
+  registerClient(ws);
+});
 
 // Limpa sessões expiradas periodicamente — sem isso a tabela `sessions` só
 // cresce (cada login novo insere, nada nunca removia sozinho antes de

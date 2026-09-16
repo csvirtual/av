@@ -351,9 +351,9 @@ router.post('/', async (req, res) => {
       actingRole: req.userRole, actingPermissions: req.userPermissions,
       discountApprovalProvided, approvedAdminId,
     }, req.db || db);
-    broadcast('sales-changed', { reason: 'created', id: sale.id });
-    broadcast('products-changed', { reason: 'sale' });
-    if (sale.customerId) broadcast('customers-changed', { reason: 'sale', id: sale.customerId });
+    broadcast('sales-changed', { reason: 'created', id: sale.id }, req.tenantId);
+    broadcast('products-changed', { reason: 'sale' }, req.tenantId);
+    if (sale.customerId) broadcast('customers-changed', { reason: 'sale', id: sale.customerId }, req.tenantId);
     res.status(201).json({ sale });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
@@ -563,9 +563,9 @@ router.post('/:id/refund', async (req, res) => {
       ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, approvedAdminId,
     }, req.db || db);
-    broadcast('sales-changed', { reason: 'refunded', id: sale.id });
-    broadcast('products-changed', { reason: 'refund' });
-    if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId });
+    broadcast('sales-changed', { reason: 'refunded', id: sale.id }, req.tenantId);
+    broadcast('products-changed', { reason: 'refund' }, req.tenantId);
+    if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId }, req.tenantId);
     // `refund` não vem separado do estado interno da transação — é sempre o
     // último item de sale.refunds (foi acabado de dar push nele ali em
     // cima), então derivar daqui é seguro e evita duplicar o objeto na

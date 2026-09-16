@@ -131,7 +131,7 @@ router.post('/', (req, res) => {
       updatedAt: Date.now(),
     };
     targetDb.prepare(INSERT_CUSTOMER_SQL).run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
-    broadcast('customers-changed', { reason: 'created', id: customer.id });
+    broadcast('customers-changed', { reason: 'created', id: customer.id }, req.tenantId);
     res.status(201).json({ customer });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -167,7 +167,7 @@ router.put('/:id', (req, res) => {
     if (body.active !== undefined) customer.active = !!body.active;
     customer.updatedAt = Date.now();
     targetDb.prepare(UPDATE_CUSTOMER_SQL).run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
-    broadcast('customers-changed', { reason: 'updated', id: customer.id });
+    broadcast('customers-changed', { reason: 'updated', id: customer.id }, req.tenantId);
     res.json({ customer });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -187,7 +187,7 @@ router.delete('/:id', (req, res) => {
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   targetDb.prepare(DELETE_CUSTOMER_SQL).run(req.params.id);
-  broadcast('customers-changed', { reason: 'deleted', id: req.params.id });
+  broadcast('customers-changed', { reason: 'deleted', id: req.params.id }, req.tenantId);
   res.json({ ok: true });
 });
 
@@ -233,7 +233,7 @@ router.post('/:id/pagamento', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
     const entry = commitPayment({ ...req.body, customerId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, targetDb);
-    broadcast('customers-changed', { reason: 'payment', id: req.params.id });
+    broadcast('customers-changed', { reason: 'payment', id: req.params.id }, req.tenantId);
     res.status(201).json({ entry, balance: customerBalance(req.params.id, targetDb) });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {

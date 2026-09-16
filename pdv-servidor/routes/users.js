@@ -81,7 +81,7 @@ router.post('/', async (req, res) => {
       action: 'Cadastro de usuário', details: `Vendedor "${user.nome}" (${user.username}) cadastrado.`,
       entity: 'user', entityId: user.id,
     }, targetDb);
-    broadcast('users-changed', { reason: 'created', id: user.id });
+    broadcast('users-changed', { reason: 'created', id: user.id }, req.tenantId);
     res.status(201).json({ user: publicUser(user) });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -147,7 +147,7 @@ router.put('/:id', (req, res) => {
       action: 'Edição de usuário', details: `Cadastro de "${user.nome}" (${user.username}) atualizado.`,
       entity: 'user', entityId: user.id,
     }, targetDb);
-    broadcast('users-changed', { reason: 'updated', id: user.id });
+    broadcast('users-changed', { reason: 'updated', id: user.id }, req.tenantId);
     res.json({ user: publicUser(user) });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -186,7 +186,7 @@ router.post('/:id/ativo', (req, res) => {
       details: `Conta de "${user.nome}" (${user.username}) ${user.active ? 'reativada' : 'desativada'}.`,
       entity: 'user', entityId: user.id,
     }, targetDb);
-    broadcast('users-changed', { reason: 'active-toggled', id: user.id });
+    broadcast('users-changed', { reason: 'active-toggled', id: user.id }, req.tenantId);
     res.json({ user: publicUser(user) });
   } catch (err) {
     res.status(400).json({ error: err.message });

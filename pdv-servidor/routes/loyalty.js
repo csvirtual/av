@@ -44,7 +44,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
   }
   updateConfig({ loyaltyPointsPerReal: pointsPerReal, loyaltyRedemptionRate: redemptionRate }, req.db || db);
   const config = { pointsPerReal, redemptionRate };
-  broadcast('loyalty-config-changed', config);
+  broadcast('loyalty-config-changed', config, req.tenantId);
   res.json(config);
 });
 
@@ -124,7 +124,7 @@ router.post('/:customerId/resgatar', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
     const result = commitRedemption({ ...req.body, customerId: req.params.customerId, userId: req.userId, userName: req.userName }, targetDb);
-    broadcast('customers-changed', { reason: 'loyalty-redemption', id: req.params.customerId });
+    broadcast('customers-changed', { reason: 'loyalty-redemption', id: req.params.customerId }, req.tenantId);
     res.status(201).json(result);
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {

@@ -4,16 +4,44 @@
 // tela atual (reaproveitando a própria função refresh() de cada view, do
 // lado do cliente — o servidor só avisa "mudou algo em X", não manda o dado
 // pronto, mantém o servidor simples).
-const clients = new Set();
+//
+// Etapa 6 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): um
+// `Set` único avisava TODO terminal conectado ao processo, de qualquer
+// loja — inofensivo até aqui porque cada rota ainda não sabia de tenant
+// nenhum, mas exatamente o vazamento que faltava fechar depois da etapa 5
+// (conversão de rota pra rota): sem isto, um terminal da Loja A recarregaria
+// a tela sozinho toda vez que a Loja B vendesse algo. Vira um
+// `Map<tenantKey, Set<ws>>` — uma "sala" por loja. `LEGACY_TENANT_KEY` é a
+// mesma chave usada em db/index.js pro processo sem MULTI_TENANT_DOMAIN
+// configurada: nesse caso, todo mundo cai na mesma sala única, comportamento
+// idêntico a antes desta etapa.
+const LEGACY_TENANT_KEY = '__legacy__';
+const rooms = new Map();
 
-export function registerClient(ws) {
-  clients.add(ws);
-  ws.on('close', () => clients.delete(ws));
+function roomFor(tenantId) {
+  const key = tenantId || LEGACY_TENANT_KEY;
+  let room = rooms.get(key);
+  if (!room) {
+    room = new Set();
+    rooms.set(key, room);
+  }
+  return room;
 }
 
-export function broadcast(topic, payload = {}) {
+export function registerClient(ws, tenantId) {
+  const room = roomFor(tenantId);
+  room.add(ws);
+  ws.on('close', () => {
+    room.delete(ws);
+    if (room.size === 0) rooms.delete(tenantId || LEGACY_TENANT_KEY);
+  });
+}
+
+export function broadcast(topic, payload = {}, tenantId) {
   const message = JSON.stringify({ topic, ...payload, at: Date.now() });
-  for (const ws of clients) {
+  const room = rooms.get(tenantId || LEGACY_TENANT_KEY);
+  if (!room) return;
+  for (const ws of room) {
     if (ws.readyState === ws.OPEN) ws.send(message);
   }
 }
@@ -26,8 +54,10 @@ export function broadcast(topic, payload = {}) {
 // Chamado no desligamento antes de fechar o servidor HTTP, pra não
 // depender do temporizador de segurança pra sair rápido.
 export function closeAllClients() {
-  for (const ws of clients) {
-    try { ws.close(); } catch { /* melhor esforço */ }
+  for (const room of rooms.values()) {
+    for (const ws of room) {
+      try { ws.close(); } catch { /* melhor esforço */ }
+    }
   }
-  clients.clear();
+  rooms.clear();
 }

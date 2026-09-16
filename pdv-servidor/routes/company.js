@@ -229,7 +229,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     // próxima chamada (o servidor nunca confia em política antiga vinda
     // do cliente, ver achado de segurança da Fase 9 anterior). Avisado
     // agora igual ao resto.
-    broadcast('company-changed', {});
+    broadcast('company-changed', {}, req.tenantId);
     res.json({ ...readCompanyInfo(updated), ...readPolicies(updated, req.db) });
   } catch (err) {
     console.error('[erro inesperado] PUT /api/company:', err);

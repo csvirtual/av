@@ -61,7 +61,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
     return res.status(400).json({ error: 'Modo de caixa inválido.' });
   }
   updateConfig({ caixaMode: mode }, req.db);
-  broadcast('cash-config-changed', { caixaMode: mode });
+  broadcast('cash-config-changed', { caixaMode: mode }, req.tenantId);
   res.json({ caixaMode: mode });
 });
 
@@ -147,7 +147,7 @@ function openCashSession(input, targetDb) {
 router.post('/open', (req, res) => {
   try {
     const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, req.db || db);
-    broadcast('cash-changed', { reason: 'opened', id: session.id });
+    broadcast('cash-changed', { reason: 'opened', id: session.id }, req.tenantId);
     res.status(201).json({ session });
   } catch (err) {
     // Achado de auditoria (P3): traduz o índice único parcial de
@@ -206,7 +206,7 @@ function commitMovement(input, targetDb) {
 router.post('/sessions/:id/movimento', (req, res) => {
   try {
     const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
-    broadcast('cash-changed', { reason: 'movement', id: movement.sessionId });
+    broadcast('cash-changed', { reason: 'movement', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
@@ -285,7 +285,7 @@ function commitAdjustment(input, targetDb) {
 router.post('/sessions/:id/retificar', (req, res) => {
   try {
     const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
-    broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId });
+    broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
@@ -423,7 +423,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
       return closed;
     });
     const closed = closeCashSession();
-    broadcast('cash-changed', { reason: 'closed', id: closed.id });
+    broadcast('cash-changed', { reason: 'closed', id: closed.id }, req.tenantId);
     res.json({ session: closed });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
