@@ -34,7 +34,7 @@
 
   <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
 
-  <div id="login-screen" class="screen">
+  <div id="login-screen" class="screen" hidden>
     <main class="auth-screen">
       <form id="login-form" class="auth-card">
         <div class="auth-brand">
@@ -54,6 +54,16 @@
         <button type="submit" class="btn-submit">Entrar</button>
         <p id="login-error" class="error" role="alert"></p>
       </form>
+    </main>
+  </div>
+
+  <div id="blocked-screen" class="screen" hidden>
+    <main class="auth-screen">
+      <div class="auth-card" style="text-align:center;">
+        <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true" style="margin:0 auto 14px;display:block;"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
+        <h1>Já aberto em outra aba</h1>
+        <p class="subtitle">O Painel de Controle já está aberto em outra aba deste navegador. Pra evitar duas telas mexendo nas lojas ao mesmo tempo, esta fica bloqueada. Feche esta e continue na outra, ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos.</p>
+      </div>
     </main>
   </div>
 

@@ -29,6 +29,7 @@
 
   const loginScreen = document.getElementById('login-screen');
   const appScreen = document.getElementById('app-screen');
+  const blockedScreen = document.getElementById('blocked-screen');
   const loginForm = document.getElementById('login-form');
   const loginError = document.getElementById('login-error');
   const adminUsernameEl = document.getElementById('admin-username');
@@ -157,6 +158,13 @@
   function showLogin() {
     loginScreen.hidden = false;
     appScreen.hidden = true;
+    blockedScreen.hidden = true;
+  }
+
+  function showBlocked() {
+    loginScreen.hidden = true;
+    appScreen.hidden = true;
+    blockedScreen.hidden = false;
   }
 
   let currentAdmin = null;
@@ -164,6 +172,7 @@
     currentAdmin = admin;
     loginScreen.hidden = true;
     appScreen.hidden = false;
+    blockedScreen.hidden = true;
     adminUsernameEl.textContent = admin.username;
     loadTenants();
   }
@@ -484,12 +493,96 @@
     showLogin();
   });
 
-  (async function boot() {
+  // Achado do usuário: sem isto, duplicar a aba (ou abrir o painel em duas
+  // abas do mesmo navegador) dava acesso total e simultâneo às DUAS, sem
+  // pedir senha de novo — a sessão é por COOKIE do navegador, não por aba,
+  // então qualquer aba nova já nasce autenticada se a de origem estiver
+  // logada. Mesmo mecanismo e mesmo motivo de public/js/tabPresence.js
+  // (usado pelo PDV da própria loja): a aba nova nasce REALMENTE
+  // bloqueada, não só avisada, até a mais antiga fechar. Cópia adaptada
+  // aqui (não um import de public/js/) porque este bundle é autocontido,
+  // ver comentário no topo do arquivo.
+  const TAB_PRESENCE_KEY = 'adminTabPresence';
+  const HEARTBEAT_MS = 300;
+  const PROBE_MS = 2500;
+  const STALE_MS = 8000;
+  const myTabId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  function readTabPresence() {
+    try { return JSON.parse(localStorage.getItem(TAB_PRESENCE_KEY) || '{}'); } catch { return {}; }
+  }
+  function writeTabPresence(map) {
+    try { localStorage.setItem(TAB_PRESENCE_KEY, JSON.stringify(map)); } catch { /* aba privada/sem storage — nunca vence a eleição sozinha, fica bloqueada com segurança */ }
+  }
+  function watchTabPresence(onChange) {
+    let running = false;
+    async function tick() {
+      if (running) return;
+      running = true;
+      try {
+        const now = Date.now();
+        let map = readTabPresence();
+        for (const [id, ts] of Object.entries(map)) {
+          if (now - ts > STALE_MS) delete map[id];
+        }
+        map[myTabId] = now;
+        writeTabPresence(map);
+
+        let liveIds = Object.keys(map).sort();
+        if (liveIds[0] !== myTabId) {
+          const rivalId = liveIds[0];
+          const rivalTsBefore = map[rivalId];
+          await new Promise((r) => setTimeout(r, PROBE_MS));
+          const mapAfterProbe = readTabPresence();
+          const rivalTsAfter = mapAfterProbe[rivalId];
+          if (rivalTsAfter === undefined || rivalTsAfter === rivalTsBefore) delete mapAfterProbe[rivalId];
+          mapAfterProbe[myTabId] = Date.now();
+          writeTabPresence(mapAfterProbe);
+          map = mapAfterProbe;
+          liveIds = Object.keys(map).sort();
+        }
+        onChange(liveIds.length === 0 || liveIds[0] === myTabId);
+      } finally {
+        running = false;
+      }
+    }
+    tick();
+    setInterval(tick, HEARTBEAT_MS);
+    window.addEventListener('pagehide', (event) => {
+      if (event.persisted) return;
+      const map = readTabPresence();
+      delete map[myTabId];
+      writeTabPresence(map);
+    });
+    window.addEventListener('pageshow', (event) => { if (event.persisted) tick(); });
+  }
+
+  // Nasce bloqueada de propósito (mesmo raciocínio de public/js/app.js) —
+  // só vira false uma vez, quando watchTabPresence confirma que esta é a
+  // aba mais antiga viva. Checado dentro de boot() (não só no ponto que
+  // chama a primeira vez) pra nunca deixar uma aba bloqueada terminar de
+  // rodar por baixo do pano.
+  let tabIsBlocked = true;
+  async function boot() {
+    if (tabIsBlocked) return;
     try {
       const data = await api('/api/admin/me');
       showApp(data.admin);
     } catch {
       showLogin();
     }
-  })();
+  }
+
+  watchTabPresence((iAmTheOldestAlive) => {
+    if (iAmTheOldestAlive) {
+      if (tabIsBlocked) {
+        tabIsBlocked = false;
+        boot();
+      }
+      return;
+    }
+    // Uma aba que já estava operando nunca é interrompida no meio por
+    // causa de uma aba nova aparecendo depois — só a aba nova bloqueia.
+    if (tabIsBlocked) showBlocked();
+  });
 })();
