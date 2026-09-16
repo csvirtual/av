@@ -20,6 +20,8 @@
   --danger-light: #fbe9e7;
   --success: #1a7a45;
   --success-light: #e4f0e9;
+  --warning: #a6650f;
+  --warning-light: #fbeecd;
   --radius: 10px;
   --radius-sm: 6px;
   --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
@@ -40,6 +42,8 @@
     --danger-light: rgba(229, 100, 90, 0.18);
     --success: #3fae6c;
     --success-light: rgba(47, 157, 107, 0.18);
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
   }
 }
@@ -171,17 +175,34 @@ body {
   transition: background 0.15s ease;
 }
 .success-link-btn:hover { background: var(--border); }
+/* Mesmo padrão visual de public/css/styles.css .notice-card (usado nos
+   avisos da tela de configuração/login da extensão e do servidor):
+   borda superior colorida + título centralizado com ícone + texto
+   centralizado, em vez de um bloco cinza qualquer. */
 .hint-block {
   margin: 0;
   padding: 12px 14px;
-  background: var(--surface-alt);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--warning);
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  text-align: center;
+}
+.hint-block .hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--warning);
+}
+.hint-block p {
+  margin: 0;
+  font-size: 12.5px;
   color: var(--text-muted);
-  line-height: 1.6;
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  line-height: 1.55;
 }
 .hint-block strong { color: var(--text); }
 
