@@ -57,14 +57,18 @@
     </main>
   </div>
 
+  <!-- Mesmo estilo (.boot-loading/.card) e mesmo texto de
+       public/js/app.js#renderTabBlockedScreen — a tela de "já aberto em
+       outra aba" do PDV da própria loja, ver admin.js#watchTabPresence. -->
   <div id="blocked-screen" class="screen" hidden>
-    <main class="auth-screen">
-      <div class="auth-card" style="text-align:center;">
-        <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true" style="margin:0 auto 14px;display:block;"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
-        <h1>Já aberto em outra aba</h1>
-        <p class="subtitle">O Painel de Controle já está aberto em outra aba deste navegador. Pra evitar duas telas mexendo nas lojas ao mesmo tempo, esta fica bloqueada. Feche esta e continue na outra, ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos.</p>
+    <div class="boot-loading">
+      <div class="card" style="max-width:420px;text-align:center;">
+        <div style="margin-bottom:6px;"><svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 014.5 5H9l2 2.5h8.5A1.5 1.5 0 0121 9v9a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18V6.5z" fill="#e0b385" stroke="#a9723f" stroke-width=".8" stroke-linejoin="round"/><path d="M3 9h18" stroke="#c98a4b" stroke-width=".8"/></svg></div>
+        <h1 style="font-size:18px;margin:0 0 18px;text-transform:uppercase;letter-spacing:0.4px;">Já aberto em outra janela</h1>
+        <p style="margin:0 0 10px;">O Painel de Controle já está aberto em outra janela deste navegador. Pra evitar duas telas mexendo nas lojas ao mesmo tempo, esta fica bloqueada.</p>
+        <p class="text-muted" style="font-size:13px;margin:0;">Feche esta e continue na outra, ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos, sem precisar recarregar nada.</p>
       </div>
-    </main>
+    </div>
   </div>
 
   <div id="app-screen" class="screen" hidden>

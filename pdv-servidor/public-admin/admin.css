@@ -127,6 +127,28 @@ a { color: var(--primary); }
 .auth-card h1 { font-size: 22px; margin: 10px 0 4px; text-wrap: balance; }
 .auth-card p.subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
 
+/* Mesmo estilo de public/css/styles.css (.boot-loading/.card) — usado
+ * pela tela de "já aberto em outra aba" (ver admin.js#watchTabPresence),
+ * fundo neutro da própria tela (não o degradê do login), pra combinar com
+ * o mesmo aviso que o PDV da própria loja já usa (app.js#renderTabBlockedScreen). */
+.boot-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 16px;
+}
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.text-muted { color: var(--text-muted); }
+
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .field label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
 .field input {
