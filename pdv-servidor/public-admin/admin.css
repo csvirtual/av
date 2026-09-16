@@ -291,6 +291,75 @@ select, input[type="date"] {
 .toast.error { background: var(--danger); }
 .toast.success { background: var(--primary); }
 
+/* Modal de confirmação (exclusão de loja) — mesmo padrão visual de
+ * public/css/styles.css .modal-backdrop/.modal (versão mínima, só a
+ * variante de confirmação; este bundle não usa openModal() completo).
+ * Achado do usuário: window.confirm() nativo não fica centralizado na
+ * tela (aparece colado no topo, e a posição varia por navegador/SO —
+ * fora do nosso controle via CSS) — trocado por este modal próprio. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 20, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1100;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 400px;
+}
+.modal h2 { margin: 0; padding: 24px 26px 4px; font-size: 18px; }
+.modal-body { padding: 8px 26px 0; }
+.modal-body p { margin: 0; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 20px 26px 24px; }
+.modal-actions .btn {
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.modal-actions .btn:hover { background: var(--primary-dark); }
+.modal-actions .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.modal-actions .btn-secondary:hover { background: var(--surface-alt); }
+.modal-actions .btn-danger { background: var(--danger); }
+.modal-actions .btn-danger:hover { background: var(--danger-dark); }
+
+.lixeira-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; }
+.lixeira-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.lixeira-slug { font-size: 14px; font-weight: 600; }
+.lixeira-date { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.restore-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.restore-btn:hover { background: var(--primary); color: #fff; }
+
 /* Botão discreto de claro/escuro — canto da tela, sempre visível (tanto
  * sobre o degradê do login quanto sobre o fundo liso do painel) mas sem
  * chamar atenção (sem texto, mesmo cartão branco/escuro do resto da UI). */

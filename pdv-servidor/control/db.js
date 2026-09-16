@@ -9,6 +9,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openTenantConnection } from '../db/connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONTROL_DB_PATH = path.join(__dirname, 'plataforma.sqlite3');
@@ -114,4 +115,76 @@ export function deleteTenant(slug) {
 
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slug);
   return tenant;
+}
+
+/** Lista o que está na "lixeira" (tenants/_lixeira/<slug>-<timestamp>/),
+ * mais recente primeiro — usado pelo painel de Super Admin pra oferecer
+ * restaurar uma loja excluída. `entry` é o nome da pasta em si (chave
+ * usada por restoreTenant abaixo); `slug`/`deletedAt` são derivados do
+ * próprio nome, sem precisar abrir o banco de cada loja só pra listar. */
+export function listTrashedTenants() {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  if (!fs.existsSync(trashDir)) return [];
+  return fs.readdirSync(trashDir)
+    .filter((name) => fs.statSync(path.join(trashDir, name)).isDirectory())
+    .map((entry) => {
+      const match = entry.match(/^(.*)-(\d+)$/);
+      return { entry, slug: match ? match[1] : entry, deletedAt: match ? Number(match[2]) : null };
+    })
+    .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+}
+
+/** Restaura uma loja da lixeira — move a pasta de volta pra tenants/<slug>
+ * e recadastra no banco de controle (id novo; o cadastro antigo foi
+ * apagado por deleteTenant, então isto é, na prática, o mesmo caminho de
+ * scripts/createTenant.js#adoptExistingTenant, só que a pasta já está no
+ * lugar certo — sem precisar de cópia de segurança nem checkpoint de WAL,
+ * o arquivo não foi tocado desde a exclusão). O INSERT aqui é uma
+ * duplicata mínima e proposital do de registerTenant (scripts/createTenant.js)
+ * — importar de lá criaria um ciclo (createTenant.js já importa este
+ * arquivo), mesmo raciocínio documentado em seedAdminInto sobre duplicar
+ * em vez de reusar através de um ciclo. Lança se a pasta não existir na
+ * lixeira ou se o slug já estiver em uso (ex: alguém recadastrou o mesmo
+ * endereço depois da exclusão). */
+export function restoreTenant(entry) {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  const source = path.join(trashDir, entry);
+  if (!fs.existsSync(source)) throw new Error(`Não encontrado na lixeira: "${entry}".`);
+
+  const match = entry.match(/^(.*)-(\d+)$/);
+  const slug = match ? match[1] : entry;
+  if (getTenantBySlug(slug)) {
+    throw new Error(`Não dá pra restaurar: já existe uma loja cadastrada com o endereço "${slug}" (provavelmente recadastrado depois da exclusão).`);
+  }
+
+  const dest = path.join(TENANTS_DIR, slug);
+  fs.renameSync(source, dest);
+  const dbPath = path.join(dest, 'dados-da-loja.sqlite3');
+
+  const tenantDb = openTenantConnection(dbPath);
+  let config = {};
+  try {
+    const row = tenantDb.prepare("SELECT data FROM company WHERE id = 'config'").get();
+    config = row ? JSON.parse(row.data) : {};
+  } catch {
+    // Segue com config vazio (nomeFantasia/razaoSocial caem pro slug) —
+    // mesma cautela de scripts/createTenant.js#readCompanyConfig.
+  }
+  tenantDb.close();
+
+  const tenant = {
+    id: crypto.randomUUID(),
+    slug,
+    razaoSocial: config.razaoSocial || slug,
+    nomeFantasia: config.nomeFantasia || slug,
+    cnpj: config.cnpj || null,
+    status: 'ativo',
+    dbPath,
+    createdAt: Date.now(),
+  };
+  controlDb.prepare(`
+    INSERT INTO tenants (id, slug, razao_social, nome_fantasia, cnpj, status, plano, db_path, created_at, expires_at)
+    VALUES (@id, @slug, @razaoSocial, @nomeFantasia, @cnpj, @status, @status, @dbPath, @createdAt, NULL)
+  `).run(tenant);
+  return getTenantBySlug(slug);
 }

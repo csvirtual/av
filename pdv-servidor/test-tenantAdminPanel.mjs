@@ -135,15 +135,28 @@ try {
   const meAfterLogout = await request(ADMIN_HOST, { reqPath: '/api/admin/me', cookie: newPasswordLogin.cookie });
   check('sessão do painel invalidada depois do logout', meAfterLogout.status === 401, meAfterLogout.status);
 
-  // --- Excluir loja ---
+  // --- Excluir loja (exige reconfirmar a senha do admin logado) ---
+  // A senha do admin foi trocada pelo reseed acima — a partir daqui, a
+  // senha "atual" é 'outra-senha-valida-123', não mais `adminPassword`.
+  const currentAdminPassword = 'outra-senha-valida-123';
+
   const deleteNoAuth = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}` });
   check('excluir loja sem sessão retorna 401', deleteNoAuth.status === 401, deleteNoAuth.status);
 
-  const deleteUnknown = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/nao-existe-${suffix}`, cookie: adminCookie });
-  check('excluir loja inexistente é rejeitado (400)', deleteUnknown.status === 400, JSON.stringify(deleteUnknown.body));
+  const deleteNoPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie });
+  check('excluir loja sem informar senha é rejeitado (400)', deleteNoPassword.status === 400, JSON.stringify(deleteNoPassword.body));
 
-  const del = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie });
-  check('excluir loja A pelo painel funciona', del.status === 200 && del.body.tenant?.slug === slugA, JSON.stringify(del.body));
+  const deleteWrongPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie, body: { password: 'senha-errada-com-certeza' } });
+  check('excluir loja com senha errada é rejeitado (400)', deleteWrongPassword.status === 400, JSON.stringify(deleteWrongPassword.body));
+
+  const listStillThere = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants', cookie: adminCookie });
+  check('loja A continua na lista depois das tentativas com senha errada/faltando', listStillThere.body.tenants?.some((t) => t.slug === slugA), JSON.stringify(listStillThere.body.tenants?.map((t) => t.slug)));
+
+  const deleteUnknown = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/nao-existe-${suffix}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir loja inexistente (com senha certa) é rejeitado (400)', deleteUnknown.status === 400, JSON.stringify(deleteUnknown.body));
+
+  const del = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir loja A pelo painel funciona (senha certa)', del.status === 200 && del.body.tenant?.slug === slugA, JSON.stringify(del.body));
 
   const listAfterDelete = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants', cookie: adminCookie });
   check('loja excluída some da listagem', !listAfterDelete.body.tenants?.some((t) => t.slug === slugA), JSON.stringify(listAfterDelete.body.tenants?.map((t) => t.slug)));
@@ -158,6 +171,29 @@ try {
   const trashDirHasIt = fs.existsSync(path.join(__dirname, 'tenants', '_lixeira')) &&
     fs.readdirSync(path.join(__dirname, 'tenants', '_lixeira')).some((name) => name.startsWith(`${slugA}-`));
   check('pasta da loja saiu de tenants/<slug> e foi pra tenants/_lixeira (nunca apagada de verdade)', tenantDirGone && trashDirHasIt, `gone=${tenantDirGone} trashed=${trashDirHasIt}`);
+
+  // --- Lixeira: listar e restaurar ---
+  const lixeiraNoAuth = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira' });
+  check('listar lixeira sem sessão retorna 401', lixeiraNoAuth.status === 401, lixeiraNoAuth.status);
+
+  const lixeiraList = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  const trashEntry = lixeiraList.body.trashed?.find((t) => t.slug === slugA);
+  check('loja excluída aparece na lixeira', lixeiraList.status === 200 && !!trashEntry, JSON.stringify(lixeiraList.body.trashed));
+
+  const restoreUnknown = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent('nao-existe-' + suffix)}/restore`, cookie: adminCookie });
+  check('restaurar entrada inexistente da lixeira é rejeitado (400)', restoreUnknown.status === 400, JSON.stringify(restoreUnknown.body));
+
+  const restore = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry.entry)}/restore`, cookie: adminCookie });
+  check('restaurar loja A da lixeira funciona', restore.status === 200 && restore.body.tenant?.slug === slugA, JSON.stringify(restore.body));
+
+  const listAfterRestore = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants', cookie: adminCookie });
+  check('loja restaurada volta a aparecer na listagem', listAfterRestore.body.tenants?.some((t) => t.slug === slugA), JSON.stringify(listAfterRestore.body.tenants?.map((t) => t.slug)));
+
+  const unblockedAfterRestore = await request(hostA, { reqPath: '/api/status' });
+  check('loja restaurada volta a responder (200)', unblockedAfterRestore.status === 200, unblockedAfterRestore.status);
+
+  const lixeiraAfterRestore = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  check('loja restaurada some da lixeira', !lixeiraAfterRestore.body.trashed?.some((t) => t.slug === slugA), JSON.stringify(lixeiraAfterRestore.body.trashed));
 } finally {
   controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(adminUsername.toLowerCase());
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugA);

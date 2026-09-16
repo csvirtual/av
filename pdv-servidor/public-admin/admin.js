@@ -33,10 +33,66 @@
   const loginError = document.getElementById('login-error');
   const adminUsernameEl = document.getElementById('admin-username');
   const logoutBtn = document.getElementById('logout-btn');
+  const lixeiraBtn = document.getElementById('lixeira-btn');
   const tenantsBody = document.getElementById('tenants-body');
   const emptyState = document.getElementById('empty-state');
   const rowTemplate = document.getElementById('tenant-row-template');
   const toastRoot = document.getElementById('toast-root');
+
+  function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // Modal genérico (versão mínima de public/js/components/modal.js —
+  // este bundle é autocontido, ver comentário no topo do arquivo, então
+  // não importa de lá). Usado pela confirmação de exclusão (com campo de
+  // senha) e pela lista da lixeira.
+  function openModal({ title, bodyHtml, onMount, onSubmit, submitLabel = 'Salvar', cancelLabel = 'Cancelar', danger = false, singleButton = false }) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal">
+        <h2>${escapeHtml(title)}</h2>
+        <div class="modal-body">${bodyHtml}</div>
+        <div class="modal-actions">
+          ${singleButton ? '' : `<button type="button" class="btn btn-secondary" data-action="cancel">${escapeHtml(cancelLabel)}</button>`}
+          <button type="button" class="btn ${danger ? 'btn-danger' : ''}" data-action="submit">${escapeHtml(submitLabel)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    const modalEl = backdrop.querySelector('.modal');
+    const close = () => {
+      backdrop.remove();
+      document.removeEventListener('keydown', onKeydown);
+    };
+    const onKeydown = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKeydown);
+    backdrop.addEventListener('mousedown', (e) => { if (e.target === backdrop) close(); });
+    const cancelBtn = backdrop.querySelector('[data-action="cancel"]');
+    cancelBtn?.addEventListener('click', close);
+
+    const submitBtn = backdrop.querySelector('[data-action="submit"]');
+    let submitting = false;
+    submitBtn.addEventListener('click', async () => {
+      if (submitting) return;
+      if (!onSubmit) { close(); return; }
+      submitting = true;
+      submitBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      try {
+        const shouldClose = await onSubmit(modalEl, close);
+        if (shouldClose !== false) close();
+      } finally {
+        submitting = false;
+        submitBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+      }
+    });
+
+    if (onMount) onMount(modalEl, close);
+    return { close, modalEl };
+  }
 
   let validStatuses = ['trial', 'ativo', 'suspenso', 'cancelado'];
 
@@ -117,22 +173,46 @@
         }
       });
 
-      row.querySelector('.delete-btn').addEventListener('click', async () => {
+      row.querySelector('.delete-btn').addEventListener('click', () => {
         const nome = tenant.nomeFantasia || tenant.razaoSocial || tenant.slug;
-        // window.confirm em vez de um modal próprio: painel de uma tela só,
-        // sem componente de modal nenhum (nem importado de public/js/, ver
-        // comentário no topo do arquivo) — pra uma ação rara e destrutiva
-        // como esta, o confirm nativo já resolve sem precisar construir uma
-        // UI só pra isso.
-        const ok = window.confirm(`Excluir a loja "${nome}" (${tenant.slug})?\n\nOs dados saem da lista e a loja deixa de responder. Isto não pode ser desfeito por aqui.`);
-        if (!ok) return;
-        try {
-          await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE' });
-          toast(`Loja "${tenant.slug}" excluída.`, 'success');
-          loadTenants();
-        } catch (err) {
-          toast(err.message, 'error');
-        }
+        // Achado do usuário: window.confirm() nativo não fica centralizado
+        // na tela (posição varia por navegador/SO, fora do nosso controle
+        // via CSS) — trocado pelo modal próprio acima. E excluir é destrutivo
+        // demais pra só um clique de confirmação: pede a PRÓPRIA senha do
+        // admin logado (mesmo raciocínio do fechamento de caixa), conferida
+        // no servidor (routes/admin/tenants.js).
+        let errorEl, passwordInput;
+        openModal({
+          title: 'Excluir loja',
+          danger: true,
+          submitLabel: 'Excluir',
+          bodyHtml: `
+            <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px;line-height:1.5;">
+              Excluir a loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})?
+              Os dados saem da lista e a loja deixa de responder. A pasta vai pra lixeira — dá pra restaurar depois por lá.
+            </p>
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">Confirme sua senha</label>
+            <input type="password" class="delete-password-input" autocomplete="current-password" style="width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;box-sizing:border-box;background:var(--surface);color:var(--text);">
+            <p class="delete-error" style="color:var(--danger);font-size:12.5px;min-height:16px;margin:8px 0 0;"></p>
+          `,
+          onMount: (modalEl) => {
+            errorEl = modalEl.querySelector('.delete-error');
+            passwordInput = modalEl.querySelector('.delete-password-input');
+            passwordInput.focus();
+          },
+          onSubmit: async () => {
+            const password = passwordInput.value;
+            if (!password) { errorEl.textContent = 'Informe sua senha.'; return false; }
+            try {
+              await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
+              toast(`Loja "${tenant.slug}" excluída.`, 'success');
+              loadTenants();
+            } catch (err) {
+              errorEl.textContent = err.message;
+              return false;
+            }
+          },
+        });
       });
 
       tenantsBody.appendChild(row);
@@ -148,6 +228,66 @@
       toast(err.message, 'error');
     }
   }
+
+  function formatTrashDate(ts) {
+    return ts ? new Date(ts).toLocaleString('pt-BR') : '—';
+  }
+
+  // Achado do usuário: excluir precisa ter pra onde voltar — a lixeira
+  // (control/db.js#listTrashedTenants/restoreTenant) já guardava a pasta
+  // desde a primeira versão do botão Excluir, só faltava um jeito de ver e
+  // restaurar isso pela tela.
+  function openLixeiraModal() {
+    let listEl;
+    async function refresh() {
+      if (!listEl) return;
+      listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:0;">Carregando…</p>';
+      try {
+        const data = await api('/api/admin/tenants/lixeira');
+        const items = data.trashed || [];
+        if (!items.length) {
+          listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:0;">A lixeira está vazia.</p>';
+          return;
+        }
+        listEl.innerHTML = '';
+        for (const item of items) {
+          const row = document.createElement('div');
+          row.className = 'lixeira-row';
+          row.innerHTML = `
+            <div>
+              <div class="lixeira-slug">${escapeHtml(item.slug)}</div>
+              <div class="lixeira-date">Excluída em ${escapeHtml(formatTrashDate(item.deletedAt))}</div>
+            </div>
+            <button type="button" class="restore-btn">Restaurar</button>
+          `;
+          row.querySelector('.restore-btn').addEventListener('click', async () => {
+            try {
+              await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}/restore`, { method: 'POST' });
+              toast(`Loja "${item.slug}" restaurada.`, 'success');
+              refresh();
+              loadTenants();
+            } catch (err) {
+              toast(err.message, 'error');
+            }
+          });
+          listEl.appendChild(row);
+        }
+      } catch (err) {
+        listEl.innerHTML = `<p style="color:var(--danger);font-size:13px;margin:0;">${escapeHtml(err.message)}</p>`;
+      }
+    }
+    openModal({
+      title: 'Lixeira',
+      submitLabel: 'Fechar',
+      singleButton: true,
+      bodyHtml: '<div class="lixeira-list"></div>',
+      onMount: (modalEl) => {
+        listEl = modalEl.querySelector('.lixeira-list');
+        refresh();
+      },
+    });
+  }
+  lixeiraBtn.addEventListener('click', openLixeiraModal);
 
   loginForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();

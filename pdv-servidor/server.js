@@ -13,6 +13,7 @@ import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
 import { getConfig } from './lib/companyConfig.js';
 import { resolveSession, sweepExpiredSessions } from './lib/session.js';
+import { getPlatformAdminById } from './lib/platformAdminAuth.js';
 import { registerClient, closeAllClients } from './lib/broadcast.js';
 import authRoutes from './routes/auth.js';
 import productsRoutes from './routes/products.js';
@@ -357,6 +358,10 @@ app.use(async (req, res, next) => {
 function requireAdminAuth(req, res, next) {
   const adminId = resolveSession(req.cookies?.admin_session, controlDb);
   if (!adminId) return res.status(401).json({ error: 'Não autenticado.' });
+  // Anexa quem está agindo — routes/admin/tenants.js#DELETE precisa do
+  // username pra reconfirmar a senha antes de excluir uma loja (mesmo
+  // raciocínio de req.userId em requireAuth, versão painel).
+  req.platformAdmin = getPlatformAdminById(adminId);
   next();
 }
 app.use('/api/admin', adminAuthRoutes);

@@ -18,6 +18,12 @@ const FIND_BY_USERNAME_SQL = 'SELECT * FROM platform_admins WHERE username_lower
 // numa loja nunca afeta o bloqueio de um admin da plataforma, e vice-versa.
 const LOCKOUT_NAMESPACE = 'platform-admin';
 
+// Namespace SEPARADO pra reconfirmação de senha (ex: excluir loja no
+// painel) — mesmo raciocínio de lib/verifyLogin.js (usado por
+// routes/cash.js#confirmPassword): errar a reconfirmação várias vezes não
+// pode bloquear o login normal do admin, nem o contrário.
+const CONFIRM_LOCKOUT_NAMESPACE = 'platform-admin-confirm';
+
 // Mesmo raciocínio de DUMMY_SALT/DUMMY_HASH em lib/verifyLogin.js: paga o
 // mesmo custo de PBKDF2 pra usuário inexistente/inativo, pra não vazar por
 // timing quais logins de admin existem.
@@ -28,24 +34,36 @@ export function getPlatformAdminLoginLockState(username) {
   return getLoginLockState(username, LOCKOUT_NAMESPACE);
 }
 
-export async function verifyPlatformAdminLogin(username, password) {
+async function verifyPlatformAdminPasswordInNamespace(username, password, namespace) {
   const usernameLower = String(username || '').trim().toLowerCase();
-  const lockState = getLoginLockState(usernameLower, LOCKOUT_NAMESPACE);
+  const lockState = getLoginLockState(usernameLower, namespace);
   if (lockState.remainingMs > 0) return null;
 
   const row = controlDb.prepare(FIND_BY_USERNAME_SQL).get(usernameLower);
   if (!row || !row.active) {
     await verifyPasswordHash(password, DUMMY_SALT, DUMMY_HASH);
-    recordFailedLogin(usernameLower, LOCKOUT_NAMESPACE);
+    recordFailedLogin(usernameLower, namespace);
     return null;
   }
   const ok = await verifyPasswordHash(password, row.password_salt, row.password_hash);
   if (!ok) {
-    recordFailedLogin(usernameLower, LOCKOUT_NAMESPACE);
+    recordFailedLogin(usernameLower, namespace);
     return null;
   }
-  clearLoginLock(usernameLower, LOCKOUT_NAMESPACE);
+  clearLoginLock(usernameLower, namespace);
   return { id: row.id, username: row.username_lower };
+}
+
+export async function verifyPlatformAdminLogin(username, password) {
+  return verifyPlatformAdminPasswordInNamespace(username, password, LOCKOUT_NAMESPACE);
+}
+
+/** Reconfirmação de senha de uma sessão de admin já autenticada — usado por
+ * ações destrutivas do painel (ex: excluir loja, ver
+ * routes/admin/tenants.js). Bloqueio por força bruta em namespace PRÓPRIO
+ * (ver CONFIRM_LOCKOUT_NAMESPACE acima), nunca o do login normal. */
+export async function verifyPlatformAdminPassword(username, password) {
+  return verifyPlatformAdminPasswordInNamespace(username, password, CONFIRM_LOCKOUT_NAMESPACE);
 }
 
 export function getPlatformAdminById(id) {
