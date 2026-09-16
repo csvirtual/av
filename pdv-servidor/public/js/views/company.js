@@ -17,6 +17,7 @@
 // qualquer um que chegue aqui por link direto — a permissão de verdade é
 // sempre conferida no servidor (routes/company.js#PUT), nunca só na tela.
 import { getCompany, saveCompany } from '../data/companyRepo.js';
+import { getCaixaConfig, setCaixaMode } from '../data/cashRepo.js';
 import { getLicenseStatus, activateLicenseKey } from '../data/licenseRepo.js';
 import { verifyLicenseKey } from '../utils/license.js';
 import { logAction } from '../data/auditRepo.js';
@@ -52,6 +53,12 @@ export async function renderCompany(container, ctx) {
   // Token do código de liberação de CNPJ (ver "Desbloquear edição" abaixo)
   // — só some da memória ao trocar de tela ou salvar; nunca persiste.
   let cnpjUnlockToken = null;
+  // Pedido do usuário: cada vendedor poder abrir/fechar o próprio caixa em
+  // vez de um único caixa pra loja toda (estoque continua compartilhado —
+  // isso nunca muda). 'porTerminal' também existe no servidor (ver
+  // lib/cashSession.js) mas não tem UI própria ainda — só os dois modos
+  // que o usuário pediu aparecem aqui.
+  let caixaConfig = await getCaixaConfig();
 
   function html() {
     const p = company.policies;
@@ -158,6 +165,21 @@ export async function renderCompany(container, ctx) {
             Exigir caixa aberto para registrar vendas
           </label>
 
+          <p class="section-title">Modo de caixa</p>
+          <div class="radio-field-row">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+              <input type="radio" name="caixaMode" id="caixaModeUnico" value="unico" ${caixaConfig.caixaMode !== 'porOperador' ? 'checked' : ''}>
+              Único (um caixa aberto por vez, pra loja toda)
+            </label>
+          </div>
+          <div class="radio-field-row" style="margin-bottom:6px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px;">
+              <input type="radio" name="caixaMode" id="caixaModePorOperador" value="porOperador" ${caixaConfig.caixaMode === 'porOperador' ? 'checked' : ''}>
+              Por vendedor (cada um abre e fecha o próprio caixa)
+            </label>
+          </div>
+          <span class="hint" style="display:block;margin:0 0 16px;">O estoque continua o mesmo pra todo mundo nos dois modos — só muda quem pode mexer em qual caixa.</span>
+
           <p class="section-title">Juros no parcelamento do cartão de crédito</p>
           <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
             Configurado só aqui — o vendedor nunca vê nem edita essa taxa na hora da venda, ela entra sozinha ao escolher Cartão de crédito e o número de parcelas. 1x (à vista no cartão) nunca tem juro, sempre.
@@ -216,6 +238,7 @@ export async function renderCompany(container, ctx) {
   async function refresh() {
     company = await getCompany();
     license = await getLicenseStatus();
+    caixaConfig = await getCaixaConfig();
     cnpjUnlockToken = null;
     container.innerHTML = html();
     wire();
@@ -362,10 +385,15 @@ export async function renderCompany(container, ctx) {
         },
       };
 
+      const newCaixaMode = document.getElementById('caixaModePorOperador').checked ? 'porOperador' : 'unico';
+
       const submitBtn = document.getElementById('company-save-btn');
       submitBtn.disabled = true;
       try {
         await saveCompany(patch);
+        if (newCaixaMode !== caixaConfig.caixaMode) {
+          await setCaixaMode(newCaixaMode);
+        }
         await logAction({
           userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
           action: 'Edição dos dados da loja',

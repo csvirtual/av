@@ -23,9 +23,10 @@ const FIADO_METHOD = 'Fiado';
 
 const getOpenGlobalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1");
 const getOpenByTerminalStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1");
+const getOpenByUserStmt = db.prepare("SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1");
 const getSessionByIdStmt = db.prepare('SELECT * FROM cash_sessions WHERE id = ?');
 const insertSessionStmt = db.prepare(`
-  INSERT INTO cash_sessions (id, opened_at, status, terminal_id, data) VALUES (@id, @openedAt, 'aberto', @terminalId, @data)
+  INSERT INTO cash_sessions (id, opened_at, status, terminal_id, user_id, data) VALUES (@id, @openedAt, 'aberto', @terminalId, @userId, @data)
 `);
 const updateSessionStmt = db.prepare('UPDATE cash_sessions SET status = @status, data = @data WHERE id = @id');
 const listSessionsStmt = db.prepare('SELECT * FROM cash_sessions ORDER BY opened_at DESC LIMIT ?');
@@ -51,7 +52,7 @@ router.get('/config', (req, res) => {
 // company.js e loyalty.js.
 router.put('/config', requirePermission('empresa'), (req, res) => {
   const mode = req.body.caixaMode;
-  if (mode !== 'unico' && mode !== 'porTerminal') {
+  if (mode !== 'unico' && mode !== 'porTerminal' && mode !== 'porOperador') {
     return res.status(400).json({ error: 'Modo de caixa inválido.' });
   }
   updateConfig({ caixaMode: mode });
@@ -61,7 +62,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
 
 router.get('/open', (req, res) => {
   const mode = getCaixaMode();
-  const session = resolveOpenSession(req.terminalId);
+  const session = resolveOpenSession(req.terminalId, req.userId);
   res.json({ mode, session });
 });
 
@@ -86,11 +87,12 @@ router.get('/sessions/:id', (req, res) => {
 });
 
 /** Abrir só é permitido se não houver nenhuma sessão aberta no escopo certo
- * (a loja inteira no modo "único", só este terminal no modo "porTerminal").
- * A checagem e a gravação acontecem na mesma transação — sem isso, um
- * duplo-clique em "Abrir caixa" (ou duas pessoas em terminais diferentes no
- * modo único) podia ler "nenhuma aberta" duas vezes antes de qualquer uma
- * gravar, e abrir duas sessões ao mesmo tempo. */
+ * (a loja inteira no modo "único", só este terminal no modo "porTerminal",
+ * só este usuário no modo "porOperador"). A checagem e a gravação
+ * acontecem na mesma transação — sem isso, um duplo-clique em "Abrir
+ * caixa" (ou duas pessoas em terminais/contas diferentes num modo
+ * compartilhado) podia ler "nenhuma aberta" duas vezes antes de qualquer
+ * uma gravar, e abrir duas sessões ao mesmo tempo. */
 const openCashSession = db.transaction((input) => {
   const mode = getCaixaMode();
   if (mode === 'porTerminal' && !input.terminalId) {
@@ -98,17 +100,22 @@ const openCashSession = db.transaction((input) => {
   }
   const existing = mode === 'porTerminal'
     ? getOpenByTerminalStmt.get(input.terminalId)
-    : getOpenGlobalStmt.get();
+    : mode === 'porOperador'
+      ? getOpenByUserStmt.get(input.userId)
+      : getOpenGlobalStmt.get();
   if (existing) {
     throw new Error(mode === 'porTerminal'
       ? 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.'
-      : 'Já existe um caixa aberto. Feche-o antes de abrir um novo.');
+      : mode === 'porOperador'
+        ? 'Você já tem um caixa aberto. Feche-o antes de abrir um novo.'
+        : 'Já existe um caixa aberto. Feche-o antes de abrir um novo.');
   }
   const parsedOpening = Number(input.openingAmount);
   if (!Number.isFinite(parsedOpening) || parsedOpening < 0) {
     throw new Error('Informe um valor de abertura válido.');
   }
   const terminalId = mode === 'porTerminal' ? input.terminalId : null;
+  const userId = mode === 'porOperador' ? input.userId : null;
   const session = {
     id: crypto.randomUUID(),
     status: 'aberto',
@@ -125,7 +132,7 @@ const openCashSession = db.transaction((input) => {
     difference: null,
     closingNotes: '',
   };
-  insertSessionStmt.run({ id: session.id, openedAt: session.openedAt, terminalId, data: JSON.stringify(session) });
+  insertSessionStmt.run({ id: session.id, openedAt: session.openedAt, terminalId, userId, data: JSON.stringify(session) });
   return session;
 });
 
@@ -143,9 +150,25 @@ router.post('/open', (req, res) => {
     if (String(err.message).includes('idx_cashsessions_open_terminal_unique')) {
       return res.status(400).json({ error: 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.' });
     }
+    if (String(err.message).includes('idx_cashsessions_open_user_unique')) {
+      return res.status(400).json({ error: 'Você já tem um caixa aberto. Feche-o antes de abrir um novo.' });
+    }
     res.status(400).json({ error: err.message });
   }
 });
+
+/** Pedido do usuário: no modo "por operador", cada um mexe só no PRÓPRIO
+ * caixa — sangria/suprimento/retificação/fechamento. Admin sempre pode
+ * (mesmo raciocínio já usado em toda a tela de Usuários: admin cobre
+ * qualquer situação, ex: vendedor esqueceu de fechar e já foi embora).
+ * Nos outros dois modos (único/porTerminal) não muda nada — sempre foi
+ * "qualquer um mexe", e continua sendo. */
+function assertCanOperateSession(req, session) {
+  if (session.mode !== 'porOperador') return;
+  if (req.userRole === 'admin') return;
+  if (session.openedBy.userId === req.userId) return;
+  throw Object.assign(new Error('Este caixa é de outro operador — só quem abriu (ou um administrador) pode mexer nele.'), { status: 403 });
+}
 
 const commitMovement = db.transaction((input) => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
@@ -155,6 +178,7 @@ const commitMovement = db.transaction((input) => {
   const row = getSessionByIdStmt.get(input.sessionId);
   if (!row) throw new Error('Caixa não encontrado.');
   const session = rowToSession(row);
+  assertCanOperateSession(input, session);
   if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
   if (input.type !== 'sangria' && input.type !== 'suprimento') throw new Error('Tipo de movimento inválido.');
   if (!input.reason || !input.reason.trim()) throw new Error('Informe o motivo do movimento de caixa.');
@@ -171,10 +195,11 @@ const commitMovement = db.transaction((input) => {
 
 router.post('/sessions/:id/movimento', (req, res) => {
   try {
-    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName });
+    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole });
     broadcast('cash-changed', { reason: 'movement', id: movement.sessionId });
     res.status(201).json({ movement });
   } catch (err) {
+    if (err.status === 403) return res.status(403).json({ error: err.message });
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este movimento já foi registrado — evite reenviar.' });
     }
@@ -216,6 +241,7 @@ const commitAdjustment = db.transaction((input) => {
   const row = getSessionByIdStmt.get(input.sessionId);
   if (!row) throw new Error('Caixa não encontrado.');
   const session = rowToSession(row);
+  assertCanOperateSession(input, session);
   if (session.status !== 'aberto') throw new Error('Este caixa não está mais aberto.');
 
   const currentMovements = listMovementsStmt.all(session.id).map((r) => JSON.parse(r.data));
@@ -246,10 +272,11 @@ const commitAdjustment = db.transaction((input) => {
 
 router.post('/sessions/:id/retificar', (req, res) => {
   try {
-    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName });
+    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole });
     broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId });
     res.status(201).json({ movement });
   } catch (err) {
+    if (err.status === 403) return res.status(403).json({ error: err.message });
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Esta retificação já foi registrada — evite reenviar.' });
     }
@@ -351,6 +378,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     const row = getSessionByIdStmt.get(req.params.id);
     if (!row) return res.status(404).json({ error: 'Caixa não encontrado.' });
     const session = rowToSession(row);
+    assertCanOperateSession(req, session);
     if (session.status !== 'aberto') return res.status(400).json({ error: 'Este caixa não está mais aberto.' });
 
     // computeExpectedAmounts lê outras tabelas — fica fora da transação de
@@ -385,6 +413,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     broadcast('cash-changed', { reason: 'closed', id: closed.id });
     res.json({ session: closed });
   } catch (err) {
+    if (err.status === 403) return res.status(403).json({ error: err.message });
     res.status(400).json({ error: err.message });
   }
 });

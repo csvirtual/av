@@ -5,6 +5,24 @@
 // sangria/suprimento, retificação, fechamento e histórico.
 import { api } from './apiClient.js';
 
+/** Modo de caixa configurado pra loja — 'unico', 'porTerminal' ou
+ * 'porOperador' (ver lib/cashSession.js). Lido por views/company.js pra
+ * mostrar o rádio marcado, e por qualquer outra tela que precise adaptar o
+ * texto conforme o modo. */
+export async function getCaixaConfig() {
+  return api('/api/cash/config');
+}
+
+/** Só quem tem a permissão 'empresa' pode trocar (mesmo gate de
+ * routes/cash.js#PUT /config) — chamado por views/company.js junto com o
+ * resto do formulário de "Dados da loja". */
+export async function setCaixaMode(caixaMode) {
+  return api('/api/cash/config', {
+    method: 'PUT',
+    body: JSON.stringify({ caixaMode }),
+  });
+}
+
 /** Devolve a sessão de caixa aberta NESTE terminal (ou `null`) — mesmo
  * contrato de app/js/data/cashRepo.js#getOpenSession() da extensão
  * (single-machine sempre tinha um caixa só pra loja toda; aqui pode ser

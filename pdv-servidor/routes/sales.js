@@ -264,7 +264,7 @@ const commitSale = db.transaction((input) => {
     }
   }
 
-  const openSession = resolveOpenSession(input.terminalId);
+  const openSession = resolveOpenSession(input.terminalId, input.userId);
   const sale = {
     id: saleId,
     timestamp: Date.now(),
@@ -459,7 +459,7 @@ const commitRefund = db.transaction((input) => {
   // com o caixa de hoje aberto). computeExpectedAmounts (routes/cash.js) usa
   // isso pra saber em qual fechamento esse dinheiro que sai da gaveta entra
   // na conferência.
-  const openSession = resolveOpenSession(input.terminalId);
+  const openSession = resolveOpenSession(input.terminalId, input.userId);
   const refund = {
     id: crypto.randomUUID(), timestamp: Date.now(), userId: input.userId, userName: input.userName,
     reason: input.reason.trim(), totalRefunded, items: refundedItems,

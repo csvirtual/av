@@ -28,6 +28,22 @@ const cashSessionsCols = db.prepare('PRAGMA table_info(cash_sessions)').all().ma
 if (!cashSessionsCols.includes('terminal_id')) {
   db.exec('ALTER TABLE cash_sessions ADD COLUMN terminal_id TEXT');
 }
+// Pedido do usuário: modo de caixa "por vendedor" (além de "único" e
+// "porTerminal" já existentes) — cada operador abre/fecha o seu, estoque
+// continua compartilhado. Precisa de uma coluna própria pra achar "o caixa
+// aberto deste usuário" e pro índice único abaixo (mesma ideia de
+// idx_cashsessions_open_terminal_unique, agora por user_id). Criado aqui
+// (não em schema.sql) de propósito: db.exec(schema) já rodou ANTES deste
+// bloco — um CREATE INDEX ali dentro apontando pra uma coluna que só passa
+// a existir DEPOIS deste ALTER quebraria justamente no banco de uma loja
+// já em uso, que é o caso que este bloco inteiro existe pra proteger.
+if (!cashSessionsCols.includes('user_id')) {
+  db.exec('ALTER TABLE cash_sessions ADD COLUMN user_id TEXT');
+}
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_cashsessions_open_user_unique
+  ON cash_sessions(user_id) WHERE status = 'aberto' AND user_id IS NOT NULL
+`);
 
 // Achado de auditoria (P4): cada chamada mutadora precisa de `dedupeKey`
 // (ver rotas em routes/*.js) e cada uma grava uma linha nova em

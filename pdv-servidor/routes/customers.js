@@ -205,7 +205,7 @@ const commitPayment = db.transaction((input) => {
   if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
   claimIdempotencyStmt.run(input.dedupeKey, Date.now());
 
-  const openSession = resolveOpenSession(input.terminalId);
+  const openSession = resolveOpenSession(input.terminalId, input.userId);
   const entry = {
     id: crypto.randomUUID(), customerId: input.customerId, type: 'pagamento', amount: value,
     saleId: null, paymentMethod: input.paymentMethod, cashSessionId: openSession ? openSession.id : null,

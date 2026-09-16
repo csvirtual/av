@@ -1,9 +1,16 @@
 // Caixa da loja — abertura, sangria/suprimento e fechamento com conferência.
-// Disponível pra admin e vendedor (é um caixa único da loja: quem está de
-// turno abre e fecha, não é uma sessão pessoal de cada um). Toda ação aqui
-// (abrir, sangria, suprimento, fechar) vai pro log de auditoria com
-// usuário, data/hora e valores — independente da política de caixa
-// obrigatório estar ligada ou não (ver Dados da loja > Políticas de venda).
+// Disponível pra admin e vendedor. O modo é configurável em Dados da loja
+// (ver lib/cashSession.js): "único" é um caixa só pra loja toda (quem está
+// de turno abre e fecha, não é pessoal de ninguém); "por vendedor" dá um
+// caixa próprio pra cada usuário — nesta tela não muda NADA na renderização
+// (getOpenSession já devolve só a sessão do usuário certo pro modo ativo,
+// resolvido no servidor), só o servidor passa a recusar (403) sangria/
+// suprimento/retificação/fechamento de quem não é o dono da sessão nem
+// admin. Estoque é sempre compartilhado pela loja inteira, nos dois modos.
+// Toda ação aqui (abrir, sangria, suprimento, fechar) vai pro log de
+// auditoria com usuário, data/hora e valores — independente da política de
+// caixa obrigatório estar ligada ou não (ver Dados da loja > Políticas de
+// venda).
 //
 // Fechar caixa exige digitar usuário e senha de QUALQUER conta ativa (admin
 // ou vendedor, não importa qual) como confirmação — e essa mesma senha, ao
