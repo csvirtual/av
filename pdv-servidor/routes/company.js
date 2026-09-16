@@ -98,7 +98,19 @@ router.get('/', (req, res) => {
   // direto na raiz; o wrapper cliente (public/js/data/companyRepo.js) que
   // reagrupa isso em `{ ...info, policies }` ao montar o objeto pra view,
   // não esta rota.
-  res.json({ ...readCompanyInfo(cfg), ...readPolicies(cfg, req.db) });
+  const info = readCompanyInfo(cfg);
+  // Achado do usuário: a sincronização com o Painel de Controle (ver PUT
+  // abaixo) só dispara num SALVAMENTO — uma loja que já tinha CNPJ
+  // cadastrado (e travado) ANTES desta funcionalidade existir nunca teria
+  // motivo pra salvar de novo (o campo trancado não convida a mexer),
+  // então ficaria pra sempre sem sincronizar. Sincronizar aqui também, a
+  // cada LEITURA (toda vez que a tela "Dados da loja" carrega, ou o app
+  // inicia), resolve isso sozinho, sem precisar reeditar nada — mesma
+  // função, mesma cautela (nunca lança, só grava campo não-vazio).
+  if (req.tenantId) {
+    syncTenantCompanyInfo(req.tenantId, { cnpj: info.cnpj, razaoSocial: info.razaoSocial, nomeFantasia: info.nomeFantasia });
+  }
+  res.json({ ...info, ...readPolicies(cfg, req.db) });
 });
 
 router.put('/', requirePermission('empresa'), async (req, res) => {

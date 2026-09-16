@@ -113,6 +113,19 @@ try {
   check('CNPJ da loja B sincronizou com o banco de controle (não o de A)', controlRowB.cnpj === '11.222.333/0001-81', controlRowB.cnpj);
   check('razão social/nome fantasia da loja B sincronizaram com o banco de controle (não os de A)', controlRowB.razao_social === 'Loja B LTDA' && controlRowB.nome_fantasia === 'Loja B', JSON.stringify(controlRowB));
 
+  // Achado do usuário: uma loja que já tinha CNPJ preenchido (e travado)
+  // ANTES da sincronização existir nunca teria motivo pra salvar de novo
+  // (campo trancado não convida a mexer) — ficaria pra sempre sem
+  // sincronizar. Simula esse cenário: zera o CNPJ da loja B só no banco
+  // de CONTROLE (como se nunca tivesse sincronizado), sem tocar no banco
+  // da própria loja (que já tem "11.222.333/0001-81" salvo) — um simples
+  // GET (nunca PUT) precisa bastar pra sincronizar de novo sozinho.
+  controlDb.prepare('UPDATE tenants SET cnpj = NULL WHERE slug = ?').run(slugB);
+  const getBAgain = await request(hostB, { reqPath: '/api/company', cookie: loginB.cookie });
+  check('GET /api/company (sem PUT nenhum) continua devolvendo o CNPJ certo da loja', getBAgain.body.cnpj === '11.222.333/0001-81', getBAgain.body.cnpj);
+  const controlRowBAfterGet = controlDb.prepare('SELECT cnpj FROM tenants WHERE slug = ?').get(slugB);
+  check('só o GET já rebackfilla o CNPJ no banco de controle, sem precisar de PUT', controlRowBAfterGet.cnpj === '11.222.333/0001-81', controlRowBAfterGet.cnpj);
+
   const panelA = listTenants().find((t) => t.slug === slugA);
   check('loja A aparece no Painel de Controle com o CNPJ/nome que ela mesma cadastrou', panelA?.cnpj === '11.444.777/0001-61' && panelA?.nome_fantasia === 'Loja A', JSON.stringify(panelA));
 
