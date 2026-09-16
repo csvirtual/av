@@ -22,13 +22,18 @@ const PAYMENT_TOLERANCE = 0.01;
 // tela mostra (ver public/js/views/financeiro.js#PAYMENT_METHODS).
 const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix', 'Transferência']);
 
-const insertEntryStmt = db.prepare(`
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const INSERT_ENTRY_SQL = `
   INSERT INTO financial_entries (id, status, due_date, data) VALUES (@id, @status, @dueDate, @data)
-`);
-const updateEntryStmt = db.prepare('UPDATE financial_entries SET status = @status, data = @data WHERE id = @id');
-const getEntryStmt = db.prepare('SELECT * FROM financial_entries WHERE id = ?');
-const listEntriesStmt = db.prepare('SELECT data FROM financial_entries ORDER BY due_date ASC');
-const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
+`;
+const UPDATE_ENTRY_SQL = 'UPDATE financial_entries SET status = @status, data = @data WHERE id = @id';
+const GET_ENTRY_SQL = 'SELECT * FROM financial_entries WHERE id = ?';
+const LIST_ENTRIES_SQL = 'SELECT data FROM financial_entries ORDER BY due_date ASC';
+const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToEntry(row) { return JSON.parse(row.data); }
 
@@ -50,13 +55,14 @@ function entryStatus(entry) {
 }
 
 router.get('/', (req, res) => {
-  const entries = listEntriesStmt.all().map(rowToEntry);
+  const entries = (req.db || db).prepare(LIST_ENTRIES_SQL).all().map(rowToEntry);
   res.json({ entries: entries.map((e) => ({ ...e, displayStatus: entryStatus(e), paidTotal: paidTotal(e), remaining: remainingAmount(e) })) });
 });
 
 router.post('/', (req, res) => {
   try {
     const type = req.body.type;
+    const targetDb = req.db || db;
     if (type !== 'pagar' && type !== 'receber') throw new Error('Tipo de conta inválido.');
     const description = (req.body.description || '').trim();
     if (!description) throw new Error('Descrição é obrigatória.');
@@ -79,7 +85,7 @@ router.post('/', (req, res) => {
       createdBy: { userId: req.userId, userName: req.userName },
       createdAt: Date.now(),
     };
-    insertEntryStmt.run({ id: entry.id, status: entry.status, dueDate: entry.dueDate, data: JSON.stringify(entry) });
+    targetDb.prepare(INSERT_ENTRY_SQL).run({ id: entry.id, status: entry.status, dueDate: entry.dueDate, data: JSON.stringify(entry) });
     broadcast('finance-changed', { reason: 'created', id: entry.id });
     res.status(201).json({ entry });
   } catch (err) {
@@ -94,35 +100,37 @@ router.post('/', (req, res) => {
  * dedupeKey. A conta só fecha ('pago') quando a SOMA de tudo bate (ou
  * passa) o valor total; enquanto sobrar saldo, continua disponível pra
  * novos pagamentos parciais. */
-const commitPayment = db.transaction((input) => {
-  const value = Number(input.amount);
-  if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor pago maior que zero.');
-  if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
+function commitPayment(input, targetDb) {
+  return targetDb.transaction(() => {
+    const value = Number(input.amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor pago maior que zero.');
+    if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
 
-  const row = getEntryStmt.get(input.id);
-  if (!row) throw new Error('Conta não encontrada.');
-  const entry = rowToEntry(row);
-  if (entry.status === 'pago') throw new Error('Esta conta já está totalmente paga.');
-  if (entry.status === 'cancelado') throw new Error('Esta conta foi cancelada.');
-  const remaining = remainingAmount(entry);
-  if (value > remaining + PAYMENT_TOLERANCE) {
-    throw new Error(`O valor informado (${value.toFixed(2)}) é maior que o restante a pagar (${remaining.toFixed(2)}).`);
-  }
-  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
-  // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
+    const row = targetDb.prepare(GET_ENTRY_SQL).get(input.id);
+    if (!row) throw new Error('Conta não encontrada.');
+    const entry = rowToEntry(row);
+    if (entry.status === 'pago') throw new Error('Esta conta já está totalmente paga.');
+    if (entry.status === 'cancelado') throw new Error('Esta conta foi cancelada.');
+    const remaining = remainingAmount(entry);
+    if (value > remaining + PAYMENT_TOLERANCE) {
+      throw new Error(`O valor informado (${value.toFixed(2)}) é maior que o restante a pagar (${remaining.toFixed(2)}).`);
+    }
+    // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+    // routes/deliveries.js#commitDelivery pro raciocínio completo.
+    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
 
-  const payment = { id: crypto.randomUUID(), amount: value, paymentMethod: input.paymentMethod, paidAt: Date.now(), userId: input.userId, userName: input.userName };
-  entry.payments = Array.isArray(entry.payments) ? [...entry.payments, payment] : [payment];
-  if (paidTotal(entry) >= entry.amount - PAYMENT_TOLERANCE) entry.status = 'pago';
-  updateEntryStmt.run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
-  return entry;
-});
+    const payment = { id: crypto.randomUUID(), amount: value, paymentMethod: input.paymentMethod, paidAt: Date.now(), userId: input.userId, userName: input.userName };
+    entry.payments = Array.isArray(entry.payments) ? [...entry.payments, payment] : [payment];
+    if (paidTotal(entry) >= entry.amount - PAYMENT_TOLERANCE) entry.status = 'pago';
+    targetDb.prepare(UPDATE_ENTRY_SQL).run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
+    return entry;
+  })();
+}
 
 router.post('/:id/pagamento', (req, res) => {
   try {
-    const entry = commitPayment({ ...req.body, id: req.params.id, userId: req.userId, userName: req.userName });
+    const entry = commitPayment({ ...req.body, id: req.params.id, userId: req.userId, userName: req.userName }, req.db || db);
     broadcast('finance-changed', { reason: 'payment', id: entry.id });
     res.status(201).json({ entry });
   } catch (err) {
@@ -136,21 +144,23 @@ router.post('/:id/pagamento', (req, res) => {
 /** Excluir um pagamento já registrado — se isso tirar a conta de "paga",
  * ela volta sozinha a aparecer pendente/parcial (nunca fica presa em
  * status 'pago' com menos dinheiro registrado do que o total exige). */
-const commitDeletePayment = db.transaction((input) => {
-  const row = getEntryStmt.get(input.entryId);
-  if (!row) throw new Error('Conta não encontrada.');
-  const entry = rowToEntry(row);
-  const payments = Array.isArray(entry.payments) ? entry.payments : [];
-  if (!payments.some((p) => p.id === input.paymentId)) throw new Error('Pagamento não encontrado.');
-  entry.payments = payments.filter((p) => p.id !== input.paymentId);
-  entry.status = paidTotal(entry) >= entry.amount - PAYMENT_TOLERANCE ? 'pago' : 'pendente';
-  updateEntryStmt.run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
-  return entry;
-});
+function commitDeletePayment(input, targetDb) {
+  return targetDb.transaction(() => {
+    const row = targetDb.prepare(GET_ENTRY_SQL).get(input.entryId);
+    if (!row) throw new Error('Conta não encontrada.');
+    const entry = rowToEntry(row);
+    const payments = Array.isArray(entry.payments) ? entry.payments : [];
+    if (!payments.some((p) => p.id === input.paymentId)) throw new Error('Pagamento não encontrado.');
+    entry.payments = payments.filter((p) => p.id !== input.paymentId);
+    entry.status = paidTotal(entry) >= entry.amount - PAYMENT_TOLERANCE ? 'pago' : 'pendente';
+    targetDb.prepare(UPDATE_ENTRY_SQL).run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
+    return entry;
+  })();
+}
 
 router.delete('/:id/pagamento/:paymentId', (req, res) => {
   try {
-    const entry = commitDeletePayment({ entryId: req.params.id, paymentId: req.params.paymentId });
+    const entry = commitDeletePayment({ entryId: req.params.id, paymentId: req.params.paymentId }, req.db || db);
     broadcast('finance-changed', { reason: 'payment-deleted', id: entry.id });
     res.json({ entry });
   } catch (err) {
@@ -158,22 +168,24 @@ router.delete('/:id/pagamento/:paymentId', (req, res) => {
   }
 });
 
-const commitCancel = db.transaction((entryId) => {
-  const row = getEntryStmt.get(entryId);
-  if (!row) throw new Error('Conta não encontrada.');
-  const entry = rowToEntry(row);
-  if (entry.status === 'pago') throw new Error('Não é possível cancelar uma conta já paga.');
-  if (paidTotal(entry) > PAYMENT_TOLERANCE) {
-    throw new Error('Esta conta já tem pagamento(s) registrado(s) — exclua os pagamentos antes de cancelar.');
-  }
-  entry.status = 'cancelado';
-  updateEntryStmt.run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
-  return entry;
-});
+function commitCancel(entryId, targetDb) {
+  return targetDb.transaction(() => {
+    const row = targetDb.prepare(GET_ENTRY_SQL).get(entryId);
+    if (!row) throw new Error('Conta não encontrada.');
+    const entry = rowToEntry(row);
+    if (entry.status === 'pago') throw new Error('Não é possível cancelar uma conta já paga.');
+    if (paidTotal(entry) > PAYMENT_TOLERANCE) {
+      throw new Error('Esta conta já tem pagamento(s) registrado(s) — exclua os pagamentos antes de cancelar.');
+    }
+    entry.status = 'cancelado';
+    targetDb.prepare(UPDATE_ENTRY_SQL).run({ id: entry.id, status: entry.status, data: JSON.stringify(entry) });
+    return entry;
+  })();
+}
 
 router.post('/:id/cancelar', (req, res) => {
   try {
-    const entry = commitCancel(req.params.id);
+    const entry = commitCancel(req.params.id, req.db || db);
     broadcast('finance-changed', { reason: 'cancelled', id: entry.id });
     res.json({ entry });
   } catch (err) {

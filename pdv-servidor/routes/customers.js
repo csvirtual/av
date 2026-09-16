@@ -21,26 +21,31 @@ const router = Router();
 // tela mostra (ver public/js/views/clientes.js#PAYMENT_METHODS).
 const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartão de crédito', 'Pix']);
 
-const insertCustomerStmt = db.prepare('INSERT INTO customers (id, name_lower, data) VALUES (@id, @nameLower, @data)');
-const updateCustomerStmt = db.prepare('UPDATE customers SET name_lower = @nameLower, data = @data WHERE id = @id');
-const deleteCustomerStmt = db.prepare('DELETE FROM customers WHERE id = ?');
-const getCustomerStmt = db.prepare('SELECT data FROM customers WHERE id = ?');
-const listCustomersStmt = db.prepare('SELECT data FROM customers');
-const listLedgerStmt = db.prepare('SELECT data FROM customer_debts WHERE customer_id = ? ORDER BY timestamp DESC');
-const listAllDebtsStmt = db.prepare('SELECT data FROM customer_debts');
-const insertDebtEntryStmt = db.prepare('INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)');
-const claimIdempotencyStmt = db.prepare('INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)');
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// do processo como fallback), comportamento idêntico a antes desta etapa
+// quando não há multi-tenant configurado.
+const INSERT_CUSTOMER_SQL = 'INSERT INTO customers (id, name_lower, data) VALUES (@id, @nameLower, @data)';
+const UPDATE_CUSTOMER_SQL = 'UPDATE customers SET name_lower = @nameLower, data = @data WHERE id = @id';
+const DELETE_CUSTOMER_SQL = 'DELETE FROM customers WHERE id = ?';
+const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
+const LIST_CUSTOMERS_SQL = 'SELECT data FROM customers';
+const LIST_LEDGER_SQL = 'SELECT data FROM customer_debts WHERE customer_id = ? ORDER BY timestamp DESC';
+const LIST_ALL_DEBTS_SQL = 'SELECT data FROM customer_debts';
+const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
+const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToCustomer(row) { return JSON.parse(row.data); }
 function money(n) { return 'R$ ' + Number(n).toFixed(2).replace('.', ','); }
 function onlyDigits(s) { return (s || '').replace(/\D/g, ''); }
 
-function listCustomers() {
-  return listCustomersStmt.all().map(rowToCustomer).sort((a, b) => a.nameLower.localeCompare(b.nameLower, 'pt-BR'));
+function listCustomers(targetDb) {
+  return targetDb.prepare(LIST_CUSTOMERS_SQL).all().map(rowToCustomer).sort((a, b) => a.nameLower.localeCompare(b.nameLower, 'pt-BR'));
 }
 
-function customerBalance(customerId) {
-  const entries = listLedgerStmt.all(customerId).map((r) => JSON.parse(r.data));
+function customerBalance(customerId, targetDb) {
+  const entries = targetDb.prepare(LIST_LEDGER_SQL).all(customerId).map((r) => JSON.parse(r.data));
   return entries.reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
 }
 
@@ -52,7 +57,7 @@ function sanitizeDebtDueDate(value) {
 
 router.get('/', (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
-  let items = listCustomers();
+  let items = listCustomers(req.db || db);
   if (q) {
     const qDigits = onlyDigits(q);
     items = items.filter((c) => c.nameLower.includes(q)
@@ -63,7 +68,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/balances', (req, res) => {
-  const all = listAllDebtsStmt.all().map((r) => JSON.parse(r.data));
+  const all = (req.db || db).prepare(LIST_ALL_DEBTS_SQL).all().map((r) => JSON.parse(r.data));
   const balances = {};
   for (const e of all) {
     const delta = e.type === 'fiado' ? e.amount : -e.amount;
@@ -73,16 +78,18 @@ router.get('/balances', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const row = getCustomerStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   const customer = rowToCustomer(row);
-  res.json({ customer, balance: customerBalance(customer.id) });
+  res.json({ customer, balance: customerBalance(customer.id, targetDb) });
 });
 
 router.get('/:id/ledger', (req, res) => {
-  const row = getCustomerStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
-  const entries = listLedgerStmt.all(req.params.id).map((r) => JSON.parse(r.data));
+  const entries = targetDb.prepare(LIST_LEDGER_SQL).all(req.params.id).map((r) => JSON.parse(r.data));
   res.json({ entries });
 });
 
@@ -94,18 +101,19 @@ router.get('/:id/ledger', (req, res) => {
 // (ou um vendedor desatento) podia comprar fiado até o limite num cadastro,
 // e voltar a comprar fiado do zero criando outro com o mesmo documento.
 // Mesmo padrão de checagem que products.js já faz pra barcode.
-function findCustomerByDocument(digits, excludeId = null) {
+function findCustomerByDocument(digits, targetDb, excludeId = null) {
   if (!digits) return null;
-  return listCustomers().find((c) => c.id !== excludeId && onlyDigits(c.documento) === digits);
+  return listCustomers(targetDb).find((c) => c.id !== excludeId && onlyDigits(c.documento) === digits);
 }
 
 router.post('/', (req, res) => {
   try {
+    const targetDb = req.db || db;
     const nome = (req.body.nome || '').trim();
     if (!nome) throw new Error('Nome do cliente é obrigatório.');
     const documento = (req.body.documento || '').trim();
     const documentoDigits = onlyDigits(documento);
-    if (documentoDigits && findCustomerByDocument(documentoDigits)) {
+    if (documentoDigits && findCustomerByDocument(documentoDigits, targetDb)) {
       throw new Error('Já existe um cliente cadastrado com esse CPF/CNPJ.');
     }
     const customer = {
@@ -122,7 +130,7 @@ router.post('/', (req, res) => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    insertCustomerStmt.run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
+    targetDb.prepare(INSERT_CUSTOMER_SQL).run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
     broadcast('customers-changed', { reason: 'created', id: customer.id });
     res.status(201).json({ customer });
   } catch (err) {
@@ -131,7 +139,8 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const row = getCustomerStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
     const customer = rowToCustomer(row);
@@ -146,7 +155,7 @@ router.put('/:id', (req, res) => {
     if (body.documento !== undefined) {
       const documento = body.documento.trim();
       const documentoDigits = onlyDigits(documento);
-      if (documentoDigits && findCustomerByDocument(documentoDigits, customer.id)) {
+      if (documentoDigits && findCustomerByDocument(documentoDigits, targetDb, customer.id)) {
         throw new Error('Já existe outro cliente cadastrado com esse CPF/CNPJ.');
       }
       customer.documento = documento;
@@ -157,7 +166,7 @@ router.put('/:id', (req, res) => {
     if (body.debtDueDate !== undefined) customer.debtDueDate = sanitizeDebtDueDate(body.debtDueDate);
     if (body.active !== undefined) customer.active = !!body.active;
     customer.updatedAt = Date.now();
-    updateCustomerStmt.run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
+    targetDb.prepare(UPDATE_CUSTOMER_SQL).run({ id: customer.id, nameLower: customer.nameLower, data: JSON.stringify(customer) });
     broadcast('customers-changed', { reason: 'updated', id: customer.id });
     res.json({ customer });
   } catch (err) {
@@ -174,9 +183,10 @@ router.delete('/:id', (req, res) => {
   if (!userCan(req.userRole, req.userPermissions, 'deleteCustomer')) {
     return res.status(403).json({ error: 'Você não tem permissão para excluir clientes.' });
   }
-  const row = getCustomerStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
-  deleteCustomerStmt.run(req.params.id);
+  targetDb.prepare(DELETE_CUSTOMER_SQL).run(req.params.id);
   broadcast('customers-changed', { reason: 'deleted', id: req.params.id });
   res.json({ ok: true });
 });
@@ -190,38 +200,41 @@ router.delete('/:id', (req, res) => {
  * checagem de saldo passar — uma tentativa rejeitada por saldo insuficiente
  * nunca queima a dedupeKey, então corrigir o valor e reenviar no mesmo modal
  * (mesma dedupeKey, de propósito) não é barrado como "duplicado". */
-const commitPayment = db.transaction((input) => {
-  const value = Number(input.amount);
-  if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor de pagamento maior que zero.');
-  if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
+function commitPayment(input, targetDb) {
+  return targetDb.transaction(() => {
+    const value = Number(input.amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor de pagamento maior que zero.');
+    if (!VALID_PAYMENT_METHODS.has(input.paymentMethod)) throw new Error('Forma de pagamento inválida.');
 
-  const entries = listLedgerStmt.all(input.customerId).map((r) => JSON.parse(r.data));
-  const balance = entries.reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
-  if (value > balance + 0.01) {
-    throw new Error(`O cliente deve ${money(balance)} — não é possível registrar um pagamento maior que a dívida.`);
-  }
-  // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
-  // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  claimIdempotencyStmt.run(input.dedupeKey, Date.now());
+    const entries = targetDb.prepare(LIST_LEDGER_SQL).all(input.customerId).map((r) => JSON.parse(r.data));
+    const balance = entries.reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
+    if (value > balance + 0.01) {
+      throw new Error(`O cliente deve ${money(balance)} — não é possível registrar um pagamento maior que a dívida.`);
+    }
+    // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
+    // routes/deliveries.js#commitDelivery pro raciocínio completo.
+    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
 
-  const openSession = resolveOpenSession(input.terminalId, input.userId);
-  const entry = {
-    id: crypto.randomUUID(), customerId: input.customerId, type: 'pagamento', amount: value,
-    saleId: null, paymentMethod: input.paymentMethod, cashSessionId: openSession ? openSession.id : null,
-    note: (input.note || '').trim(), userId: input.userId, userName: input.userName, timestamp: Date.now(),
-  };
-  insertDebtEntryStmt.run({ id: entry.id, customerId: entry.customerId, timestamp: entry.timestamp, data: JSON.stringify(entry) });
-  return entry;
-});
+    const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
+    const entry = {
+      id: crypto.randomUUID(), customerId: input.customerId, type: 'pagamento', amount: value,
+      saleId: null, paymentMethod: input.paymentMethod, cashSessionId: openSession ? openSession.id : null,
+      note: (input.note || '').trim(), userId: input.userId, userName: input.userName, timestamp: Date.now(),
+    };
+    targetDb.prepare(INSERT_DEBT_ENTRY_SQL).run({ id: entry.id, customerId: entry.customerId, timestamp: entry.timestamp, data: JSON.stringify(entry) });
+    return entry;
+  })();
+}
 
 router.post('/:id/pagamento', (req, res) => {
-  const row = getCustomerStmt.get(req.params.id);
+  const targetDb = req.db || db;
+  const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
-    const entry = commitPayment({ ...req.body, customerId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId });
+    const entry = commitPayment({ ...req.body, customerId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, targetDb);
     broadcast('customers-changed', { reason: 'payment', id: req.params.id });
-    res.status(201).json({ entry, balance: customerBalance(req.params.id) });
+    res.status(201).json({ entry, balance: customerBalance(req.params.id, targetDb) });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este pagamento já foi registrado — evite reenviar.' });
