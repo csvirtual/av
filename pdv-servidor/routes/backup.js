@@ -5,6 +5,7 @@
 // contagem de cada tabela, pra tela pedir confirmação ANTES de aplicar de
 // verdade (ver public/test.html).
 import { Router } from 'express';
+import { db } from '../db/index.js';
 import { encryptPayload, decryptPayload, MIN_BACKUP_PASSWORD_LENGTH } from '../lib/backupCrypto.js';
 import { buildBackupPayload, applyBackupPayload, getCurrentCounts, resetOperationalData, BACKUP_FORMAT_VERSION, BACKUP_TABLES } from '../lib/backup.js';
 import { logAction } from '../lib/audit.js';
@@ -22,20 +23,22 @@ const router = Router();
  * routes/cash.js#backup-fechamento) não tinha como perceber, sem abrir o
  * Log do sistema, se aquela rede de segurança estava realmente funcionando. */
 router.get('/current-counts', (req, res) => {
-  res.json({ counts: getCurrentCounts(), lastBackupAt: getConfig().lastBackupAt || null });
+  const targetDb = req.db || db;
+  res.json({ counts: getCurrentCounts(targetDb), lastBackupAt: getConfig(targetDb).lastBackupAt || null });
 });
 
 router.post('/export', async (req, res) => {
   try {
+    const targetDb = req.db || db;
     const password = req.body.password;
     if (!password || password.length < MIN_BACKUP_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres pra proteger o backup.`);
-    const payload = buildBackupPayload();
+    const payload = buildBackupPayload(targetDb);
     const envelope = await encryptPayload(payload, password);
-    updateConfig({ lastBackupAt: Date.now() });
+    updateConfig({ lastBackupAt: Date.now() }, targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Exportação de backup', details: 'Backup completo gerado e baixado.', entity: 'backup', entityId: 'export',
-    });
+    }, targetDb);
     res.json({ envelope });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -65,7 +68,7 @@ router.post('/preview', async (req, res) => {
     }
     const fileCounts = {};
     for (const table of BACKUP_TABLES) fileCounts[table] = (payload.tables[table] || []).length;
-    res.json({ fileCounts, currentCounts: getCurrentCounts(), exportedAt: payload.exportedAt });
+    res.json({ fileCounts, currentCounts: getCurrentCounts(req.db || db), exportedAt: payload.exportedAt });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -89,12 +92,13 @@ router.post('/import', async (req, res) => {
     if (typeof payload.backupFormatVersion !== 'number' || payload.backupFormatVersion > BACKUP_FORMAT_VERSION) {
       throw new Error('Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize o servidor antes de restaurar.');
     }
-    applyBackupPayload(payload);
+    const targetDb = req.db || db;
+    applyBackupPayload(payload, targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Restauração de backup', details: 'TODOS os dados do sistema foram substituídos pelo conteúdo do arquivo restaurado.',
       entity: 'backup', entityId: 'import',
-    });
+    }, targetDb);
     // Restauração troca TUDO — o jeito mais simples e seguro de todo
     // terminal conectado voltar a mostrar dados corretos é recarregar a
     // página inteira (ver public/test.html), em vez de tentar reconciliar
@@ -117,13 +121,14 @@ router.post('/import', async (req, res) => {
  * autorização adicional (mesmo raciocínio do reset-form na extensão). */
 router.post('/reset', async (req, res) => {
   try {
-    resetOperationalData();
+    const targetDb = req.db || db;
+    resetOperationalData(targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
       action: 'Reinício de operação (zerar dados)',
       details: 'Vendas, caixa, financeiro, fiado, carretos, compras, fidelidade, crédito de troca e log anteriores foram apagados — estoque, dados da loja, usuários, fornecedores e clientes preservados.',
       entity: 'backup', entityId: 'reset',
-    });
+    }, targetDb);
     // Mesmo raciocínio do broadcast de /import acima: um reinício de
     // operação também troca dado que QUALQUER terminal pode estar
     // mostrando na tela agora (um caixa aberto em outro terminal, por
