@@ -42,7 +42,7 @@ router.post('/login', async (req, res) => {
     const preLock = getLoginLockState(username);
     if (preLock.remainingMs > 0) {
       return res.status(429).json({
-        error: `Muitas tentativas incorretas — aguarde ${Math.ceil(preLock.remainingMs / 1000)}s antes de tentar de novo.`,
+        error: `Muitas tentativas incorretas. Aguarde ${Math.ceil(preLock.remainingMs / 1000)}s antes de tentar de novo.`,
         remainingMs: preLock.remainingMs,
       });
     }

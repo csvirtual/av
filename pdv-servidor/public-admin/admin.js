@@ -146,7 +146,11 @@
     });
     let body = null;
     try { body = await res.json(); } catch { /* corpo vazio (ex: 204) */ }
-    if (!res.ok) throw new Error((body && body.error) || `Erro ${res.status}`);
+    if (!res.ok) {
+      const err = new Error((body && body.error) || `Erro ${res.status}`);
+      if (body && body.remainingMs) err.remainingMs = body.remainingMs;
+      throw err;
+    }
     return body;
   }
 
@@ -421,8 +425,35 @@
   }
   lixeiraBtn.addEventListener('click', openLixeiraModal);
 
+  // Achado do usuário: o aviso de bloqueio por tentativas incorretas
+  // (lib/loginLockout.js, 60s a partir da 2ª tentativa errada) mostrava só
+  // o segundo inicial, parado na tela, sem descer — parecia travado. Agora
+  // desce de verdade, um segundo por vez, e reabilita o botão sozinho
+  // quando chega a zero.
+  const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
+  let lockoutTimer = null;
+  function startLockoutCountdown(remainingMs) {
+    if (lockoutTimer) clearInterval(lockoutTimer);
+    let remaining = Math.ceil(remainingMs / 1000);
+    loginSubmitBtn.disabled = true;
+    const render = () => { loginError.textContent = `Muitas tentativas incorretas. Aguarde ${remaining}s antes de tentar de novo.`; };
+    render();
+    lockoutTimer = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(lockoutTimer);
+        lockoutTimer = null;
+        loginError.textContent = '';
+        loginSubmitBtn.disabled = false;
+        return;
+      }
+      render();
+    }, 1000);
+  }
+
   loginForm.addEventListener('submit', async (ev) => {
     ev.preventDefault();
+    if (lockoutTimer) return;
     loginError.textContent = '';
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
@@ -430,7 +461,11 @@
       const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) });
       showApp(data.admin);
     } catch (err) {
-      loginError.textContent = err.message;
+      if (err.remainingMs > 0) {
+        startLockoutCountdown(err.remainingMs);
+      } else {
+        loginError.textContent = err.message;
+      }
     }
   });
 
