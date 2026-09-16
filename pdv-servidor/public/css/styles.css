@@ -2049,7 +2049,6 @@ input.customer-search-input:focus {
    * próprio (#summary-box no Financeiro, id direto no próprio grid nas
    * outras três) pra não afetar outras grades .stat-grid fora dessas 4
    * telas específicas. */
-  #summary-box, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid { position: relative; }
   #summary-box .stat-grid, #dashboard-stat-grid, #caixa-stat-grid, #relatorios-stat-grid {
     display: flex;
     overflow-x: auto;
@@ -2062,11 +2061,22 @@ input.customer-search-input:focus {
   #caixa-stat-grid .stat-card,
   #relatorios-stat-grid .stat-card { flex: 0 0 auto; min-width: 150px; scroll-snap-align: start; }
   /* Mesma ideia do "scroll-shadow" que .table-wrap já usa — esmaece a
-   * borda pra deixar óbvio que tem mais cartão pra rolar. */
-  #summary-box::after, #dashboard-stat-grid::after, #caixa-stat-grid::after, #relatorios-stat-grid::after {
-    content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
+   * borda pra deixar óbvio que tem mais cartão pra rolar. Achado do
+   * usuário: com `position: absolute`, a sombra ficava presa no QUADRO
+   * do carrossel (a "janela" visível), não no conteúdo — como só o
+   * conteúdo rola, ela nunca se move, e qualquer cartão que passe por
+   * baixo dela no meio do arrasto fica com um véu em cima do valor.
+   * Corrigido virando a sombra mais um ITEM no fim da própria fileira
+   * (sem position:absolute) — ela participa do flex como se fosse mais
+   * um cartão, então rola junto com o resto e nunca fica sobreposta a
+   * nenhum valor. Confirmado com mockup interativo antes de aplicar. */
+  #summary-box .stat-grid::after,
+  #dashboard-stat-grid::after,
+  #caixa-stat-grid::after,
+  #relatorios-stat-grid::after {
+    content: '';
+    flex: 0 0 28px;
     background: linear-gradient(to right, transparent, var(--bg));
-    pointer-events: none;
   }
 }
 
