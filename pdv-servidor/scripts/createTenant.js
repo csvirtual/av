@@ -74,7 +74,7 @@ function validateSlug(slug) {
   }
   const existing = controlDb.prepare('SELECT 1 FROM tenants WHERE slug = ?').get(slug);
   if (existing) {
-    throw new Error(`Já existe uma loja cadastrada com esse endereço — escolha outro.`);
+    throw new Error(`Já existe loja cadastrada com esse endereço, escolha outro.`);
   }
 }
 
