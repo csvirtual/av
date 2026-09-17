@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_DELIVERIES_CHANGED } from '../public/js/utils/liveTopics.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.post('/', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este carreto já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -128,7 +129,7 @@ router.post('/:id/entregar', (req, res) => {
     broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'delivered', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -138,7 +139,7 @@ router.post('/:id/cancelar', (req, res) => {
     broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'cancelled', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

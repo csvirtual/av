@@ -11,6 +11,7 @@ import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_CUSTOMERS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
 import { userCan } from '../lib/permissions.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -135,7 +136,7 @@ router.post('/', (req, res) => {
     broadcast(TOPIC_CUSTOMERS_CHANGED, { reason: 'created', id: customer.id }, req.tenantId);
     res.status(201).json({ customer });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -171,7 +172,7 @@ router.put('/:id', (req, res) => {
     broadcast(TOPIC_CUSTOMERS_CHANGED, { reason: 'updated', id: customer.id }, req.tenantId);
     res.json({ customer });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -239,7 +240,7 @@ router.post('/:id/pagamento', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este pagamento já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

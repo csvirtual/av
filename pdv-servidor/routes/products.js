@@ -17,6 +17,7 @@ import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_PRODUCTS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { requirePermission } from '../lib/permissions.js';
 import { recordStockMovement } from '../lib/stockMovements.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -120,7 +121,7 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
   try {
     unitFields = resolveCustomUnitFields(body);
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return respondValidationError(res, err);
   }
   const name = String(body.name || '').trim();
   const isPersonalizado = body.unit === 'personalizado';
@@ -211,7 +212,7 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
     try {
       unitFields = resolveCustomUnitFields(body);
     } catch (err) {
-      return res.status(400).json({ error: err.message });
+      return respondValidationError(res, err);
     }
     updated.unit = body.unit;
     updated.customUnitLabel = unitFields.customUnitLabel;
@@ -367,7 +368,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este ajuste já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

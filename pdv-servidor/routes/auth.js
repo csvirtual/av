@@ -6,6 +6,7 @@ import { verifyLogin } from '../lib/verifyLogin.js';
 import { getLoginLockState } from '../lib/loginLockout.js';
 import { hashPassword, verifyPasswordHash } from '../lib/auth.js';
 import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
+import { respondUnexpectedError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -108,8 +109,7 @@ router.post('/login', async (req, res) => {
     // (que só captura throw síncrono) — em versões modernas do Node, uma
     // rejeição não tratada DERRUBA O PROCESSO inteiro, tirando do ar TODOS
     // os terminais conectados de uma vez, não só quem tentou logar.
-    console.error('[erro inesperado] POST /api/auth/login:', err);
-    res.status(500).json({ error: 'Erro inesperado ao entrar. Tente novamente.' });
+    respondUnexpectedError(res, err, 'POST /api/auth/login', 'Erro inesperado ao entrar. Tente novamente.');
   }
 });
 
@@ -131,8 +131,7 @@ router.post('/verify', async (req, res) => {
     res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
   } catch (err) {
     // Mesmo achado de auditoria do handler /login acima.
-    console.error('[erro inesperado] POST /api/auth/verify:', err);
-    res.status(500).json({ error: 'Erro inesperado ao confirmar. Tente novamente.' });
+    respondUnexpectedError(res, err, 'POST /api/auth/verify', 'Erro inesperado ao confirmar. Tente novamente.');
   }
 });
 
@@ -184,8 +183,7 @@ router.post('/change-password', async (req, res) => {
     logAction({ userId: user.id, userName: user.nome, role: user.role, action: 'Troca de senha', details: 'Senha própria alterada.', entity: 'user', entityId: user.id }, targetDb);
     res.json({ user: publicUser({ data: JSON.stringify(user) }) });
   } catch (err) {
-    console.error('[erro inesperado] POST /api/auth/change-password:', err);
-    res.status(500).json({ error: 'Erro inesperado ao trocar a senha. Tente novamente.' });
+    respondUnexpectedError(res, err, 'POST /api/auth/change-password', 'Erro inesperado ao trocar a senha. Tente novamente.');
   }
 });
 

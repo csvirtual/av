@@ -12,6 +12,7 @@ import { logAction } from '../lib/audit.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_BACKUP_RESTORED, TOPIC_DATA_RESET } from '../public/js/utils/liveTopics.js';
 import { getConfig, updateConfig } from '../lib/companyConfig.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.post('/export', async (req, res) => {
     }, targetDb);
     res.json({ envelope });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -71,7 +72,7 @@ router.post('/preview', async (req, res) => {
     for (const table of BACKUP_TABLES) fileCounts[table] = (payload.tables[table] || []).length;
     res.json({ fileCounts, currentCounts: getCurrentCounts(req.db), exportedAt: payload.exportedAt });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -107,7 +108,7 @@ router.post('/import', async (req, res) => {
     broadcast(TOPIC_BACKUP_RESTORED, {}, req.tenantId);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -139,7 +140,7 @@ router.post('/reset', async (req, res) => {
     broadcast(TOPIC_DATA_RESET, {}, req.tenantId);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

@@ -4,6 +4,7 @@
 // Mesma função de verdade (control/db.js#setTenantStatus), nenhuma lógica
 // duplicada — só um jeito novo (autenticado, pela rede) de chamá-la.
 import { Router } from 'express';
+import { respondValidationError } from '../../lib/httpResponses.js';
 import {
   listTenants, setTenantStatus, deleteTenant, VALID_TENANT_STATUSES,
   listTrashedTenants, restoreTenant, purgeTrashedTenant,
@@ -45,7 +46,7 @@ router.post('/:slug/status', (req, res) => {
     }
     res.json({ tenant: publicTenant(updated) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -63,7 +64,7 @@ router.delete('/:slug', async (req, res) => {
     const deleted = deleteTenant(req.params.slug);
     res.json({ tenant: publicTenant(deleted) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -81,7 +82,7 @@ router.post('/lixeira/:entry/restore', (req, res) => {
     const restored = restoreTenant(req.params.entry);
     res.json({ tenant: publicTenant(restored) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -97,7 +98,7 @@ router.delete('/lixeira/:entry', async (req, res) => {
     purgeTrashedTenant(req.params.entry);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

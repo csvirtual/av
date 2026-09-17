@@ -16,6 +16,7 @@ import { buildBackupPayload } from '../lib/backup.js';
 import { encryptPayload } from '../lib/backupCrypto.js';
 import { MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -160,7 +161,7 @@ router.post('/open', (req, res) => {
     if (String(err.message).includes('idx_cashsessions_open_user_unique')) {
       return res.status(400).json({ error: 'Você já tem um caixa aberto. Feche-o antes de abrir um novo.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -211,7 +212,7 @@ router.post('/sessions/:id/movimento', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este movimento já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -289,7 +290,7 @@ router.post('/sessions/:id/retificar', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Esta retificação já foi registrada — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -424,7 +425,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     res.json({ session: closed });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -459,7 +460,7 @@ router.post('/backup-fechamento', async (req, res) => {
     updateConfig({ lastBackupAt: Date.now() }, req.db);
     res.json({ envelope });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

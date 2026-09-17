@@ -15,6 +15,7 @@ import { verifyLicenseKey } from '../lib/license.js';
 import { onlyDigits, formatCnpj, isValidCnpj, formatCep, isValidCep, isValidEmail } from '../lib/companyValidation.js';
 import { UFS } from '../lib/ufs.js';
 import { syncTenantCompanyInfo } from '../control/db.js';
+import { respondUnexpectedError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -252,8 +253,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     }
     res.json({ ...readCompanyInfo(updated), ...readPolicies(updated, req.db) });
   } catch (err) {
-    console.error('[erro inesperado] PUT /api/company:', err);
-    res.status(500).json({ error: 'Erro inesperado ao salvar. Tente novamente.' });
+    respondUnexpectedError(res, err, 'PUT /api/company', 'Erro inesperado ao salvar. Tente novamente.');
   }
 });
 

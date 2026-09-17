@@ -14,6 +14,7 @@ import { TOPIC_USERS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { hashPassword } from '../lib/auth.js';
 import { sanitizePermissions, PERMISSION_DEFS, MIN_USER_PASSWORD_LENGTH } from '../lib/permissions.js';
 import { logAction } from '../lib/audit.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -86,7 +87,7 @@ router.post('/', async (req, res) => {
     broadcast(TOPIC_USERS_CHANGED, { reason: 'created', id: user.id }, req.tenantId);
     res.status(201).json({ user: publicUser(user) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -152,7 +153,7 @@ router.put('/:id', (req, res) => {
     broadcast(TOPIC_USERS_CHANGED, { reason: 'updated', id: user.id }, req.tenantId);
     res.json({ user: publicUser(user) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -191,7 +192,7 @@ router.post('/:id/ativo', (req, res) => {
     broadcast(TOPIC_USERS_CHANGED, { reason: 'active-toggled', id: user.id }, req.tenantId);
     res.json({ user: publicUser(user) });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -239,7 +240,7 @@ router.post('/:id/redefinir-senha', async (req, res) => {
     }, targetDb);
     res.json({ ok: true });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

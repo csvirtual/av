@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { controlDb } from '../../control/db.js';
 import { createSession, destroySession, resolveSession } from '../../lib/session.js';
 import { verifyPlatformAdminLogin, getPlatformAdminLoginLockState, getPlatformAdminById, updatePlatformAdminAccount } from '../../lib/platformAdminAuth.js';
+import { respondUnexpectedError, respondValidationError } from '../../lib/httpResponses.js';
 
 const router = Router();
 
@@ -38,8 +39,7 @@ router.post('/login', async (req, res) => {
     });
     res.json({ admin: { id: admin.id, username: admin.username } });
   } catch (err) {
-    console.error('[erro inesperado] POST /api/admin/login:', err);
-    res.status(500).json({ error: 'Erro inesperado ao entrar. Tente novamente.' });
+    respondUnexpectedError(res, err, 'POST /api/admin/login', 'Erro inesperado ao entrar. Tente novamente.');
   }
 });
 
@@ -69,7 +69,7 @@ router.post('/account', async (req, res) => {
     const admin = await updatePlatformAdminAccount(adminId, { currentPassword, newUsername, newPassword });
     res.json({ admin });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

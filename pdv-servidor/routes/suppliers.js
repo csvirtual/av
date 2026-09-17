@@ -14,6 +14,7 @@ import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_SUPPLIERS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { requirePermission } from '../lib/permissions.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -69,7 +70,7 @@ router.post('/', requirePermission('compras'), (req, res) => {
     broadcast(TOPIC_SUPPLIERS_CHANGED, { reason: 'created', id: supplier.id }, req.tenantId);
     res.status(201).json({ supplier });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -97,7 +98,7 @@ router.put('/:id', requirePermission('compras'), (req, res) => {
     broadcast(TOPIC_SUPPLIERS_CHANGED, { reason: 'updated', id: supplier.id }, req.tenantId);
     res.json({ supplier });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

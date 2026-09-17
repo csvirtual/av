@@ -20,6 +20,7 @@ import { getConfig } from '../lib/companyConfig.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
 import { userCan } from '../lib/permissions.js';
 import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS, AMOUNT_TOLERANCE } from '../lib/pricing.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -346,7 +347,7 @@ router.post('/', async (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Esta venda já foi registrada — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -564,7 +565,7 @@ router.post('/:id/refund', async (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este estorno já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

@@ -14,6 +14,7 @@ import { verifyLicenseKey } from '../lib/license.js';
 import { logAction } from '../lib/audit.js';
 import { BUILD_VERSION } from '../lib/buildVersion.js';
 import { autoSuspendExpiredTrial } from '../control/db.js';
+import { respondUnexpectedError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -43,8 +44,7 @@ router.get('/status', async (req, res) => {
     status.version = BUILD_VERSION;
     res.json(status);
   } catch (err) {
-    console.error('[erro inesperado] GET /api/license/status:', err);
-    res.status(500).json({ error: 'Erro inesperado ao conferir a licença.' });
+    respondUnexpectedError(res, err, 'GET /api/license/status', 'Erro inesperado ao conferir a licença.');
   }
 });
 
@@ -73,8 +73,7 @@ router.post('/activate', async (req, res) => {
     const status = await getLicenseStatus(cnpj, req.db);
     res.json(status);
   } catch (err) {
-    console.error('[erro inesperado] POST /api/license/activate:', err);
-    res.status(500).json({ error: 'Erro inesperado ao ativar. Tente novamente.' });
+    respondUnexpectedError(res, err, 'POST /api/license/activate', 'Erro inesperado ao ativar. Tente novamente.');
   }
 });
 

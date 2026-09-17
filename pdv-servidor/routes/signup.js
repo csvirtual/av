@@ -16,6 +16,7 @@
 import { Router } from 'express';
 import { createNewTenant, validateSlug } from '../scripts/createTenant.js';
 import { checkSignupRateLimit } from '../lib/signupRateLimit.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -61,7 +62,7 @@ router.post('/', async (req, res) => {
       loginHint: { username: 'admin', password: 'admin123', mustChangePassword: true },
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

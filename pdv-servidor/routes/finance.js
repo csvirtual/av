@@ -11,6 +11,7 @@ import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_FINANCE_CHANGED } from '../public/js/utils/liveTopics.js';
 import { AMOUNT_TOLERANCE as PAYMENT_TOLERANCE } from '../lib/pricing.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -89,7 +90,7 @@ router.post('/', (req, res) => {
     broadcast(TOPIC_FINANCE_CHANGED, { reason: 'created', id: entry.id }, req.tenantId);
     res.status(201).json({ entry });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -136,7 +137,7 @@ router.post('/:id/pagamento', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este pagamento já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -163,7 +164,7 @@ router.delete('/:id/pagamento/:paymentId', (req, res) => {
     broadcast(TOPIC_FINANCE_CHANGED, { reason: 'payment-deleted', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -188,7 +189,7 @@ router.post('/:id/cancelar', (req, res) => {
     broadcast(TOPIC_FINANCE_CHANGED, { reason: 'cancelled', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

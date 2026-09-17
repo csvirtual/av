@@ -12,6 +12,7 @@ import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { updateConfig } from '../lib/companyConfig.js';
 import { requirePermission } from '../lib/permissions.js';
 import { pointsBalance, creditBalance, listLoyaltyLedger, listCreditLedger, insertLoyaltyEntry, insertCreditEntry } from '../lib/loyaltyLedger.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -130,7 +131,7 @@ router.post('/:customerId/resgatar', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este resgate já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 

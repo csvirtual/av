@@ -12,6 +12,7 @@ import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_PRODUCTS_CHANGED, TOPIC_PURCHASES_CHANGED } from '../public/js/utils/liveTopics.js';
 import { saveProductAfterStockChange, recordStockMovement } from '../lib/stockMovements.js';
+import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.post('/', (req, res) => {
     broadcast(TOPIC_PURCHASES_CHANGED, { reason: 'created', id: order.id }, req.tenantId);
     res.status(201).json({ order });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -169,7 +170,7 @@ router.post('/:id/receber', (req, res) => {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
       return res.status(409).json({ error: 'Este recebimento já foi registrado — evite reenviar.' });
     }
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
@@ -192,7 +193,7 @@ router.post('/:id/cancelar', (req, res) => {
     broadcast(TOPIC_PURCHASES_CHANGED, { reason: 'cancelled', id: order.id }, req.tenantId);
     res.json({ order });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    respondValidationError(res, err);
   }
 });
 
