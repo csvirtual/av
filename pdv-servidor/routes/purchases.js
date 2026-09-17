@@ -17,9 +17,10 @@ const CUSTOM_UNIT_VALUE = 'personalizado';
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_ORDER_SQL = `
   INSERT INTO purchase_orders (id, supplier_id, status, created_at, data) VALUES (@id, @supplierId, @status, @createdAt, @data)
 `;
@@ -55,18 +56,18 @@ function saveProduct(product, targetDb) {
 function formatQty(n) { return Number(n).toString(); }
 
 router.get('/', (req, res) => {
-  res.json({ orders: (req.db || db).prepare(LIST_ORDERS_SQL).all().map(rowToOrder) });
+  res.json({ orders: req.db.prepare(LIST_ORDERS_SQL).all().map(rowToOrder) });
 });
 
 router.get('/:id', (req, res) => {
-  const row = (req.db || db).prepare(GET_ORDER_SQL).get(req.params.id);
+  const row = req.db.prepare(GET_ORDER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Pedido não encontrado.' });
   res.json({ order: rowToOrder(row) });
 });
 
 router.post('/', (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const supplierRow = targetDb.prepare(GET_SUPPLIER_SQL).get(req.body.supplierId);
     if (!supplierRow) throw new Error('Selecione um fornecedor.');
     const supplier = JSON.parse(supplierRow.data);
@@ -172,7 +173,7 @@ function commitReceive(input, targetDb) {
 
 router.post('/:id/receber', (req, res) => {
   try {
-    const { order, entry } = commitReceive({ ...req.body, orderId: req.params.id, userId: req.userId, userName: req.userName }, req.db || db);
+    const { order, entry } = commitReceive({ ...req.body, orderId: req.params.id, userId: req.userId, userName: req.userName }, req.db);
     broadcast('purchases-changed', { reason: 'received', id: order.id }, req.tenantId);
     broadcast('products-changed', { reason: 'purchase-received' }, req.tenantId);
     res.json({ order, entry });
@@ -199,7 +200,7 @@ function commitCancel(orderId, targetDb) {
 
 router.post('/:id/cancelar', (req, res) => {
   try {
-    const order = commitCancel(req.params.id, req.db || db);
+    const order = commitCancel(req.params.id, req.db);
     broadcast('purchases-changed', { reason: 'cancelled', id: order.id }, req.tenantId);
     res.json({ order });
   } catch (err) {
@@ -213,7 +214,7 @@ router.post('/:id/cancelar', (req, res) => {
  * sugerida repõe até o dobro do estoque mínimo — só um ponto de partida,
  * editável livremente antes de confirmar o pedido. */
 router.get('/sugestoes/por-fornecedor', (req, res) => {
-  const products = (req.db || db).prepare(LIST_ACTIVE_PRODUCTS_SQL).all().map(rowToProduct);
+  const products = req.db.prepare(LIST_ACTIVE_PRODUCTS_SQL).all().map(rowToProduct);
   const lowStock = products.filter((p) => p.supplierId && p.quantity <= p.minStock);
   const bySupplier = {};
   for (const p of lowStock) {

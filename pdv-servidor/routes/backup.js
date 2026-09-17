@@ -23,13 +23,13 @@ const router = Router();
  * routes/cash.js#backup-fechamento) não tinha como perceber, sem abrir o
  * Log do sistema, se aquela rede de segurança estava realmente funcionando. */
 router.get('/current-counts', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   res.json({ counts: getCurrentCounts(targetDb), lastBackupAt: getConfig(targetDb).lastBackupAt || null });
 });
 
 router.post('/export', async (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const password = req.body.password;
     if (!password || password.length < MIN_BACKUP_PASSWORD_LENGTH) throw new Error(`Informe uma senha com pelo menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres pra proteger o backup.`);
     const payload = buildBackupPayload(targetDb);
@@ -68,7 +68,7 @@ router.post('/preview', async (req, res) => {
     }
     const fileCounts = {};
     for (const table of BACKUP_TABLES) fileCounts[table] = (payload.tables[table] || []).length;
-    res.json({ fileCounts, currentCounts: getCurrentCounts(req.db || db), exportedAt: payload.exportedAt });
+    res.json({ fileCounts, currentCounts: getCurrentCounts(req.db), exportedAt: payload.exportedAt });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -92,7 +92,7 @@ router.post('/import', async (req, res) => {
     if (typeof payload.backupFormatVersion !== 'number' || payload.backupFormatVersion > BACKUP_FORMAT_VERSION) {
       throw new Error('Este arquivo de backup foi gerado por uma versão mais nova do sistema — atualize o servidor antes de restaurar.');
     }
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     applyBackupPayload(payload, targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
@@ -121,7 +121,7 @@ router.post('/import', async (req, res) => {
  * autorização adicional (mesmo raciocínio do reset-form na extensão). */
 router.post('/reset', async (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     resetOperationalData(targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,

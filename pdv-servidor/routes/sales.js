@@ -23,9 +23,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const GET_PRODUCT_SQL = 'SELECT * FROM products WHERE id = ?';
 const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
 const LIST_DEBT_LEDGER_SQL = 'SELECT data FROM customer_debts WHERE customer_id = ?';
@@ -350,7 +351,7 @@ router.post('/', async (req, res) => {
       ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, actingPermissions: req.userPermissions,
       discountApprovalProvided, approvedAdminId,
-    }, req.db || db);
+    }, req.db);
     broadcast('sales-changed', { reason: 'created', id: sale.id }, req.tenantId);
     broadcast('products-changed', { reason: 'sale' }, req.tenantId);
     if (sale.customerId) broadcast('customers-changed', { reason: 'sale', id: sale.customerId }, req.tenantId);
@@ -364,7 +365,7 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const { sellerId, customerId, fromTs, toTs, limit = 50, afterTs, afterId } = req.query;
   const lim = Math.min(200, Number(limit) || 50);
 
@@ -404,7 +405,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const row = (req.db || db).prepare(GET_SALE_SQL).get(req.params.id);
+  const row = req.db.prepare(GET_SALE_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Venda não encontrada.' });
   res.json({ sale: rowToSale(row) });
 });
@@ -562,7 +563,7 @@ router.post('/:id/refund', async (req, res) => {
     const { sale, debtReduced } = commitRefund({
       ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, approvedAdminId,
-    }, req.db || db);
+    }, req.db);
     broadcast('sales-changed', { reason: 'refunded', id: sale.id }, req.tenantId);
     broadcast('products-changed', { reason: 'refund' }, req.tenantId);
     if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId }, req.tenantId);

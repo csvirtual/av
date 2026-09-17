@@ -18,9 +18,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_USER_SQL = 'INSERT INTO users (id, username_lower, data) VALUES (@id, @usernameLower, @data)';
 const UPDATE_USER_SQL = 'UPDATE users SET data = @data WHERE id = @id';
 // Só usado no PUT /:id, que agora também pode mudar o login (ver abaixo) —
@@ -42,13 +43,13 @@ router.get('/permission-defs', (req, res) => {
 });
 
 router.get('/', (req, res) => {
-  const users = (req.db || db).prepare(LIST_USERS_SQL).all().map(rowToUser).sort((a, b) => a.createdAt - b.createdAt);
+  const users = req.db.prepare(LIST_USERS_SQL).all().map(rowToUser).sort((a, b) => a.createdAt - b.createdAt);
   res.json({ users: users.map(publicUser) });
 });
 
 router.post('/', async (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const nome = (req.body.nome || '').trim();
     const username = (req.body.username || '').trim();
     const usernameLower = username.toLowerCase();
@@ -92,7 +93,7 @@ router.put('/:id', (req, res) => {
   if (req.params.id === req.userId) {
     return res.status(400).json({ error: 'Você não pode editar as próprias permissões — peça pra outra pessoa com acesso a Usuários fazer isso.' });
   }
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_USER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Usuário não encontrado.' });
   try {
@@ -178,7 +179,7 @@ function commitSetActive(input, targetDb) {
 
 router.post('/:id/ativo', (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const user = commitSetActive({ id: req.params.id, active: !!req.body.active }, targetDb);
     logAction({
       userId: req.userId, userName: req.userName, role: req.userRole,
@@ -194,7 +195,7 @@ router.post('/:id/ativo', (req, res) => {
 });
 
 router.post('/:id/redefinir-senha', async (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_USER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Usuário não encontrado.' });
   try {

@@ -23,9 +23,10 @@ const FIADO_METHOD = 'Fiado';
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const GET_OPEN_GLOBAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1";
 const GET_OPEN_BY_TERMINAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1";
 const GET_OPEN_BY_USER_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1";
@@ -73,12 +74,12 @@ router.get('/open', (req, res) => {
 
 router.get('/sessions', (req, res) => {
   const lim = Math.min(200, Number(req.query.limit) || 50);
-  const rows = (req.db || db).prepare(LIST_SESSIONS_SQL).all(lim);
+  const rows = req.db.prepare(LIST_SESSIONS_SQL).all(lim);
   res.json({ items: rows.map(rowToSession) });
 });
 
 router.get('/sessions/:id', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Caixa não encontrado.' });
   const session = rowToSession(row);
@@ -146,7 +147,7 @@ function openCashSession(input, targetDb) {
 
 router.post('/open', (req, res) => {
   try {
-    const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, req.db || db);
+    const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, req.db);
     broadcast('cash-changed', { reason: 'opened', id: session.id }, req.tenantId);
     res.status(201).json({ session });
   } catch (err) {
@@ -205,7 +206,7 @@ function commitMovement(input, targetDb) {
 
 router.post('/sessions/:id/movimento', (req, res) => {
   try {
-    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
+    const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db);
     broadcast('cash-changed', { reason: 'movement', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
@@ -284,7 +285,7 @@ function commitAdjustment(input, targetDb) {
 
 router.post('/sessions/:id/retificar', (req, res) => {
   try {
-    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db || db);
+    const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db);
     broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
@@ -367,7 +368,7 @@ function effectiveAmount(targetType, baseAmount, movements, targetMovementId = n
 
 router.post('/sessions/:id/fechar', async (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     // Achado de auditoria (P1, Red Team): a tela (views/caixa.js) já pede
     // "usuário e senha de qualquer conta ativa" antes de fechar — mas essa
     // senha nunca era enviada nem conferida por esta rota, só ficava presa

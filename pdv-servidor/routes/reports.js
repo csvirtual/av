@@ -18,7 +18,7 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — o handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
+// prepara contra `req.db` (o tenant da requisição, com o banco fixo
 // do processo como fallback), comportamento idêntico a antes desta etapa
 // quando não há multi-tenant configurado.
 const LIST_SALES_IN_RANGE_SQL = `
@@ -35,7 +35,7 @@ function netSaleTotalWithInterest(sale) {
 }
 
 router.get('/vendas', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const from = req.query.from != null && req.query.from !== '' ? Number(req.query.from) : null;
   const to = req.query.to != null && req.query.to !== '' ? Number(req.query.to) : null;
 

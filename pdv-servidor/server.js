@@ -58,9 +58,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3131;
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais um prepared statement pré-montado — o middleware de
-// sessão abaixo prepara contra req.db (o tenant da requisição) quando
-// existir, senão contra o banco fixo do processo, comportamento idêntico
-// a antes desta etapa.
+// sessão abaixo prepara contra req.db, já sempre resolvido pro banco certo
+// (ver o middleware de resolução de tenant, mais abaixo neste arquivo).
 const GET_USER_BY_ID_SQL = 'SELECT data FROM users WHERE id = ?';
 
 // Achado de auditoria (P3): duas instâncias de `node server.js` abertas por
@@ -329,9 +328,10 @@ function sendTenantBlocked(req, res, status, message, tenant) {
 //
 // Bloqueio simétrico, dos três lados: (a) toda rota de LOJA (/api/* fora
 // de /api/admin e /api/signup) chegando com o Host do painel ou do
-// cadastro — sem isso, um `req.db` indefinido cairia no fallback `db` (o
-// banco fixo do processo, ver routes/*.js#`req.db || db`) e essas duas
-// telas acabariam lendo/escrevendo a loja LEGADA por acidente; (b) toda
+// cadastro — sem isso, `req.isPlatformAdminHost`/`req.isSignupHost` nunca
+// seriam marcados, o middleware de resolução de tenant logo abaixo cairia
+// no ramo de modo legado, e essas duas telas acabariam lendo/escrevendo o
+// banco fixo do processo por acidente; (b) toda
 // rota do PAINEL (/api/admin/*) chegando por qualquer OUTRO Host — sem
 // isso, `/api/admin/tenants` seria alcançável (e autenticável, bastando o
 // cookie certo) por qualquer subdomínio de loja; (c) mesma coisa pra
@@ -357,8 +357,24 @@ app.use((req, res, next) => {
   if (isAdminPath || isSignupPath) return res.status(404).send('Não encontrado.');
   next();
 });
+// Achado de auditoria (DRY — fonte única de verdade pro banco da
+// requisição): antes, `req.db` só era preenchido aqui quando
+// MULTI_TENANT_DOMAIN estava configurada — em modo legado (a instalação
+// de toda loja de hoje) ficava indefinido pra sempre, e cada uma das
+// ~80 rotas em routes/*.js precisava repetir o mesmo fallback
+// (`req.db`) pra saber qual banco usar. Mesma regra, 80 lugares
+// diferentes decidindo. Agora `req.db` sai daqui SEMPRE definido (o
+// banco do tenant resolvido, ou o banco fixo do processo em modo
+// legado) — nenhuma rota de loja mais precisa saber que "modo legado"
+// existe, só usa `req.db` direto. (Nunca preenchido pro Host do painel
+// de Super Admin nem do cadastro self-service — essas duas telas usam
+// `controlDb` direto, nunca uma loja específica.)
 app.use((req, res, next) => {
-  if (!MULTI_TENANT_DOMAIN || req.isPlatformAdminHost || req.isSignupHost) return next();
+  if (req.isPlatformAdminHost || req.isSignupHost) return next();
+  if (!MULTI_TENANT_DOMAIN) {
+    req.db = db;
+    return next();
+  }
   const tenant = resolveTenantRowFromHostname(req.hostname);
   if (!tenant) {
     return sendTenantBlocked(req, res, 404, 'Loja não encontrada.');
@@ -435,7 +451,7 @@ app.use((req, res, next) => {
   req.userPermissions = null;
   req.mustChangePassword = false;
   if (req.userId) {
-    const row = (req.db || db).prepare(GET_USER_BY_ID_SQL).get(req.userId);
+    const row = req.db.prepare(GET_USER_BY_ID_SQL).get(req.userId);
     const u = row ? JSON.parse(row.data) : null;
     if (u && u.active) {
       req.userName = u.nome;

@@ -20,9 +20,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_PRODUCT_SQL = `
   INSERT INTO products (id, barcode, name_lower, active, updated_at, data)
   VALUES (@id, @barcode, @nameLower, @active, @updatedAt, @data)
@@ -87,12 +88,12 @@ function resolveCustomUnitFields(body) {
 }
 
 router.get('/', (req, res) => {
-  const rows = (req.db || db).prepare(LIST_PRODUCTS_SQL).all();
+  const rows = req.db.prepare(LIST_PRODUCTS_SQL).all();
   res.json({ products: rows.map(rowToProduct) });
 });
 
 router.get('/by-barcode/:barcode', (req, res) => {
-  const row = (req.db || db).prepare(GET_BY_BARCODE_SQL).get(String(req.params.barcode || '').trim());
+  const row = req.db.prepare(GET_BY_BARCODE_SQL).get(String(req.params.barcode || '').trim());
   res.json({ product: row ? rowToProduct(row) : null });
 });
 
@@ -103,12 +104,12 @@ router.get('/by-barcode/:barcode', (req, res) => {
 // catálogo entre montar o carrinho e finalizar" em vez de erro) — um 404
 // aqui viraria uma exceção não tratada quando essa tela for portada.
 router.get('/:id', (req, res) => {
-  const row = (req.db || db).prepare(GET_BY_ID_SQL).get(req.params.id);
+  const row = req.db.prepare(GET_BY_ID_SQL).get(req.params.id);
   res.json({ product: row ? rowToProduct(row) : null });
 });
 
 router.post('/', requirePermission('manageProducts'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const body = req.body || {};
   const barcode = String(body.barcode || '').trim();
   if (!barcode) return res.status(400).json({ error: 'Código de barras é obrigatório.' });
@@ -177,7 +178,7 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
 });
 
 router.put('/:id', requirePermission('manageProducts'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   const existing = rowToProduct(row);
@@ -262,7 +263,7 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
 // estado final, não "inverte o que estiver lá agora" (evita corrida entre
 // duas abas clicando quase junto acabarem se cancelando).
 router.post('/:id/active', requirePermission('toggleProduct'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   const existing = rowToProduct(row);
@@ -276,7 +277,7 @@ router.post('/:id/active', requirePermission('toggleProduct'), (req, res) => {
 });
 
 router.delete('/:id', requirePermission('deleteProduct'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   targetDb.prepare(DELETE_PRODUCT_SQL).run(req.params.id);
@@ -362,7 +363,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
       productId: req.params.id, type: body.type || 'ajuste', qty, note: body.note || '',
       userId: req.userId, userName: req.userName, dedupeKey: body.dedupeKey || null,
       expectedQuantity: body.expectedQuantity ?? null,
-    }, req.db || db);
+    }, req.db);
     broadcast('products-changed', { reason: 'stock-adjusted', id: product.id }, req.tenantId);
     res.status(201).json({ product, movement: record });
   } catch (err) {
@@ -374,7 +375,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
 });
 
 router.get('/:id/movimentos', (req, res) => {
-  const rows = (req.db || db).prepare(LIST_MOVEMENTS_SQL).all(req.params.id);
+  const rows = req.db.prepare(LIST_MOVEMENTS_SQL).all(req.params.id);
   res.json({ movements: rows.map((r) => JSON.parse(r.data)) });
 });
 

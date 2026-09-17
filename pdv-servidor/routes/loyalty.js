@@ -16,14 +16,15 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
 
 router.get('/config', (req, res) => {
-  res.json(getLoyaltyConfig(req.db || db));
+  res.json(getLoyaltyConfig(req.db));
 });
 
 // Achado de auditoria (P1): sem isto, qualquer vendedor autenticado
@@ -42,7 +43,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
   if (!Number.isFinite(redemptionRate) || redemptionRate <= 0) {
     return res.status(400).json({ error: 'Informe uma taxa de resgate válida (pontos por R$ 1,00).' });
   }
-  updateConfig({ loyaltyPointsPerReal: pointsPerReal, loyaltyRedemptionRate: redemptionRate }, req.db || db);
+  updateConfig({ loyaltyPointsPerReal: pointsPerReal, loyaltyRedemptionRate: redemptionRate }, req.db);
   const config = { pointsPerReal, redemptionRate };
   broadcast('loyalty-config-changed', config, req.tenantId);
   res.json(config);
@@ -52,7 +53,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
 // tela que lista todo mundo) — igual GET /api/customers/balances. Fica
 // antes de '/:customerId' pra "balances" não ser capturado como um id.
 router.get('/balances', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const pointsRows = targetDb.prepare('SELECT data FROM loyalty_entries').all().map((r) => JSON.parse(r.data));
   const points = {};
   for (const e of pointsRows) {
@@ -69,7 +70,7 @@ router.get('/balances', (req, res) => {
 });
 
 router.get('/:customerId', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.customerId);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   res.json({
@@ -119,7 +120,7 @@ function commitRedemption(input, targetDb) {
 }
 
 router.post('/:customerId/resgatar', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.customerId);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {

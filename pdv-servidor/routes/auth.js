@@ -11,9 +11,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const FIND_BY_ID_SQL = 'SELECT * FROM users WHERE id = ?';
 const UPDATE_USER_DATA_SQL = 'UPDATE users SET data = @data WHERE id = @id';
 
@@ -29,7 +30,7 @@ function publicUser(row) {
 
 router.post('/login', async (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const { username, password } = req.body || {};
     if (!String(username || '').trim() || !password) {
       return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
@@ -125,7 +126,7 @@ router.post('/verify', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'Usuário e senha são obrigatórios.' });
     }
-    const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' }, req.db || db);
+    const user = await verifyLogin(username, password, { namespace: namespace || 'confirmPassword' }, req.db);
     if (!user) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
     res.json({ user: { id: user.id, nome: user.nome, username: user.username, role: user.role, permissions: user.permissions } });
   } catch (err) {
@@ -143,7 +144,7 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
-  const row = (req.db || db).prepare(FIND_BY_ID_SQL).get(req.userId);
+  const row = req.db.prepare(FIND_BY_ID_SQL).get(req.userId);
   if (!row) return res.status(401).json({ error: 'Não autenticado.' });
   res.json({ user: publicUser(row) });
 });
@@ -159,7 +160,7 @@ router.get('/me', (req, res) => {
 router.post('/change-password', async (req, res) => {
   try {
     if (!req.userId) return res.status(401).json({ error: 'Não autenticado.' });
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });

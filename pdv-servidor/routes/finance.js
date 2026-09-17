@@ -24,9 +24,10 @@ const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartã
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_ENTRY_SQL = `
   INSERT INTO financial_entries (id, status, due_date, data) VALUES (@id, @status, @dueDate, @data)
 `;
@@ -55,14 +56,14 @@ function entryStatus(entry) {
 }
 
 router.get('/', (req, res) => {
-  const entries = (req.db || db).prepare(LIST_ENTRIES_SQL).all().map(rowToEntry);
+  const entries = req.db.prepare(LIST_ENTRIES_SQL).all().map(rowToEntry);
   res.json({ entries: entries.map((e) => ({ ...e, displayStatus: entryStatus(e), paidTotal: paidTotal(e), remaining: remainingAmount(e) })) });
 });
 
 router.post('/', (req, res) => {
   try {
     const type = req.body.type;
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     if (type !== 'pagar' && type !== 'receber') throw new Error('Tipo de conta inválido.');
     const description = (req.body.description || '').trim();
     if (!description) throw new Error('Descrição é obrigatória.');
@@ -130,7 +131,7 @@ function commitPayment(input, targetDb) {
 
 router.post('/:id/pagamento', (req, res) => {
   try {
-    const entry = commitPayment({ ...req.body, id: req.params.id, userId: req.userId, userName: req.userName }, req.db || db);
+    const entry = commitPayment({ ...req.body, id: req.params.id, userId: req.userId, userName: req.userName }, req.db);
     broadcast('finance-changed', { reason: 'payment', id: entry.id }, req.tenantId);
     res.status(201).json({ entry });
   } catch (err) {
@@ -160,7 +161,7 @@ function commitDeletePayment(input, targetDb) {
 
 router.delete('/:id/pagamento/:paymentId', (req, res) => {
   try {
-    const entry = commitDeletePayment({ entryId: req.params.id, paymentId: req.params.paymentId }, req.db || db);
+    const entry = commitDeletePayment({ entryId: req.params.id, paymentId: req.params.paymentId }, req.db);
     broadcast('finance-changed', { reason: 'payment-deleted', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {
@@ -185,7 +186,7 @@ function commitCancel(entryId, targetDb) {
 
 router.post('/:id/cancelar', (req, res) => {
   try {
-    const entry = commitCancel(req.params.id, req.db || db);
+    const entry = commitCancel(req.params.id, req.db);
     broadcast('finance-changed', { reason: 'cancelled', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {

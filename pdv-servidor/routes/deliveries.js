@@ -11,9 +11,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_DELIVERY_SQL = `
   INSERT INTO deliveries (id, customer_id, status, created_at, data) VALUES (@id, @customerId, @status, @createdAt, @data)
 `;
@@ -27,7 +28,7 @@ function rowToDelivery(row) { return JSON.parse(row.data); }
 
 router.get('/', (req, res) => {
   const status = req.query.status;
-  let deliveries = (req.db || db).prepare(LIST_DELIVERIES_SQL).all().map(rowToDelivery);
+  let deliveries = req.db.prepare(LIST_DELIVERIES_SQL).all().map(rowToDelivery);
   if (status) deliveries = deliveries.filter((d) => d.status === status);
   res.json({ deliveries });
 });
@@ -57,7 +58,7 @@ function commitDelivery(input, targetDb) {
 
 router.post('/', (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const customerRow = targetDb.prepare(GET_CUSTOMER_SQL).get(req.body.customerId);
     if (!customerRow) throw new Error('Selecione um cliente para o carreto.');
     const customer = JSON.parse(customerRow.data);
@@ -124,7 +125,7 @@ function commitTransition(input, targetDb) {
 
 router.post('/:id/entregar', (req, res) => {
   try {
-    const delivery = commitTransition({ id: req.params.id, newStatus: 'entregue', userId: req.userId, userName: req.userName }, req.db || db);
+    const delivery = commitTransition({ id: req.params.id, newStatus: 'entregue', userId: req.userId, userName: req.userName }, req.db);
     broadcast('deliveries-changed', { reason: 'delivered', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
@@ -134,7 +135,7 @@ router.post('/:id/entregar', (req, res) => {
 
 router.post('/:id/cancelar', (req, res) => {
   try {
-    const delivery = commitTransition({ id: req.params.id, newStatus: 'cancelado' }, req.db || db);
+    const delivery = commitTransition({ id: req.params.id, newStatus: 'cancelado' }, req.db);
     broadcast('deliveries-changed', { reason: 'cancelled', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {

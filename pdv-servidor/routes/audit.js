@@ -71,7 +71,7 @@ router.get('/', requirePermission('logs'), (req, res) => {
 
   const items = [];
   let hasMore = false;
-  for (const row of (req.db || db).prepare(SCAN_SQL).iterate(params)) {
+  for (const row of req.db.prepare(SCAN_SQL).iterate(params)) {
     const entry = JSON.parse(row.data);
     if (role && entry.role !== role) continue;
     if (termLower && !`${entry.action} ${entry.details}`.toLowerCase().includes(termLower)) continue;

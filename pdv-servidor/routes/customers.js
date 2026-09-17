@@ -23,9 +23,10 @@ const VALID_PAYMENT_METHODS = new Set(['Dinheiro', 'Cartão de débito', 'Cartã
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_CUSTOMER_SQL = 'INSERT INTO customers (id, name_lower, data) VALUES (@id, @nameLower, @data)';
 const UPDATE_CUSTOMER_SQL = 'UPDATE customers SET name_lower = @nameLower, data = @data WHERE id = @id';
 const DELETE_CUSTOMER_SQL = 'DELETE FROM customers WHERE id = ?';
@@ -57,7 +58,7 @@ function sanitizeDebtDueDate(value) {
 
 router.get('/', (req, res) => {
   const q = String(req.query.q || '').trim().toLowerCase();
-  let items = listCustomers(req.db || db);
+  let items = listCustomers(req.db);
   if (q) {
     const qDigits = onlyDigits(q);
     items = items.filter((c) => c.nameLower.includes(q)
@@ -68,7 +69,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/balances', (req, res) => {
-  const all = (req.db || db).prepare(LIST_ALL_DEBTS_SQL).all().map((r) => JSON.parse(r.data));
+  const all = req.db.prepare(LIST_ALL_DEBTS_SQL).all().map((r) => JSON.parse(r.data));
   const balances = {};
   for (const e of all) {
     const delta = e.type === 'fiado' ? e.amount : -e.amount;
@@ -78,7 +79,7 @@ router.get('/balances', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   const customer = rowToCustomer(row);
@@ -86,7 +87,7 @@ router.get('/:id', (req, res) => {
 });
 
 router.get('/:id/ledger', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   const entries = targetDb.prepare(LIST_LEDGER_SQL).all(req.params.id).map((r) => JSON.parse(r.data));
@@ -108,7 +109,7 @@ function findCustomerByDocument(digits, targetDb, excludeId = null) {
 
 router.post('/', (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const nome = (req.body.nome || '').trim();
     if (!nome) throw new Error('Nome do cliente é obrigatório.');
     const documento = (req.body.documento || '').trim();
@@ -139,7 +140,7 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
@@ -183,7 +184,7 @@ router.delete('/:id', (req, res) => {
   if (!userCan(req.userRole, req.userPermissions, 'deleteCustomer')) {
     return res.status(403).json({ error: 'Você não tem permissão para excluir clientes.' });
   }
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   targetDb.prepare(DELETE_CUSTOMER_SQL).run(req.params.id);
@@ -228,7 +229,7 @@ function commitPayment(input, targetDb) {
 }
 
 router.post('/:id/pagamento', (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_CUSTOMER_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {

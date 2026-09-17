@@ -18,9 +18,10 @@ const router = Router();
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
-// prepara contra `req.db || db` (o tenant da requisição, com o banco fixo
-// do processo como fallback), comportamento idêntico a antes desta etapa
-// quando não há multi-tenant configurado.
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
 const INSERT_SQL = 'INSERT INTO suppliers (id, name_lower, data) VALUES (@id, @nameLower, @data)';
 const UPDATE_SQL = 'UPDATE suppliers SET name_lower = @nameLower, data = @data WHERE id = @id';
 const DELETE_SQL = 'DELETE FROM suppliers WHERE id = ?';
@@ -30,7 +31,7 @@ const LIST_SQL = 'SELECT data FROM suppliers';
 function rowToSupplier(row) { return JSON.parse(row.data); }
 
 router.get('/', (req, res) => {
-  const suppliers = (req.db || db).prepare(LIST_SQL).all().map(rowToSupplier).sort((a, b) => a.nameLower.localeCompare(b.nameLower, 'pt-BR'));
+  const suppliers = req.db.prepare(LIST_SQL).all().map(rowToSupplier).sort((a, b) => a.nameLower.localeCompare(b.nameLower, 'pt-BR'));
   res.json({ suppliers });
 });
 
@@ -41,13 +42,13 @@ router.get('/', (req, res) => {
 // estourar uma exceção de rede não tratada — mesmo achado já corrigido
 // em routes/products.js#getProduct.
 router.get('/:id', (req, res) => {
-  const row = (req.db || db).prepare(GET_SQL).get(req.params.id);
+  const row = req.db.prepare(GET_SQL).get(req.params.id);
   res.json({ supplier: row ? rowToSupplier(row) : null });
 });
 
 router.post('/', requirePermission('compras'), (req, res) => {
   try {
-    const targetDb = req.db || db;
+    const targetDb = req.db;
     const nome = (req.body.nome || '').trim();
     if (!nome) throw new Error('Nome do fornecedor é obrigatório.');
     const supplier = {
@@ -72,7 +73,7 @@ router.post('/', requirePermission('compras'), (req, res) => {
 });
 
 router.put('/:id', requirePermission('compras'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
   try {
@@ -100,7 +101,7 @@ router.put('/:id', requirePermission('compras'), (req, res) => {
 });
 
 router.delete('/:id', requirePermission('compras'), (req, res) => {
-  const targetDb = req.db || db;
+  const targetDb = req.db;
   const row = targetDb.prepare(GET_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
   targetDb.prepare(DELETE_SQL).run(req.params.id);
