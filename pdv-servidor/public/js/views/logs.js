@@ -8,9 +8,10 @@ import { listUsers } from '../data/usersRepo.js';
 import { formatDateTime, escapeHtml } from '../utils/format.js';
 import { enhanceSelect } from '../components/customSelect.js';
 import { isAdmin } from '../utils/permissions.js';
+import { loadingStateHtml } from '../components/loadingState.js';
 
 export async function renderLogs(container) {
-  container.innerHTML = '<div class="card loading-state"><span class="spinner"></span>Carregando…</div>';
+  container.innerHTML = loadingStateHtml();
 
   const users = await listUsers();
 

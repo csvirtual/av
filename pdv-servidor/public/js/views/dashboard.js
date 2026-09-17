@@ -12,9 +12,10 @@ import { formatMoney, formatDate, formatDateTime, escapeHtml } from '../utils/fo
 import { isNearExpiry, isExpired } from '../utils/pricing.js';
 import { icon } from '../components/icon.js';
 import { DELIVERY_STATUS_PENDING } from '../utils/deliveryStatus.js';
+import { loadingStateHtml } from '../components/loadingState.js';
 
 export async function renderDashboard(container, ctx) {
-  container.innerHTML = '<div class="card loading-state"><span class="spinner"></span>Carregando painel…</div>';
+  container.innerHTML = loadingStateHtml('Carregando painel…');
 
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);

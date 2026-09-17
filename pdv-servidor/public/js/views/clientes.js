@@ -26,6 +26,7 @@ import { showToast } from '../components/toast.js';
 import { paginationHtml, wirePagination, createPageState } from '../components/pagination.js';
 import { showSaleItemsModal, SALE_STATUS_BADGE, paymentMethodLabel } from '../components/saleDetail.js';
 import { wireMaskedInput } from '../components/maskedInput.js';
+import { loadingStateHtml } from '../components/loadingState.js';
 
 const PAYMENT_METHODS = BASE_PAYMENT_METHODS;
 const LOYALTY_BADGE = {
@@ -485,7 +486,7 @@ export async function renderClientes(container, ctx) {
       submitLabel: 'Fechar',
       singleButton: true,
       wide: true,
-      bodyHtml: '<div class="loading-state"><span class="spinner"></span>Carregando…</div>',
+      bodyHtml: loadingStateHtml('Carregando…', { card: false }),
       onMount: async (modalEl) => {
         modalBodyEl = modalEl.querySelector('.modal-body');
         await loadAllSales();

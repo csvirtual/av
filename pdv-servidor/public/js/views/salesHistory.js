@@ -28,6 +28,7 @@ import { icon } from '../components/icon.js';
 import { enhanceSelect } from '../components/customSelect.js';
 import { confirmUserPassword } from '../components/passwordConfirm.js';
 import { isAdmin } from '../utils/permissions.js';
+import { loadingStateHtml } from '../components/loadingState.js';
 
 const STATUS_BADGE = {
   completa: '<span class="badge badge-green">Completa</span>',
@@ -44,7 +45,7 @@ function paymentMethodLabel(p) {
 }
 
 export async function renderSalesHistory(container, ctx) {
-  container.innerHTML = '<div class="card loading-state"><span class="spinner"></span>Carregando…</div>';
+  container.innerHTML = loadingStateHtml();
 
   const [users, customers, company] = await Promise.all([listUsers(), listCustomers(), getCompany()]);
   const customerName = (id) => customers.find((c) => c.id === id)?.nome || null;
