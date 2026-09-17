@@ -43,9 +43,9 @@ function request(hostHeader, { method = 'GET', reqPath = '/api/status', body, co
   });
 }
 
-function connectWs(hostHeader) {
+function connectWs(hostHeader, cookie) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { headers: { Host: hostHeader } });
+    const ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`, { headers: { Host: hostHeader, ...(cookie ? { Cookie: cookie } : {}) } });
     const messages = [];
     ws.on('message', (data) => messages.push(JSON.parse(data.toString())));
     ws.on('open', () => resolve({ ws, messages }));
@@ -87,13 +87,33 @@ try {
   const loginA = await request(hostA, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: 'admin123' } });
   check('login no tenant A funciona', loginA.status === 200, loginA.status);
   const cookieA = loginA.cookie;
+  const loginB = await request(hostB, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: 'admin123' } });
+  check('login no tenant B funciona', loginB.status === 200, loginB.status);
+  const cookieB = loginB.cookie;
 
-  const connA = await connectWs(hostA);
-  const connB = await connectWs(hostB);
+  // Achado de auditoria (pré-lançamento): o upgrade do WebSocket não
+  // conferia sessão nenhuma — bastava alcançar a rede, sem login, pra
+  // ficar recebendo em tempo real todo aviso desta loja. Confirma que
+  // isso está fechado antes de testar o isolamento entre tenants (que só
+  // faz sentido depois que "sem sessão nenhuma" já está bloqueado).
+  const connNoCookie = await connectWs(hostA);
+  await waitFor(300);
+  check('WebSocket SEM cookie de sessão nenhum é recusado', connNoCookie.ws.readyState === WebSocket.CLOSED || connNoCookie.ws.readyState === WebSocket.CLOSING, connNoCookie.ws.readyState);
+
+  // Cookie de sessão da loja A não pode autenticar uma conexão pra loja B
+  // (mesma regra que já vale pra HTTP, ver test-tenantAuthRoutes.mjs) — a
+  // tabela de sessões vive dentro do banco de CADA loja, então o token de
+  // A nem existe no banco de B.
+  const connCrossTenantCookie = await connectWs(hostB, cookieA);
+  await waitFor(300);
+  check('cookie de sessão da loja A não autentica WebSocket da loja B', connCrossTenantCookie.ws.readyState === WebSocket.CLOSED || connCrossTenantCookie.ws.readyState === WebSocket.CLOSING, connCrossTenantCookie.ws.readyState);
+
+  const connA = await connectWs(hostA, cookieA);
+  const connB = await connectWs(hostB, cookieB);
   wsA = connA.ws;
   wsB = connB.ws;
-  check('WebSocket do tenant A conecta normalmente', connA.ws.readyState === WebSocket.OPEN, connA.ws.readyState);
-  check('WebSocket do tenant B conecta normalmente', connB.ws.readyState === WebSocket.OPEN, connB.ws.readyState);
+  check('WebSocket do tenant A conecta normalmente (com sessão válida)', connA.ws.readyState === WebSocket.OPEN, connA.ws.readyState);
+  check('WebSocket do tenant B conecta normalmente (com sessão válida)', connB.ws.readyState === WebSocket.OPEN, connB.ws.readyState);
 
   // Host desconhecido (fora de qualquer loja cadastrada) — mesma regra de
   // acesso que o HTTP já aplica (404 "Loja não encontrada"), a conexão

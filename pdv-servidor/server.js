@@ -569,6 +569,43 @@ const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 // mesmo raciocínio pra uma loja com assinatura suspensa/cancelada/vencida
 // (tenantAccessBlockedReason) — sem mensagem de erro no protocolo
 // WebSocket (não dá pra mandar um corpo como no 403 HTTP), só fecha.
+// Achado de auditoria (pré-lançamento): o upgrade do WebSocket nunca
+// conferia sessão nenhuma — bastava alcançar a rede (LAN da loja, ou a
+// internet inteira em modo multi-tenant) pra abrir `ws://.../ws` sem
+// login nenhum e ficar recebendo, em tempo real, todo aviso de venda,
+// caixa, cliente, produto etc. desta loja (id + motivo do evento — nunca
+// o dado completo, ver lib/broadcast.js, mas ainda assim informação
+// operacional e IDs reais que nenhum visitante sem sessão deveria ver).
+// O upgrade não passa pelos middlewares do Express (mesmo raciocínio já
+// documentado acima pra resolução de tenant), então a sessão precisa ser
+// conferida aqui à mão, a partir do cookie cru do handshake — mesma
+// função (resolveSession) e mesma regra (conta precisa continuar ativa)
+// que já protegem toda rota HTTP, ver o middleware de sessão logo acima
+// neste arquivo.
+function parseCookieHeader(header) {
+  const out = {};
+  if (!header) return out;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    if (!key) continue;
+    try {
+      out[key] = decodeURIComponent(part.slice(idx + 1).trim());
+    } catch {
+      out[key] = part.slice(idx + 1).trim();
+    }
+  }
+  return out;
+}
+function wsSessionIsValid(req, targetDb) {
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const userId = resolveSession(cookies.session, targetDb);
+  if (!userId) return false;
+  const row = targetDb.prepare(GET_USER_BY_ID_SQL).get(userId);
+  const u = row ? JSON.parse(row.data) : null;
+  return !!(u && u.active);
+}
 wss.on('connection', (ws, req) => {
   if (MULTI_TENANT_DOMAIN) {
     const hostname = (req.headers.host || '').split(':')[0];
@@ -577,7 +614,16 @@ wss.on('connection', (ws, req) => {
       ws.close();
       return;
     }
+    const tenantDb = getTenantDb(tenant.id);
+    if (!wsSessionIsValid(req, tenantDb)) {
+      ws.close();
+      return;
+    }
     registerClient(ws, tenant.id);
+    return;
+  }
+  if (!wsSessionIsValid(req, db)) {
+    ws.close();
     return;
   }
   registerClient(ws);
