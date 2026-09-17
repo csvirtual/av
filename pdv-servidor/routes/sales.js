@@ -12,12 +12,13 @@ import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
+import { saveProductAfterStockChange, recordStockMovement } from '../lib/stockMovements.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { pointsBalance, creditBalance, listLoyaltyLedger, insertLoyaltyEntry, insertCreditEntry } from '../lib/loyaltyLedger.js';
 import { getConfig } from '../lib/companyConfig.js';
 import { verifyLogin } from '../lib/verifyLogin.js';
 import { userCan } from '../lib/permissions.js';
-import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS } from '../lib/pricing.js';
+import { resolveSaleItemPricing, computeCreditInterest, MAX_INSTALLMENTS, AMOUNT_TOLERANCE } from '../lib/pricing.js';
 
 const router = Router();
 
@@ -40,9 +41,6 @@ function customerDebtBalance(customerId, targetDb) {
   return targetDb.prepare(LIST_DEBT_LEDGER_SQL).all(customerId).map((r) => JSON.parse(r.data))
     .reduce((sum, e) => sum + (e.type === 'fiado' ? e.amount : -e.amount), 0);
 }
-const UPDATE_PRODUCT_SQL = `
-  UPDATE products SET name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data WHERE id = @id
-`;
 const INSERT_SALE_SQL = `
   INSERT INTO sales (id, timestamp, user_id, customer_id, data) VALUES (@id, @timestamp, @userId, @customerId, @data)
 `;
@@ -50,7 +48,7 @@ const GET_SALE_SQL = 'SELECT * FROM sales WHERE id = ?';
 const UPDATE_SALE_SQL = 'UPDATE sales SET customer_id = @customerId, data = @data WHERE id = @id';
 const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
 // Achado de auditoria (P1, Red Team, Fase 7): venda e estorno mudavam
-// `product.quantity` direto (saveProduct) sem NUNCA gravar em
+// `product.quantity` direto (saveProductAfterStockChange) sem NUNCA gravar em
 // `stock_movements` — só o ajuste manual/inventário (routes/products.js)
 // gravava lá. Isso quebra o ledger unificado que o pedido de auditoria
 // exige ("não aceite product.quantity mudar sem uma operação de estoque
@@ -59,17 +57,14 @@ const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, time
 // registro que routes/products.js#commitMovement já usa (id, productId,
 // type, qty — delta com sinal, userId, userName, note, timestamp), só que
 // gravado AQUI DENTRO da mesma transação da venda/estorno (nunca uma
-// chamada separada), pra continuar atômico.
-const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
-function recordStockMovement({ productId, type, qty, userId, userName, note }, targetDb) {
-  const record = { id: crypto.randomUUID(), productId, type, qty, userId, userName, note: note || '', timestamp: Date.now() };
-  targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
-}
+// chamada separada), pra continuar atômico. `recordStockMovement` e
+// `saveProductAfterStockChange` vêm de lib/stockMovements.js (achado de
+// auditoria DRY: essa mesma dupla de operações estava copiada, com o mesmo
+// SQL, em routes/purchases.js).
 
 const FIADO_METHOD = 'Fiado';
 const CREDIT_METHOD = 'Crédito de troca';
 const CREDIT_CARD_METHOD = 'Cartão de crédito';
-const CREDIT_TOLERANCE = 0.01;
 
 // Achado de auditoria (P1, Red Team): sem isto, `payment.method` era gravado
 // no ledger financeiro exatamente como veio do pedido, sem NUNCA conferir
@@ -88,14 +83,6 @@ function rowToSale(row) {
 function rowToProduct(row) {
   return JSON.parse(row.data);
 }
-function saveProduct(product, targetDb) {
-  targetDb.prepare(UPDATE_PRODUCT_SQL).run({
-    id: product.id, nameLower: product.nameLower, active: product.active ? 1 : 0,
-    updatedAt: Date.now(), data: JSON.stringify(product),
-  });
-}
-
-const PAYMENT_TOLERANCE = 0.01;
 
 /** A venda inteira (conferir estoque de cada item, debitar, gravar) roda
  * dentro de UMA transação SQLite — se qualquer item não tiver estoque
@@ -161,7 +148,7 @@ function commitSale(input, targetDb) {
     });
 
     product.quantity -= stockQty;
-    saveProduct(product, targetDb);
+    saveProductAfterStockChange(product, targetDb);
     recordStockMovement({ productId: product.id, type: 'venda', qty: -stockQty, userId: input.userId, userName: input.userName, note: `Venda ${saleId}` }, targetDb);
   }
 
@@ -225,7 +212,7 @@ function commitSale(input, targetDb) {
     return { method: p.method, amount, installments: installments > 1 ? installments : undefined, interestAmount };
   });
   const paymentsSum = payments.reduce((s, p) => s + p.amount, 0);
-  if (Math.abs(paymentsSum - total) > PAYMENT_TOLERANCE) {
+  if (Math.abs(paymentsSum - total) > AMOUNT_TOLERANCE) {
     throw new Error(`Pagamento (${paymentsSum.toFixed(2)}) não bate com o total da venda (${total.toFixed(2)}).`);
   }
 
@@ -264,7 +251,7 @@ function commitSale(input, targetDb) {
   if (creditPayment > 0) {
     if (!input.customerId) throw new Error('Selecione um cliente para usar crédito de troca.');
     const available = creditBalance(input.customerId, targetDb);
-    if (creditPayment > available + CREDIT_TOLERANCE) {
+    if (creditPayment > available + AMOUNT_TOLERANCE) {
       throw new Error(`O cliente só tem ${available.toFixed(2)} de crédito de troca disponível.`);
     }
   }
@@ -454,7 +441,7 @@ function commitRefund(input, targetDb) {
     if (prodRow) {
       const product = rowToProduct(prodRow);
       product.quantity += qty;
-      saveProduct(product, targetDb);
+      saveProductAfterStockChange(product, targetDb);
       recordStockMovement({ productId: product.id, type: 'estorno', qty, userId: input.userId, userName: input.userName, note: `Estorno da venda ${sale.id}` }, targetDb);
     }
   }

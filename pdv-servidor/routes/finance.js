@@ -9,10 +9,9 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { AMOUNT_TOLERANCE as PAYMENT_TOLERANCE } from '../lib/pricing.js';
 
 const router = Router();
-
-const PAYMENT_TOLERANCE = 0.01;
 
 // Achado de auditoria (Red Team, Passada 1): paymentMethod chegava sem
 // nenhuma validação — aceitava objeto, string gigante, o que fosse. Nunca

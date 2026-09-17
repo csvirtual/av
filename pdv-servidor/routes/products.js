@@ -15,6 +15,7 @@ import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { requirePermission } from '../lib/permissions.js';
+import { recordStockMovement } from '../lib/stockMovements.js';
 
 const router = Router();
 
@@ -36,7 +37,6 @@ const GET_BY_ID_SQL = 'SELECT * FROM products WHERE id = ?';
 const GET_BY_BARCODE_SQL = 'SELECT * FROM products WHERE barcode = ?';
 const LIST_PRODUCTS_SQL = 'SELECT * FROM products ORDER BY name_lower ASC';
 const DELETE_PRODUCT_SQL = 'DELETE FROM products WHERE id = ?';
-const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
 const LIST_MOVEMENTS_SQL = 'SELECT * FROM stock_movements WHERE product_id = ? ORDER BY timestamp DESC';
 
 function rowToProduct(row) {
@@ -340,12 +340,10 @@ function commitMovement(input, targetDb) {
       id: product.id, barcode: product.barcode, nameLower: product.nameLower,
       active: product.active ? 1 : 0, updatedAt: product.updatedAt, data: JSON.stringify(product),
     });
-    const record = {
-      id: crypto.randomUUID(), productId: input.productId, type: input.type,
-      qty: input.qty, userId: input.userId, userName: input.userName,
-      note: input.note || '', timestamp: Date.now(),
-    };
-    targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
+    const record = recordStockMovement({
+      productId: input.productId, type: input.type, qty: input.qty,
+      userId: input.userId, userName: input.userName, note: input.note,
+    }, targetDb);
     return { product, record };
   })();
 }

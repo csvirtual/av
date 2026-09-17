@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { saveProductAfterStockChange, recordStockMovement } from '../lib/stockMovements.js';
 
 const router = Router();
 
@@ -29,29 +30,17 @@ const GET_ORDER_SQL = 'SELECT * FROM purchase_orders WHERE id = ?';
 const LIST_ORDERS_SQL = 'SELECT data FROM purchase_orders ORDER BY created_at DESC';
 const GET_SUPPLIER_SQL = 'SELECT data FROM suppliers WHERE id = ?';
 const GET_PRODUCT_SQL = 'SELECT * FROM products WHERE id = ?';
-const UPDATE_PRODUCT_SQL = `
-  UPDATE products SET name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data WHERE id = @id
-`;
 const LIST_ACTIVE_PRODUCTS_SQL = 'SELECT data FROM products WHERE active = 1';
 // Achado de auditoria (P1, Red Team, Fase 7): recebimento de compra creditava
 // `product.quantity` direto (saveProduct) sem nunca gravar em
 // `stock_movements` — mesma classe de furo já corrigida em routes/sales.js
 // (venda/estorno). Mesmo formato de registro, gravado dentro da MESMA
-// transação do recebimento.
-const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
-function recordStockMovement({ productId, type, qty, userId, userName, note }, targetDb) {
-  const record = { id: crypto.randomUUID(), productId, type, qty, userId, userName, note: note || '', timestamp: Date.now() };
-  targetDb.prepare(INSERT_MOVEMENT_SQL).run({ id: record.id, productId: record.productId, timestamp: record.timestamp, data: JSON.stringify(record) });
-}
+// transação do recebimento. `recordStockMovement`/`saveProductAfterStockChange`
+// vêm de lib/stockMovements.js (achado de auditoria DRY: essa mesma dupla de
+// operações, com o mesmo SQL, estava copiada aqui e em routes/sales.js).
 
 function rowToOrder(row) { return JSON.parse(row.data); }
 function rowToProduct(row) { return JSON.parse(row.data); }
-function saveProduct(product, targetDb) {
-  targetDb.prepare(UPDATE_PRODUCT_SQL).run({
-    id: product.id, nameLower: product.nameLower, active: product.active ? 1 : 0,
-    updatedAt: Date.now(), data: JSON.stringify(product),
-  });
-}
 function formatQty(n) { return Number(n).toString(); }
 
 router.get('/', (req, res) => {
@@ -160,7 +149,7 @@ function commitReceive(input, targetDb) {
       // recebimento. Furo pré-existente desde a Fase 5, só nunca alcançável
       // por UI nenhuma até esta tela ser ligada.
       if (product.unit !== CUSTOM_UNIT_VALUE && ri.unitCost > 0) product.costPrice = ri.unitCost;
-      saveProduct(product, targetDb);
+      saveProductAfterStockChange(product, targetDb);
       recordStockMovement({ productId: product.id, type: 'compra', qty: ri.qty, userId: input.userId, userName: input.userName, note: `Recebimento do pedido ${order.id} (entrega ${entry.id})` }, targetDb);
     }
 

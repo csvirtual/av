@@ -27,9 +27,6 @@ const FIADO_METHOD = 'Fiado';
 // loja, ou o banco fixo do processo em modo legado) — server.js#tenant
 // resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
 // rota mais precisa repetir o fallback.
-const GET_OPEN_GLOBAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' LIMIT 1";
-const GET_OPEN_BY_TERMINAL_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND terminal_id = ? LIMIT 1";
-const GET_OPEN_BY_USER_SQL = "SELECT * FROM cash_sessions WHERE status = 'aberto' AND user_id = ? LIMIT 1";
 const GET_SESSION_BY_ID_SQL = 'SELECT * FROM cash_sessions WHERE id = ?';
 const INSERT_SESSION_SQL = `
   INSERT INTO cash_sessions (id, opened_at, status, terminal_id, user_id, data) VALUES (@id, @openedAt, 'aberto', @terminalId, @userId, @data)
@@ -105,11 +102,12 @@ function openCashSession(input, targetDb) {
     if (mode === 'porTerminal' && !input.terminalId) {
       throw new Error('Terminal não identificado — recarregue a página e tente de novo.');
     }
-    const existing = mode === 'porTerminal'
-      ? targetDb.prepare(GET_OPEN_BY_TERMINAL_SQL).get(input.terminalId)
-      : mode === 'porOperador'
-        ? targetDb.prepare(GET_OPEN_BY_USER_SQL).get(input.userId)
-        : targetDb.prepare(GET_OPEN_GLOBAL_SQL).get();
+    // Achado de auditoria (DRY): a checagem de "já existe uma sessão aberta
+    // nesse escopo" reimplementava, com suas próprias consts SQL, exatamente
+    // o mesmo branch por modo que lib/cashSession.js#resolveOpenSession já
+    // centraliza (e que sales.js/customers.js já usam) — reusa a mesma fonte
+    // em vez de manter os dois em sincronia manualmente.
+    const existing = resolveOpenSession(input.terminalId, input.userId, targetDb);
     if (existing) {
       throw new Error(mode === 'porTerminal'
         ? 'Já existe um caixa aberto neste terminal. Feche-o antes de abrir um novo.'

@@ -8,6 +8,14 @@
 export const MAX_INSTALLMENTS = 12;
 const CUSTOM_UNIT_VALUE = 'personalizado';
 
+// Achado de auditoria (DRY): a mesma margem de tolerância pra comparar
+// valores em dinheiro (ponto flutuante nunca bate exato — ex: 0.1 + 0.2 !==
+// 0.3) existia como duas constantes locais idênticas (PAYMENT_TOLERANCE em
+// routes/sales.js E em routes/finance.js, mais CREDIT_TOLERANCE em
+// routes/sales.js, as três valendo 0.01) — mesma regra de negócio ("um
+// centavo de diferença é arredondamento, não divergência"), uma fonte só.
+export const AMOUNT_TOLERANCE = 0.01;
+
 export function applyDiscount(amount, type, value) {
   const v = Number(value) || 0;
   if (!type || v <= 0) return amount;
