@@ -9,6 +9,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_FINANCE_CHANGED } from '../public/js/utils/liveTopics.js';
 import { AMOUNT_TOLERANCE as PAYMENT_TOLERANCE } from '../lib/pricing.js';
 
 const router = Router();
@@ -85,7 +86,7 @@ router.post('/', (req, res) => {
       createdAt: Date.now(),
     };
     targetDb.prepare(INSERT_ENTRY_SQL).run({ id: entry.id, status: entry.status, dueDate: entry.dueDate, data: JSON.stringify(entry) });
-    broadcast('finance-changed', { reason: 'created', id: entry.id }, req.tenantId);
+    broadcast(TOPIC_FINANCE_CHANGED, { reason: 'created', id: entry.id }, req.tenantId);
     res.status(201).json({ entry });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -129,7 +130,7 @@ function commitPayment(input, targetDb) {
 router.post('/:id/pagamento', (req, res) => {
   try {
     const entry = commitPayment({ ...req.body, id: req.params.id, userId: req.userId, userName: req.userName }, req.db);
-    broadcast('finance-changed', { reason: 'payment', id: entry.id }, req.tenantId);
+    broadcast(TOPIC_FINANCE_CHANGED, { reason: 'payment', id: entry.id }, req.tenantId);
     res.status(201).json({ entry });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
@@ -159,7 +160,7 @@ function commitDeletePayment(input, targetDb) {
 router.delete('/:id/pagamento/:paymentId', (req, res) => {
   try {
     const entry = commitDeletePayment({ entryId: req.params.id, paymentId: req.params.paymentId }, req.db);
-    broadcast('finance-changed', { reason: 'payment-deleted', id: entry.id }, req.tenantId);
+    broadcast(TOPIC_FINANCE_CHANGED, { reason: 'payment-deleted', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -184,7 +185,7 @@ function commitCancel(entryId, targetDb) {
 router.post('/:id/cancelar', (req, res) => {
   try {
     const entry = commitCancel(req.params.id, req.db);
-    broadcast('finance-changed', { reason: 'cancelled', id: entry.id }, req.tenantId);
+    broadcast(TOPIC_FINANCE_CHANGED, { reason: 'cancelled', id: entry.id }, req.tenantId);
     res.json({ entry });
   } catch (err) {
     res.status(400).json({ error: err.message });

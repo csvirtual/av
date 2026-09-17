@@ -10,6 +10,7 @@ import { encryptPayload, decryptPayload, MIN_BACKUP_PASSWORD_LENGTH } from '../l
 import { buildBackupPayload, applyBackupPayload, getCurrentCounts, resetOperationalData, BACKUP_FORMAT_VERSION, BACKUP_TABLES } from '../lib/backup.js';
 import { logAction } from '../lib/audit.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_BACKUP_RESTORED, TOPIC_DATA_RESET } from '../public/js/utils/liveTopics.js';
 import { getConfig, updateConfig } from '../lib/companyConfig.js';
 
 const router = Router();
@@ -103,7 +104,7 @@ router.post('/import', async (req, res) => {
     // terminal conectado voltar a mostrar dados corretos é recarregar a
     // página inteira (ver public/test.html), em vez de tentar reconciliar
     // cada seção uma por uma.
-    broadcast('backup-restored', {}, req.tenantId);
+    broadcast(TOPIC_BACKUP_RESTORED, {}, req.tenantId);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -135,7 +136,7 @@ router.post('/reset', async (req, res) => {
     // exemplo, deixa de existir) — recarregar a página inteira em todo
     // terminal conectado é o jeito mais simples e seguro de todos
     // voltarem a mostrar dados corretos.
-    broadcast('data-reset', {}, req.tenantId);
+    broadcast(TOPIC_DATA_RESET, {}, req.tenantId);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

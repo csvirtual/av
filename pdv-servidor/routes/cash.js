@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_CASH_CHANGED, TOPIC_CASH_CONFIG_CHANGED } from '../public/js/utils/liveTopics.js';
 import { getCaixaMode, resolveOpenSession } from '../lib/cashSession.js';
 import { updateConfig } from '../lib/companyConfig.js';
 import { requirePermission } from '../lib/permissions.js';
@@ -58,7 +59,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
     return res.status(400).json({ error: 'Modo de caixa inválido.' });
   }
   updateConfig({ caixaMode: mode }, req.db);
-  broadcast('cash-config-changed', { caixaMode: mode }, req.tenantId);
+  broadcast(TOPIC_CASH_CONFIG_CHANGED, { caixaMode: mode }, req.tenantId);
   res.json({ caixaMode: mode });
 });
 
@@ -145,7 +146,7 @@ function openCashSession(input, targetDb) {
 router.post('/open', (req, res) => {
   try {
     const session = openCashSession({ ...req.body, userId: req.userId, userName: req.userName, terminalId: req.terminalId }, req.db);
-    broadcast('cash-changed', { reason: 'opened', id: session.id }, req.tenantId);
+    broadcast(TOPIC_CASH_CHANGED, { reason: 'opened', id: session.id }, req.tenantId);
     res.status(201).json({ session });
   } catch (err) {
     // Achado de auditoria (P3): traduz o índice único parcial de
@@ -203,7 +204,7 @@ function commitMovement(input, targetDb) {
 router.post('/sessions/:id/movimento', (req, res) => {
   try {
     const movement = commitMovement({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db);
-    broadcast('cash-changed', { reason: 'movement', id: movement.sessionId }, req.tenantId);
+    broadcast(TOPIC_CASH_CHANGED, { reason: 'movement', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
@@ -281,7 +282,7 @@ function commitAdjustment(input, targetDb) {
 router.post('/sessions/:id/retificar', (req, res) => {
   try {
     const movement = commitAdjustment({ ...req.body, sessionId: req.params.id, userId: req.userId, userName: req.userName, userRole: req.userRole }, req.db);
-    broadcast('cash-changed', { reason: 'adjustment', id: movement.sessionId }, req.tenantId);
+    broadcast(TOPIC_CASH_CHANGED, { reason: 'adjustment', id: movement.sessionId }, req.tenantId);
     res.status(201).json({ movement });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });
@@ -419,7 +420,7 @@ router.post('/sessions/:id/fechar', async (req, res) => {
       return closed;
     });
     const closed = closeCashSession();
-    broadcast('cash-changed', { reason: 'closed', id: closed.id }, req.tenantId);
+    broadcast(TOPIC_CASH_CHANGED, { reason: 'closed', id: closed.id }, req.tenantId);
     res.json({ session: closed });
   } catch (err) {
     if (err.status === 403) return res.status(403).json({ error: err.message });

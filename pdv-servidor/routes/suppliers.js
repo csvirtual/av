@@ -12,6 +12,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_SUPPLIERS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { requirePermission } from '../lib/permissions.js';
 
 const router = Router();
@@ -65,7 +66,7 @@ router.post('/', requirePermission('compras'), (req, res) => {
       updatedAt: Date.now(),
     };
     targetDb.prepare(INSERT_SQL).run({ id: supplier.id, nameLower: supplier.nameLower, data: JSON.stringify(supplier) });
-    broadcast('suppliers-changed', { reason: 'created', id: supplier.id }, req.tenantId);
+    broadcast(TOPIC_SUPPLIERS_CHANGED, { reason: 'created', id: supplier.id }, req.tenantId);
     res.status(201).json({ supplier });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -93,7 +94,7 @@ router.put('/:id', requirePermission('compras'), (req, res) => {
     if (body.active !== undefined) supplier.active = !!body.active;
     supplier.updatedAt = Date.now();
     targetDb.prepare(UPDATE_SQL).run({ id: supplier.id, nameLower: supplier.nameLower, data: JSON.stringify(supplier) });
-    broadcast('suppliers-changed', { reason: 'updated', id: supplier.id }, req.tenantId);
+    broadcast(TOPIC_SUPPLIERS_CHANGED, { reason: 'updated', id: supplier.id }, req.tenantId);
     res.json({ supplier });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -105,7 +106,7 @@ router.delete('/:id', requirePermission('compras'), (req, res) => {
   const row = targetDb.prepare(GET_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Fornecedor não encontrado.' });
   targetDb.prepare(DELETE_SQL).run(req.params.id);
-  broadcast('suppliers-changed', { reason: 'deleted', id: req.params.id }, req.tenantId);
+  broadcast(TOPIC_SUPPLIERS_CHANGED, { reason: 'deleted', id: req.params.id }, req.tenantId);
   res.json({ ok: true });
 });
 

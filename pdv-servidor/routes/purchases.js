@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_PRODUCTS_CHANGED, TOPIC_PURCHASES_CHANGED } from '../public/js/utils/liveTopics.js';
 import { saveProductAfterStockChange, recordStockMovement } from '../lib/stockMovements.js';
 
 const router = Router();
@@ -86,7 +87,7 @@ router.post('/', (req, res) => {
       receivedEntries: [],
     };
     targetDb.prepare(INSERT_ORDER_SQL).run({ id: order.id, supplierId: order.supplierId, status: order.status, createdAt: order.createdAt, data: JSON.stringify(order) });
-    broadcast('purchases-changed', { reason: 'created', id: order.id }, req.tenantId);
+    broadcast(TOPIC_PURCHASES_CHANGED, { reason: 'created', id: order.id }, req.tenantId);
     res.status(201).json({ order });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -161,8 +162,8 @@ function commitReceive(input, targetDb) {
 router.post('/:id/receber', (req, res) => {
   try {
     const { order, entry } = commitReceive({ ...req.body, orderId: req.params.id, userId: req.userId, userName: req.userName }, req.db);
-    broadcast('purchases-changed', { reason: 'received', id: order.id }, req.tenantId);
-    broadcast('products-changed', { reason: 'purchase-received' }, req.tenantId);
+    broadcast(TOPIC_PURCHASES_CHANGED, { reason: 'received', id: order.id }, req.tenantId);
+    broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'purchase-received' }, req.tenantId);
     res.json({ order, entry });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
@@ -188,7 +189,7 @@ function commitCancel(orderId, targetDb) {
 router.post('/:id/cancelar', (req, res) => {
   try {
     const order = commitCancel(req.params.id, req.db);
-    broadcast('purchases-changed', { reason: 'cancelled', id: order.id }, req.tenantId);
+    broadcast(TOPIC_PURCHASES_CHANGED, { reason: 'cancelled', id: order.id }, req.tenantId);
     res.json({ order });
   } catch (err) {
     res.status(400).json({ error: err.message });

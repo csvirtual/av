@@ -6,6 +6,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_DELIVERIES_CHANGED } from '../public/js/utils/liveTopics.js';
 
 const router = Router();
 
@@ -88,7 +89,7 @@ router.post('/', (req, res) => {
       deliveredAt: null,
     };
     commitDelivery({ delivery, dedupeKey: req.body.dedupeKey || null }, targetDb);
-    broadcast('deliveries-changed', { reason: 'created', id: delivery.id }, req.tenantId);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'created', id: delivery.id }, req.tenantId);
     res.status(201).json({ delivery });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
@@ -124,7 +125,7 @@ function commitTransition(input, targetDb) {
 router.post('/:id/entregar', (req, res) => {
   try {
     const delivery = commitTransition({ id: req.params.id, newStatus: 'entregue', userId: req.userId, userName: req.userName }, req.db);
-    broadcast('deliveries-changed', { reason: 'delivered', id: delivery.id }, req.tenantId);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'delivered', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -134,7 +135,7 @@ router.post('/:id/entregar', (req, res) => {
 router.post('/:id/cancelar', (req, res) => {
   try {
     const delivery = commitTransition({ id: req.params.id, newStatus: 'cancelado' }, req.db);
-    broadcast('deliveries-changed', { reason: 'cancelled', id: delivery.id }, req.tenantId);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'cancelled', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
     res.status(400).json({ error: err.message });

@@ -10,6 +10,7 @@ import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { MAX_INSTALLMENTS } from '../lib/pricing.js';
 import { requirePermission } from '../lib/permissions.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_COMPANY_CHANGED } from '../public/js/utils/liveTopics.js';
 import { verifyLicenseKey } from '../lib/license.js';
 import { onlyDigits, formatCnpj, isValidCnpj, formatCep, isValidCep, isValidEmail } from '../lib/companyValidation.js';
 import { UFS } from '../lib/ufs.js';
@@ -242,7 +243,7 @@ router.put('/', requirePermission('empresa'), async (req, res) => {
     // próxima chamada (o servidor nunca confia em política antiga vinda
     // do cliente, ver achado de segurança da Fase 9 anterior). Avisado
     // agora igual ao resto.
-    broadcast('company-changed', {}, req.tenantId);
+    broadcast(TOPIC_COMPANY_CHANGED, {}, req.tenantId);
     // Achado do usuário: CNPJ/nome preenchidos aqui não apareciam no
     // Painel de Controle (etapa 8) — só existe req.tenantId em modo
     // multi-tenant (ver server.js#resolveTenantRowFromHostname).

@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_CUSTOMERS_CHANGED, TOPIC_LOYALTY_CONFIG_CHANGED } from '../public/js/utils/liveTopics.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { updateConfig } from '../lib/companyConfig.js';
 import { requirePermission } from '../lib/permissions.js';
@@ -44,7 +45,7 @@ router.put('/config', requirePermission('empresa'), (req, res) => {
   }
   updateConfig({ loyaltyPointsPerReal: pointsPerReal, loyaltyRedemptionRate: redemptionRate }, req.db);
   const config = { pointsPerReal, redemptionRate };
-  broadcast('loyalty-config-changed', config, req.tenantId);
+  broadcast(TOPIC_LOYALTY_CONFIG_CHANGED, config, req.tenantId);
   res.json(config);
 });
 
@@ -123,7 +124,7 @@ router.post('/:customerId/resgatar', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Cliente não encontrado.' });
   try {
     const result = commitRedemption({ ...req.body, customerId: req.params.customerId, userId: req.userId, userName: req.userName }, targetDb);
-    broadcast('customers-changed', { reason: 'loyalty-redemption', id: req.params.customerId }, req.tenantId);
+    broadcast(TOPIC_CUSTOMERS_CHANGED, { reason: 'loyalty-redemption', id: req.params.customerId }, req.tenantId);
     res.status(201).json(result);
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {

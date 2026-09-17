@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_CUSTOMERS_CHANGED, TOPIC_PRODUCTS_CHANGED, TOPIC_SALES_CHANGED } from '../public/js/utils/liveTopics.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
 import { saveProductAfterStockChange, recordStockMovement } from '../lib/stockMovements.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
@@ -337,9 +338,9 @@ router.post('/', async (req, res) => {
       actingRole: req.userRole, actingPermissions: req.userPermissions,
       discountApprovalProvided, approvedAdminId,
     }, req.db);
-    broadcast('sales-changed', { reason: 'created', id: sale.id }, req.tenantId);
-    broadcast('products-changed', { reason: 'sale' }, req.tenantId);
-    if (sale.customerId) broadcast('customers-changed', { reason: 'sale', id: sale.customerId }, req.tenantId);
+    broadcast(TOPIC_SALES_CHANGED, { reason: 'created', id: sale.id }, req.tenantId);
+    broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'sale' }, req.tenantId);
+    if (sale.customerId) broadcast(TOPIC_CUSTOMERS_CHANGED, { reason: 'sale', id: sale.customerId }, req.tenantId);
     res.status(201).json({ sale });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
@@ -548,9 +549,9 @@ router.post('/:id/refund', async (req, res) => {
       ...req.body, saleId: req.params.id, userId: req.userId, userName: req.userName, terminalId: req.terminalId,
       actingRole: req.userRole, approvedAdminId,
     }, req.db);
-    broadcast('sales-changed', { reason: 'refunded', id: sale.id }, req.tenantId);
-    broadcast('products-changed', { reason: 'refund' }, req.tenantId);
-    if (sale.customerId) broadcast('customers-changed', { reason: 'refund', id: sale.customerId }, req.tenantId);
+    broadcast(TOPIC_SALES_CHANGED, { reason: 'refunded', id: sale.id }, req.tenantId);
+    broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'refund' }, req.tenantId);
+    if (sale.customerId) broadcast(TOPIC_CUSTOMERS_CHANGED, { reason: 'refund', id: sale.customerId }, req.tenantId);
     // `refund` não vem separado do estado interno da transação — é sempre o
     // último item de sale.refunds (foi acabado de dar push nele ali em
     // cima), então derivar daqui é seguro e evita duplicar o objeto na

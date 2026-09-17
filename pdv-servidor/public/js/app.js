@@ -42,6 +42,11 @@ import { getLicenseStatus, activateLicenseKey } from './data/licenseRepo.js';
 import { api } from './data/apiClient.js';
 import { openSupportWhatsappModal, openSupportEmailModal } from './components/supportContact.js';
 import { logAction } from './data/auditRepo.js';
+import {
+  TOPIC_PRODUCTS_CHANGED, TOPIC_SUPPLIERS_CHANGED, TOPIC_SALES_CHANGED, TOPIC_CUSTOMERS_CHANGED,
+  TOPIC_DELIVERIES_CHANGED, TOPIC_CASH_CHANGED, TOPIC_CASH_CONFIG_CHANGED, TOPIC_COMPANY_CHANGED,
+  TOPIC_LOYALTY_CONFIG_CHANGED, TOPIC_USERS_CHANGED, TOPIC_BACKUP_RESTORED, TOPIC_DATA_RESET,
+} from './utils/liveTopics.js';
 import { getThemePreference, applyTheme } from './theme.js';
 import { icon } from './components/icon.js';
 import { closeAllModals, confirmDialog } from './components/modal.js';
@@ -205,10 +210,13 @@ function canAccessRoute(route, user) {
 // ('backup-restored'/'data-reset') são tratadas fora deste esquema por
 // tópico de tela — ver o listener logo abaixo.
 const LIVE_TOPICS = {
-  estoque: new Set(['products-changed', 'suppliers-changed']),
-  venda: new Set(['customers-changed', 'cash-changed', 'cash-config-changed', 'company-changed']),
-  dashboard: new Set(['products-changed', 'sales-changed', 'customers-changed', 'deliveries-changed', 'cash-changed', 'cash-config-changed', 'company-changed', 'loyalty-config-changed']),
-  usuarios: new Set(['users-changed']),
+  estoque: new Set([TOPIC_PRODUCTS_CHANGED, TOPIC_SUPPLIERS_CHANGED]),
+  venda: new Set([TOPIC_CUSTOMERS_CHANGED, TOPIC_CASH_CHANGED, TOPIC_CASH_CONFIG_CHANGED, TOPIC_COMPANY_CHANGED]),
+  dashboard: new Set([
+    TOPIC_PRODUCTS_CHANGED, TOPIC_SALES_CHANGED, TOPIC_CUSTOMERS_CHANGED, TOPIC_DELIVERIES_CHANGED,
+    TOPIC_CASH_CHANGED, TOPIC_CASH_CONFIG_CHANGED, TOPIC_COMPANY_CHANGED, TOPIC_LOYALTY_CONFIG_CHANGED,
+  ]),
+  usuarios: new Set([TOPIC_USERS_CHANGED]),
 };
 const LIVE_DEBOUNCE_MS = 500;
 
@@ -263,11 +271,11 @@ function scheduleLiveRefresh() {
 // 'data-reset' não: usuários nunca fazem parte do que é zerado, a mesma
 // sessão continua válida depois.
 onLiveMessage((msg) => {
-  if (msg.topic === 'backup-restored') {
+  if (msg.topic === TOPIC_BACKUP_RESTORED) {
     clearSession().finally(() => location.reload());
     return;
   }
-  if (msg.topic === 'data-reset') {
+  if (msg.topic === TOPIC_DATA_RESET) {
     location.reload();
     return;
   }

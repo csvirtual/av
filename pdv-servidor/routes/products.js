@@ -14,6 +14,7 @@
 import { Router } from 'express';
 import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_PRODUCTS_CHANGED } from '../public/js/utils/liveTopics.js';
 import { requirePermission } from '../lib/permissions.js';
 import { recordStockMovement } from '../lib/stockMovements.js';
 
@@ -172,7 +173,7 @@ router.post('/', requirePermission('manageProducts'), (req, res) => {
     }
     throw err;
   }
-  broadcast('products-changed', { reason: 'created', id: product.id }, req.tenantId);
+  broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'created', id: product.id }, req.tenantId);
   res.status(201).json({ product });
 });
 
@@ -253,7 +254,7 @@ router.put('/:id', requirePermission('manageProducts'), (req, res) => {
     }
     throw err;
   }
-  broadcast('products-changed', { reason: 'updated', id: updated.id }, req.tenantId);
+  broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'updated', id: updated.id }, req.tenantId);
   res.json({ product: updated });
 });
 
@@ -271,7 +272,7 @@ router.post('/:id/active', requirePermission('toggleProduct'), (req, res) => {
     id: updated.id, barcode: updated.barcode, nameLower: updated.nameLower,
     active: updated.active ? 1 : 0, updatedAt: updated.updatedAt, data: JSON.stringify(updated),
   });
-  broadcast('products-changed', { reason: 'toggled', id: updated.id }, req.tenantId);
+  broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'toggled', id: updated.id }, req.tenantId);
   res.json({ product: updated });
 });
 
@@ -280,7 +281,7 @@ router.delete('/:id', requirePermission('deleteProduct'), (req, res) => {
   const row = targetDb.prepare(GET_BY_ID_SQL).get(req.params.id);
   if (!row) return res.status(404).json({ error: 'Produto não encontrado.' });
   targetDb.prepare(DELETE_PRODUCT_SQL).run(req.params.id);
-  broadcast('products-changed', { reason: 'deleted', id: req.params.id }, req.tenantId);
+  broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'deleted', id: req.params.id }, req.tenantId);
   res.json({ ok: true });
 });
 
@@ -360,7 +361,7 @@ router.post('/:id/movimentos', requirePermission('adjustStock'), (req, res) => {
       userId: req.userId, userName: req.userName, dedupeKey: body.dedupeKey || null,
       expectedQuantity: body.expectedQuantity ?? null,
     }, req.db);
-    broadcast('products-changed', { reason: 'stock-adjusted', id: product.id }, req.tenantId);
+    broadcast(TOPIC_PRODUCTS_CHANGED, { reason: 'stock-adjusted', id: product.id }, req.tenantId);
     res.status(201).json({ product, movement: record });
   } catch (err) {
     if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
