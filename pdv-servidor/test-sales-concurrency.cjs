@@ -29,6 +29,10 @@ async function api(cookie, path, opts = {}) {
 (async () => {
   const cookie = await login();
   check('login funcionou', !!cookie, cookie);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await api(cookie, '/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // Produto com estoque de 5
   const { status: createStatus, body: createBody } = await api(cookie, '/api/products', {

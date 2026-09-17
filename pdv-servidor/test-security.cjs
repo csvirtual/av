@@ -32,7 +32,14 @@ function api(cookie) {
 (async () => {
   const adminLogin = await rawLogin('admin', 'admin123');
   check('login do admin funcionou', adminLogin.status === 200, adminLogin.status);
-  const callAdmin = api(adminLogin.cookie);
+  let callAdmin = api(adminLogin.cookie);
+  // Achado de auditoria (suíte de teste desatualizada): admin novo nasce
+  // com mustChangePassword=true (lib/seedAdmin.js) — desde que o gate que
+  // bloqueia toda rota /api enquanto isso for true existe (P1), este
+  // teste (escrito antes do gate) parava de funcionar num banco zerado.
+  // Troca aqui, antes de qualquer outra chamada, pra suíte continuar
+  // valendo como regressão de verdade.
+  await callAdmin('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // --- (1) bloqueio por força bruta ---
   const lockoutRes = await callAdmin('/api/users', {
@@ -49,8 +56,9 @@ function api(cookie) {
   check('3ª tentativa (com a senha CERTA) é bloqueada por força bruta (429)', thirdEvenCorrect.status === 429, thirdEvenCorrect.status);
   check('mensagem de bloqueio menciona tempo de espera', /aguarde/i.test(thirdEvenCorrect.body.error), thirdEvenCorrect.body.error);
 
-  const otherUserUnaffected = await rawLogin('admin', 'admin123');
+  const otherUserUnaffected = await rawLogin('admin', 'admin123SenhaNova');
   check('bloqueio é por usuário — outra conta (admin) loga normalmente', otherUserUnaffected.status === 200, otherUserUnaffected.status);
+  callAdmin = api(otherUserUnaffected.cookie);
 
   // --- (2) aprovação de desconto acima do limite ---
   await callAdmin('/api/company', { method: 'PUT', body: JSON.stringify({ vendorMaxDiscountPercent: 10 }) });
@@ -95,7 +103,7 @@ function api(cookie) {
       items: [{ productId: product.id, qty: 1, unitPrice: 100 }],
       overallDiscountAmount: 30,
       payments: [{ method: 'Dinheiro', amount: 70 }],
-      discountApproval: { username: 'admin', password: 'admin123' },
+      discountApproval: { username: 'admin', password: 'admin123SenhaNova' },
       dedupeKey: 'dk-sec-sale3-' + Date.now(),
     }),
   });

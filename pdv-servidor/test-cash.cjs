@@ -39,6 +39,10 @@ function api(cookieJar, terminalId) {
   const jar = {};
   await login(jar);
   const call = api(jar);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await call('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // Garante modo "único" pra primeira leva de testes.
   await call('/api/cash/config', { method: 'PUT', body: JSON.stringify({ caixaMode: 'unico' }) });
@@ -47,7 +51,7 @@ function api(cookieJar, terminalId) {
   const openNow = await call('/api/cash/open');
   if (openNow.body.session) {
     await call(`/api/cash/sessions/${openNow.body.session.id}/fechar`, {
-      method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }),
+      method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }),
     });
   }
 
@@ -99,7 +103,7 @@ function api(cookieJar, terminalId) {
 
   // (3) fechamento com diferença de -5 (faltou dinheiro)
   const fechar = await call(`/api/cash/sessions/${session.id}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 135 }, closingNotes: 'Teste automatizado', confirmUsername: 'admin', confirmPassword: 'admin123' }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 135 }, closingNotes: 'Teste automatizado', confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }),
   });
   check('fechamento aceito', fechar.status === 200, fechar.status);
   check('diferença calculada certa (135-140=-5)', Math.abs(fechar.body.session.difference - (-5)) < 0.001, fechar.body.session.difference);
@@ -109,7 +113,7 @@ function api(cookieJar, terminalId) {
   check('depois de fechado, /open não mostra mais sessão ativa', reopenAttempt.body.session === null, JSON.stringify(reopenAttempt.body.session));
 
   const fecharDeNovo = await call(`/api/cash/sessions/${session.id}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }),
   });
   check('fechar um caixa já fechado é rejeitado', fecharDeNovo.status === 400, fecharDeNovo.status);
 
@@ -135,8 +139,8 @@ function api(cookieJar, terminalId) {
   check('GET /open do terminal B só mostra a sessão do B (troco 70)', openViewB.body.session.openingAmount === 70, openViewB.body.session.openingAmount);
 
   // limpa: fecha os dois caixas por-terminal abertos neste teste
-  await callA(`/api/cash/sessions/${openA.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }) });
-  await callB(`/api/cash/sessions/${openB.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123' }) });
+  await callA(`/api/cash/sessions/${openA.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }) });
+  await callB(`/api/cash/sessions/${openB.body.session.id}/fechar`, { method: 'POST', body: JSON.stringify({ countedAmounts: {}, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }) });
   await call('/api/cash/config', { method: 'PUT', body: JSON.stringify({ caixaMode: 'unico' }) });
 
   console.log('\n' + (results.every(Boolean) ? 'TUDO OK' : 'ALGO FALHOU'));

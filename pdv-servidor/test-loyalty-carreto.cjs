@@ -34,6 +34,10 @@ function api(jar) {
   const jar = {};
   await login(jar);
   const call = api(jar);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await call('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // 1 ponto por real gasto, 1 ponto = R$ 1,00 de crédito (números redondos pro teste)
   const cfgRes = await call('/api/loyalty/config', { method: 'PUT', body: JSON.stringify({ pointsPerReal: 1, redemptionRate: 1 }) });

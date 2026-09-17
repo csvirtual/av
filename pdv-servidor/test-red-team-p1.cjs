@@ -43,6 +43,10 @@ const dedupeKey = (label) => `${label}-${Date.now()}-${Math.random().toString(36
   const adminLogin = await rawLogin('admin', 'admin123');
   check('login do admin funcionou', adminLogin.status === 200, adminLogin.status);
   const callAdmin = api(adminLogin.cookie);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await callAdmin('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // Produto + estoque inicial pra usar nos testes de venda/estorno/pagamento.
   const prodRes = await callAdmin('/api/products', {
@@ -142,7 +146,7 @@ const dedupeKey = (label) => `${label}-${Date.now()}-${Math.random().toString(36
   );
 
   const closeOkRes = await callAdmin(`/api/cash/sessions/${sessionId}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 100 }, confirmUsername: 'admin', confirmPassword: 'admin123' }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 100 }, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }),
   });
   check('fechamento de caixa com senha CERTA funciona normalmente', closeOkRes.status === 200, closeOkRes.status);
 
@@ -167,7 +171,7 @@ const dedupeKey = (label) => `${label}-${Date.now()}-${Math.random().toString(36
     JSON.stringify(blockedRes),
   );
 
-  const loginStillWorksRes = await rawLogin('admin', 'admin123');
+  const loginStillWorksRes = await rawLogin('admin', 'admin123SenhaNova');
   check('login continua funcionando mesmo com licença expirada (pra dar pra ativar uma chave nova)', loginStillWorksRes.status === 200, loginStillWorksRes.status);
 
   const statusStillWorksRes = await fetch(`${BASE}/api/license/status`);

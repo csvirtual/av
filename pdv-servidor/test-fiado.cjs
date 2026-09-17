@@ -33,6 +33,10 @@ function api(jar) {
   const jar = {};
   await login(jar);
   const call = api(jar);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await call('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   const customerRes = await call('/api/customers', { method: 'POST', body: JSON.stringify({ nome: 'Cliente Fiado Teste', telefone: '11999998888' }) });
   check('cliente criado', customerRes.status === 201, customerRes.status);

@@ -35,6 +35,10 @@ function api(cookie) {
 (async () => {
   const admin = await login('admin', 'admin123');
   const callAdmin = api(admin.cookie);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await callAdmin('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   await callAdmin('/api/cash/config', { method: 'PUT', body: JSON.stringify({ caixaMode: 'porOperador' }) });
   const configCheck = await callAdmin('/api/cash/config');
@@ -96,7 +100,7 @@ function api(cookie) {
   check('admin registra movimento no caixa do operador 1, mesmo não sendo o dono', adminSangriaOnV1.status === 201, adminSangriaOnV1.status);
 
   const adminCloseV2 = await callAdmin(`/api/cash/sessions/${session2.id}/fechar`, {
-    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 200 }, confirmUsername: 'admin', confirmPassword: 'admin123' }),
+    method: 'POST', body: JSON.stringify({ countedAmounts: { Dinheiro: 200 }, confirmUsername: 'admin', confirmPassword: 'admin123SenhaNova' }),
   });
   check('admin fecha o caixa do operador 2 (esqueceu de fechar / foi embora)', adminCloseV2.status === 200, adminCloseV2.status);
 

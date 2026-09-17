@@ -37,6 +37,10 @@ function api(cookie) {
   const admin = await login('admin', 'admin123');
   check('login do admin funcionou', admin.status === 200, admin.status);
   const callAdmin = api(admin.cookie);
+  // Achado de auditoria (suíte de teste desatualizada, ver test-security.cjs
+  // pro mesmo achado): admin novo nasce com mustChangePassword=true — troca
+  // aqui, antes de qualquer outra chamada, pro gate (P1) não bloquear tudo.
+  await callAdmin('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: 'admin123', newPassword: 'admin123SenhaNova' }) });
 
   // --- vendedor sem nenhuma permissão ---
   const v1Res = await callAdmin('/api/users', {
