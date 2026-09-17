@@ -8,7 +8,7 @@
 // realmente creditado deixaria o sistema mostrando menos do que a loja tem
 // fisicamente na prateleira).
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
@@ -33,7 +33,6 @@ const UPDATE_PRODUCT_SQL = `
   UPDATE products SET name_lower = @nameLower, active = @active, updated_at = @updatedAt, data = @data WHERE id = @id
 `;
 const LIST_ACTIVE_PRODUCTS_SQL = 'SELECT data FROM products WHERE active = 1';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 // Achado de auditoria (P1, Red Team, Fase 7): recebimento de compra creditava
 // `product.quantity` direto (saveProduct) sem nunca gravar em
 // `stock_movements` — mesma classe de furo já corrigida em routes/sales.js
@@ -109,8 +108,7 @@ function commitReceive(input, targetDb) {
   return targetDb.transaction(() => {
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
     const row = targetDb.prepare(GET_ORDER_SQL).get(input.orderId);
     if (!row) throw new Error('Pedido não encontrado.');
     const order = rowToOrder(row);

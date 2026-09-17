@@ -9,7 +9,7 @@
 // single-machine precisa (ver salesRepo.js#createSale) porque lá o
 // IndexedDB é assíncrono de verdade.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
@@ -48,7 +48,6 @@ const INSERT_SALE_SQL = `
 `;
 const GET_SALE_SQL = 'SELECT * FROM sales WHERE id = ?';
 const UPDATE_SALE_SQL = 'UPDATE sales SET customer_id = @customerId, data = @data WHERE id = @id';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
 // Achado de auditoria (P1, Red Team, Fase 7): venda e estorno mudavam
 // `product.quantity` direto (saveProduct) sem NUNCA gravar em
@@ -107,8 +106,7 @@ function commitSale(input, targetDb) {
   return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now()); // estoura se repetido (chave já existe)
+  claimIdempotencyKey(input.dedupeKey, targetDb);
 
   // Gerado aqui (não só lá embaixo no objeto `sale`) pra já existir a
   // tempo de referenciar na nota do movimento de estoque de cada item,
@@ -417,8 +415,7 @@ function commitRefund(input, targetDb) {
   return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.
-  if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-  targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+  claimIdempotencyKey(input.dedupeKey, targetDb);
   const row = targetDb.prepare(GET_SALE_SQL).get(input.saleId);
   if (!row) throw new Error('Venda não encontrada.');
   const sale = rowToSale(row);

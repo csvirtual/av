@@ -6,7 +6,7 @@
 // perde o histórico de como ele chegou nesse valor. Mesma lógica de
 // data/customersRepo.js da extensão, portada pro servidor.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { resolveOpenSession } from '../lib/cashSession.js';
 import { userCan } from '../lib/permissions.js';
@@ -35,7 +35,6 @@ const LIST_CUSTOMERS_SQL = 'SELECT data FROM customers';
 const LIST_LEDGER_SQL = 'SELECT data FROM customer_debts WHERE customer_id = ? ORDER BY timestamp DESC';
 const LIST_ALL_DEBTS_SQL = 'SELECT data FROM customer_debts';
 const INSERT_DEBT_ENTRY_SQL = 'INSERT INTO customer_debts (id, customer_id, timestamp, data) VALUES (@id, @customerId, @timestamp, @data)';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToCustomer(row) { return JSON.parse(row.data); }
 function money(n) { return 'R$ ' + Number(n).toFixed(2).replace('.', ','); }
@@ -214,8 +213,7 @@ function commitPayment(input, targetDb) {
     }
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
 
     const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
     const entry = {

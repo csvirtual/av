@@ -6,7 +6,7 @@
 // requisição — trocar o modo não mexe em sessões já abertas, só afeta a
 // checagem "já existe uma aberta?" da PRÓXIMA abertura.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getCaixaMode, resolveOpenSession } from '../lib/cashSession.js';
 import { updateConfig } from '../lib/companyConfig.js';
@@ -42,7 +42,6 @@ const INSERT_MOVEMENT_SQL = `
 const LIST_MOVEMENTS_SQL = 'SELECT data FROM cash_movements WHERE session_id = ? ORDER BY timestamp DESC';
 const LIST_ALL_SALES_SQL = 'SELECT data FROM sales';
 const LIST_ALL_DEBTS_SQL = 'SELECT data FROM customer_debts';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToSession(row) { return JSON.parse(row.data); }
 
@@ -183,8 +182,7 @@ function commitMovement(input, targetDb) {
   return targetDb.transaction(() => {
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
     const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(input.sessionId);
     if (!row) throw new Error('Caixa não encontrado.');
     const session = rowToSession(row);
@@ -234,8 +232,7 @@ function commitAdjustment(input, targetDb) {
   return targetDb.transaction(() => {
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
     if (!['abertura', 'sangria', 'suprimento'].includes(input.targetType)) {
       throw new Error('Tipo de retificação inválido.');
     }

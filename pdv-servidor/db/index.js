@@ -64,3 +64,19 @@ const deleteOldIdempotencyKeysStmt = db.prepare('DELETE FROM idempotency_keys WH
 export function sweepOldIdempotencyKeys() {
   deleteOldIdempotencyKeysStmt.run(Date.now() - IDEMPOTENCY_KEY_RETENTION_MS);
 }
+
+// Achado de auditoria (DRY): mesma validação + mesmo INSERT copiados
+// idênticos em 8 arquivos de rota (vendas, caixa, clientes, entregas,
+// financeiro, fidelidade, produtos, compras) — cada operação mutadora
+// "reivindica" a própria dedupeKey antes de prosseguir, e a constraint
+// UNIQUE da tabela é quem de fato barra um reenvio duplicado (duplo
+// clique, retry automático do navegador). Fonte única agora: mesma regra,
+// um lugar só. `targetDb` sempre passado explicitamente pelas rotas (o
+// tenant da requisição) — sem default pra `db` de propósito, isto roda
+// dentro da MESMA transação da operação que está protegendo, nunca faria
+// sentido cair silenciosamente no banco errado.
+const CLAIM_IDEMPOTENCY_KEY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
+export function claimIdempotencyKey(dedupeKey, targetDb) {
+  if (!dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
+  targetDb.prepare(CLAIM_IDEMPOTENCY_KEY_SQL).run(dedupeKey, Date.now());
+}

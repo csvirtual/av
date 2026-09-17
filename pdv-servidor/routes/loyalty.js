@@ -5,7 +5,7 @@
 // si acontece dentro de routes/sales.js#commitSale (mesma transação da
 // venda); aqui só ficam config, leitura do extrato e o resgate.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getLoyaltyConfig } from '../lib/loyaltyConfig.js';
 import { updateConfig } from '../lib/companyConfig.js';
@@ -20,7 +20,6 @@ const router = Router();
 // loja, ou o banco fixo do processo em modo legado) — server.js#tenant
 // resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
 // rota mais precisa repetir o fallback.
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
 
 router.get('/config', (req, res) => {
@@ -96,8 +95,7 @@ function commitRedemption(input, targetDb) {
     if (points > balance) throw new Error(`O cliente só tem ${balance} pontos disponíveis.`);
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
 
     const { redemptionRate } = getLoyaltyConfig(targetDb);
     const amount = points / redemptionRate;

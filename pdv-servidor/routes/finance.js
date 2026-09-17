@@ -7,7 +7,7 @@
 // princípio de saldo do fiado: nunca um número solto que alguém esqueça de
 // manter em dia).
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
@@ -34,7 +34,6 @@ const INSERT_ENTRY_SQL = `
 const UPDATE_ENTRY_SQL = 'UPDATE financial_entries SET status = @status, data = @data WHERE id = @id';
 const GET_ENTRY_SQL = 'SELECT * FROM financial_entries WHERE id = ?';
 const LIST_ENTRIES_SQL = 'SELECT data FROM financial_entries ORDER BY due_date ASC';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToEntry(row) { return JSON.parse(row.data); }
 
@@ -118,8 +117,7 @@ function commitPayment(input, targetDb) {
     }
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
 
     const payment = { id: crypto.randomUUID(), amount: value, paymentMethod: input.paymentMethod, paidAt: Date.now(), userId: input.userId, userName: input.userName };
     entry.payments = Array.isArray(entry.payments) ? [...entry.payments, payment] : [payment];

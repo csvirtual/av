@@ -12,7 +12,7 @@
 // abaixo) — por isso os `requirePermission(...)` ficam aqui dentro, rota a
 // rota, em vez de no mount de server.js.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { requirePermission } from '../lib/permissions.js';
 
@@ -38,7 +38,6 @@ const LIST_PRODUCTS_SQL = 'SELECT * FROM products ORDER BY name_lower ASC';
 const DELETE_PRODUCT_SQL = 'DELETE FROM products WHERE id = ?';
 const INSERT_MOVEMENT_SQL = 'INSERT INTO stock_movements (id, product_id, timestamp, data) VALUES (@id, @productId, @timestamp, @data)';
 const LIST_MOVEMENTS_SQL = 'SELECT * FROM stock_movements WHERE product_id = ? ORDER BY timestamp DESC';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToProduct(row) {
   return JSON.parse(row.data);
@@ -323,8 +322,7 @@ function commitMovement(input, targetDb) {
   return targetDb.transaction(() => {
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now()); // estoura (UNIQUE) se repetido
+    claimIdempotencyKey(input.dedupeKey, targetDb);
     const row = targetDb.prepare(GET_BY_ID_SQL).get(input.productId);
     if (!row) throw new Error('Produto não encontrado.');
     const product = rowToProduct(row);

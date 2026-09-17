@@ -4,7 +4,7 @@
 // baixa de estoque de verdade já acontece na Venda) — o carreto só ajuda a
 // organizar o que precisa sair, pra quem, e se já foi entregue ou não.
 import { Router } from 'express';
-import { db } from '../db/index.js';
+import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 
 const router = Router();
@@ -22,7 +22,6 @@ const UPDATE_DELIVERY_SQL = 'UPDATE deliveries SET status = @status, data = @dat
 const GET_DELIVERY_SQL = 'SELECT * FROM deliveries WHERE id = ?';
 const LIST_DELIVERIES_SQL = 'SELECT data FROM deliveries ORDER BY created_at DESC';
 const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
-const CLAIM_IDEMPOTENCY_SQL = 'INSERT INTO idempotency_keys (key, created_at) VALUES (?, ?)';
 
 function rowToDelivery(row) { return JSON.parse(row.data); }
 
@@ -46,8 +45,7 @@ function commitDelivery(input, targetDb) {
     // mandar. Uma chamada direta à API (fora das telas, que sempre mandam)
     // não tinha proteção nenhuma contra reenvio duplicado. Agora é exigida
     // em toda rota com efeito de negócio real.
-    if (!input.dedupeKey) throw new Error('Requisição sem identificador de deduplicação.');
-    targetDb.prepare(CLAIM_IDEMPOTENCY_SQL).run(input.dedupeKey, Date.now());
+    claimIdempotencyKey(input.dedupeKey, targetDb);
     targetDb.prepare(INSERT_DELIVERY_SQL).run({
       id: input.delivery.id, customerId: input.delivery.customerId, status: input.delivery.status,
       createdAt: input.delivery.createdAt, data: JSON.stringify(input.delivery),
