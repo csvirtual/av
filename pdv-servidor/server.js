@@ -98,7 +98,39 @@ acquireProcessLock();
 process.on('exit', releaseProcessLock);
 
 const app = express();
-app.use(express.json());
+// Achado de auditoria (pré-lançamento, payload gigante): o limite padrão
+// do express.json() é 100kb — pequeno demais pro corpo de POST
+// /api/backup/preview e /api/backup/import (routes/backup.js), que
+// carrega o backup CRIPTOGRAFADO INTEIRO da loja em base64 dentro do
+// próprio corpo JSON. Reproduzido: um envelope de ~200KB (tamanho
+// plausível pra qualquer loja depois de alguns meses de uso — catálogo +
+// vendas + movimentos de estoque + log) já tomava 413, tornando
+// IMPOSSÍVEL restaurar o próprio backup assim que a loja crescesse além
+// de ~70KB de dados. 25mb é generoso o bastante pra qualquer backup real
+// (a exportação em si — GET, sem limite de corpo — nunca chegou perto
+// disso nos testes) sem abrir mão de um teto (nunca "sem limite nenhum",
+// isso seria a mesma classe de risco de DoS por payload que o limite
+// existe pra fechar).
+app.use(express.json({ limit: '25mb' }));
+// Achado de auditoria (pré-lançamento, exposição de informação): sem
+// isto, um corpo JSON malformado OU maior que o limite acima nunca
+// chegava nas rotas de baixo — o handler de erro PADRÃO do Express pegava
+// primeiro e devolvia uma página HTML com stack trace, incluindo o
+// CAMINHO DE ARQUIVO no disco do servidor (ex:
+// "/home/user/.../server.js"), pra qualquer requisição, autenticada ou
+// não. Precisa vir logo depois do express.json() (é o único middleware
+// que lança esse tipo de erro) — intercepta antes de qualquer coisa
+// interna vazar, devolve só uma mensagem segura em JSON, no mesmo formato
+// que toda rota da API já usa.
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Arquivo enviado é grande demais.' });
+  }
+  if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    return res.status(400).json({ error: 'Corpo da requisição não é um JSON válido.' });
+  }
+  next(err);
+});
 app.use(cookieParser());
 
 // Etapa 3 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
@@ -552,6 +584,23 @@ app.use('/api/reports', requireAuth, requirePermission('relatorios'), reportsRou
 // `null` sem MULTI_TENANT_DOMAIN (mesmo comportamento de sempre).
 app.get('/api/status', (req, res) => {
   res.json({ ok: true, autenticado: !!req.userId, tenantId: req.tenantId || null });
+});
+
+// Achado de auditoria (pré-lançamento, exposição de informação — defesa
+// em profundidade): toda rota já trata seus próprios erros (try/catch,
+// resposta JSON própria — ver qualquer routes/*.js), mas um erro
+// verdadeiramente inesperado (bug numa dependência, algo que escapou de
+// um try/catch) ainda cairia no handler PADRÃO do Express, que devolve
+// uma página HTML com stack trace completo — incluindo caminho de
+// arquivo no disco do servidor — pra qualquer cliente, autenticado ou
+// não. Rede de segurança final: nunca deveria disparar no uso normal,
+// mas se disparar, garante que o vazamento não acontece. O erro
+// completo continua indo pro log do servidor (nunca escondido de quem
+// opera a loja), só não vai mais pra quem fez a requisição.
+app.use((err, req, res, next) => {
+  console.error('[erro inesperado] não tratado por nenhuma rota:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Erro inesperado no servidor.' });
 });
 
 const httpServer = createServer(app);
