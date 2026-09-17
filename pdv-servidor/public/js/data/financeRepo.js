@@ -69,3 +69,10 @@ export function entryStatus(entry) {
   if (entry.dueDate < startOfToday.getTime()) return 'vencido';
   return 'pendente';
 }
+
+// Achado de auditoria (DRY): views/financeiro.js repetia esta mesma
+// checagem ("ainda dá pra registrar pagamento nesse status?") como um
+// OR-chain/array solto em 4 pontos diferentes — mesma regra, um lugar só.
+export function isPayable(status) {
+  return status === 'pendente' || status === 'vencido' || status === 'parcial';
+}

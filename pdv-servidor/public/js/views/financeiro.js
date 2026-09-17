@@ -6,7 +6,7 @@
 // parcialmente" com o valor que falta em destaque, nunca escondida como se
 // já estivesse quitada (ver data/financeRepo.js).
 import {
-  listEntries, createEntry, registerPayment, deletePayment, cancelEntry, entryStatus, paidTotal, remainingAmount,
+  listEntries, createEntry, registerPayment, deletePayment, cancelEntry, entryStatus, paidTotal, remainingAmount, isPayable,
 } from '../data/financeRepo.js';
 import { listSuppliers } from '../data/suppliersRepo.js';
 import { logAction } from '../data/auditRepo.js';
@@ -80,7 +80,7 @@ export async function renderFinanceiro(container, ctx) {
     // somar e.amount de uma conta já parcialmente paga infla o "a pagar/a
     // receber" com dinheiro que já trocou de mãos (mesmo achado de
     // auditoria do botão "Marcar pago" antigo, aplicado aqui no resumo).
-    const pendentes = all.filter((e) => ['pendente', 'vencido', 'parcial'].includes(entryStatus(e)));
+    const pendentes = all.filter((e) => isPayable(entryStatus(e)));
     const aPagar = pendentes.filter((e) => e.type === 'pagar').reduce((sum, e) => sum + remainingAmount(e), 0);
     const aReceber = pendentes.filter((e) => e.type === 'receber').reduce((sum, e) => sum + remainingAmount(e), 0);
     const vencidas = all.filter((e) => entryStatus(e) === 'vencido').length;
@@ -111,7 +111,7 @@ export async function renderFinanceiro(container, ctx) {
           <tbody>
             ${visible.map((e) => {
               const status = entryStatus(e);
-              const canPay = status === 'pendente' || status === 'vencido' || status === 'parcial';
+              const canPay = isPayable(status);
               const hasPayments = paidTotal(e) > 0.001;
               return `
               <tr>
@@ -163,7 +163,7 @@ export async function renderFinanceiro(container, ctx) {
    * sem mais nada a fazer), fica como botão direto sozinho. */
   function cardSheetItems(entry) {
     const status = entryStatus(entry);
-    const canPay = status === 'pendente' || status === 'vencido' || status === 'parcial';
+    const canPay = isPayable(status);
     const hasPayments = paidTotal(entry) > 0.001;
     const items = [];
     if (canPay && hasPayments) items.push({ label: 'Ver pagamentos', run: () => openPaymentsModal(entry) });
@@ -177,7 +177,7 @@ export async function renderFinanceiro(container, ctx) {
       <div class="card-stack">
         ${list.map((e) => {
           const status = entryStatus(e);
-          const canPay = status === 'pendente' || status === 'vencido' || status === 'parcial';
+          const canPay = isPayable(status);
           const hasPayments = paidTotal(e) > 0.001;
           const sheetItems = cardSheetItems(e);
           let directHtml = '';
