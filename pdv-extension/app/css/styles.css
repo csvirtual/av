@@ -585,6 +585,13 @@ a { color: var(--primary); }
 .setup-choice-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 @media (max-width: 620px) { .setup-choice-grid { grid-template-columns: 1fr; } }
 
+/* ---------- Backup: prévia lado a lado (atual x backup) antes de restaurar ---------- */
+.restore-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Achado do usuário (celular): duas colunas lado a lado não cabem numa
+ * tela estreita — a segunda tabela ("No backup") cortava. Empilha em
+ * vez de espremer, mesmo breakpoint já usado pra .setup-choice-grid. */
+@media (max-width: 620px) { .restore-preview-grid { grid-template-columns: 1fr; } }
+
 /* ---------- Shell do app (pós-login) ---------- */
 .shell {
   display: grid;
@@ -640,6 +647,10 @@ a { color: var(--primary); }
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
+  /* Achado do usuário (modo escuro): sem isto, o <button> cai na cor
+   * padrão do navegador em vez de herdar o texto do tema — o ícone (que
+   * usa stroke="currentColor") ficava quase preto sobre o fundo escuro. */
+  color: var(--text);
   box-shadow: var(--shadow);
   font-size: 18px;
 }
