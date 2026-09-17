@@ -8,6 +8,7 @@ import { db, claimIdempotencyKey } from '../db/index.js';
 import { broadcast } from '../lib/broadcast.js';
 import { TOPIC_DELIVERIES_CHANGED } from '../public/js/utils/liveTopics.js';
 import { respondValidationError } from '../lib/httpResponses.js';
+import { DELIVERY_STATUS_PENDING, DELIVERY_STATUS_DELIVERED, DELIVERY_STATUS_CANCELLED } from '../public/js/utils/deliveryStatus.js';
 
 const router = Router();
 
@@ -82,7 +83,7 @@ router.post('/', (req, res) => {
       address: (req.body.address || '').trim() || customer.endereco || '',
       responsible: (req.body.responsible || '').trim(),
       notes: (req.body.notes || '').trim(),
-      status: 'pendente',
+      status: DELIVERY_STATUS_PENDING,
       saleId: req.body.saleId || null,
       createdBy: { userId: req.userId, userName: req.userName },
       createdAt: Date.now(),
@@ -110,11 +111,11 @@ function commitTransition(input, targetDb) {
     const row = targetDb.prepare(GET_DELIVERY_SQL).get(input.id);
     if (!row) throw new Error('Carreto não encontrado.');
     const delivery = rowToDelivery(row);
-    if (delivery.status !== 'pendente') {
-      throw new Error(input.newStatus === 'entregue' ? 'Este carreto não está mais pendente.' : 'Só é possível cancelar um carreto pendente.');
+    if (delivery.status !== DELIVERY_STATUS_PENDING) {
+      throw new Error(input.newStatus === DELIVERY_STATUS_DELIVERED ? 'Este carreto não está mais pendente.' : 'Só é possível cancelar um carreto pendente.');
     }
     delivery.status = input.newStatus;
-    if (input.newStatus === 'entregue') {
+    if (input.newStatus === DELIVERY_STATUS_DELIVERED) {
       delivery.deliveredBy = { userId: input.userId, userName: input.userName };
       delivery.deliveredAt = Date.now();
     }
@@ -125,7 +126,7 @@ function commitTransition(input, targetDb) {
 
 router.post('/:id/entregar', (req, res) => {
   try {
-    const delivery = commitTransition({ id: req.params.id, newStatus: 'entregue', userId: req.userId, userName: req.userName }, req.db);
+    const delivery = commitTransition({ id: req.params.id, newStatus: DELIVERY_STATUS_DELIVERED, userId: req.userId, userName: req.userName }, req.db);
     broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'delivered', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {
@@ -135,7 +136,7 @@ router.post('/:id/entregar', (req, res) => {
 
 router.post('/:id/cancelar', (req, res) => {
   try {
-    const delivery = commitTransition({ id: req.params.id, newStatus: 'cancelado' }, req.db);
+    const delivery = commitTransition({ id: req.params.id, newStatus: DELIVERY_STATUS_CANCELLED }, req.db);
     broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'cancelled', id: delivery.id }, req.tenantId);
     res.json({ delivery });
   } catch (err) {

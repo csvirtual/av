@@ -13,15 +13,16 @@ import { openModal, confirmDialog } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { paginationHtml, wirePagination, createPageState } from '../components/pagination.js';
 import { enhanceSelect } from '../components/customSelect.js';
+import { DELIVERY_STATUS_PENDING, DELIVERY_STATUS_DELIVERED, DELIVERY_STATUS_CANCELLED } from '../utils/deliveryStatus.js';
 
 const STATUS_BADGE = {
-  pendente: '<span class="badge badge-gray">Pendente</span>',
-  entregue: '<span class="badge badge-green">Entregue</span>',
-  cancelado: '<span class="badge badge-red">Cancelado</span>',
+  [DELIVERY_STATUS_PENDING]: '<span class="badge badge-gray">Pendente</span>',
+  [DELIVERY_STATUS_DELIVERED]: '<span class="badge badge-green">Entregue</span>',
+  [DELIVERY_STATUS_CANCELLED]: '<span class="badge badge-red">Cancelado</span>',
 };
 
 export async function renderCarreto(container, ctx) {
-  let statusFilter = 'pendente';
+  let statusFilter = DELIVERY_STATUS_PENDING;
 
   container.innerHTML = `
     <div class="page-header">
@@ -35,9 +36,9 @@ export async function renderCarreto(container, ctx) {
     </div>
     <div class="toolbar">
       <select id="status-filter">
-        <option value="pendente">Pendentes</option>
-        <option value="entregue">Entregues</option>
-        <option value="cancelado">Cancelados</option>
+        <option value="${DELIVERY_STATUS_PENDING}">Pendentes</option>
+        <option value="${DELIVERY_STATUS_DELIVERED}">Entregues</option>
+        <option value="${DELIVERY_STATUS_CANCELLED}">Cancelados</option>
         <option value="">Todos</option>
       </select>
     </div>
@@ -118,7 +119,7 @@ export async function renderCarreto(container, ctx) {
   }
 
   function showDeliveryDetail(delivery) {
-    const canAct = delivery.status === 'pendente';
+    const canAct = delivery.status === DELIVERY_STATUS_PENDING;
     openModal({
       title: `Carreto — ${escapeHtml(delivery.customerName)}`,
       submitLabel: canAct ? 'Marcar como entregue' : 'Fechar',
@@ -147,7 +148,7 @@ export async function renderCarreto(container, ctx) {
           </table>
         </div>
         ${delivery.notes ? `<p style="font-size:13px;margin-top:10px;"><strong>Observações:</strong> ${escapeHtml(delivery.notes)}</p>` : ''}
-        ${delivery.status === 'entregue' ? `<p class="text-muted" style="font-size:12.5px;margin-top:10px;">Entregue em ${formatDateTime(delivery.deliveredAt)} por ${escapeHtml(delivery.deliveredBy.userName)}.</p>` : ''}
+        ${delivery.status === DELIVERY_STATUS_DELIVERED ? `<p class="text-muted" style="font-size:12.5px;margin-top:10px;">Entregue em ${formatDateTime(delivery.deliveredAt)} por ${escapeHtml(delivery.deliveredBy.userName)}.</p>` : ''}
         ${canAct ? '<button type="button" class="btn btn-ghost btn-sm" id="cancel-delivery-btn" style="color:var(--danger);margin-top:8px;">Cancelar carreto</button>' : ''}
       `,
       onMount: (modalEl, close) => {

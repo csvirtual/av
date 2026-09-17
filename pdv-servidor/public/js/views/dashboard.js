@@ -11,6 +11,7 @@ import { openEstoqueFilteredByStatus } from './products.js';
 import { formatMoney, formatDate, formatDateTime, escapeHtml } from '../utils/format.js';
 import { isNearExpiry, isExpired } from '../utils/pricing.js';
 import { icon } from '../components/icon.js';
+import { DELIVERY_STATUS_PENDING } from '../utils/deliveryStatus.js';
 
 export async function renderDashboard(container, ctx) {
   container.innerHTML = '<div class="card loading-state"><span class="spinner"></span>Carregando painel…</div>';
@@ -31,7 +32,7 @@ export async function renderDashboard(container, ctx) {
     summarizeSales({ fromTs: startOfDay.getTime() }),
     getOpenSession(), getAllBalances(), getAllPointsBalances(), getCompany(), listDeliveries(), listCustomers(),
   ]);
-  const pendingDeliveries = deliveries.filter((d) => d.status === 'pendente');
+  const pendingDeliveries = deliveries.filter((d) => d.status === DELIVERY_STATUS_PENDING);
   const totalFiado = Object.values(balances).reduce((sum, v) => sum + v, 0);
   const totalPoints = Object.values(pointsBalances).reduce((sum, v) => sum + v, 0);
   const loyaltyOn = (company?.policies?.loyaltyPointsPerReal ?? 0) > 0;
