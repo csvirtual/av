@@ -68,6 +68,15 @@ router.post('/', (req, res) => {
     if (!customerRow) throw new Error('Selecione um cliente para o carreto.');
     const customer = JSON.parse(customerRow.data);
 
+    // Achado de auditoria (exploração ao vivo): `items` de tipo errado
+    // (string, número, objeto) caía direto no `.map()` abaixo sem
+    // checagem nenhuma antes — TypeError não tratado vazando o texto
+    // exato da expressão JS (`"(req.body.items || []).map is not a
+    // function"`) pro cliente, em vez de uma mensagem de validação
+    // decente. Mesma checagem que sales.js#commitSale já faz.
+    if (req.body.items !== undefined && !Array.isArray(req.body.items)) {
+      throw new Error('Adicione ao menos um item ao carreto.');
+    }
     if (req.body.items && req.body.items.length > MAX_DELIVERY_ITEMS) {
       throw new Error(`Um carreto não pode ter mais de ${MAX_DELIVERY_ITEMS} itens.`);
     }

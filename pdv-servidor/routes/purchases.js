@@ -68,6 +68,14 @@ router.post('/', (req, res) => {
     if (!supplierRow) throw new Error('Selecione um fornecedor.');
     const supplier = JSON.parse(supplierRow.data);
 
+    // Achado de auditoria (exploração ao vivo): `items` de tipo errado
+    // (string, número, objeto) caía direto no `.map()` abaixo sem
+    // checagem nenhuma antes — TypeError não tratado vazando o texto
+    // exato da expressão JS pro cliente, em vez de uma mensagem de
+    // validação decente. Mesma checagem que sales.js#commitSale já faz.
+    if (req.body.items !== undefined && !Array.isArray(req.body.items)) {
+      throw new Error('O pedido precisa ter ao menos um item com quantidade.');
+    }
     if (req.body.items && req.body.items.length > MAX_ORDER_ITEMS) {
       throw new Error(`Um pedido de compra não pode ter mais de ${MAX_ORDER_ITEMS} itens.`);
     }

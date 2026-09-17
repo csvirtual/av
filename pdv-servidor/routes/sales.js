@@ -110,6 +110,14 @@ const MAX_PAYMENTS = 20;
 function commitSale(input, targetDb) {
   if (!Array.isArray(input.items)) throw new Error('A venda precisa ter ao menos um item.');
   if (input.items.length > MAX_SALE_ITEMS) throw new Error(`Uma venda não pode ter mais de ${MAX_SALE_ITEMS} itens.`);
+  // Achado de auditoria (exploração ao vivo): `payments` de tipo errado
+  // (string, número, objeto) caía direto no `.map()` mais abaixo sem
+  // checagem nenhuma — TypeError não tratado vazando o texto exato da
+  // expressão JS pro cliente ("(input.payments || []).map is not a
+  // function"), em vez de uma mensagem de validação decente.
+  if (input.payments !== undefined && !Array.isArray(input.payments)) {
+    throw new Error('Informe ao menos uma forma de pagamento.');
+  }
   if (input.payments && input.payments.length > MAX_PAYMENTS) {
     throw new Error(`Uma venda não pode ter mais de ${MAX_PAYMENTS} formas de pagamento.`);
   }

@@ -114,6 +114,40 @@ async function login(username, password) {
   check('carreto com 301 itens é rejeitado (400)', deliveryRes.status === 400, deliveryRes.status);
   check('mensagem do carreto é sobre limite de itens', /não pode ter mais de/.test(deliveryBody.error || ''), deliveryBody.error);
 
+  // (5) Achado de auditoria (exploração ao vivo, sessão de continuação):
+  // `items`/`payments` de tipo ERRADO (string em vez de array) caíam
+  // direto num `.map()` sem checagem de tipo antes — TypeError não
+  // tratado vazando o texto exato da expressão JS pro cliente
+  // ("(input.payments || []).map is not a function"), reproduzido de
+  // verdade contra o servidor rodando. As três rotas devem responder com
+  // uma mensagem de validação normal, nunca o texto cru do erro do
+  // motor JS (que sempre contém "is not a function" ou ".map"/".filter").
+  const looksLikeRawJsError = (msg) => /is not a function|TypeError|\.map\(|\.filter\(/.test(msg || '');
+
+  const badPaymentsRes = await fetch(`${BASE}/api/sales`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: sellerCookie },
+    body: JSON.stringify({ items: [{ productId: product.id, qty: 1 }], payments: 'nao sou array', dedupeKey: 'dos-test-badpayments-' + Date.now() }),
+  });
+  const badPaymentsBody = await badPaymentsRes.json();
+  check('venda com payments não-array é rejeitada (400)', badPaymentsRes.status === 400, badPaymentsRes.status);
+  check('mensagem NÃO vaza erro cru do motor JS (payments)', !looksLikeRawJsError(badPaymentsBody.error), badPaymentsBody.error);
+
+  const badOrderItemsRes = await fetch(`${BASE}/api/purchases`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+    body: JSON.stringify({ supplierId: supplier.id, items: 'nao sou array' }),
+  });
+  const badOrderItemsBody = await badOrderItemsRes.json();
+  check('pedido de compra com items não-array é rejeitado (400)', badOrderItemsRes.status === 400, badOrderItemsRes.status);
+  check('mensagem NÃO vaza erro cru do motor JS (pedido de compra)', !looksLikeRawJsError(badOrderItemsBody.error), badOrderItemsBody.error);
+
+  const badDeliveryItemsRes = await fetch(`${BASE}/api/deliveries`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+    body: JSON.stringify({ customerId: customer.id, items: 'nao sou array' }),
+  });
+  const badDeliveryItemsBody = await badDeliveryItemsRes.json();
+  check('carreto com items não-array é rejeitado (400)', badDeliveryItemsRes.status === 400, badDeliveryItemsRes.status);
+  check('mensagem NÃO vaza erro cru do motor JS (carreto)', !looksLikeRawJsError(badDeliveryItemsBody.error), badDeliveryItemsBody.error);
+
   console.log('\n' + (results.every(Boolean) ? 'TUDO OK' : 'ALGO FALHOU'));
   process.exit(results.every(Boolean) ? 0 : 1);
 })();
