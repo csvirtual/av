@@ -86,12 +86,33 @@ function rowToProduct(row) {
   return JSON.parse(row.data);
 }
 
+// Achado de auditoria (DoS, exploração ao vivo): sem limite nenhum no
+// tamanho de `items`, uma única requisição autenticada (qualquer
+// vendedor, mesmo sem nenhuma permissão extra) com um array gigante
+// travava o processo inteiro — reproduzido de verdade com 200.000 itens:
+// a venda em si (dentro da transação síncrona, 1 SELECT real por item)
+// levou ~9s, e QUALQUER outra requisição chegando nesse meio-tempo
+// (outro terminal, outra loja em modo multi-tenant) ficou parada
+// esperando o event loop liberar — Node é single-threaded e
+// better-sqlite3 é síncrono de propósito (ver comentário no topo do
+// arquivo), então nada mais roda enquanto o loop não termina. Um carrinho
+// de verdade nunca chega perto de 300 itens; o limite existe só pra
+// travar ANTES de abrir a transação (checagem O(1), mais barata possível).
+const MAX_SALE_ITEMS = 300;
+const MAX_REFUND_ITEMS = 300;
+const MAX_PAYMENTS = 20;
+
 /** A venda inteira (conferir estoque de cada item, debitar, gravar) roda
  * dentro de UMA transação SQLite — se qualquer item não tiver estoque
  * suficiente, a transação inteira desfaz sozinha (nenhum produto fica
  * debitado pela metade). `db.transaction()` do better-sqlite3 já cuida
  * do BEGIN/COMMIT/ROLLBACK; só precisa lançar uma exceção pra abortar. */
 function commitSale(input, targetDb) {
+  if (!Array.isArray(input.items)) throw new Error('A venda precisa ter ao menos um item.');
+  if (input.items.length > MAX_SALE_ITEMS) throw new Error(`Uma venda não pode ter mais de ${MAX_SALE_ITEMS} itens.`);
+  if (input.payments && input.payments.length > MAX_PAYMENTS) {
+    throw new Error(`Uma venda não pode ter mais de ${MAX_PAYMENTS} formas de pagamento.`);
+  }
   return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.
@@ -401,6 +422,8 @@ router.get('/:id', (req, res) => {
  * conferir, marcar qtyRefunded e devolver ao estoque tudo dentro de uma
  * transação só. */
 function commitRefund(input, targetDb) {
+  if (!Array.isArray(input.items)) throw new Error('Informe ao menos um item pra estornar.');
+  if (input.items.length > MAX_REFUND_ITEMS) throw new Error(`Um estorno não pode ter mais de ${MAX_REFUND_ITEMS} itens.`);
   return targetDb.transaction(() => {
   // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
   // routes/deliveries.js#commitDelivery pro raciocínio completo.

@@ -25,6 +25,10 @@ const UPDATE_DELIVERY_SQL = 'UPDATE deliveries SET status = @status, data = @dat
 const GET_DELIVERY_SQL = 'SELECT * FROM deliveries WHERE id = ?';
 const LIST_DELIVERIES_SQL = 'SELECT data FROM deliveries ORDER BY created_at DESC';
 const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
+// Achado de auditoria (DoS): mesma classe de risco medida ao vivo em
+// routes/sales.js#commitSale — limite defensivo antes de qualquer
+// trabalho real sobre o array de itens.
+const MAX_DELIVERY_ITEMS = 300;
 
 function rowToDelivery(row) { return JSON.parse(row.data); }
 
@@ -64,6 +68,9 @@ router.post('/', (req, res) => {
     if (!customerRow) throw new Error('Selecione um cliente para o carreto.');
     const customer = JSON.parse(customerRow.data);
 
+    if (req.body.items && req.body.items.length > MAX_DELIVERY_ITEMS) {
+      throw new Error(`Um carreto não pode ter mais de ${MAX_DELIVERY_ITEMS} itens.`);
+    }
     const items = (req.body.items || [])
       .map((item) => ({
         source: item.source === 'avulso' ? 'avulso' : 'estoque',

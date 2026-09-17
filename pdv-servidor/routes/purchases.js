@@ -17,6 +17,12 @@ import { respondValidationError } from '../lib/httpResponses.js';
 const router = Router();
 
 const CUSTOM_UNIT_VALUE = 'personalizado';
+// Achado de auditoria (DoS): mesma classe de risco medida ao vivo em
+// routes/sales.js#commitSale (array de itens sem limite travando o
+// processo inteiro, síncrono) — mesmo limite defensivo aqui, antes de
+// qualquer trabalho real.
+const MAX_ORDER_ITEMS = 300;
+const MAX_RECEIVE_ITEMS = 300;
 
 // Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
 // como texto, não mais prepared statements pré-montados — cada handler
@@ -62,6 +68,9 @@ router.post('/', (req, res) => {
     if (!supplierRow) throw new Error('Selecione um fornecedor.');
     const supplier = JSON.parse(supplierRow.data);
 
+    if (req.body.items && req.body.items.length > MAX_ORDER_ITEMS) {
+      throw new Error(`Um pedido de compra não pode ter mais de ${MAX_ORDER_ITEMS} itens.`);
+    }
     const orderItems = (req.body.items || [])
       .map((item) => {
         const qtyOrdered = Number(item.qty);
@@ -96,6 +105,9 @@ router.post('/', (req, res) => {
 });
 
 function commitReceive(input, targetDb) {
+  if (input.items && input.items.length > MAX_RECEIVE_ITEMS) {
+    throw new Error(`Um recebimento não pode ter mais de ${MAX_RECEIVE_ITEMS} itens.`);
+  }
   return targetDb.transaction(() => {
     // Achado de auditoria (P2): dedupeKey agora é obrigatória — ver
     // routes/deliveries.js#commitDelivery pro raciocínio completo.
