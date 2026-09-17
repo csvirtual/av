@@ -133,6 +133,22 @@ app.use((err, req, res, next) => {
 });
 app.use(cookieParser());
 
+// Achado de auditoria (pré-lançamento, HTTP security headers): dois
+// headers de baixo risco (nunca quebram nada — não são como CSP, que
+// exigiria mapear todo script/estilo inline de cada tela antes de ligar
+// com segurança, incluindo public-admin/public-signup). X-Content-Type-Options
+// impede o navegador de "adivinhar" um Content-Type diferente do
+// declarado (ex: tratar um upload como HTML executável) — mitigação
+// padrão contra um raciocínio de MIME-sniffing que, combinado com
+// upload de arquivo, vira XSS. Referrer-Policy evita vazar a URL cheia
+// (que pode ter dados da loja num path) pra um link externo clicado de
+// dentro do sistema.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
+
 // Etapa 3 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // resolve o tenant pelo subdomínio do Host (ex: lojax.<MULTI_TENANT_DOMAIN>
 // -> slug "lojax"), ANTES de qualquer outro gate — se o Host não apontar
