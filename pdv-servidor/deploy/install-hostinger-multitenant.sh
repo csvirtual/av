@@ -143,11 +143,15 @@ systemctl enable pdv-servidor >/dev/null
 systemctl restart pdv-servidor
 
 echo "==> Aguardando o servidor subir..."
+# Nota: em modo multi-tenant, o domínio-base (cadastro) e admin.$DOMAIN
+# bloqueiam qualquer /api/* que não seja deles próprios com 404 — então
+# aqui não dá pra exigir sucesso (-f), só provar que o servidor está de
+# pé e respondendo alguma coisa (mesmo um 404 já prova isso).
 for i in $(seq 1 20); do
-  if curl -sf http://127.0.0.1:3131/api/status -H "Host: $DOMAIN" >/dev/null 2>&1; then break; fi
+  if curl -s -o /dev/null http://127.0.0.1:3131/api/status -H "Host: $DOMAIN" 2>&1; then break; fi
   sleep 0.5
 done
-if ! curl -sf http://127.0.0.1:3131/api/status -H "Host: $DOMAIN" >/dev/null 2>&1; then
+if ! curl -s -o /dev/null http://127.0.0.1:3131/api/status -H "Host: $DOMAIN" 2>&1; then
   echo "O servidor não respondeu a tempo. Veja o log com: journalctl -u pdv-servidor -e" >&2
   exit 1
 fi
