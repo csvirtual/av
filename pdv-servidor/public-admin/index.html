@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV - C&amp;S Virtual: Painel de Controle</title>
+<script>
+  // Aplica o tema salvo ANTES do CSS renderizar, pra não piscar no tema
+  // errado por uma fração de segundo (mesma chave "theme.preference" de
+  // public/js/theme.js — cada origem tem seu próprio localStorage, então
+  // isso não "puxa" a preferência de outra tela, só reaproveita o nome
+  // pra quem já conhece o padrão do resto do PDV).
+  (function () {
+    try {
+      var v = localStorage.getItem('theme.preference');
+      if (v === 'dark' || v === 'light') document.documentElement.setAttribute('data-theme', v);
+    } catch {}
+  })();
+</script>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <!--
+    Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+    painel mínimo de Super Admin — login (control/plataforma.sqlite3 #
+    platform_admins) + listar lojas + mudar status/vencimento
+    (control/db.js#setTenantStatus, mesma função que a CLI
+    scripts/createTenant.js --set-status usa). Sem contrapartida na
+    extensão (pdv-extension) — tela nova, de propósito fora da regra de
+    paridade visual documentada em CLAUDE.md (que vale só pra telas que
+    existem nos dois produtos).
+  -->
+  <div id="toast-root" aria-live="polite"></div>
+
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
+
+  <div id="login-screen" class="screen" hidden>
+    <main class="auth-screen">
+      <form id="login-form" class="auth-card">
+        <div class="auth-brand">
+          <span class="dot" aria-hidden="true"></span>
+          <span>PDV - C&amp;S Virtual (multi-terminal)</span>
+        </div>
+        <h1>Painel de Controle</h1>
+        <p class="subtitle">Administre as lojas cadastradas.</p>
+        <div class="field">
+          <label for="login-username">Usuário</label>
+          <input id="login-username" name="username" type="text" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Senha</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn-submit">Entrar</button>
+        <p id="login-error" class="error" role="alert"></p>
+      </form>
+    </main>
+  </div>
+
+  <!-- Mesmo estilo (.boot-loading/.card) e mesmo texto de
+       public/js/app.js#renderTabBlockedScreen — a tela de "já aberto em
+       outra aba" do PDV da própria loja, ver admin.js#watchTabPresence. -->
+  <div id="blocked-screen" class="screen" hidden>
+    <div class="boot-loading">
+      <div class="card" style="max-width:420px;text-align:center;">
+        <div style="margin-bottom:6px;"><svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 014.5 5H9l2 2.5h8.5A1.5 1.5 0 0121 9v9a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 18V6.5z" fill="#e0b385" stroke="#a9723f" stroke-width=".8" stroke-linejoin="round"/><path d="M3 9h18" stroke="#c98a4b" stroke-width=".8"/></svg></div>
+        <h1 style="font-size:18px;margin:0 0 18px;text-transform:uppercase;letter-spacing:0.4px;">Já aberto em outra janela</h1>
+        <p style="margin:0 0 10px;">O Painel de Controle já está aberto em outra janela deste navegador. Pra evitar duas telas mexendo nas lojas ao mesmo tempo, esta fica bloqueada.</p>
+        <p class="text-muted" style="font-size:13px;margin:0;">Feche esta e continue na outra, ou feche a outra: assim que ela fechar, esta libera sozinha em poucos segundos, sem precisar recarregar nada.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-screen" class="screen" hidden>
+    <div class="page-shell">
+      <header class="page-header">
+        <div>
+          <h1>Painel de Controle</h1>
+          <p class="desc">Administre as lojas cadastradas.</p>
+        </div>
+        <div class="header-actions">
+          <button id="admin-username" type="button" class="admin-username" title="Trocar usuário/senha"></button>
+          <button id="lixeira-btn" type="button" class="btn-secondary btn-sm">Lixeira</button>
+          <button id="logout-btn" type="button" class="btn-secondary btn-sm">Sair</button>
+        </div>
+      </header>
+      <main>
+        <div class="table-wrap">
+          <table id="tenants-table">
+            <thead>
+              <tr>
+                <th>Loja</th>
+                <th>Slug</th>
+                <th>CNPJ</th>
+                <th>Status</th>
+                <th>Vencimento</th>
+                <th>Criada em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tenants-body"></tbody>
+          </table>
+        </div>
+        <p id="empty-state" class="table-empty" hidden>Nenhuma loja cadastrada ainda.</p>
+      </main>
+    </div>
+  </div>
+
+  <template id="tenant-row-template">
+    <tr>
+      <td class="tenant-name"></td>
+      <td class="tenant-slug"></td>
+      <td class="tenant-cnpj"></td>
+      <td>
+        <select class="tenant-status"></select>
+      </td>
+      <td>
+        <input type="date" class="tenant-expires">
+      </td>
+      <td class="tenant-created"></td>
+      <td class="tenant-actions">
+        <button type="button" class="save-btn">Salvar</button>
+        <button type="button" class="keygen-btn">Chave</button>
+        <button type="button" class="delete-btn">Excluir</button>
+      </td>
+    </tr>
+  </template>
+
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+/* Etapa 9 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+ * mesmos tokens de cor/tipografia/sombra de public/css/styles.css
+ * (:root, .auth-screen, .auth-card, .field, .btn) — copiados pra este
+ * bundle separado (public-signup/ é servido isolado de public/, ver
+ * server.js) em vez de importados, pra manter o cadastro autocontido.
+ * Resultado: mesma "cara" da tela de login, sem herdar o arquivo de
+ * 2000+ linhas inteiro que não se aplica aqui (não há carrinho, tabela,
+ * menu lateral etc. nesta tela). */
+:root {
+  --bg: #f4f6f5;
+  --surface: #ffffff;
+  --surface-alt: #eef1f0;
+  --border: #dde3e1;
+  --text: #1c2523;
+  --text-muted: #62716d;
+  --primary: #145333;
+  --primary-dark: #0d3b24;
+  --primary-light: #e4f0e9;
+  --danger: #b3261e;
+  --danger-light: #fbe9e7;
+  --success: #1a7a45;
+  --success-light: #e4f0e9;
+  --warning: #a6650f;
+  --warning-light: #fbeecd;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
+}
+
+/* [data-theme] permite o botão .theme-toggle sobrepor a preferência do
+ * sistema operacional com uma escolha explícita — guardado por
+ * :not([data-theme="light"]) pra uma escolha explícita de claro vencer o
+ * SO quando o SO estiver em escuro (mesmo padrão de public/js/theme.js). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101613;
+    --surface: #1a221e;
+    --surface-alt: #212b25;
+    --border: #34413a;
+    --text: #e9efec;
+    --text-muted: #93a89e;
+    --primary: #2f9d6b;
+    --primary-dark: #0d2b1c;
+    --primary-light: rgba(47, 157, 107, 0.18);
+    --danger: #e5645a;
+    --danger-light: rgba(229, 100, 90, 0.18);
+    --success: #3fae6c;
+    --success-light: rgba(47, 157, 107, 0.18);
+    --warning: #d99a35;
+    --warning-light: rgba(217, 154, 53, 0.18);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101613;
+  --surface: #1a221e;
+  --surface-alt: #212b25;
+  --border: #34413a;
+  --text: #e9efec;
+  --text-muted: #93a89e;
+  --primary: #2f9d6b;
+  --primary-dark: #0d2b1c;
+  --primary-light: rgba(47, 157, 107, 0.18);
+  --danger: #e5645a;
+  --danger-light: rgba(229, 100, 90, 0.18);
+  --success: #3fae6c;
+  --success-light: rgba(47, 157, 107, 0.18);
+  --warning: #d99a35;
+  --warning-light: rgba(217, 154, 53, 0.18);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--text);
+}
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--primary-dark), var(--primary) 65%);
+  padding: 32px 16px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 440px;
+  padding: 36px 40px;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.auth-brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.auth-brand span:last-child {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.auth-card h1 { font-size: 22px; margin: 10px 0 4px; text-wrap: balance; }
+.auth-card p.subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.field input {
+  padding: 9px 11px;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input::placeholder { color: var(--text-muted); opacity: 0.6; }
+.field input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.slug-row { display: flex; align-items: center; gap: 8px; }
+.slug-row input { flex: 1; min-width: 0; }
+.slug-domain { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
+.feedback { font-size: 12px; min-height: 16px; margin: 2px 0 0; transition: color 0.15s ease; }
+.feedback.ok { color: var(--success); }
+.feedback.bad { color: var(--danger); }
+
+.btn-submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.btn-submit:hover { background: var(--primary-dark); }
+.btn-submit:active { transform: translateY(1px); }
+.btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 10px 0 0; text-align: center; }
+
+/* ---------- Card de sucesso ---------- */
+/* :not([hidden]) importa: uma regra de autor com "display" sempre vence
+   o "display: none" que o navegador aplica por padrão pro atributo
+   [hidden] — sem essa exceção, este card continuava visível (lado a
+   lado com o formulário) mesmo com o atributo hidden presente. */
+.success-card:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.success-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--success);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 0 16px;
+}
+.success-card h1 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.success-card p.subtitle { margin: 0 0 20px; }
+.success-link-btn {
+  display: inline-block;
+  margin: 0 0 24px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  word-break: break-all;
+  transition: background 0.15s ease;
+}
+.success-link-btn:hover { background: var(--border); }
+/* Mesmo padrão visual de public/css/styles.css .notice-card (usado nos
+   avisos da tela de configuração/login da extensão e do servidor):
+   borda superior colorida + título centralizado com ícone + texto
+   centralizado, em vez de um bloco cinza qualquer. */
+.hint-block {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.hint-block .hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--warning);
+}
+.hint-block p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.hint-block strong { color: var(--text); }
+
+/* Canto inferior direito, mesmo padrão de public/css/styles.css
+   #toast-root (o resto do PDV inteiro usa esse canto) — não o superior,
+   que além de fugir do padrão colidia visualmente com o botão de tema. */
+#toast-root {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+}
+.toast.error { background: var(--danger); }
+
+/* Botão discreto de claro/escuro — canto da tela, sempre visível mas sem
+ * chamar atenção (sem texto, mesmo cartão branco/escuro do resto da UI). */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  z-index: 900;
+}
+.theme-toggle:hover { background: var(--surface-alt); color: var(--text); }
+.theme-toggle svg { display: block; }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 28px 24px; }
+}

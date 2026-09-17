@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste isolado — productsRepo.js + stockRepo.js (servidor)</title>
+</head>
+<body>
+<!--
+  Harness mínimo pra testar public/js/data/productsRepo.js e
+  public/js/data/stockRepo.js sozinhos, sem depender de nenhuma tela real
+  (Fase 9 ainda não portou views/products.js) — mesmo espírito de
+  test-session.html. Expõe os dois módulos e um helper de login em
+  `window` pra um script Playwright chamar direto.
+-->
+<script type="module">
+  import * as productsRepo from './js/data/productsRepo.js';
+  import * as stockRepo from './js/data/stockRepo.js';
+  window.__productsRepo = productsRepo;
+  window.__stockRepo = stockRepo;
+
+  window.__login = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'login falhou');
+    return body.user;
+  };
+</script>
+</body>
+</html>

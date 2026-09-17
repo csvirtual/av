@@ -1,7 +1,7 @@
 // Tela de login. Cada vendedor/administrador entra com seu próprio usuário
 // e senha — é isso que garante que toda venda e ação fique corretamente
 // atribuída a uma pessoa (rastreabilidade + log de auditoria).
-import { verifyLogin } from '../data/usersRepo.js';
+import { verifyLogin, findByUsername } from '../data/usersRepo.js';
 import { setSessionUserId } from '../session.js';
 import { logAction } from '../data/auditRepo.js';
 import { escapeHtml } from '../utils/format.js';
@@ -137,6 +137,28 @@ export function renderLogin(root, { onLogin, company }) {
       // tentativa duas vezes.
       const user = await verifyLogin(username, password);
       if (!user) {
+        // Achado de auditoria: até aqui, uma tentativa malsucedida só
+        // ficava no contador efêmero do bloqueio (loginLockout.js, some
+        // ao passar os 60s) — o Log do sistema (permanente) nunca sabia
+        // que alguém tentou entrar errado. Registra aqui — só na tela de
+        // login de verdade, não nos modais de confirmar senha de admin
+        // (passwordConfirm.js), que usam verifyLogin com outro namespace
+        // e têm seu próprio contexto de ação já logado pelo chamador.
+        // Distingue "conta existe mas a senha veio errada" de "esse
+        // usuário nem existe" só no log interno — a mensagem pro usuário
+        // continua genérica, sem revelar qual dos dois foi.
+        const existing = await findByUsername(username);
+        await logAction({
+          userId: existing?.id ?? null,
+          userName: existing?.nome ?? username,
+          role: existing?.role ?? null,
+          action: 'Login malsucedido',
+          details: existing
+            ? `Tentativa de login com senha incorreta para "${existing.nome}".`
+            : `Tentativa de login com usuário inexistente ("${username}").`,
+          entity: 'auth', entityId: existing?.id ?? null,
+        });
+
         const newState = await getLoginLockState(username);
         if (newState.remainingMs > 0) {
           lockFields(newState.lockedUntil);

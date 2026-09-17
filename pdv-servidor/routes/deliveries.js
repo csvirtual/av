@@ -1,0 +1,163 @@
+// Fase 6 (carreto): lista organizada do que precisa ser entregue pro
+// cliente numa entrega — comum em loja de material de construção. É só um
+// registro de controle/logística: NÃO mexe em estoque nem em dinheiro (a
+// baixa de estoque de verdade já acontece na Venda) — o carreto só ajuda a
+// organizar o que precisa sair, pra quem, e se já foi entregue ou não.
+import { Router } from 'express';
+import { db, claimIdempotencyKey } from '../db/index.js';
+import { broadcast } from '../lib/broadcast.js';
+import { TOPIC_DELIVERIES_CHANGED } from '../public/js/utils/liveTopics.js';
+import { respondValidationError } from '../lib/httpResponses.js';
+import { DELIVERY_STATUS_PENDING, DELIVERY_STATUS_DELIVERED, DELIVERY_STATUS_CANCELLED } from '../public/js/utils/deliveryStatus.js';
+
+const router = Router();
+
+// Etapa 5 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"): SQL
+// como texto, não mais prepared statements pré-montados — cada handler
+// prepara contra `req.db`, sempre já resolvido pro banco certo (o da
+// loja, ou o banco fixo do processo em modo legado) — server.js#tenant
+// resolution middleware é a ÚNICA fonte dessa decisão agora, nenhuma
+// rota mais precisa repetir o fallback.
+const INSERT_DELIVERY_SQL = `
+  INSERT INTO deliveries (id, customer_id, status, created_at, data) VALUES (@id, @customerId, @status, @createdAt, @data)
+`;
+const UPDATE_DELIVERY_SQL = 'UPDATE deliveries SET status = @status, data = @data WHERE id = @id';
+const GET_DELIVERY_SQL = 'SELECT * FROM deliveries WHERE id = ?';
+const LIST_DELIVERIES_SQL = 'SELECT data FROM deliveries ORDER BY created_at DESC';
+const GET_CUSTOMER_SQL = 'SELECT data FROM customers WHERE id = ?';
+// Achado de auditoria (DoS): mesma classe de risco medida ao vivo em
+// routes/sales.js#commitSale — limite defensivo antes de qualquer
+// trabalho real sobre o array de itens.
+const MAX_DELIVERY_ITEMS = 300;
+
+function rowToDelivery(row) { return JSON.parse(row.data); }
+
+router.get('/', (req, res) => {
+  const status = req.query.status;
+  let deliveries = req.db.prepare(LIST_DELIVERIES_SQL).all().map(rowToDelivery);
+  if (status) deliveries = deliveries.filter((d) => d.status === status);
+  res.json({ deliveries });
+});
+
+// Achado de auditoria (mesma classe já corrigida em products/stock/sales):
+// a versão anterior não tinha proteção nenhuma contra reenvio — um duplo
+// clique em "Criar carreto" (ou o clique automático de "Finalizar venda +
+// carreto" em sale.js, que cria a venda E o carreto numa sequência) criava
+// dois registros idênticos. deliveriesRepo.js#createDelivery da extensão
+// já reivindica um dedupeKey pra isso — porta o mesmo aqui.
+function commitDelivery(input, targetDb) {
+  return targetDb.transaction(() => {
+    // Achado de auditoria (P2): antes, `dedupeKey` era inteiramente opcional
+    // — o servidor nunca EXIGIA a chave, só a usava se o chamador decidisse
+    // mandar. Uma chamada direta à API (fora das telas, que sempre mandam)
+    // não tinha proteção nenhuma contra reenvio duplicado. Agora é exigida
+    // em toda rota com efeito de negócio real.
+    claimIdempotencyKey(input.dedupeKey, targetDb);
+    targetDb.prepare(INSERT_DELIVERY_SQL).run({
+      id: input.delivery.id, customerId: input.delivery.customerId, status: input.delivery.status,
+      createdAt: input.delivery.createdAt, data: JSON.stringify(input.delivery),
+    });
+    return input.delivery;
+  })();
+}
+
+router.post('/', (req, res) => {
+  try {
+    const targetDb = req.db;
+    const customerRow = targetDb.prepare(GET_CUSTOMER_SQL).get(req.body.customerId);
+    if (!customerRow) throw new Error('Selecione um cliente para o carreto.');
+    const customer = JSON.parse(customerRow.data);
+
+    // Achado de auditoria (exploração ao vivo): `items` de tipo errado
+    // (string, número, objeto) caía direto no `.map()` abaixo sem
+    // checagem nenhuma antes — TypeError não tratado vazando o texto
+    // exato da expressão JS (`"(req.body.items || []).map is not a
+    // function"`) pro cliente, em vez de uma mensagem de validação
+    // decente. Mesma checagem que sales.js#commitSale já faz.
+    if (req.body.items !== undefined && !Array.isArray(req.body.items)) {
+      throw new Error('Adicione ao menos um item ao carreto.');
+    }
+    if (req.body.items && req.body.items.length > MAX_DELIVERY_ITEMS) {
+      throw new Error(`Um carreto não pode ter mais de ${MAX_DELIVERY_ITEMS} itens.`);
+    }
+    const items = (req.body.items || [])
+      .map((item) => ({
+        source: item.source === 'avulso' ? 'avulso' : 'estoque',
+        productId: item.source === 'avulso' ? null : (item.productId || null),
+        name: (item.name || '').trim(),
+        unit: (item.unit || 'un').trim() || 'un',
+        qty: Math.max(0, Number(item.qty) || 0),
+      }))
+      .filter((i) => i.name && i.qty > 0 && (i.source === 'avulso' || i.productId));
+    if (items.length === 0) throw new Error('Adicione ao menos um item ao carreto.');
+
+    const delivery = {
+      id: crypto.randomUUID(),
+      customerId: customer.id,
+      customerName: customer.nome,
+      items,
+      address: (req.body.address || '').trim() || customer.endereco || '',
+      responsible: (req.body.responsible || '').trim(),
+      notes: (req.body.notes || '').trim(),
+      status: DELIVERY_STATUS_PENDING,
+      saleId: req.body.saleId || null,
+      createdBy: { userId: req.userId, userName: req.userName },
+      createdAt: Date.now(),
+      deliveredBy: null,
+      deliveredAt: null,
+    };
+    commitDelivery({ delivery, dedupeKey: req.body.dedupeKey || null }, targetDb);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'created', id: delivery.id }, req.tenantId);
+    res.status(201).json({ delivery });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
+      return res.status(409).json({ error: 'Este carreto já foi registrado — evite reenviar.' });
+    }
+    respondValidationError(res, err);
+  }
+});
+
+// markDelivered/cancelar: a checagem "ainda está pendente?" e a gravação da
+// transição de status acontecem na mesma transação — duas ações
+// concorrentes sobre o mesmo carreto (marcar entregue e cancelar, em
+// terminais diferentes) não conseguem as duas passar na checagem antes de
+// qualquer uma gravar.
+function commitTransition(input, targetDb) {
+  return targetDb.transaction(() => {
+    const row = targetDb.prepare(GET_DELIVERY_SQL).get(input.id);
+    if (!row) throw new Error('Carreto não encontrado.');
+    const delivery = rowToDelivery(row);
+    if (delivery.status !== DELIVERY_STATUS_PENDING) {
+      throw new Error(input.newStatus === DELIVERY_STATUS_DELIVERED ? 'Este carreto não está mais pendente.' : 'Só é possível cancelar um carreto pendente.');
+    }
+    delivery.status = input.newStatus;
+    if (input.newStatus === DELIVERY_STATUS_DELIVERED) {
+      delivery.deliveredBy = { userId: input.userId, userName: input.userName };
+      delivery.deliveredAt = Date.now();
+    }
+    targetDb.prepare(UPDATE_DELIVERY_SQL).run({ id: delivery.id, status: delivery.status, data: JSON.stringify(delivery) });
+    return delivery;
+  })();
+}
+
+router.post('/:id/entregar', (req, res) => {
+  try {
+    const delivery = commitTransition({ id: req.params.id, newStatus: DELIVERY_STATUS_DELIVERED, userId: req.userId, userName: req.userName }, req.db);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'delivered', id: delivery.id }, req.tenantId);
+    res.json({ delivery });
+  } catch (err) {
+    respondValidationError(res, err);
+  }
+});
+
+router.post('/:id/cancelar', (req, res) => {
+  try {
+    const delivery = commitTransition({ id: req.params.id, newStatus: DELIVERY_STATUS_CANCELLED }, req.db);
+    broadcast(TOPIC_DELIVERIES_CHANGED, { reason: 'cancelled', id: delivery.id }, req.tenantId);
+    res.json({ delivery });
+  } catch (err) {
+    respondValidationError(res, err);
+  }
+});
+
+export default router;

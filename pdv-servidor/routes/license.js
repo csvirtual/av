@@ -1,0 +1,80 @@
+// Status e ativação de licença — porta o mesmo mecanismo de
+// data/licenseRepo.js/app.js#renderLicenseBlockedScreen da extensão pro
+// servidor. SEM requireAuth de propósito (ver server.js): o status
+// precisa ser conferido ANTES do login (pra travar o sistema inteiro,
+// tela de login incluída, quando o trial/demo expira — ver
+// public/js/app.js#bootImpl), e a ativação em si também precisa
+// funcionar sem sessão nenhuma, pelo mesmo motivo — quem está bloqueado
+// não tem como logar pra "ganhar permissão" de ativar. A chave assinada é
+// a única proteção de verdade aqui, não uma sessão.
+import { Router } from 'express';
+import { getConfig } from '../lib/companyConfig.js';
+import { getLicenseStatus, setStoredActivationKey } from '../lib/licenseState.js';
+import { verifyLicenseKey } from '../lib/license.js';
+import { logAction } from '../lib/audit.js';
+import { BUILD_VERSION } from '../lib/buildVersion.js';
+import { autoSuspendExpiredTrial } from '../control/db.js';
+import { respondUnexpectedError } from '../lib/httpResponses.js';
+
+const router = Router();
+
+router.get('/status', async (req, res) => {
+  try {
+    const cfg = getConfig(req.db);
+    const cnpj = cfg.cnpj || '';
+    const status = await getLicenseStatus(cnpj, req.db);
+    // Achado do usuário: quando o período de teste de 7 dias acaba, a loja
+    // deve suspender também na PLATAFORMA (não só no PDV dela) — sem
+    // isso, o Painel de Controle continuava mostrando "trial" pra sempre,
+    // mesmo com a loja já bloqueada por dentro. Só mexe se o status
+    // atual for "trial" (ver control/db.js#autoSuspendExpiredTrial) —
+    // nunca roda em modo legado de loja única (sem req.tenantId).
+    if (status.tipo === 'trial-expirado' && req.tenantId) {
+      autoSuspendExpiredTrial(req.tenantId);
+    }
+    // Achado do usuário: a tela de bloqueio (public/js/app.js#renderLicenseBlockedScreen)
+    // roda ANTES de qualquer login — chamar GET /api/company (que exige
+    // sessão) pra montar a mensagem de contato do suporte sempre dava 401
+    // e travava o boot inteiro em "Carregando…". Aqui, junto do status
+    // (já público de propósito, ver comentário no topo do arquivo), vai só
+    // o mínimo não-sensível (mesmas informações que já aparecem impressas
+    // num comprovante) — nunca o cadastro fiscal completo (endereço,
+    // inscrições, LGPD), que continua exigindo login.
+    status.company = { nomeFantasia: cfg.nomeFantasia || '', cnpj, email: cfg.email || '' };
+    status.version = BUILD_VERSION;
+    res.json(status);
+  } catch (err) {
+    respondUnexpectedError(res, err, 'GET /api/license/status', 'Erro inesperado ao conferir a licença.');
+  }
+});
+
+router.post('/activate', async (req, res) => {
+  try {
+    const cnpj = getConfig(req.db).cnpj || '';
+    const result = await verifyLicenseKey(req.body?.key, cnpj);
+    // Mesmo achado de auditoria da extensão (ver app.js#renderLicenseBlockedScreen
+    // e views/company.js): um código de liberação de CNPJ (tipo
+    // 'cnpj-unlock') tem assinatura e CNPJ igualmente válidos — sem checar
+    // o tipo aqui, seria aceito como chave de ativação e viraria
+    // "Definitiva" pra sempre (getLicenseStatus trata "não é demo" como
+    // "é full"). Os dois tipos de código têm o mesmo formato assinado, só
+    // o campo `tipo` dentro do payload diferencia.
+    if (!result.valid || (result.tipo !== 'demo' && result.tipo !== 'full')) {
+      const reason = result.valid ? 'Esse código não é uma chave de ativação (é um código de outro tipo).' : result.reason;
+      return res.status(400).json({ error: reason });
+    }
+    setStoredActivationKey(String(req.body.key).trim(), req.db);
+    logAction({
+      userId: req.userId || null, userName: req.userName || 'Ativação (tela de bloqueio)', role: req.userRole || 'admin',
+      action: 'Chave de ativação aplicada',
+      details: `Licença ativada (tipo: ${result.tipo}) para o CNPJ ${cnpj || '(ainda não cadastrado)'}.`,
+      entity: 'license', entityId: 'main',
+    }, req.db);
+    const status = await getLicenseStatus(cnpj, req.db);
+    res.json(status);
+  } catch (err) {
+    respondUnexpectedError(res, err, 'POST /api/license/activate', 'Erro inesperado ao ativar. Tente novamente.');
+  }
+});
+
+export default router;

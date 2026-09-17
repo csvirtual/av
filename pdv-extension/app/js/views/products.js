@@ -22,6 +22,13 @@ import { paginationHtml, wirePagination, createPageState } from '../components/p
 import { enhanceSelect } from '../components/customSelect.js';
 import { icon } from '../components/icon.js';
 import { draftCartLocationsForProduct } from './sale.js';
+import { PRODUCT_CSV_COLUMNS, stringifyCsv, parseCsv, downloadCsv } from '../utils/csv.js';
+
+// Categorias válidas nesta versão (ver <select id="category-filter"> logo
+// abaixo) — usado pra decidir o que fazer quando um CSV importado traz uma
+// categoria que esta versão não tem (ex: "loja", só existe no pdv-servidor):
+// cai pra 'material' em vez de gravar um valor que a tela não sabe rotular.
+const VALID_CATEGORIES = ['material', 'mercearia'];
 
 const MOVEMENT_LABELS = {
   entrada: 'Entrada', saida: 'Saída', venda: 'Venda', ajuste: 'Ajuste', estorno: 'Estorno',
@@ -89,10 +96,13 @@ export async function renderProducts(container, ctx) {
         <div class="desc">Material de construção e mercearia — visão geral do que a loja tem disponível.</div>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" id="csv-menu-btn">CSV ▾</button>
         ${canAdjustStock ? '<button class="btn btn-secondary" id="inventory-btn">Fazer inventário</button>' : ''}
         ${canManageProducts ? '<button class="btn" id="new-product-btn">+ Novo produto</button>' : ''}
       </div>
     </div>
+    <input type="file" id="csv-import-input" accept=".csv,text/csv" hidden>
+    <div id="csv-import-progress" class="text-muted" style="font-size:13px;margin-bottom:8px;" hidden></div>
     <div class="toolbar">
       <input type="search" id="search-input" placeholder="Buscar por nome ou código de barras — ou escaneie…" autofocus>
       <select id="category-filter">
@@ -214,6 +224,57 @@ export async function renderProducts(container, ctx) {
     document.getElementById('inventory-btn').addEventListener('click', () => openInventoryModal());
   }
 
+  // Exportação sempre disponível pra quem já pode ver o Estoque (não exige
+  // 'manageProducts' — é só leitura, mesmo raciocínio de relatórios). Exporta
+  // o catálogo INTEIRO (ativos e inativos), ignorando o filtro atual da tela
+  // — é uma cópia de backup/migração, não "o que está sendo olhado agora".
+  async function runExportCsv() {
+    const [all, suppliers] = await Promise.all([listProducts(), listSuppliers()]);
+    const supplierNameById = new Map(suppliers.map((s) => [s.id, s.nome]));
+    const csv = stringifyCsv(PRODUCT_CSV_COLUMNS, all.map((p) => productToCsvRow(p, supplierNameById)));
+    downloadCsv(`estoque-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
+
+  const csvFileInput = document.getElementById('csv-import-input');
+  const csvProgressBox = document.getElementById('csv-import-progress');
+  function runImportCsv() { csvFileInput.click(); }
+  csvFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // permite escolher o MESMO arquivo de novo depois (ex: corrigir e reimportar)
+    if (!file) return;
+    csvProgressBox.hidden = false;
+    csvProgressBox.textContent = 'Importando…';
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) {
+        showToast('Arquivo CSV vazio ou sem linhas de dado.', 'error');
+        return;
+      }
+      const result = await importCsvRows(ctx, rows);
+      showImportSummary(result);
+      await refresh();
+    } catch (err) {
+      showToast(err.message || 'Falha ao ler o arquivo CSV.', 'error');
+    } finally {
+      csvProgressBox.hidden = true;
+    }
+  });
+
+  // Um botão só ("CSV ▾") em vez de dois separados — achado do usuário: com
+  // os 4 botões do cabeçalho (export, import, inventário, novo produto)
+  // lado a lado, título + descrição + botões não cabiam mais numa linha só
+  // em telas comuns, e a faixa de botões inteira caía pra debaixo do
+  // título (`.page-header` tem `flex-wrap: wrap`). Reaproveita o mesmo
+  // menu suspenso de "Opções" de cada linha (mesmo estado `openOptionsMenu`,
+  // mesmas classes `.row-options-menu`/`.row-options-item`, mesmo fechamento
+  // por clique fora), só que ancorado no botão do cabeçalho.
+  document.getElementById('csv-menu-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (openOptionsMenu?.triggerBtn === e.currentTarget) { closeOptionsMenu(); return; }
+    openCsvMenu(e.currentTarget);
+  });
+
   function wireRowActions(products) {
     tableBox.querySelectorAll('[data-options]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -284,6 +345,39 @@ export async function renderProducts(container, ctx) {
     menu.style.left = `${rect.right - menu.offsetWidth}px`;
     // Linha perto do rodapé da tela: o menu nasceria cortado embaixo —
     // reabre pra CIMA do botão em vez de embaixo, só nesse caso.
+    if (menu.getBoundingClientRect().bottom > window.innerHeight) {
+      menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
+    }
+
+    menu.querySelectorAll('[data-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = items[Number(btn.dataset.idx)];
+        closeOptionsMenu();
+        item.run();
+      });
+    });
+
+    openOptionsMenu = { menuEl: menu, triggerBtn };
+  }
+
+  // Mesmo mecanismo de openOptionsMenuFor acima, só que com 2 itens fixos
+  // (exportar sempre disponível, importar só com 'manageProducts') em vez
+  // de montados por produto.
+  function openCsvMenu(triggerBtn) {
+    closeOptionsMenu();
+    const items = [{ label: 'Exportar CSV', run: runExportCsv }];
+    if (canManageProducts) items.push({ label: 'Importar CSV', run: runImportCsv });
+
+    const menu = document.createElement('div');
+    menu.className = 'row-options-menu';
+    menu.innerHTML = items.map((item, idx) => `
+      <button type="button" class="row-options-item" data-idx="${idx}">${escapeHtml(item.label)}</button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = triggerBtn.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.left = `${rect.right - menu.offsetWidth}px`;
     if (menu.getBoundingClientRect().bottom > window.innerHeight) {
       menu.style.top = `${rect.top - menu.offsetHeight - 4}px`;
     }
@@ -618,6 +712,161 @@ export async function renderProducts(container, ctx) {
     window.removeEventListener('scroll', closeOptionsMenu, true);
     closeOptionsMenu();
   };
+}
+
+// ---------- Exportar/Importar CSV ----------
+// Mesmo formato de colunas do pdv-servidor (ver utils/csv.js) — pensado pra
+// ser a ponte de migração de catálogo entre os dois produtos, já que o
+// backup de cada um não é compatível com o outro (formato interno
+// diferente por baixo: object store do IndexedDB aqui, tabela SQL lá).
+function productToCsvRow(p, supplierNameById) {
+  return {
+    barcode: p.barcode,
+    name: p.name,
+    category: p.category,
+    unit: p.unit,
+    customUnitLabel: p.unit === CUSTOM_UNIT_VALUE ? (p.customUnitLabel || '') : '',
+    price: p.price,
+    costPrice: p.costPrice,
+    quantity: p.quantity,
+    minStock: p.minStock,
+    supplierName: p.supplierId ? (supplierNameById.get(p.supplierId) || '') : '',
+    active: p.active ? 'sim' : 'não',
+    expiryDate: p.expiryDate || '',
+    expiryPromoDays: p.expiryPromoDays ?? '',
+    promoPrice: p.promoPrice ?? '',
+    customForms: p.unit === CUSTOM_UNIT_VALUE && p.customForms ? JSON.stringify(p.customForms) : '',
+  };
+}
+
+// Valores que a coluna "active" reconhece como "inativo" — qualquer outra
+// coisa (incluindo em branco) vira ativo, o mesmo padrão de "+ Novo
+// produto" (todo produto novo nasce ativo por padrão).
+const INACTIVE_MARKERS = new Set(['não', 'nao', 'false', '0', 'inativo']);
+
+/** Processa cada linha em SEQUÊNCIA, nunca em paralelo — evita que duas
+ * linhas com o MESMO código de barras (planilha com duplicata por engano)
+ * corram a checagem de duplicidade contra o mesmo estado desatualizado e as
+ * duas tentem criar o produto ao mesmo tempo. Código de barras já
+ * cadastrado = ATUALIZA só os campos de cadastro (nome, categoria, preço,
+ * validade...); de propósito NUNCA mexe na quantidade de um produto que já
+ * existe — reimportar o mesmo arquivo (ex: só pra corrigir um preço) não
+ * pode duplicar nem resetar o estoque de quem já vende há tempo. Só produto
+ * NOVO (código de barras inédito na base) recebe a quantidade da planilha
+ * como estoque inicial, do mesmo jeito que "+ Novo produto" já faz. */
+async function importCsvRows(ctx, rows) {
+  const created = [];
+  const updated = [];
+  const errors = [];
+  const warnings = [];
+  const canToggleActive = userCan(ctx.user, 'toggleProduct');
+  // Buscado uma vez só (não a cada linha) — casamento por NOME é
+  // case-insensitive/trim, já que é gente digitando numa planilha, não um
+  // valor escolhido de um <select> como no cadastro manual.
+  const suppliers = await listSuppliers();
+  const supplierIdByName = new Map(suppliers.map((s) => [s.nome.trim().toLowerCase(), s.id]));
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // linha 1 do arquivo é o cabeçalho
+    const barcode = (row.barcode || '').trim();
+    try {
+      const name = (row.name || '').trim();
+      if (!barcode) throw new Error('código de barras vazio');
+      if (!name) throw new Error('nome vazio');
+      let category = (row.category || '').trim();
+      if (!VALID_CATEGORIES.includes(category)) category = 'material';
+      const unit = (row.unit || '').trim() || 'un';
+      let customForms;
+      if (unit === CUSTOM_UNIT_VALUE && row.customForms) {
+        try { customForms = JSON.parse(row.customForms); } catch { throw new Error('coluna customForms com JSON inválido'); }
+      }
+      const supplierNameRaw = (row.supplierName || '').trim();
+      let supplierId = null;
+      if (supplierNameRaw) {
+        supplierId = supplierIdByName.get(supplierNameRaw.toLowerCase()) || null;
+        if (!supplierId) warnings.push({ rowNum, barcode, message: `fornecedor "${supplierNameRaw}" não encontrado — deixado em branco` });
+      }
+      const wantActive = !INACTIVE_MARKERS.has((row.active || '').trim().toLowerCase());
+      const data = {
+        barcode, name, category, unit, customForms, supplierId,
+        customUnitLabel: row.customUnitLabel || '',
+        price: row.price, costPrice: row.costPrice,
+        minStock: row.minStock,
+        expiryDate: row.expiryDate || '',
+        expiryPromoDays: row.expiryPromoDays,
+        promoPrice: row.promoPrice,
+      };
+      const existing = await getByBarcode(barcode);
+      if (existing) {
+        await updateProduct(existing.id, data);
+        if (wantActive !== existing.active) {
+          if (canToggleActive) await setProductActive(existing.id, wantActive);
+          else warnings.push({ rowNum, barcode, message: 'sem permissão para ativar/inativar — status mantido' });
+        }
+        updated.push({ rowNum, barcode, name });
+      } else {
+        const record = await createProduct(data);
+        const quantity = Number(row.quantity) || 0;
+        if (quantity > 0) {
+          await recordMovement({
+            productId: record.id, type: 'entrada', qty: quantity,
+            userId: ctx.user.id, userName: ctx.user.nome, note: 'Estoque inicial via importação CSV',
+          });
+        }
+        if (!wantActive) {
+          if (canToggleActive) await setProductActive(record.id, false);
+          else warnings.push({ rowNum, barcode, message: 'sem permissão para ativar/inativar — produto criado ativo' });
+        }
+        created.push({ rowNum, barcode, name });
+      }
+    } catch (err) {
+      errors.push({ rowNum, barcode, message: err.message });
+    }
+  }
+  if (created.length > 0 || updated.length > 0) {
+    await logAction({
+      userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
+      action: 'Importação CSV de produtos',
+      details: `${created.length} produto(s) criado(s), ${updated.length} atualizado(s), ${errors.length} linha(s) com erro.`,
+      entity: 'inventory', entityId: '',
+    });
+  }
+  return { created, updated, errors, warnings };
+}
+
+function showImportSummary({ created, updated, errors, warnings }) {
+  openModal({
+    title: 'Resultado da importação',
+    submitLabel: 'Fechar',
+    singleButton: true,
+    wide: errors.length > 0 || warnings.length > 0,
+    bodyHtml: `
+      <p><strong>${created.length}</strong> produto(s) criado(s), <strong>${updated.length}</strong> atualizado(s)${errors.length > 0 ? `, <strong>${errors.length}</strong> linha(s) com erro` : ''}.</p>
+      ${updated.length > 0 ? '<p class="text-muted" style="font-size:13px;">Produtos que já existiam (mesmo código de barras) tiveram só o cadastro atualizado — o estoque atual de cada um não foi alterado.</p>' : ''}
+      ${errors.length > 0 ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Linha</th><th>Código de barras</th><th>Erro</th></tr></thead>
+            <tbody>
+              ${errors.map((e) => `<tr><td>${e.rowNum}</td><td>${escapeHtml(e.barcode || '—')}</td><td>${escapeHtml(e.message)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+      ${warnings.length > 0 ? `
+        <p class="text-muted" style="font-size:13px;margin-top:10px;">${warnings.length} aviso(s) — o produto foi processado mesmo assim, só com essa ressalva:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Linha</th><th>Código de barras</th><th>Aviso</th></tr></thead>
+            <tbody>
+              ${warnings.map((w) => `<tr><td>${w.rowNum}</td><td>${escapeHtml(w.barcode || '—')}</td><td>${escapeHtml(w.message)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+    `,
+    onSubmit: () => true,
+  });
 }
 
 /** Formulário de cadastro/edição de produto — vive fora de renderProducts

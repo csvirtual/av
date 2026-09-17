@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV - C&amp;S Virtual: Criar minha loja</title>
+<script>
+  // Aplica o tema salvo ANTES do CSS renderizar, pra não piscar no tema
+  // errado por uma fração de segundo (mesma chave "theme.preference" de
+  // public/js/theme.js — cada origem tem seu próprio localStorage, então
+  // isso não "puxa" a preferência de outra tela, só reaproveita o nome
+  // pra quem já conhece o padrão do resto do PDV).
+  (function () {
+    try {
+      var v = localStorage.getItem('theme.preference');
+      if (v === 'dark' || v === 'light') document.documentElement.setAttribute('data-theme', v);
+    } catch {}
+  })();
+</script>
+<link rel="stylesheet" href="signup.css">
+</head>
+<body>
+  <!--
+    Etapa 9 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
+    cadastro self-service — formulário público, sem login, que provisiona
+    uma loja nova (routes/signup.js -> scripts/createTenant.js#createNewTenant,
+    mesma função da CLI). De propósito sem cobrança nenhuma: toda loja
+    nasce em "trial". Sem contrapartida na extensão — tela nova, fora da
+    regra de paridade visual do CLAUDE.md (que vale só pra telas que
+    existem nos dois produtos) — mas usando o mesmo "molde" visual do
+    login (.auth-screen/.auth-card em public/css/styles.css), só copiado
+    pra este bundle separado em vez de importado, pra manter
+    public-signup/ autocontido.
+  -->
+  <div id="toast-root" aria-live="polite"></div>
+
+  <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
+
+  <main class="auth-screen">
+    <form id="signup-form" class="auth-card">
+      <div class="auth-brand">
+        <span class="dot" aria-hidden="true"></span>
+        <span>PDV - C&amp;S Virtual (multi-terminal)</span>
+      </div>
+      <h1>Criar minha loja</h1>
+      <p class="subtitle">Comece grátis, sem cartão de crédito.</p>
+
+      <div class="field">
+        <label for="nome-fantasia">Nome da loja</label>
+        <input id="nome-fantasia" name="nomeFantasia" type="text" maxlength="120" placeholder="Ex: Mercadinho da Ana" required>
+      </div>
+
+      <div class="field">
+        <label for="razao-social">Razão social</label>
+        <input id="razao-social" name="razaoSocial" type="text" maxlength="120" placeholder="Ex: Ana Comércio de Alimentos LTDA" required>
+      </div>
+
+      <div class="field">
+        <label for="slug">Endereço da sua loja</label>
+        <div class="slug-row">
+          <input id="slug" name="slug" type="text" maxlength="30" placeholder="minhaloja" autocomplete="off" spellcheck="false" required>
+          <span id="slug-domain" class="slug-domain"></span>
+        </div>
+        <p id="slug-feedback" class="feedback" role="status"></p>
+      </div>
+
+      <button type="submit" class="btn-submit">Criar loja grátis</button>
+      <p id="signup-error" class="error" role="alert"></p>
+    </form>
+
+    <div id="success-card" class="auth-card success-card" hidden>
+      <div class="success-icon" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h1>Loja criada!</h1>
+      <p class="subtitle">Sua loja já está pronta:</p>
+      <a id="success-link" class="success-link-btn" href="#" target="_blank" rel="noopener"></a>
+      <div class="hint-block">
+        <div class="hint-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="currentColor" opacity="0.15"/><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="currentColor"/></svg>
+          <span>Primeiro acesso</span>
+        </div>
+        <p>
+          Entre com o usuário <strong>admin</strong> e a senha <strong>admin123</strong>.
+          Você vai precisar trocar essa senha no primeiro login.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script src="signup.js"></script>
+</body>
+</html>

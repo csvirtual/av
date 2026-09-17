@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Teste isolado — salesRepo/deliveriesRepo/companyRepo/cashRepo/customersRepo (servidor)</title>
+</head>
+<body>
+<!--
+  Harness mínimo pra testar os 5 módulos que views/sale.js (PDV) precisa,
+  sem depender da tela real ainda — mesmo espírito de test-products-repo.html.
+-->
+<script type="module">
+  import * as productsRepo from './js/data/productsRepo.js';
+  import * as stockRepo from './js/data/stockRepo.js';
+  import * as salesRepo from './js/data/salesRepo.js';
+  import * as deliveriesRepo from './js/data/deliveriesRepo.js';
+  import * as companyRepo from './js/data/companyRepo.js';
+  import * as cashRepo from './js/data/cashRepo.js';
+  import * as customersRepo from './js/data/customersRepo.js';
+
+  window.__productsRepo = productsRepo;
+  window.__stockRepo = stockRepo;
+  window.__salesRepo = salesRepo;
+  window.__deliveriesRepo = deliveriesRepo;
+  window.__companyRepo = companyRepo;
+  window.__cashRepo = cashRepo;
+  window.__customersRepo = customersRepo;
+
+  window.__login = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'login falhou');
+    return body.user;
+  };
+</script>
+</body>
+</html>

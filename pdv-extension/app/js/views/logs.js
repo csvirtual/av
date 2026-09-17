@@ -104,7 +104,7 @@ export async function renderLogs(container) {
               <tr>
                 <td style="white-space:nowrap;">${formatDateTime(l.timestamp)}</td>
                 <td>${escapeHtml(l.userName)}</td>
-                <td>${isAdmin(l) ? '<span class="badge badge-gold">Admin</span>' : '<span class="badge badge-green">Vendedor</span>'}</td>
+                <td>${l.role == null ? '<span class="badge badge-gray">—</span>' : (isAdmin(l) ? '<span class="badge badge-gold">Admin</span>' : '<span class="badge badge-green">Vendedor</span>')}</td>
                 <td>${escapeHtml(l.action)}</td>
                 <td class="text-muted">${escapeHtml(l.details)}</td>
               </tr>

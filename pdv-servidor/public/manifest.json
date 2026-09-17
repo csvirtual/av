@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "PDV - C&S Virtual (multi-terminal)",
+  "short_name": "PDV C&S",
+  "description": "Gestão de estoque, vendas, fornecedores e colaboradores para lojas de material de construção, mercearias e mercados de bairro — servidor multi-terminal.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f5",
+  "theme_color": "#145333",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
