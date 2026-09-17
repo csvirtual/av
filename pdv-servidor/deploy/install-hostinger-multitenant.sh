@@ -99,6 +99,11 @@ else
   git clone --depth 1 "$REPO_URL" /tmp/av-clone
   mkdir -p "$APP_DIR"
   cp -r /tmp/av-clone/pdv-servidor/. "$APP_DIR"/
+  # A cópia acima não leva a pasta .git (fica um nível acima, em
+  # /tmp/av-clone/.git) — sem ela, lib/buildVersion.js não acha o hash
+  # via `git rev-parse` e cai no fallback "dev". Grava o hash real aqui,
+  # igual ao que `git archive` faria num deploy por zip.
+  git -C /tmp/av-clone rev-parse --short HEAD > "$APP_DIR/BUILD_VERSION"
   rm -rf /tmp/av-clone
   chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 fi
