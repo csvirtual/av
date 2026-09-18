@@ -216,7 +216,7 @@ const SUPPORT_EMAIL = 'csvirtual.av@gmail.com';
 // tela só oferece "fale com o suporte". Só entra no 404: no 403 (loja
 // encontrada mas bloqueada, ex: trial vencido) quem está vendo a tela já
 // é cliente, "cadastre outra loja" não faz sentido nenhum ali.
-function renderTenantContactButtons(message, tenant, status) {
+function renderTenantContactButtons(message, tenant, status, { allowSignupCta = true } = {}) {
   const lines = [`Olá! Uso o sistema PDV - C&S Virtual e preciso de ajuda: ${message}`];
   if (tenant) {
     lines.push('', `Loja: ${tenant.nome_fantasia || tenant.razao_social || '(não identificada)'}`, `CNPJ: ${tenant.cnpj || '(não identificado)'}`);
@@ -224,7 +224,12 @@ function renderTenantContactButtons(message, tenant, status) {
   const contactMessage = lines.join('\n');
   const waHref = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(contactMessage)}`;
   const mailHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('PDV - C&S Virtual: preciso de ajuda')}&body=${encodeURIComponent(contactMessage)}`;
-  const isNotFound = status === 404 && !!MULTI_TENANT_DOMAIN;
+  // allowSignupCta: false pras páginas de "caminho não existe" no próprio
+  // domínio-base de cadastro e no painel de admin (ver catch-all mais
+  // abaixo) — "Cadastre agora grátis" apontando pro MESMO domínio-base em
+  // que a pessoa já está (ou pro painel interno, que não é pra cliente
+  // nenhum) não faz sentido nenhum, só confundiria.
+  const isNotFound = status === 404 && !!MULTI_TENANT_DOMAIN && allowSignupCta;
   const signupHref = `https://${MULTI_TENANT_DOMAIN}/`;
   const signupSection = isNotFound ? `
     <p class="contact-hint">Ainda não tem o nosso PDV na sua loja?</p>
@@ -261,7 +266,7 @@ function renderTenantContactButtons(message, tenant, status) {
 // abaixo é 100% autocontida (mesmos tokens de cor copiados de
 // public-signup/signup.css, mesmo ícone de aviso de components/icon.js)
 // — nasce e morre sem depender de nenhum outro arquivo.
-function renderTenantBlockedPage(message, tenant, status) {
+function renderTenantBlockedPage(message, tenant, status, opts) {
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -333,7 +338,7 @@ function renderTenantBlockedPage(message, tenant, status) {
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
     <h1>Loja indisponível</h1>
     <p>${escapeBlockedPageHtml(message)}</p>
-    ${renderTenantContactButtons(message, tenant, status)}
+    ${renderTenantContactButtons(message, tenant, status, opts)}
   </div>
 </body>
 </html>
@@ -343,9 +348,9 @@ function renderTenantBlockedPage(message, tenant, status) {
 // API (fetch de JS que já tenha carregado) precisa continuar recebendo
 // JSON, não HTML — só a NAVEGAÇÃO de página (o que o navegador mostra na
 // aba) usa a página estilizada acima.
-function sendTenantBlocked(req, res, status, message, tenant) {
+function sendTenantBlocked(req, res, status, message, tenant, opts) {
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
-  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant, status));
+  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant, status, opts));
 }
 // Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
@@ -648,6 +653,31 @@ app.use('/api/reports', requireAuth, requirePermission('relatorios'), reportsRou
 // `null` sem MULTI_TENANT_DOMAIN (mesmo comportamento de sempre).
 app.get('/api/status', (req, res) => {
   res.json({ ok: true, autenticado: !!req.userId, tenantId: req.tenantId || null });
+});
+
+// Achado do usuário (print): visitar um caminho que não existe (ex:
+// digitado errado, link velho, bot sondando) caía no handler PADRÃO do
+// Express — "Cannot GET /caminho", texto cru sem nada do visual do PDV.
+// Pega qualquer requisição que sobrou sem resposta até aqui:
+// - /api/* desconhecido: 404 JSON simples (nunca a página HTML — quem
+//   chama uma API espera JSON, mesmo quando o caminho em si não existe).
+// - No domínio-base de cadastro ou no painel de Super Admin: a mesma
+//   página estilizada de "loja indisponível" já usada pra tenant
+//   desconhecido/bloqueado (ver sendTenantBlocked acima), sem o botão
+//   "Cadastre agora grátis" (apontar pro MESMO domínio em que a pessoa já
+//   está, ou pro painel interno, não faz sentido).
+// - Numa loja de verdade (já resolvida e liberada pelo middleware lá em
+//   cima): NUNCA a página de "indisponível" — a loja existe e está
+//   funcionando, só ninguém bateu num arquivo estático porque o
+//   roteamento do app é por #hash (nunca chega ao servidor, é só o
+//   navegador). Serve o mesmo index.html de sempre e deixa o app decidir
+//   o que mostrar.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Não encontrado.' });
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.isSignupHost) return sendTenantBlocked(req, res, 404, 'Loja não encontrada.', null, { allowSignupCta: false });
+  if (req.isPlatformAdminHost) return sendTenantBlocked(req, res, 404, 'Página não encontrada.', null, { allowSignupCta: false });
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Achado de auditoria (pré-lançamento, exposição de informação — defesa
