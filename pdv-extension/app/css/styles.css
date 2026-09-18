@@ -88,6 +88,19 @@
 }
 
 * { box-sizing: border-box; }
+/* Achado do usuário (pdv-servidor): o Chrome/Android (e outros
+ * navegadores WebKit/Blink em touchscreen) pinta um "flash" cinza
+ * RETANGULAR por cima de qualquer elemento clicável ao tocar, por
+ * padrão — mesmo elementos redondos (o botão "voltar ao topo", um
+ * input[type=radio]), já que esse flash não acompanha border-radius.
+ * Isso é diferente do nosso :focus/:active (que já existe e já está
+ * certo em cada um) — some por cima dele mesmo assim, porque aparece
+ * antes/independente. Desliga esse flash nativo em todo o app; cada
+ * elemento clicável já tem seu próprio feedback de toque combinando
+ * com o design (.btn:active, .scroll-top-btn:active,
+ * input[type=radio]:focus etc.). Réplica idêntica no servidor pra
+ * manter paridade. */
+* { -webkit-tap-highlight-color: transparent; }
 
 html {
   /* Achado do usuário: sem isso, uma tela centralizada (ex: o assistente de
