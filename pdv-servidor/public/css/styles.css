@@ -2142,6 +2142,16 @@ input.customer-search-input:focus {
   .main { padding: 72px 12px 40px; }
 
   .form-row { flex-direction: column; gap: 0; }
+  /* Achado do usuário (Dados da loja, celular): campos como Número/UF/CEP
+   * têm flex-basis fixo em px embutido no HTML (ex: flex:0 0 100px) pra
+   * ficarem estreitos ao lado dos outros no desktop — com .form-row
+   * virando coluna aqui, esse valor em px passa a valer pra ALTURA em
+   * vez de largura, e cada campo virava um bloco vazio do tamanho do
+   * número (100px/90px/130px) em vez da altura real do rótulo+input,
+   * sobrando um vão enorme antes do próximo campo. flex:1 1 auto (com
+   * !important pra vencer o style embutido) devolve a altura ao
+   * conteúdo, e os campos ainda ocupam a largura toda empilhados. */
+  .form-row .field { flex: 1 1 auto !important; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar input, .toolbar select, .toolbar label, .toolbar .custom-select { width: 100%; min-width: 0; }
   .toolbar label { display: flex; justify-content: space-between; gap: 8px; }
