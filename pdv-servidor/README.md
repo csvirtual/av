@@ -1549,7 +1549,7 @@ e testada com essa premissa como critério de aceite.
 | 6 | WebSocket por tenant | `lib/broadcast.js`: `Set` único de conexões vira `Map<tenantId, Set>` — um terminal da Loja A nunca recebe aviso de tempo real de uma mudança na Loja B. |
 | 7 | Assinatura controlada pela plataforma | `tenants.status`/`expires_at` no banco de controle — uma loja "suspenso"/"cancelado"/vencida é bloqueada com `403` ANTES de qualquer rota (HTTP e WebSocket), independente do mecanismo de trial/chave de ativação de cada loja (que continua existindo por baixo, é o licenciamento do produto on-premise). |
 | 8 | Painel de Super Admin | `admin.<MULTI_TENANT_DOMAIN>` — SPA mínima (login + tabela de lojas com status/vencimento editáveis), autenticação própria (`platform_admins`, cookie `admin_session`, nunca confundido com sessão de loja). Mesma função (`control/db.js#setTenantStatus`) usada tanto pela CLI quanto pelo painel — nenhuma lógica duplicada. |
-| 9 | Cadastro self-service | Domínio-base (`<MULTI_TENANT_DOMAIN>`, sem subdomínio) — formulário público, sem login, que provisiona uma loja nova em "trial" na hora (mesma `createNewTenant` da CLI). Trava de taxa por IP (`lib/signupRateLimit.js`) contra abuso trivial. De propósito SEM cobrança nenhuma — ver "O que falta" abaixo. |
+| 9 | Cadastro self-service | Domínio-base (`<MULTI_TENANT_DOMAIN>`, sem subdomínio) — formulário público, sem login, que provisiona uma loja nova em "trial" na hora (mesma `createNewTenant` da CLI). Trava de taxa por IP (`lib/signupRateLimit.js`) contra abuso trivial, mais CAPTCHA opcional (Cloudflare Turnstile, `lib/turnstile.js`) contra ataque de robô, desligado até `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` serem configuradas. De propósito SEM cobrança nenhuma — ver "O que falta" abaixo. |
 
 Cada etapa tem seu próprio `test-tenant*.mjs` (raiz de `pdv-servidor/`),
 rodando contra um servidor real com `MULTI_TENANT_DOMAIN` configurada,
@@ -1592,6 +1592,26 @@ formulário público (nome da loja, razão social, endereço/slug desejado,
 com verificação de disponibilidade em tempo real) que provisiona a MESMA
 coisa por baixo (`routes/signup.js` → `createNewTenant`) — toda loja
 nasce em `trial`, sem cobrança nenhuma.
+
+O cadastro público já tem uma trava de taxa por IP embutida
+(`lib/signupRateLimit.js`), mas contra um ataque de robô de verdade
+(distribuído entre vários IPs) isso sozinho não segura. CAPTCHA
+(Cloudflare Turnstile) opcional, ligado só com duas variáveis de
+ambiente. Sem elas, o cadastro segue funcionando exatamente como
+sempre, sem CAPTCHA nenhum:
+
+```
+TURNSTILE_SITE_KEY=<chave de site>
+TURNSTILE_SECRET_KEY=<chave secreta>
+```
+
+As duas vêm juntas do painel da Cloudflare (dashboard.cloudflare.com →
+Turnstile → Add site, escolha o domínio-base do cadastro). A chave de
+site é pública (o navegador carrega o widget com ela); a secreta nunca
+sai do servidor (usada só pra conferir o token com a Cloudflare em
+`lib/turnstile.js`). Com as duas configuradas, o formulário passa a
+mostrar o widget e a rota `POST /api/signup` passa a exigir e conferir
+o token antes de criar a loja.
 
 Adotar um banco `.sqlite3` já existente (ex: migrar uma instalação
 single-tenant pra dentro do SaaS):

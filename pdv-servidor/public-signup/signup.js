@@ -34,9 +34,39 @@
   const errorEl = document.getElementById('signup-error');
   const toastRoot = document.getElementById('toast-root');
   const submitBtn = form.querySelector('button[type="submit"]');
+  const turnstileWidget = document.getElementById('turnstile-widget');
 
   const baseHost = window.location.host; // ex: "pdv-csvirtual.com.br" (ou "pdv-csvirtual.com.br:3131" em teste local)
   slugDomainEl.textContent = `.${baseHost}`;
+
+  // Achado do usuário: CAPTCHA (Cloudflare Turnstile) na confirmação do
+  // cadastro, contra ataque de robô — ver routes/signup.js pro raciocínio
+  // completo. A chave de site é pública (o próprio widget a expõe no
+  // HTML de qualquer página que o usa), mas só sabemos se está
+  // configurada perguntando ao servidor — sem chave nenhuma, o widget
+  // simplesmente não aparece (turnstile-widget continua vazio) e o
+  // cadastro segue sem CAPTCHA, exatamente como sempre foi até a loja
+  // decidir ligar a proteção.
+  let turnstileWidgetId = null;
+  (async () => {
+    try {
+      const res = await fetch('/api/signup/config');
+      const { turnstileSiteKey } = await res.json();
+      if (!turnstileSiteKey) return;
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        turnstileWidgetId = window.turnstile.render(turnstileWidget, { sitekey: turnstileSiteKey });
+      };
+      document.head.appendChild(script);
+    } catch {
+      // Sem CAPTCHA nenhum se a checagem falhar (ex: offline) — o
+      // cadastro em si segue tentando normalmente, o servidor reconfere
+      // a exigência de qualquer jeito quando a chave está configurada.
+    }
+  })();
 
   function toast(message) {
     const el = document.createElement('div');
@@ -92,6 +122,7 @@
         nomeFantasia: document.getElementById('nome-fantasia').value,
         razaoSocial: document.getElementById('razao-social').value,
         slug: slugInput.value.trim(),
+        turnstileToken: turnstileWidgetId != null ? window.turnstile.getResponse(turnstileWidgetId) : undefined,
       };
       const res = await fetch('/api/signup', {
         method: 'POST',
@@ -111,6 +142,13 @@
       toast(err.message);
     } finally {
       submitBtn.disabled = false;
+      // Achado do usuário: um token do Turnstile só serve pra UMA
+      // tentativa (usada ou não) — sem resetar aqui, uma segunda tentativa
+      // depois de um erro (nome inválido, endereço já em uso etc.) mandava
+      // o MESMO token de novo, que a Cloudflare já rejeita como
+      // reaproveitado, obrigando a recarregar a página inteira só pra
+      // tentar de novo.
+      if (turnstileWidgetId != null) window.turnstile.reset(turnstileWidgetId);
     }
   });
 })();

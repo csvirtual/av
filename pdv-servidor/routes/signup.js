@@ -16,6 +16,7 @@
 import { Router } from 'express';
 import { createNewTenant, validateSlug } from '../scripts/createTenant.js';
 import { checkSignupRateLimit } from '../lib/signupRateLimit.js';
+import { getTurnstileSiteKey, isTurnstileConfigured, verifyTurnstileToken } from '../lib/turnstile.js';
 import { respondValidationError } from '../lib/httpResponses.js';
 
 const router = Router();
@@ -36,6 +37,18 @@ router.get('/check-slug/:slug', (req, res) => {
   }
 });
 
+// Achado do usuário: CAPTCHA (Cloudflare Turnstile) na confirmação do
+// cadastro, contra ataque de robô — ver lib/turnstile.js pro raciocínio
+// completo (inclusive por que fica desligado sem TURNSTILE_SECRET_KEY
+// configurada). A chave pública precisa chegar ao navegador de algum
+// jeito: público-signup/ é um bundle estático isolado (não passa por
+// nenhum template do servidor), então expõe aqui — chave de SITE é
+// pública por natureza (o próprio widget do Cloudflare a expõe no HTML
+// de qualquer página que o usa).
+router.get('/config', (req, res) => {
+  res.json({ turnstileSiteKey: getTurnstileSiteKey() });
+});
+
 router.post('/', async (req, res) => {
   try {
     const rate = checkSignupRateLimit(req.ip);
@@ -43,6 +56,12 @@ router.post('/', async (req, res) => {
       return res.status(429).json({
         error: `Muitos cadastros a partir deste endereço. Aguarde ${Math.ceil(rate.remainingMs / 60000)}min antes de tentar de novo.`,
       });
+    }
+    if (isTurnstileConfigured()) {
+      const captchaOk = await verifyTurnstileToken(req.body?.turnstileToken, req.ip);
+      if (!captchaOk) {
+        throw new Error('Não foi possível confirmar que você não é um robô. Atualize a página e tente de novo.');
+      }
     }
     const slug = String(req.body?.slug || '').trim().toLowerCase();
     const razaoSocial = String(req.body?.razaoSocial || '').trim();

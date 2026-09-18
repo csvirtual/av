@@ -149,6 +149,12 @@ body {
 .feedback.ok { color: var(--success); }
 .feedback.bad { color: var(--danger); }
 
+/* Achado do usuário: CAPTCHA (Cloudflare Turnstile) antes de confirmar o
+   cadastro, contra ataque de robô — ver routes/signup.js. Vazio (0 altura,
+   sem margem) quando a chave não está configurada, então não deixa buraco
+   nenhum na tela até alguém decidir ligar a proteção. */
+.turnstile-widget:not(:empty) { margin: 14px 0 4px; display: flex; justify-content: center; }
+
 .btn-submit {
   width: 100%;
   margin-top: 8px;
