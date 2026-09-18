@@ -367,15 +367,24 @@ router.post('/sessions/:id/fechar', async (req, res) => {
   try {
     const targetDb = req.db;
     // Achado de auditoria (P1, Red Team): a tela (views/caixa.js) já pede
-    // "usuário e senha de qualquer conta ativa" antes de fechar — mas essa
-    // senha nunca era enviada nem conferida por esta rota, só ficava presa
-    // na UI. Reproduzido chamando esta rota direto (curl), sem nenhum
-    // campo de senha: o caixa fechava normalmente. Diferente da aprovação
-    // de desconto (routes/sales.js, que exige especificamente um ADMIN),
-    // aqui vale QUALQUER conta ativa — mesma regra que a tela já descrevia
-    // pro usuário, agora reforçada de verdade no servidor. namespace
-    // 'confirmPassword' (mesmo de sales.js) pra não confundir com o
-    // bloqueio por força bruta do login real (ver lib/loginLockout.js).
+    // usuário e senha antes de fechar — mas essa senha nunca era enviada
+    // nem conferida por esta rota, só ficava presa na UI. Reproduzido
+    // chamando esta rota direto (curl), sem nenhum campo de senha: o caixa
+    // fechava normalmente. namespace 'confirmPassword' (mesmo de
+    // sales.js) pra não confundir com o bloqueio por força bruta do login
+    // real (ver lib/loginLockout.js).
+    //
+    // Achado do usuário: a confirmação aceitava a senha de QUALQUER conta
+    // ativa, sem nenhum vínculo com quem está de fato fechando o caixa —
+    // um vendedor podia fechar o caixa de outro vendedor só sabendo a
+    // senha de um terceiro qualquer. A regra de verdade é mais estrita:
+    // cada vendedor só fecha o PRÓPRIO caixa com a PRÓPRIA senha; um
+    // administrador pode fechar qualquer caixa, mas com a senha DELE
+    // mesmo (ele "pode tudo", não precisa da senha de quem abriu). Como
+    // req.userId aqui já passou por assertCanOperateSession logo abaixo
+    // (só quem abriu, ou um admin, chega até aqui em modo porOperador), a
+    // checagem certa é simples: quem confirma a senha tem que ser a MESMA
+    // conta logada nesta aba, a menos que seja administrador.
     const confirmUsername = req.body.confirmUsername;
     const confirmPassword = req.body.confirmPassword;
     if (!confirmUsername || !confirmPassword) {
@@ -384,6 +393,9 @@ router.post('/sessions/:id/fechar', async (req, res) => {
     const confirmedUser = await verifyLogin(confirmUsername, confirmPassword, { namespace: 'confirmPassword' }, targetDb);
     if (!confirmedUser) {
       return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+    }
+    if (confirmedUser.id !== req.userId && confirmedUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Confirme com a sua própria senha, ou com a senha de um administrador.' });
     }
 
     const row = targetDb.prepare(GET_SESSION_BY_ID_SQL).get(req.params.id);

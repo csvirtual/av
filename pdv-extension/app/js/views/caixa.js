@@ -16,6 +16,7 @@ import {
 } from '../data/cashRepo.js';
 import { getCompany } from '../data/companyRepo.js';
 import { confirmUserPassword } from '../components/passwordConfirm.js';
+import { isAdmin } from '../utils/permissions.js';
 import { buildAutomaticCashCloseBackup } from '../data/backupRepo.js';
 import { logAction } from '../data/auditRepo.js';
 import { formatMoney, formatDateTime, escapeHtml, BASE_PAYMENT_METHODS } from '../utils/format.js';
@@ -425,8 +426,8 @@ async function renderOpenSession(container, ctx, session, refresh) {
 
         <p class="section-title">Confirmação e backup de segurança</p>
         <p class="text-muted" style="font-size:12.5px;margin-top:-8px;">
-          Digite usuário e senha de qualquer conta ativa no sistema (não precisa ser administrador) pra confirmar o
-          fechamento. Ao aceitar a senha, o sistema já gera e baixa sozinho um backup completo e atualizado de tudo —
+          Digite a sua própria senha pra confirmar o fechamento (um administrador pode confirmar com a senha dele em
+          vez da sua). Ao aceitar a senha, o sistema já gera e baixa sozinho um backup completo e atualizado de tudo —
           segurança extra de fim de turno, sem precisar lembrar de ir em "Backup" fazer isso à parte.
         </p>
         <div class="form-row">
@@ -445,17 +446,25 @@ async function renderOpenSession(container, ctx, session, refresh) {
         const confirmUsername = modalEl.querySelector('#f-confirm-user').value.trim();
         const confirmPassword = modalEl.querySelector('#f-confirm-pass').value;
 
-        // Não precisa ser o mesmo usuário logado nesta aba, nem admin —
-        // qualquer conta ativa serve, é só a confirmação de que alguém
-        // autorizado está de fato fechando o caixa agora. confirmUserPassword
-        // já trata erro inesperado de verifyLogin (ex: erro no IndexedDB)
-        // sem deixar o modal travado sem explicar nada — mesmo padrão usado
-        // no modal de aprovação de desconto em views/sale.js.
+        // Achado do usuário: a confirmação aceitava a senha de QUALQUER
+        // conta ativa, sem vínculo nenhum com quem está de fato fechando o
+        // caixa — um vendedor podia fechar o caixa de outro vendedor só
+        // sabendo a senha de um terceiro qualquer. Regra de verdade: cada
+        // vendedor só fecha o PRÓPRIO caixa com a PRÓPRIA senha; um
+        // administrador fecha qualquer caixa, mas com a senha DELE mesmo.
+        // confirmUserPassword já trata erro inesperado de verifyLogin (ex:
+        // erro no IndexedDB) sem deixar o modal travado sem explicar nada
+        // — mesmo padrão usado no modal de aprovação de desconto em
+        // views/sale.js.
         const confirmingUser = await confirmUserPassword({
           username: confirmUsername, password: confirmPassword, errBox,
           emptyMessage: 'Informe usuário e senha pra confirmar o fechamento.',
         });
         if (!confirmingUser) return false;
+        if (confirmingUser.id !== ctx.user.id && !isAdmin(confirmingUser)) {
+          errBox.innerHTML = '<div class="form-error">Confirme com a sua própria senha, ou com a senha de um administrador.</div>';
+          return false;
+        }
 
         const ok = await confirmDialog({
           title: 'Confirmar fechamento',
