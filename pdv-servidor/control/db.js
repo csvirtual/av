@@ -174,6 +174,37 @@ export function listTrashedTenants() {
     .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
 }
 
+// Achado do usuário: sem isto, a lixeira só cresce pra sempre — cada
+// exclusão deixa uma pasta inteira (banco .sqlite3 da loja incluído) em
+// tenants/_lixeira/, nunca apagada sozinha. 90 dias é folga suficiente pra
+// notar uma exclusão errada e restaurar (mesmo bem depois de excluir por
+// engano), sem deixar disco se enchendo de lojas que ninguém mais vai
+// recuperar. Mesmo raciocínio/padrão de db/index.js#sweepOldIdempotencyKeys
+// e lib/session.js#sweepExpiredSessions — chamado pelo mesmo `setInterval`
+// periódico em server.js.
+const TRASH_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Apaga DEFINITIVAMENTE (mesma operação de purgeTrashedTenant abaixo) toda
+ * entrada da lixeira mais velha que TRASH_RETENTION_MS — chamado
+ * periodicamente por server.js, nunca por uma rota (ninguém "pede" isso,
+ * acontece sozinho em segundo plano). Entradas cujo nome não bate no
+ * padrão "<slug>-<timestamp>" (não deveria existir, mas por segurança)
+ * nunca são tocadas aqui — `deletedAt` vem null nesse caso, e null nunca é
+ * "mais velho" que o corte. */
+export function purgeExpiredTrashedTenants() {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  if (!fs.existsSync(trashDir)) return 0;
+  const cutoff = Date.now() - TRASH_RETENTION_MS;
+  let purged = 0;
+  for (const { entry, deletedAt } of listTrashedTenants()) {
+    if (deletedAt !== null && deletedAt < cutoff) {
+      fs.rmSync(path.join(trashDir, entry), { recursive: true, force: true });
+      purged += 1;
+    }
+  }
+  return purged;
+}
+
 /** Restaura uma loja da lixeira — move a pasta de volta pra tenants/<slug>
  * e recadastra no banco de controle (id novo; o cadastro antigo foi
  * apagado por deleteTenant, então isto é, na prática, o mesmo caminho de

@@ -407,60 +407,105 @@
   // (control/db.js#listTrashedTenants/restoreTenant) já guardava a pasta
   // desde a primeira versão do botão Excluir, só faltava um jeito de ver e
   // restaurar isso pela tela.
+  //
+  // Achado do usuário: sem limite nenhum, essa lista só cresceria pra
+  // sempre (uma entrada por exclusão) e o modal teria que renderizar tudo
+  // de uma vez. Duas frentes: 90 dias de retenção automática no servidor
+  // (control/db.js#purgeExpiredTrashedTenants, chamado por um
+  // `setInterval` em server.js — sem rota nenhuma envolvida, roda sozinho)
+  // e paginação aqui na tela — a API continua devolvendo a lista inteira
+  // (já limitada pelos 90 dias) e o modal fatia em páginas de 10, mesmo
+  // padrão "servidor manda tudo, tela pagina" já usado no resto do PDV
+  // (ver public/js/components/pagination.js) — versão mínima copiada aqui
+  // porque public-admin/ é um bundle autocontido (ver comentário no topo
+  // deste arquivo), sem o seletor de tamanho de página (lista pequena
+  // demais pra precisar).
+  const LIXEIRA_PAGE_SIZE = 10;
   function openLixeiraModal() {
-    let listEl;
+    let listEl, pagerEl;
+    let allItems = [];
+    let page = 1;
+
+    function renderRow(item) {
+      const row = document.createElement('div');
+      row.className = 'lixeira-row';
+      row.innerHTML = `
+        <div>
+          <div class="lixeira-slug">${escapeHtml(item.slug)}</div>
+          <div class="lixeira-date">Excluída em ${escapeHtml(formatTrashDate(item.deletedAt))}</div>
+        </div>
+        <div class="lixeira-row-actions">
+          <button type="button" class="restore-btn">Restaurar</button>
+          <button type="button" class="purge-btn">Excluir definitivamente</button>
+        </div>
+      `;
+      row.querySelector('.restore-btn').addEventListener('click', async () => {
+        try {
+          await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}/restore`, { method: 'POST' });
+          toast(`Loja "${item.slug}" restaurada.`, 'success');
+          refresh();
+          loadTenants();
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+      row.querySelector('.purge-btn').addEventListener('click', () => {
+        // Diferente de excluir (que ainda vai pra lixeira), isto é
+        // definitivo — apaga o .sqlite3 de verdade (control/db.js#purgeTrashedTenant),
+        // por isso reconfirma a senha de novo, mesmo já estando dentro
+        // de um fluxo que começou com uma confirmação de senha.
+        openPasswordConfirmModal({
+          title: 'Excluir definitivamente',
+          submitLabel: 'Excluir definitivamente',
+          message: `Excluir <strong>"${escapeHtml(item.slug)}"</strong> definitivamente? Isto apaga os dados da loja de vez. Depois disso não tem mais lixeira, não tem como desfazer.`,
+          onConfirm: async (password) => {
+            await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
+            toast(`"${item.slug}" excluído definitivamente.`, 'success');
+            refresh();
+          },
+        });
+      });
+      return row;
+    }
+
+    // Fatia `allItems` (já em memória, sem chamada nova ao servidor) pra
+    // página atual — trocar de página é só re-render local, mesmo
+    // raciocínio do resto do PDV (slice client-side sobre uma lista que já
+    // cabe inteira em memória).
+    function renderPage() {
+      const totalPages = Math.max(1, Math.ceil(allItems.length / LIXEIRA_PAGE_SIZE));
+      page = Math.min(Math.max(1, page), totalPages);
+      const start = (page - 1) * LIXEIRA_PAGE_SIZE;
+      const pageItems = allItems.slice(start, start + LIXEIRA_PAGE_SIZE);
+
+      listEl.innerHTML = '';
+      for (const item of pageItems) listEl.appendChild(renderRow(item));
+
+      if (allItems.length <= LIXEIRA_PAGE_SIZE) { pagerEl.innerHTML = ''; return; }
+      pagerEl.innerHTML = `
+        <span class="lixeira-pg-info">${start + 1}–${Math.min(start + LIXEIRA_PAGE_SIZE, allItems.length)} de ${allItems.length}</span>
+        <div class="lixeira-pg-buttons">
+          <button type="button" class="lixeira-pg-prev" ${page <= 1 ? 'disabled' : ''}>‹ Anterior</button>
+          <span class="lixeira-pg-current">Página ${page} de ${totalPages}</span>
+          <button type="button" class="lixeira-pg-next" ${page >= totalPages ? 'disabled' : ''}>Próxima ›</button>
+        </div>
+      `;
+      pagerEl.querySelector('.lixeira-pg-prev')?.addEventListener('click', () => { page -= 1; renderPage(); });
+      pagerEl.querySelector('.lixeira-pg-next')?.addEventListener('click', () => { page += 1; renderPage(); });
+    }
+
     async function refresh() {
       if (!listEl) return;
       listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:0;">Carregando…</p>';
+      pagerEl.innerHTML = '';
       try {
         const data = await api('/api/admin/tenants/lixeira');
-        const items = data.trashed || [];
-        if (!items.length) {
+        allItems = data.trashed || [];
+        if (!allItems.length) {
           listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin:0;">A lixeira está vazia.</p>';
           return;
         }
-        listEl.innerHTML = '';
-        for (const item of items) {
-          const row = document.createElement('div');
-          row.className = 'lixeira-row';
-          row.innerHTML = `
-            <div>
-              <div class="lixeira-slug">${escapeHtml(item.slug)}</div>
-              <div class="lixeira-date">Excluída em ${escapeHtml(formatTrashDate(item.deletedAt))}</div>
-            </div>
-            <div class="lixeira-row-actions">
-              <button type="button" class="restore-btn">Restaurar</button>
-              <button type="button" class="purge-btn">Excluir definitivamente</button>
-            </div>
-          `;
-          row.querySelector('.restore-btn').addEventListener('click', async () => {
-            try {
-              await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}/restore`, { method: 'POST' });
-              toast(`Loja "${item.slug}" restaurada.`, 'success');
-              refresh();
-              loadTenants();
-            } catch (err) {
-              toast(err.message, 'error');
-            }
-          });
-          row.querySelector('.purge-btn').addEventListener('click', () => {
-            // Diferente de excluir (que ainda vai pra lixeira), isto é
-            // definitivo — apaga o .sqlite3 de verdade (control/db.js#purgeTrashedTenant),
-            // por isso reconfirma a senha de novo, mesmo já estando dentro
-            // de um fluxo que começou com uma confirmação de senha.
-            openPasswordConfirmModal({
-              title: 'Excluir definitivamente',
-              submitLabel: 'Excluir definitivamente',
-              message: `Excluir <strong>"${escapeHtml(item.slug)}"</strong> definitivamente? Isto apaga os dados da loja de vez. Depois disso não tem mais lixeira, não tem como desfazer.`,
-              onConfirm: async (password) => {
-                await api(`/api/admin/tenants/lixeira/${encodeURIComponent(item.entry)}`, { method: 'DELETE', body: JSON.stringify({ password }) });
-                toast(`"${item.slug}" excluído definitivamente.`, 'success');
-                refresh();
-              },
-            });
-          });
-          listEl.appendChild(row);
-        }
+        renderPage();
       } catch (err) {
         listEl.innerHTML = `<p style="color:var(--danger);font-size:13px;margin:0;">${escapeHtml(err.message)}</p>`;
       }
@@ -470,9 +515,11 @@
       submitLabel: 'Fechar',
       singleButton: true,
       wide: true,
-      bodyHtml: '<div class="lixeira-list"></div>',
+      bodyHtml: '<div class="lixeira-list"></div><div class="lixeira-pagination"></div>',
       onMount: (modalEl) => {
         listEl = modalEl.querySelector('.lixeira-list');
+        pagerEl = modalEl.querySelector('.lixeira-pagination');
+        page = 1;
         refresh();
       },
     });

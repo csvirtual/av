@@ -8,7 +8,7 @@ import os from 'node:os';
 import fs from 'node:fs';
 
 import { db, sweepOldIdempotencyKeys, getTenantDb } from './db/index.js';
-import { controlDb, getTenantBySlug, autoSuspendExpiredTrial } from './control/db.js';
+import { controlDb, getTenantBySlug, autoSuspendExpiredTrial, purgeExpiredTrashedTenants } from './control/db.js';
 import { ensureAdminUser } from './lib/seedAdmin.js';
 import { markTrialStartIfNeeded, getLicenseStatus } from './lib/licenseState.js';
 import { getConfig } from './lib/companyConfig.js';
@@ -833,6 +833,11 @@ setInterval(sweepExpiredSessions, 30 * 60 * 1000);
 // Achado de auditoria (P4): mesmo motivo, agora pra `idempotency_keys` —
 // ver db/index.js#sweepOldIdempotencyKeys.
 setInterval(sweepOldIdempotencyKeys, 30 * 60 * 1000);
+// Achado do usuário: mesmo motivo, agora pra lojas excluídas na lixeira do
+// painel de Super Admin (control/db.js#purgeExpiredTrashedTenants) — sem
+// isso, cada exclusão deixava uma pasta (banco .sqlite3 da loja incluído)
+// em tenants/_lixeira/ pra sempre, sem limite nenhum.
+setInterval(purgeExpiredTrashedTenants, 30 * 60 * 1000);
 
 // Garante que o usuário admin exista antes de aceitar qualquer conexão —
 // idempotente (não faz nada se já existir), então é seguro rodar em TODO
