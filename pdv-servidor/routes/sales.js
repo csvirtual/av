@@ -288,6 +288,17 @@ function commitSale(input, targetDb) {
   }
 
   const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
+  // Achado de auditoria: a política "exigir caixa aberto pra vender"
+  // (Dados da loja → Políticas de venda, routes/company.js) só era
+  // conferida na TELA (sale.js) — chamando esta rota direto (ou por uma
+  // aba com o caixa fechado nesse meio-tempo, ver comentário em sale.js
+  // sobre rebuscar o caixa "no instante exato da finalização"), a venda
+  // registrava normalmente, sem sessão de caixa nenhuma, e esse dinheiro
+  // nunca entrava em conferência de fechamento alguma — mesma classe de
+  // risco já fechada pro creditLimit (ver histórico deste arquivo).
+  if (getConfig(targetDb).requireOpenCashSession && !openSession) {
+    throw new Error('A loja exige caixa aberto para registrar vendas. Abra o caixa antes de continuar.');
+  }
   const sale = {
     id: saleId,
     timestamp: Date.now(),
@@ -499,6 +510,13 @@ function commitRefund(input, targetDb) {
   // isso pra saber em qual fechamento esse dinheiro que sai da gaveta entra
   // na conferência.
   const openSession = resolveOpenSession(input.terminalId, input.userId, targetDb);
+  // Achado de auditoria: mesma política do commitSale acima (só era
+  // conferida em salesHistory.js, nunca reforçada aqui) — sem isso, um
+  // estorno em dinheiro sem caixa aberto tirava dinheiro da gaveta sem
+  // nenhuma conferência de fechamento saber disso.
+  if (getConfig(targetDb).requireOpenCashSession && !openSession) {
+    throw new Error('A loja exige caixa aberto para registrar estornos. Abra o caixa antes de continuar.');
+  }
   const refund = {
     id: crypto.randomUUID(), timestamp: Date.now(), userId: input.userId, userName: input.userName,
     reason: input.reason.trim(), totalRefunded, items: refundedItems,
@@ -537,9 +555,20 @@ function commitRefund(input, targetDb) {
   // routes/cash.js#computeExpectedAmounts já ignora refund.creditGenerated
   // (não reduz o "Dinheiro" esperado) — só faltava gravar o crédito de
   // verdade, que é este bloco.
-  if (refund.creditGenerated) {
+  //
+  // Achado de auditoria: a parte FIADA de `totalRefunded` já vira redução
+  // de dívida no bloco acima (`debtReduced`) — o cliente nunca chegou a
+  // pagar aquele tanto, então não existe dinheiro nenhum ali pra virar
+  // crédito. Gerar crédito sobre o `totalRefunded` CHEIO duplicava a
+  // compensação: o cliente saía com a dívida zerada E com crédito gastável
+  // do mesmo valor que nunca pagou — dinheiro novo saindo do caixa da loja
+  // sem nunca ter entrado. O crédito só pode cobrir a fração que já foi
+  // paga de verdade (dinheiro, cartão, Pix etc.) — o resto (`debtReduced`)
+  // fica só como perdão de dívida.
+  const creditAmount = totalRefunded - debtReduced;
+  if (refund.creditGenerated && creditAmount > 0) {
     const creditEntry = {
-      id: crypto.randomUUID(), customerId: sale.customerId, type: 'estorno-credito', amount: totalRefunded,
+      id: crypto.randomUUID(), customerId: sale.customerId, type: 'estorno-credito', amount: creditAmount,
       note: `Crédito de troca gerado pelo estorno de uma venda`, saleId: sale.id, refundId: refund.id,
       userId: input.userId, userName: input.userName, timestamp: Date.now(),
     };
