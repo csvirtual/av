@@ -164,7 +164,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: '"Usuário ou senha inválidos, ou usuário desativado"',
-        a: 'Mensagem de propósito genérica: o sistema não diz qual dos três é (usuário errado, senha errada, ou usuário existente mas desativado por um admin), pra não dar pista a quem estiver tentando adivinhar credenciais de outra pessoa. Confira os três com quem administra o sistema.',
+        a: 'Mensagem de propósito genérica: o sistema não diz qual dos três é (usuário errado, senha errada, ou usuário existente mas desativado por um admin), pra não dar pista a quem estiver tentando adivinhar credenciais de outra pessoa. Confira os três com o administrador da loja.',
       },
       {
         q: '"Você não pode editar as próprias permissões, peça pra outra pessoa com acesso a Usuários fazer isso"',
@@ -189,7 +189,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: '"Este arquivo de backup foi gerado por uma versão mais nova do sistema, atualize o servidor antes de restaurar"',
-        a: 'Só acontece restaurando um backup gerado por uma versão do servidor mais nova do que a que está rodando agora. Atualize o servidor pra versão mais recente do código (pergunte a quem administra a instalação) e tente restaurar de novo.',
+        a: 'Só acontece tentando restaurar um backup gerado por uma versão mais nova do sistema do que a que está rodando nesta loja agora. Avise o suporte (veja o tópico "Licença e ativação" pros contatos) informando essa mensagem: eles atualizam o sistema e você tenta restaurar de novo.',
       },
     ],
   },
@@ -198,7 +198,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: '"CNPJ já cadastrado e travado..."',
-        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes: depois do primeiro salvamento, o campo trava de propósito (ver tópico "Licença e ativação"). Clique em "Desbloquear edição" e cole o código de liberação, pedindo a quem administra a instalação (é o mesmo lugar que fornece a chave de ativação).',
+        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes: depois do primeiro salvamento, o campo trava de propósito (ver tópico "Licença e ativação"). Clique em "Desbloquear edição" e cole o código de liberação, pedindo ao suporte (o mesmo contato que fornece a chave de ativação, veja o tópico "Licença e ativação").',
       },
       {
         q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
@@ -274,11 +274,11 @@ const TOPICS = [
       <h2>Primeiros passos</h2>
       <p class="help-subtitle">Como o sistema começa a funcionar e como você entra todo dia.</p>
 
-      <h3>Cadastro da loja</h3>
-      <p>Este é o servidor multi-terminal do <strong>PDV - C&amp;S Virtual</strong>: um computador liga o programa (<code>node server.js</code>) e fica no ar pra loja inteira, os outros terminais só acessam pelo navegador com o endereço dele na rede. Diferente da extensão (que pede os dados da loja num assistente de primeira execução), o próprio arranque do servidor já cria sozinho um usuário <strong>Administrador Geral</strong> (usuário <code>admin</code>, senha <code>admin123</code>), pronto pra logar direto, sem nenhum assistente pra preencher antes. O cadastro da loja em si (CNPJ, razão social, endereço, telefone...) fica em <strong>Dados da loja</strong>, no menu, sempre disponível pra editar, sem um passo único de "configuração inicial". Preencher isso não é só burocracia: é o que aparece no recibo impresso de cada venda e no relatório em PDF.</p>
+      <h3>Criando a loja</h3>
+      <p>A loja começa no cadastro rápido do site: nome da loja, razão social e o endereço que ela vai usar (algo como <code>minhaloja.pdv-csvirtual.com.br</code>). Assim que confirma, a loja já está pronta pra acessar, com um usuário <strong>Administrador Geral</strong> (usuário <code>admin</code>, senha <code>admin123</code>) pra entrar pela primeira vez. O restante do cadastro (CNPJ, endereço completo, telefone) fica em <strong>Dados da loja</strong>, no menu, sempre disponível pra editar quando quiser, sem um passo único de "configuração inicial". Preencher isso não é só burocracia: é o que aparece no recibo impresso de cada venda e no relatório em PDF.</p>
       <p>Alguns campos se formatam sozinhos enquanto você digita e só aceitam o formato certo: <strong>CNPJ</strong> ("xx.xxx.xxx/xxxx-xx", com dígito verificador conferido de verdade, igual a Receita faz), <strong>telefone</strong> (celular vira "(xx) x xxxx-xxxx", fixo vira "(xx) xxxx-xxxx") e <strong>CEP</strong> ("xxxxx-xxx"). O mesmo vale pro <strong>e-mail</strong>, se preenchido. Esses campos aparecem de novo em Clientes, Fornecedores e Dados da loja (edição), sempre com a mesma formatação e validação.</p>
       <p>Em <strong>Dados da loja</strong> tem também a seção <strong>Ramo de atuação</strong>: checkboxes de "Material de construção", "Mercearia / Mercadinho" e "Loja", só informativo (não muda nenhum cálculo nem trava nenhuma tela), marque quantos combinarem com o seu negócio.</p>
-      <div class="warn-box"><strong>Primeira coisa a fazer: troque a senha padrão.</strong> Loga com <code>admin</code>/<code>admin123</code> e já vai em <strong>Usuários</strong> trocar essa senha. Ela é a mesma em toda instalação nova deste sistema, continua segura só enquanto ninguém de fora souber que você ainda não trocou. Recomendado fazer isso antes de qualquer outra coisa, principalmente se este servidor for acessível por outros computadores da rede.</div>
+      <div class="warn-box"><strong>O primeiro login já pede pra trocar a senha padrão.</strong> Toda loja nova começa com o usuário <code>admin</code> e a senha <code>admin123</code>. Assim que você loga pela primeira vez, o sistema pede pra trocar essa senha antes de liberar qualquer outra tela, não dá pra adiar nem pular esse passo.</div>
 
       <h3>O Administrador Geral</h3>
       <p>É esse primeiro usuário criado sozinho pelo sistema, com acesso a tudo: cadastro de produtos, usuários, caixa, log de auditoria, configurações. Só existe um administrador geral na loja.</p>
@@ -335,14 +335,9 @@ const TOPICS = [
       <div class="tip"><strong>Errou o CNPJ no cadastro?</strong> Por segurança, o campo de CNPJ não pode ser editado sozinho depois de salvo (veja o aviso ao lado do campo, em Dados da loja). Se precisar corrigir, envie um e-mail para <a href="mailto:csvirtual.av@gmail.com">csvirtual.av@gmail.com</a> pedindo um código de liberação: ele destrava o campo uma única vez, só pra você corrigir.</div>
       <div class="tip"><strong>"A chave salva parou de valer"?</strong> Esse aviso aparece quando existe uma chave de ativação salva, mas ela não bate mais com o CNPJ cadastrado agora. A causa mais comum é ter <strong>restaurado um backup</strong> feito num momento em que o CNPJ da loja era outro (a chave nunca é apagada nem mexida por um backup, veja o tópico "Backup", só que ela foi ativada pra um CNPJ específico). Pra resolver: confira em "Dados da loja" se o CNPJ está correto e, se estiver, cole a chave de novo, ela ativa igual, sem precisar de uma chave nova.</div>
 
-      <h3>Verificar se há uma versão nova</h3>
-      <p>Diferente da extensão (que se atualiza sozinha pelo Chrome), este servidor não tem um botão de atualização dentro do sistema: quem administra a instalação precisa baixar o código mais novo e reiniciar o processo (<code>node server.js</code>) na mão. A versão instalada agora aparece em <strong>Dados da loja</strong>, como "Build" seguido de um código curto: é ela que identifica exatamente qual versão está rodando, pra conferir com quem dá suporte se já existe uma atualização disponível.</p>
-      <div class="tip"><strong>Reiniciar o servidor nunca perde dado nenhum</strong> (vendas, estoque, caixa, clientes etc. ficam gravados no banco, não na memória). Só uma venda com itens no carrinho ainda não finalizada, em algum terminal, seria perdida se o servidor reiniciar bem nesse instante. Se der pra avisar os terminais e esperar o carrinho fechar antes, melhor.</div>
-
-      <h3>Instalar como app (opcional, só no computador do servidor)</h3>
-      <p>Em vez de abrir sempre pelo navegador, dá pra "instalar" este sistema como se fosse um app de verdade: mesmo site, só ganha um ícone próprio e abre em janela cheia, sem barra de endereço. No computador que roda o servidor (o que fica ligado com <code>node server.js</code>), abrindo pelo endereço <code>http://localhost:3131</code>: no Chrome/Edge, clique no ícone de instalar que aparece na barra de endereço, ou no menu do navegador em "Instalar PDV - C&S Virtual...".</p>
-      <div class="warn-box"><strong>Não funciona nos outros terminais nem no celular.</strong> Este sistema roda em HTTP puro na rede da loja, sem certificado (é assim de propósito). Instalar como app exige uma conexão segura (HTTPS) ou o endereço <code>localhost</code>: qualquer terminal ou celular que acesse pelo IP da rede (o jeito normal de usar este sistema no dia a dia) não vai ver a opção de instalar, porque o navegador bloqueia isso por segurança em conexões sem certificado. Continue usando pelo navegador normalmente nesses casos, funciona exatamente igual, só sem o ícone de app.</div>
-      <div class="tip"><strong>Hospedando fora da loja, em HTTPS, e mesmo assim não aparece a opção de instalar?</strong> Alguns planos gratuitos de hospedagem colocam uma barreira de acesso própria na frente do site (uma senha/token de "preview"). Nesse caso o navegador consegue abrir a página normalmente, mas a busca automática pelo arquivo de configuração do app (<code>manifest.json</code>) esbarra nessa barreira e falha, e a opção de instalar não aparece. Não é um problema deste sistema: dá pra confirmar abrindo o Console do navegador (F12) e procurando um erro do tipo "Manifest fetch... failed, code 401". Se aparecer, o jeito de resolver é checar com a hospedagem se tem como tirar essa proteção de "preview" do site, ou passar pra um plano que não tenha essa barreira.</div>
+      <h3>Instalar como app (em qualquer terminal, inclusive celular)</h3>
+      <p>Em vez de abrir sempre pelo navegador, dá pra "instalar" este sistema como se fosse um app de verdade: mesmo site, só ganha um ícone próprio e abre em janela cheia, sem barra de endereço. Funciona em qualquer terminal que acesse o endereço da loja, computador ou celular: no Chrome/Edge do computador, clique no ícone de instalar que aparece na barra de endereço, ou no menu do navegador em "Instalar PDV - C&S Virtual..."; no celular, use "Adicionar à tela inicial" no menu do navegador.</p>
+      <p class="text-muted" style="font-size:12.5px;">A versão em uso aparece em <strong>Dados da loja</strong>, como "Build" seguido de um código curto. É só uma identificação, útil se precisar conferir alguma coisa com o suporte.</p>
     `,
   },
   {
@@ -510,9 +505,11 @@ const TOPICS = [
     // cadastro (ver views/company.js), pra não obrigar copiar/colar
     // manualmente esses dados no aviso de privacidade pronto. Os outros
     // tópicos são texto fixo; ver renderTopic()/SEARCH_INDEX mais abaixo
-    // pra como isso é tratado nos dois casos. Cópia fiel da lógica de
-    // app/js/views/ajuda.js da extensão, só com "servidor da loja" no
-    // lugar de "localmente"/"este computador".
+    // pra como isso é tratado nos dois casos. Baseado na lógica de
+    // app/js/views/ajuda.js da extensão, mas com o texto ajustado pro
+    // modelo hospedado: dado fica na infraestrutura da plataforma (papel
+    // de "operador" da C&S Virtual), não "só localmente"/"neste
+    // computador" como na extensão de instalação única.
     html: (company) => {
       const nomeLoja = company?.nomeFantasia || '[nome da loja]';
       const encNome = company?.encarregadoLgpd?.nome;
@@ -522,18 +519,18 @@ const TOPICS = [
         : '[Se quiser, informe aqui quem é o responsável por dúvidas de privacidade. Preencha em Dados da loja → Privacidade e LGPD.]';
       return `
       <h2>Privacidade e LGPD</h2>
-      <p class="help-subtitle">Os dados ficam só no servidor da loja, mas isso não tira a responsabilidade da loja sobre os dados dos clientes.</p>
+      <p class="help-subtitle">Os dados ficam guardados de forma isolada por loja, mas isso não tira a responsabilidade da loja sobre os dados dos próprios clientes.</p>
 
       <h3>Quem é o responsável pelos dados</h3>
-      <p>A Lei Geral de Proteção de Dados (LGPD) se aplica sempre que dado pessoal é tratado (nome, telefone, endereço, histórico de fiado), <strong>mesmo guardado só no servidor da loja</strong>, sem sair da rede interna. Pela lei, quem decide coletar e usar esse dado é o <strong>"controlador"</strong>, e esse é <strong>o dono da loja</strong>, não o sistema em si. O sistema é só a ferramenta; a responsabilidade de informar os clientes e atender pedidos deles sobre os próprios dados é da loja.</p>
+      <p>A Lei Geral de Proteção de Dados (LGPD) se aplica sempre que dado pessoal é tratado: nome, telefone, endereço, histórico de fiado. Pela lei, quem decide coletar e usar esse dado é o <strong>"controlador"</strong>, e esse é <strong>o dono da loja</strong>, não o sistema em si nem quem hospeda a plataforma. O sistema (e a C&amp;S Virtual, responsável pela infraestrutura) atua como <strong>"operador"</strong>: guarda e processa o dado por conta da loja, sem decidir o que fazer com ele. A responsabilidade de informar os clientes e atender pedidos deles sobre os próprios dados continua sendo da loja.</p>
 
-      <div class="tip"><strong>O que o sistema já ajuda:</strong> tudo fica só no servidor da loja (nada sobe pra nuvem nem é compartilhado com ninguém), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
+      <div class="tip"><strong>O que o sistema já ajuda:</strong> cada loja tem seu próprio banco de dados isolado (nenhuma loja acessa ou vê dado de outra), senha nunca é gravada em texto puro, backup só sai criptografado, e toda ação fica registrada no Log de auditoria. Isso reduz bastante o risco, mas não substitui avisar o cliente sobre o que é feito com o dado dele.</div>
 
       <h3>Aviso de privacidade pronto pra usar</h3>
       <p>Texto pra afixar no balcão ou entregar ao cliente, pode copiar, adaptar e imprimir como quiser:</p>
       <div class="template-box">AVISO DE PRIVACIDADE: ${escapeHtml(nomeLoja)}
 
-Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura, no servidor desta loja, não são enviados para a internet nem compartilhados com terceiros.
+Seus dados (nome, telefone, endereço) são usados só para controle de vendas, fiado e entregas desta loja. Ficam guardados de forma segura e isolada na plataforma que hospeda o sistema, não são compartilhados com outras lojas nem com terceiros.
 
 Você pode pedir a qualquer momento para ver, corrigir ou apagar seus dados. Registros de venda podem precisar ser mantidos por um tempo por exigência fiscal, mesmo após um pedido de exclusão.
 
@@ -767,7 +764,7 @@ ${linhaEncarregado}</div>
       <p>Quer guardar ou enviar o relatório? Clique em <strong>${icon('printer', { size: 14 })} Exportar PDF</strong>, ao lado do seletor de período: abre o diálogo de impressão do navegador, já formatado pra folha (A4/Carta), com todas as tabelas do período escolhido. Escolha "Salvar como PDF" no próprio diálogo, ou uma impressora de verdade se preferir uma cópia em papel.</p>
 
       <h3>Programa de fidelidade</h3>
-      <p>Fica desligado por padrão (0 pontos por real). Quantos pontos o cliente ganha por real gasto ainda não tem uma tela própria pra ajustar nesta versão, peça pra quem administra o servidor configurar direto. Uma vez ligado, toda venda com cliente selecionado já soma pontos sozinha, não precisa de nenhuma ação extra na hora de vender.</p>
+      <p>Fica desligado por padrão (0 pontos por real). Quantos pontos o cliente ganha por real gasto ainda não tem uma tela própria pra ajustar nesta versão: entre em contato com o suporte (veja o tópico "Licença e ativação" pros contatos) pra habilitar e definir o valor. Uma vez ligado, toda venda com cliente selecionado já soma pontos sozinha, não precisa de nenhuma ação extra na hora de vender.</p>
       <p>Pra usar os pontos, vá no <strong>extrato do cliente</strong> (tela Clientes) e clique em <strong>Resgatar pontos</strong>. Eles viram um crédito de troca, disponível como forma de pagamento na próxima venda: o mesmo mecanismo já usado pelas trocas (veja o tópico "Estorno e troca").</p>
     `,
   },
@@ -801,7 +798,7 @@ ${linhaEncarregado}</div>
       <h2>Backup e restauração</h2>
       <p class="help-subtitle">Como proteger os dados da loja contra perda. Exige a permissão "Acessar Backup".</p>
 
-      <p>Todos os dados do sistema (estoque, vendas, clientes, financeiro, usuários...) ficam salvos só no computador que roda o servidor: todo terminal que acessa pelo navegador só está lendo/escrevendo remotamente, nada fica salvo nos outros computadores. Se esse computador (o servidor) quebrar, for formatado, ou tiver o disco corrompido, esses dados <strong>não têm como ser recuperados</strong> a não ser que exista um backup feito antes.</p>
+      <p>Todos os dados do sistema (estoque, vendas, clientes, financeiro, usuários...) ficam salvos na infraestrutura que hospeda a loja, não em nenhum dos terminais: todo terminal que acessa pelo navegador só está lendo/escrevendo remotamente, nada fica salvo localmente. Mesmo assim, ter seu próprio backup é importante: é a única cópia dos dados que fica sob seu controle, fora do sistema, pra caso precise recuperar algo de um jeito independente.</p>
 
       <div class="tip"><strong>Também existe um backup automático:</strong> toda vez que o caixa é fechado, o sistema já gera e baixa sozinho um backup completo, sem precisar vir nesta tela. Veja "Confirmação por senha e backup automático" no tópico Caixa. Isso não substitui fazer backup manual com regularidade (nem todo mundo fecha caixa todo dia), só é uma rede de segurança a mais.</div>
 
@@ -814,8 +811,8 @@ ${linhaEncarregado}</div>
       <div class="warn-box"><strong>Atenção:</strong> restaurar um backup <strong>apaga todos os dados atuais</strong> e substitui pelos dados do arquivo. Não tem como desfazer.</div>
       <p>Depois de restaurar, o sistema desloga automaticamente. Faça login de novo com um usuário que exista no backup restaurado.</p>
 
-      <h3>Restaurar num servidor novo</h3>
-      <p>Um servidor recém-instalado já sobe com o Administrador Geral pronto (<code>admin</code>/<code>admin123</code>, ver "Cadastro da loja" no tópico Primeiros passos): não tem assistente nenhum perguntando "cadastrar do zero ou restaurar backup". Pra trazer os dados de uma loja já existente, é só logar com esse usuário padrão e restaurar o backup normalmente pela tela <strong>Backup</strong>, como em qualquer restauração: os usuários e a política de venda do arquivo substituem os daqui, então o login de quem administrava antes volta a funcionar depois de restaurar.</p>
+      <h3>Restaurando logo depois de criar a loja</h3>
+      <p>Toda loja nova já sobe com o Administrador Geral pronto (<code>admin</code>/<code>admin123</code>, ver "Criando a loja" no tópico Primeiros passos). Se você já tem um backup de outra instalação (por exemplo, migrando da extensão Chrome) e não quer recomeçar o cadastro do zero, é só logar com esse usuário padrão assim que a loja for criada e restaurar o backup normalmente pela tela <strong>Backup</strong>: os usuários e a política de venda do arquivo substituem os daqui, então o login de quem administrava antes volta a funcionar depois de restaurar.</p>
 
       <h3>Zerar dados e reiniciar a operação</h3>
       <p>Feito pra depois de um período de teste ou de transição vindo de outro sistema de PDV: na tela <strong>Backup</strong>, a seção <strong>"Zerar dados e reiniciar a operação"</strong> apaga vendas, caixa, financeiro, fiado (o saldo de cada cliente volta a zero), carretos, compras, fidelidade e o log de auditoria, mas <strong>mantém intactos</strong> o estoque (produtos e a quantidade atual de cada um), os dados da loja, os usuários, os fornecedores e os clientes. Não precisa refazer nenhum cadastro pra começar a operar de verdade.</p>
@@ -833,7 +830,7 @@ ${linhaEncarregado}</div>
     html: `
       <h2>Perguntas frequentes (F.A.Q)</h2>
       <p class="help-subtitle">Todo aviso vermelho (ou amarelo) previsto no sistema, tela por tela: o que cada um significa e o que fazer.</p>
-      <p>Tudo abaixo é o sistema travando algo de propósito, antes de gravar um dado errado. Nunca aparece sozinho por acaso. Se algo <strong>diferente</strong> do que está listado aqui aparecer, aí sim vale anotar o texto exato e chamar quem administra o sistema.</p>
+      <p>Tudo abaixo é o sistema travando algo de propósito, antes de gravar um dado errado. Nunca aparece sozinho por acaso. Se algo <strong>diferente</strong> do que está listado aqui aparecer, aí sim vale anotar o texto exato e chamar o suporte (veja o tópico "Licença e ativação" pros contatos).</p>
 
       ${renderFaqAccordion()}
     `,
