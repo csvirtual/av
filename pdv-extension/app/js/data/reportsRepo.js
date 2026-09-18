@@ -54,8 +54,15 @@ export async function computeSalesReport({ from = null, to = null } = {}) {
       // de fora dele. Sem ratear essa diferença aqui, a soma da receita por
       // produto/categoria ficaria maior que o faturamento total de vendas com
       // desconto geral. `ratio` traz cada item pro mesmo total líquido da venda.
+      //
+      // Achado de auditoria: usar netSaleTotal(s) aqui (que já subtrai
+      // refundedTotal) JUNTO com soldQty (que já exclui as unidades
+      // estornadas logo abaixo) descontava o estorno duas vezes. `ratio`
+      // deve ratear só o desconto GERAL do carrinho — o mesmo raciocínio
+      // (e a mesma fórmula) de salesRepo.js#refundSaleItems,
+      // `discountRatio = sale.total / lineTotalSum`.
       const itemsLineSum = s.items.reduce((sum, i) => sum + i.lineTotal, 0);
-      const ratio = itemsLineSum > 0 ? netSaleTotal(s) / itemsLineSum : 1;
+      const ratio = itemsLineSum > 0 ? s.total / itemsLineSum : 1;
       for (const item of s.items) {
         const soldQty = item.qty - item.qtyRefunded;
         if (soldQty <= 0) continue;
