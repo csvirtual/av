@@ -216,7 +216,7 @@ const SUPPORT_EMAIL = 'csvirtual.av@gmail.com';
 // tela só oferece "fale com o suporte". Só entra no 404: no 403 (loja
 // encontrada mas bloqueada, ex: trial vencido) quem está vendo a tela já
 // é cliente, "cadastre outra loja" não faz sentido nenhum ali.
-function renderTenantContactButtons(message, tenant, status, { allowSignupCta = true } = {}) {
+function renderTenantContactButtons(message, tenant, status) {
   const lines = [`Olá! Uso o sistema PDV - C&S Virtual e preciso de ajuda: ${message}`];
   if (tenant) {
     lines.push('', `Loja: ${tenant.nome_fantasia || tenant.razao_social || '(não identificada)'}`, `CNPJ: ${tenant.cnpj || '(não identificado)'}`);
@@ -224,12 +224,7 @@ function renderTenantContactButtons(message, tenant, status, { allowSignupCta = 
   const contactMessage = lines.join('\n');
   const waHref = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(contactMessage)}`;
   const mailHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('PDV - C&S Virtual: preciso de ajuda')}&body=${encodeURIComponent(contactMessage)}`;
-  // allowSignupCta: false pras páginas de "caminho não existe" no próprio
-  // domínio-base de cadastro e no painel de admin (ver catch-all mais
-  // abaixo) — "Cadastre agora grátis" apontando pro MESMO domínio-base em
-  // que a pessoa já está (ou pro painel interno, que não é pra cliente
-  // nenhum) não faz sentido nenhum, só confundiria.
-  const isNotFound = status === 404 && !!MULTI_TENANT_DOMAIN && allowSignupCta;
+  const isNotFound = status === 404 && !!MULTI_TENANT_DOMAIN;
   const signupHref = `https://${MULTI_TENANT_DOMAIN}/`;
   const signupSection = isNotFound ? `
     <p class="contact-hint">Ainda não tem o nosso PDV na sua loja?</p>
@@ -262,18 +257,14 @@ function renderTenantContactButtons(message, tenant, status, { allowSignupCta = 
 // text/html sem nenhum estilo — fonte padrão do navegador, sem cor, sem
 // nada do PDV) — porque este middleware roda ANTES de qualquer arquivo
 // estático, inclusive o CSS: linkar public/css/styles.css aqui não
-// funcionaria, essa mesma requisição também seria bloqueada. A página
-// abaixo é 100% autocontida (mesmos tokens de cor copiados de
+// funcionaria, essa mesma requisição também seria bloqueada. As páginas
+// abaixo são 100% autocontidas (mesmos tokens de cor copiados de
 // public-signup/signup.css, mesmo ícone de aviso de components/icon.js)
-// — nasce e morre sem depender de nenhum outro arquivo.
-function renderTenantBlockedPage(message, tenant, status, opts) {
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDV - C&amp;S Virtual: Loja indisponível</title>
-<style>
+// — nascem e morrem sem depender de nenhum outro arquivo. CSS extraído
+// aqui (BLOCKED_PAGE_STYLE) porque as duas páginas (tenant bloqueado e
+// caminho inexistente, ver renderNotFoundRedirectPage mais abaixo)
+// compartilham o mesmo cartão/tema, só o conteúdo de dentro muda.
+const BLOCKED_PAGE_STYLE = `
   :root {
     --bg: #f4f6f5; --surface: #ffffff; --text: #1c2523; --text-muted: #62716d;
     --primary: #145333; --primary-dark: #0d3b24;
@@ -331,15 +322,66 @@ function renderTenantBlockedPage(message, tenant, status, opts) {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .signup-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24); }
-</style>
+`;
+
+function renderTenantBlockedPage(message, tenant, status) {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV - C&amp;S Virtual: Loja indisponível</title>
+<style>${BLOCKED_PAGE_STYLE}</style>
 </head>
 <body>
   <div class="card">
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
     <h1>Loja indisponível</h1>
     <p>${escapeBlockedPageHtml(message)}</p>
-    ${renderTenantContactButtons(message, tenant, status, opts)}
+    ${renderTenantContactButtons(message, tenant, status)}
   </div>
+</body>
+</html>
+`;
+}
+
+// Achado do usuário: caminho que não existe (mas o HOST em si é válido —
+// domínio-base de cadastro, painel de admin, ou uma loja de verdade já
+// resolvida) merece uma mensagem diferente da de "loja indisponível"
+// (que é sobre o HOST não resolver pra nenhuma loja, um problema bem
+// diferente): aqui a "loja"/painel/cadastro está funcionando
+// normalmente, só o CAMINHO específico é que não existe. Mesma
+// aparência (cartão, gradiente, ícone), conteúdo e comportamento
+// diferentes: "Erro 404" + redirecionamento automático pra "/" depois
+// de alguns segundos (pra onde exatamente depende de quem está vendo —
+// dashboard se já estiver logado, tela de login se não estiver, decidido
+// pelo próprio app/painel depois do redirecionamento, não por esta
+// página estática).
+function renderNotFoundRedirectPage(redirectSeconds = 7) {
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDV - C&amp;S Virtual: Página não encontrada</title>
+<style>${BLOCKED_PAGE_STYLE}</style>
+</head>
+<body>
+  <div class="card">
+    <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="rgba(20, 83, 51, 0.12)" stroke="var(--primary)" stroke-width="1.4"/><path d="M9.5 9.5a2.5 2.5 0 114.2 1.85c-.6.55-1.2.95-1.2 1.9" stroke="var(--primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="16.3" r="1" fill="var(--primary)"/></svg>
+    <h1>Erro 404</h1>
+    <p>A página que você pesquisou não existe.</p>
+    <p style="margin-top: 10px;">Você está sendo redirecionado à página inicial do PDV, ou à tela de login se não estiver logado, em <span id="cd">${redirectSeconds}</span> segundos.</p>
+  </div>
+  <script>
+    var s = ${redirectSeconds};
+    var el = document.getElementById('cd');
+    var t = setInterval(function () {
+      s -= 1;
+      if (s <= 0) { clearInterval(t); location.href = '/'; return; }
+      el.textContent = s;
+    }, 1000);
+  </script>
 </body>
 </html>
 `;
@@ -348,9 +390,9 @@ function renderTenantBlockedPage(message, tenant, status, opts) {
 // API (fetch de JS que já tenha carregado) precisa continuar recebendo
 // JSON, não HTML — só a NAVEGAÇÃO de página (o que o navegador mostra na
 // aba) usa a página estilizada acima.
-function sendTenantBlocked(req, res, status, message, tenant, opts) {
+function sendTenantBlocked(req, res, status, message, tenant) {
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
-  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant, status, opts));
+  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant, status));
 }
 // Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
@@ -661,23 +703,20 @@ app.get('/api/status', (req, res) => {
 // Pega qualquer requisição que sobrou sem resposta até aqui:
 // - /api/* desconhecido: 404 JSON simples (nunca a página HTML — quem
 //   chama uma API espera JSON, mesmo quando o caminho em si não existe).
-// - No domínio-base de cadastro ou no painel de Super Admin: a mesma
-//   página estilizada de "loja indisponível" já usada pra tenant
-//   desconhecido/bloqueado (ver sendTenantBlocked acima), sem o botão
-//   "Cadastre agora grátis" (apontar pro MESMO domínio em que a pessoa já
-//   está, ou pro painel interno, não faz sentido).
-// - Numa loja de verdade (já resolvida e liberada pelo middleware lá em
-//   cima): NUNCA a página de "indisponível" — a loja existe e está
-//   funcionando, só ninguém bateu num arquivo estático porque o
-//   roteamento do app é por #hash (nunca chega ao servidor, é só o
-//   navegador). Serve o mesmo index.html de sempre e deixa o app decidir
-//   o que mostrar.
+// - Qualquer outro caminho, em qualquer host (domínio-base de cadastro,
+//   painel de Super Admin, ou uma loja de verdade já resolvida e
+//   liberada): página de "Erro 404" com redirecionamento automático pra
+//   "/" (ver renderNotFoundRedirectPage) — diferente da página de "loja
+//   indisponível" (essa é sobre o HOST inteiro não resolver pra nenhuma
+//   loja; aqui o host está ótimo, só o caminho específico é que não
+//   existe). O próprio "/" decide o que mostrar depois do
+//   redirecionamento: formulário de cadastro, tela de login do painel,
+//   ou o app da loja (dashboard se já estiver logado, login se não —
+//   nunca esta página estática decidindo isso).
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Não encontrado.' });
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-  if (req.isSignupHost) return sendTenantBlocked(req, res, 404, 'Loja não encontrada.', null, { allowSignupCta: false });
-  if (req.isPlatformAdminHost) return sendTenantBlocked(req, res, 404, 'Página não encontrada.', null, { allowSignupCta: false });
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.status(404).type('html').send(renderNotFoundRedirectPage());
 });
 
 // Achado de auditoria (pré-lançamento, exposição de informação — defesa
