@@ -7,6 +7,29 @@
 // repositório novo.
 const TERMINAL_ID_KEY = 'terminalId';
 
+// Em HTTP puro (sem certificado), o navegador bloqueia crypto.randomUUID()
+// — só libera em contexto seguro (HTTPS ou localhost). Este sistema roda
+// em rede local por HTTP simples por design, então precisamos de um plano
+// B: crypto.getRandomValues() continua funcionando mesmo sem HTTPS, e só
+// no pior caso (sem Web Crypto nenhuma) cai pra Math.random().
+function gerarUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0'));
+    return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Identidade da MÁQUINA/navegador (não confundir com o usuário logado,
 // que pode trocar sem trocar de terminal) — gerada uma vez, sobrevive a
 // F5, é única por navegador/perfil. O servidor só usa isto no modo de
@@ -15,7 +38,7 @@ const TERMINAL_ID_KEY = 'terminalId';
 function getOrCreateTerminalId() {
   let id = localStorage.getItem(TERMINAL_ID_KEY);
   if (!id) {
-    id = crypto.randomUUID();
+    id = gerarUUID();
     localStorage.setItem(TERMINAL_ID_KEY, id);
   }
   return id;
@@ -45,5 +68,5 @@ export async function api(path, opts = {}) {
  * etc.), só que aqui vira o campo `dedupeKey` mandado pro servidor
  * reivindicar contra a tabela `idempotency_keys` (ver routes/*.js). */
 export function newDedupeKey() {
-  return crypto.randomUUID();
+  return gerarUUID();
 }
