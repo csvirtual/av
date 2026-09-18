@@ -27,7 +27,22 @@ router.post('/login', async (req, res) => {
       });
     }
     const admin = await verifyPlatformAdminLogin(username, password);
-    if (!admin) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    if (!admin) {
+      // Achado do usuário: mesma lacuna do login da loja (ver
+      // routes/auth.js) — verifyPlatformAdminLogin já registra a
+      // tentativa e já ativa o bloqueio ao atingir o limite, ANTES de
+      // devolver null, mas esta resposta só mandava o erro genérico
+      // mesmo quando é ela mesma que acabou de travar a conta.
+      // Reconfere o estado depois da tentativa pra avisar já aqui.
+      const postLock = getPlatformAdminLoginLockState(username);
+      if (postLock.remainingMs > 0) {
+        return res.status(429).json({
+          error: `Muitas tentativas incorretas. Aguarde ${Math.ceil(postLock.remainingMs / 1000)}s antes de tentar de novo.`,
+          remainingMs: postLock.remainingMs,
+        });
+      }
+      return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    }
 
     const token = createSession(admin.id, controlDb);
     const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';

@@ -54,7 +54,25 @@ router.post('/login', async (req, res) => {
     // permitiria enumerar quais contas existem só pelo comportamento do
     // login).
     const user = await verifyLogin(username, password, {}, targetDb);
-    if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    if (!user) {
+      // Achado do usuário: verifyLogin já registra a tentativa errada (e,
+      // ao atingir o limite, já ativa o bloqueio) ANTES de devolver null —
+      // mas esta resposta continuava mandando só o erro genérico, sem
+      // remainingMs, mesmo quando é ESTA MESMA tentativa que acabou de
+      // ativar o bloqueio. Resultado: a pessoa só ficava sabendo do
+      // bloqueio (e via o campo de senha travar) na tentativa SEGUINTE,
+      // uma a mais do que devia — reconfere o estado aqui, depois de
+      // verifyLogin, pra avisar já nesta resposta se foi ela quem
+      // acabou de travar a conta.
+      const postLock = getLoginLockState(username);
+      if (postLock.remainingMs > 0) {
+        return res.status(429).json({
+          error: `Muitas tentativas incorretas. Aguarde ${Math.ceil(postLock.remainingMs / 1000)}s antes de tentar de novo.`,
+          remainingMs: postLock.remainingMs,
+        });
+      }
+      return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    }
     const row = targetDb.prepare(FIND_BY_ID_SQL).get(user.id);
 
     // Achado do usuário: até aqui, todo login herdava a MESMA rota
