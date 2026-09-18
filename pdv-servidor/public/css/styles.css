@@ -227,15 +227,44 @@ input:not([type="radio"]):focus, select:focus, textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
 }
-/* Achado do usuário: a regra acima também valia pra input[type="radio"] —
- * o box-shadow desenha em volta da CAIXA do elemento, que é quadrada,
- * mesmo a bolinha em si sendo redonda (o navegador não recorta a sombra
- * no formato visual dela sozinho). border-radius:50% aqui faz a sombra
- * acompanhar o círculo em vez de sobrar canto. Sem border-color: rádio
- * nativo não desenha borda própria, então não tem o que trocar de cor. */
-input[type="radio"]:focus {
-  box-shadow: 0 0 0 3px var(--primary-light);
+/* Achado do usuário: border-radius:50% sozinho não bastou pro halo de
+ * foco do rádio acompanhar o círculo — um input[type="radio"] nativo
+ * (appearance padrão do navegador) é desenhado pelo SISTEMA OPERACIONAL
+ * por cima da caixa CSS, que continua quadrada por baixo; a sombra segue
+ * essa caixa quadrada de verdade, não a bolinha desenhada visualmente.
+ * Não dá pra "arredondar" um controle nativo só com CSS de fora — a
+ * única forma confiável é desligar o desenho nativo dele
+ * (appearance:none) e desenhar o círculo (e a bolinha de "marcado") a
+ * gente mesmo, do zero, com CSS puro. Mesmo raciocínio, motivo e
+ * achado já documentados em components/customSelect.js pro <select>
+ * nativo (lista com fundo branco fixo, ignora tema escuro) — aqui é o
+ * mesmo problema, versão radio: dá pra escapar de appearance nativa sem
+ * JS nenhum, só CSS, porque um radio não tem popup pra recriar. */
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 2px solid var(--control-border);
   border-radius: 50%;
+  background: var(--surface);
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+input[type="radio"]:checked { border-color: var(--primary); }
+/* A "bolinha de marcado" de dentro — não dá pra usar ::before/::after
+ * junto com appearance:none em todo navegador de forma confiável, mas
+ * um gradiente radial no próprio background resolve com uma única
+ * declaração, sem pseudo-elemento nenhum. */
+input[type="radio"]:checked {
+  background: radial-gradient(circle, var(--primary) 0 5px, var(--surface) 6px);
+}
+input[type="radio"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 a { color: var(--primary); }
