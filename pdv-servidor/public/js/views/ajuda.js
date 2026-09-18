@@ -804,7 +804,7 @@ ${linhaEncarregado}</div>
 
       <h3>Exportar backup</h3>
       <p>Na tela <strong>Backup</strong>, defina uma senha e clique em <strong>Gerar backup</strong>. O sistema baixa um arquivo com todos os dados da loja, protegido por essa senha: sem ela, o arquivo é ilegível pra qualquer pessoa, inclusive pra você. Guarde esse arquivo em outro lugar (pendrive, e-mail pra você mesmo, nuvem pessoal) e anote a senha num lugar seguro.</p>
-      <div class="tip"><strong>Não existe "esqueci a senha" aqui.</strong> Como o sistema é 100% local (sem servidor nenhum por trás), ninguém, nem o desenvolvedor do sistema, consegue recuperar um backup se a senha for perdida. É o preço de ser realmente privado.</div>
+      <div class="tip"><strong>Não existe "esqueci a senha" aqui.</strong> Essa senha nunca é enviada nem guardada em nenhum lugar, só existe no momento em que você gera ou restaura o backup. Ninguém, nem quem opera a plataforma, consegue recuperar um backup se a senha for perdida. É o preço de ser realmente privado.</div>
 
       <h3>Restaurar backup</h3>
       <p>Selecione o arquivo de backup, digite a senha e clique em <strong>Ler backup</strong>. O sistema mostra uma prévia comparando os dados atuais com os do arquivo antes de mexer em qualquer coisa. Só depois de confirmar (duas vezes, de propósito) é que a restauração realmente acontece.</p>
@@ -963,7 +963,7 @@ export async function renderAjuda(container) {
   // acima) — nunca no texto corrido das respostas, de propósito. Clicar
   // num resultado de tópico só troca de tópico; um de F.A.Q troca pro
   // tópico F.A.Q E já abre a pergunta certa, sem o vendedor precisar catar
-  // ela na lista de 33 depois.
+  // ela na lista de 37 depois.
   function closeSearchResults() {
     searchResults.hidden = true;
     searchResults.innerHTML = '';

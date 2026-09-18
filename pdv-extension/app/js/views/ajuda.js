@@ -163,7 +163,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: '"Usuário ou senha inválidos, ou usuário desativado"',
-        a: 'Mensagem de propósito genérica: o sistema não diz qual dos três é (usuário errado, senha errada, ou usuário existente mas desativado por um admin), pra não dar pista a quem estiver tentando adivinhar credenciais de outra pessoa. Confira os três com quem administra o sistema.',
+        a: 'Mensagem de propósito genérica: o sistema não diz qual dos três é (usuário errado, senha errada, ou usuário existente mas desativado por um admin), pra não dar pista a quem estiver tentando adivinhar credenciais de outra pessoa. Confira os três com o administrador da loja.',
       },
       {
         q: '"Você não pode editar as próprias permissões, peça pra outra pessoa com acesso a Usuários fazer isso"',
@@ -842,7 +842,7 @@ function stripHtml(html) {
   return html.replace(/<[^>]*>/g, ' ');
 }
 
-/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 34
+/** Índice de busca da Ajuda — achado do usuário: com 15 tópicos e 38
  * perguntas de F.A.Q, navegar só pelo menu lateral demorava demais pra
  * achar algo específico. `searchText` cobre título/pergunta E o corpo da
  * resposta/tópico inteiro (sem tags) — uma palavra que só aparece dentro
@@ -962,7 +962,7 @@ export async function renderAjuda(container, ctx) {
   // acima) — nunca no texto corrido das respostas, de propósito. Clicar
   // num resultado de tópico só troca de tópico; um de F.A.Q troca pro
   // tópico F.A.Q E já abre a pergunta certa, sem o vendedor precisar catar
-  // ela na lista de 33 depois.
+  // ela na lista de 38 depois.
   function closeSearchResults() {
     searchResults.hidden = true;
     searchResults.innerHTML = '';
