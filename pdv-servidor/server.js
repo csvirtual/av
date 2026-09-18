@@ -236,7 +236,7 @@ function renderTenantContactButtons(message, tenant, status) {
     </div>` : '';
   const contactHint = isNotFound
     ? 'Se você já é nosso cliente e mesmo assim caiu aqui nesta tela, verifique se digitou corretamente o endereço da loja na barra de endereço deste navegador. Se algo parece errado, fale com o nosso suporte usando os botões abaixo.'
-    : 'Precisa de ajuda? Fale com o suporte.';
+    : 'Se algo parece errado, fale com o nosso suporte.';
   return `
     ${signupSection}
     <p class="contact-hint">${contactHint}</p>
