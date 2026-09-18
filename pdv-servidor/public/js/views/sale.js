@@ -36,6 +36,7 @@ import { bindBarcodeInput, installGlobalScannerListener } from '../utils/barcode
 import { formatMoney, escapeHtml, displayUnit, formatQty, BASE_PAYMENT_METHODS } from '../utils/format.js';
 import { applyDiscount, computeCartTotals, computeCreditInterest, effectivePrice, isNearExpiry, isExpired, MAX_INSTALLMENTS } from '../utils/pricing.js';
 import { userCan } from '../utils/permissions.js';
+import { isMobileViewport } from '../utils/viewport.js';
 import { showToast } from '../components/toast.js';
 import { openModal, confirmDialog } from '../components/modal.js';
 import { printSaleReceipt } from '../components/receipt.js';
@@ -201,7 +202,7 @@ export async function renderSale(container, ctx) {
     <div class="pdv-layout">
       <div class="card">
         <div class="scan-box">
-          <input type="text" id="scan-input" placeholder="Escaneie o código de barras ou digite o nome do produto…" autofocus>
+          <input type="text" id="scan-input" placeholder="Escaneie o código de barras ou digite o nome do produto…">
         </div>
         <div id="search-results"></div>
         <div id="credit-banner"></div>
@@ -250,15 +251,20 @@ export async function renderSale(container, ctx) {
   `;
 
   const scanInput = document.getElementById('scan-input');
-  // O atributo autofocus no HTML acima não funciona sozinho aqui — só
-  // dispara quando o elemento é inserido pelo parser nativo da página, não
-  // quando o HTML entra via innerHTML (como é o caso de toda tela deste
-  // app). Sem isto, era preciso clicar no campo antes de digitar ou
-  // escanear pela primeira vez ao abrir a tela — o leitor físico continua
-  // funcionando igual independente disso (ver installGlobalScannerListener,
-  // que captura o scan mesmo sem foco em lugar nenhum), isto é só pra quem
-  // vai digitar/buscar manualmente já poder começar direto.
-  scanInput.focus();
+  // O atributo autofocus nativo não funciona sozinho aqui — só dispara
+  // quando o elemento é inserido pelo parser nativo da página, não quando
+  // o HTML entra via innerHTML (como é o caso de toda tela deste app). Sem
+  // isto, era preciso clicar no campo antes de digitar ou escanear pela
+  // primeira vez ao abrir a tela — o leitor físico continua funcionando
+  // igual independente disso (ver installGlobalScannerListener, que
+  // captura o scan mesmo sem foco em lugar nenhum), isto é só pra quem vai
+  // digitar/buscar manualmente já poder começar direto.
+  // Achado do usuário (celular/tablet): SÓ no desktop — em tela estreita,
+  // focar sozinho abre o teclado virtual na hora e cobre metade da tela
+  // antes da pessoa ver o carrinho; lá o foco fica só um clique de
+  // distância, igual qualquer outro campo do app (o leitor físico continua
+  // funcionando de qualquer forma, como já explicado acima).
+  if (!isMobileViewport()) scanInput.focus();
   const resultsBox = document.getElementById('search-results');
   const creditBanner = document.getElementById('credit-banner');
   const customerBox = document.getElementById('customer-box');
