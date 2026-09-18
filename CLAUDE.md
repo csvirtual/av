@@ -74,6 +74,38 @@ enfraqueça a checagem em si (ex: voltar a permitir propriedade nova sem
 querer) só pra fazer um commit passar — foi exatamente esse tipo de
 "servidor pode só adicionar" que deixou o bug original entrar.
 
+# Regra: foco automático de campo só em desktop
+
+Nunca dê `.focus()`/`autofocus` automático (ao simplesmente entrar numa
+tela) num campo de busca/scan/texto sem checar `isMobileViewport()`
+primeiro (`pdv-servidor/public/js/utils/viewport.js`, ponto de corte
+900px — mesmo já usado pro menu virar gaveta). Em celular/tablet, focar
+sozinho abre o teclado virtual na hora, cobrindo metade da tela antes da
+pessoa ver o que tem nela. No desktop o comportamento é bom (mãos no
+teclado físico) e deve continuar.
+
+Achado que originou esta regra: a busca do Estoque (`views/products.js`)
+e o campo de escaneio da Nova Venda (`views/sale.js`) focavam sozinhos
+sem essa checagem — corrigido gating os dois com
+`if (!isMobileViewport()) input.focus();`. Qualquer campo NOVO com foco
+automático de entrada de tela deve nascer já com essa checagem, não
+como um conserto posterior.
+
+# Regra: botão com ícone precisa de `color` explícito
+
+Todo `<button>` que usa um ícone SVG com `stroke="currentColor"` (ver
+`public/js/components/icon.js`) precisa declarar `color` na própria
+regra CSS do botão — nunca contar com herança. Navegadores não garantem
+que um `<button>` herde a cor de texto do body/tema; sem `color`
+explícito, ele cai na cor padrão do navegador (geralmente escura),
+invisível ou quase invisível sobre um fundo escuro no tema dark.
+
+Achado que originou esta regra: `.menu-toggle-btn` (o hambúrguer do menu
+mobile) nunca declarava `color` — no tema claro passava despercebido
+(cor padrão do navegador já é escura, contrasta igual), mas no tema
+escuro o ícone ficava quase preto sobre fundo escuro. Corrigido com
+`color: var(--text);` na regra do botão.
+
 ## Contexto: por que dois produtos com o mesmo visual
 
 `pdv-extension` é a extensão Chrome (IndexedDB, um terminal só, um

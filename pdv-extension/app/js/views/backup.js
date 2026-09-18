@@ -193,7 +193,7 @@ export async function renderBackup(container, ctx) {
       previewBox.innerHTML = `
         <p class="section-title" style="margin-top:20px;">Prévia — o que será substituído</p>
         <p class="hint" style="margin-bottom:10px;">Backup gerado em ${escapeHtml(new Date(payload.exportedAt).toLocaleString('pt-BR'))}.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="restore-preview-grid">
           <div>${countsTableHtml(currentCounts, 'Atual')}</div>
           <div>${countsTableHtml(counts, 'No backup')}</div>
         </div>

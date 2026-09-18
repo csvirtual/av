@@ -205,9 +205,20 @@ input, select, textarea {
  * visível têm, cada um, seu próprio ":focus" explícito repetindo esta
  * mesma receita (ver .scan-box input:focus, .payment-*:focus etc.),
  * igual o resto do arquivo já fazia antes desta regra existir. */
-input:focus, select:focus, textarea:focus {
+input:not([type="radio"]):focus, select:focus, textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-light);
+}
+/* Achado do usuário (pdv-servidor): a regra acima também valia pra
+ * input[type="radio"] — o box-shadow desenha em volta da CAIXA do
+ * elemento, que é quadrada, mesmo a bolinha em si sendo redonda (o
+ * navegador não recorta a sombra no formato visual dela sozinho).
+ * border-radius:50% aqui faz a sombra acompanhar o círculo em vez de
+ * sobrar canto. Sem border-color: rádio nativo não desenha borda
+ * própria, então não tem o que trocar de cor. */
+input[type="radio"]:focus {
+  box-shadow: 0 0 0 3px var(--primary-light);
+  border-radius: 50%;
 }
 
 a { color: var(--primary); }
@@ -585,6 +596,13 @@ a { color: var(--primary); }
 .setup-choice-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 @media (max-width: 620px) { .setup-choice-grid { grid-template-columns: 1fr; } }
 
+/* ---------- Backup: prévia lado a lado (atual x backup) antes de restaurar ---------- */
+.restore-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Achado do usuário (celular): duas colunas lado a lado não cabem numa
+ * tela estreita — a segunda tabela ("No backup") cortava. Empilha em
+ * vez de espremer, mesmo breakpoint já usado pra .setup-choice-grid. */
+@media (max-width: 620px) { .restore-preview-grid { grid-template-columns: 1fr; } }
+
 /* ---------- Shell do app (pós-login) ---------- */
 .shell {
   display: grid;
@@ -640,6 +658,10 @@ a { color: var(--primary); }
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
+  /* Achado do usuário (modo escuro): sem isto, o <button> cai na cor
+   * padrão do navegador em vez de herdar o texto do tema — o ícone (que
+   * usa stroke="currentColor") ficava quase preto sobre o fundo escuro. */
+  color: var(--text);
   box-shadow: var(--shadow);
   font-size: 18px;
 }
@@ -1071,6 +1093,18 @@ tbody tr:hover { background: var(--surface-alt); }
   font-size: 14px;
   cursor: pointer;
   text-align: left;
+  /* Achado do usuário (pdv-servidor, Log do sistema no celular): sem
+   * isto, o botão fica do tamanho do próprio texto em vez de acompanhar
+   * a largura que .custom-select (o wrapper por fora) recebeu do flex do
+   * pai — ao lado de um filtro com texto mais curto, sobrava um vão sem
+   * borda nenhuma entre os dois, parecendo um espaçamento desproporcional.
+   * flex:1 faz o botão preencher o wrapper inteiro sempre, com ou sem o
+   * .custom-select-clear ao lado (que continua com largura fixa, 34px,
+   * sem crescer). Réplica idêntica no servidor pra manter paridade — o
+   * efeito só aparece de verdade onde algo força .custom-select a ficar
+   * mais largo que o próprio texto (hoje só .toolbar-filters no celular,
+   * ver @media 640px em public/css/styles.css), sem mudar nada aqui. */
+  flex: 1 1 auto;
 }
 .custom-select-trigger:focus-visible {
   outline: none;
@@ -1850,6 +1884,16 @@ input.customer-search-input:focus {
   .main { padding: 72px 12px 40px; }
 
   .form-row { flex-direction: column; gap: 0; }
+  /* Achado do usuário (pdv-servidor, Dados da loja no celular): campos
+   * como Número/UF/CEP têm flex-basis fixo em px embutido no HTML (ex:
+   * flex:0 0 100px) pra ficarem estreitos ao lado dos outros no desktop —
+   * com .form-row virando coluna aqui, esse valor em px passa a valer
+   * pra ALTURA em vez de largura, e cada campo virava um bloco vazio do
+   * tamanho do número (100px/90px/130px) em vez da altura real do
+   * rótulo+input, sobrando um vão enorme antes do próximo campo.
+   * flex:1 1 auto (com !important pra vencer o style embutido) devolve a
+   * altura ao conteúdo. Réplica idêntica no servidor pra manter paridade. */
+  .form-row .field { flex: 1 1 auto !important; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar input, .toolbar select, .toolbar label, .toolbar .custom-select { width: 100%; min-width: 0; }
   .toolbar label { display: flex; justify-content: space-between; gap: 8px; }

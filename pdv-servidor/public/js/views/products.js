@@ -16,6 +16,7 @@ import { bindBarcodeInput, generateInternalBarcode } from '../utils/barcode.js';
 import { formatMoney, formatDateTime, escapeHtml, displayUnit, formatQty, CATEGORY_LABELS, categoryLabel } from '../utils/format.js';
 import { isNearExpiry, isExpired } from '../utils/pricing.js';
 import { userCan } from '../utils/permissions.js';
+import { isMobileViewport } from '../utils/viewport.js';
 import { openModal, confirmDialog } from '../components/modal.js';
 import { showToast } from '../components/toast.js';
 import { paginationHtml, wirePagination, createPageState } from '../components/pagination.js';
@@ -98,7 +99,7 @@ export async function renderProducts(container, ctx) {
     <input type="file" id="csv-import-input" accept=".csv,text/csv" hidden>
     <div id="csv-import-progress" class="text-muted" style="font-size:13px;margin-bottom:8px;" hidden></div>
     <div class="toolbar">
-      <input type="search" id="search-input" placeholder="Buscar por nome ou código de barras — ou escaneie…" autofocus>
+      <input type="search" id="search-input" placeholder="Buscar por nome ou código de barras — ou escaneie…">
       <div class="toolbar-filters">
         <select id="category-filter">
           <option value="">Todas as categorias</option>
@@ -122,14 +123,18 @@ export async function renderProducts(container, ctx) {
   const searchInput = document.getElementById('search-input');
   const tableBox = document.getElementById('products-table');
   // Achado do usuário: o único campo de digitação desta tela é a busca —
-  // o atributo `autofocus` do HTML acima não é garantia (o botão do menu
-  // lateral que acabou de ser clicado pra chegar aqui continua com o foco
-  // do navegador; `autofocus` inserido via innerHTML nem sempre consegue
+  // o atributo `autofocus` nativo não é garantia (o botão do menu lateral
+  // que acabou de ser clicado pra chegar aqui continua com o foco do
+  // navegador; `autofocus` inserido via innerHTML nem sempre consegue
   // "roubar" esse foco de volta, dependendo do navegador/timing). Foca aqui
-  // via JS, sempre, na entrada da tela — não importa se veio do menu, de um
+  // via JS na entrada da tela — não importa se veio do menu, de um
   // indicador do Painel (openEstoqueFilteredByStatus) ou de "Voltar/Avançar"
   // do navegador: o vendedor já pode digitar ou bipar direto, sem clicar.
-  searchInput.focus();
+  // Achado do usuário (celular/tablet): SÓ no desktop — em tela estreita,
+  // focar sozinho abre o teclado virtual na hora e cobre metade da tela
+  // antes da pessoa ver o que tem no Estoque; lá o foco fica só um clique
+  // de distância mesmo, igual qualquer outro campo do app.
+  if (!isMobileViewport()) searchInput.focus();
 
   // Mesma condição usada pelo selo de cada linha (ver statusBadge mais
   // abaixo) — pra o filtro nunca "prometer" um status que a própria linha
