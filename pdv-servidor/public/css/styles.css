@@ -906,8 +906,15 @@ a { color: var(--primary); }
   margin-bottom: 10px;
 }
 
+/* Achado do usuário: mesmo problema já corrigido pro celular/tablet nos
+ * @media 900px/640px abaixo (.scroll-top-btn "grudado" no último card) —
+ * faltava aqui no desktop/notebook. O botão ocupa a faixa de 22px a 66px
+ * contados do fim da tela (bottom:22px + 44px de altura); com só 60px de
+ * padding embaixo, o rodapé do último card ficava DENTRO dessa faixa
+ * (60 < 66). 78px garante a mesma folga (66px do botão + ~12px de
+ * respiro) já usada nos breakpoints menores. */
 .main {
-  padding: 28px 34px 60px;
+  padding: 28px 34px 78px;
   overflow-x: auto;
 }
 
