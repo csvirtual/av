@@ -209,7 +209,14 @@ function escapeBlockedPageHtml(str) {
 // externo (ver comentário de renderTenantBlockedPage).
 const SUPPORT_WHATSAPP = '5571986461027';
 const SUPPORT_EMAIL = 'csvirtual.av@gmail.com';
-function renderTenantContactButtons(message, tenant) {
+// Achado do usuário: quando o motivo é "loja não encontrada" (404), quem
+// caiu aqui pode ser um endereço digitado errado por um cliente já
+// existente, MAS também pode ser gente nova batendo numa loja que nunca
+// existiu — esse segundo caso é oportunidade de cadastro perdida se a
+// tela só oferece "fale com o suporte". Só entra no 404: no 403 (loja
+// encontrada mas bloqueada, ex: trial vencido) quem está vendo a tela já
+// é cliente, "cadastre outra loja" não faz sentido nenhum ali.
+function renderTenantContactButtons(message, tenant, status) {
   const lines = [`Olá! Uso o sistema PDV - C&S Virtual e preciso de ajuda: ${message}`];
   if (tenant) {
     lines.push('', `Loja: ${tenant.nome_fantasia || tenant.razao_social || '(não identificada)'}`, `CNPJ: ${tenant.cnpj || '(não identificado)'}`);
@@ -217,15 +224,29 @@ function renderTenantContactButtons(message, tenant) {
   const contactMessage = lines.join('\n');
   const waHref = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(contactMessage)}`;
   const mailHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('PDV - C&S Virtual: preciso de ajuda')}&body=${encodeURIComponent(contactMessage)}`;
-  return `
-    <p class="contact-hint">Precisa de ajuda? Fale com o suporte.</p>
+  const isNotFound = status === 404 && !!MULTI_TENANT_DOMAIN;
+  const signupHref = `https://${MULTI_TENANT_DOMAIN}/`;
+  const signupSection = isNotFound ? `
+    <p class="contact-hint">Ainda não tem o nosso PDV na sua loja?</p>
     <div class="contact-row">
-      <a class="contact-btn" href="${waHref}" target="_blank" rel="noopener">
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="wa-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#32D96A"/><stop offset="100%" stop-color="#1EAE53"/></linearGradient></defs><circle cx="12" cy="12" r="10" fill="url(#wa-grad)"/><path d="M12 5.3a6.7 6.7 0 00-5.72 10.15L5.4 18.7l3.34-.88A6.7 6.7 0 1012 5.3z" fill="#fff"/><path d="M9.06 8.4c.24-.53.49-.54.72-.55.19-.01.4-.01.58.01.2.02.47-.08.73.55.28.65.92 2.27 1 2.43.09.17.14.36.02.57-.11.22-.17.34-.33.53-.17.19-.35.42-.5.57-.17.17-.34.35-.15.68.2.34.88 1.44 1.89 2.33 1.3 1.15 2.39 1.51 2.73 1.68.34.17.54.15.74-.08.2-.24.86-1 1.09-1.34.23-.34.47-.28.78-.17.32.12 2.02.95 2.36 1.12.34.17.56.26.65.4.08.15.08.85-.2 1.66-.29.82-1.64 1.6-2.29 1.68-.58.08-1.3.11-2.1-.14-.48-.15-1.09-.35-1.88-.69-3.31-1.43-5.47-4.77-5.64-5-.17-.22-1.35-1.79-1.35-3.42 0-1.63.85-2.42 1.15-2.75z" fill="#1EAE53"/></svg>
+      <a class="signup-btn" href="${signupHref}">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.22)"/><path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Cadastre agora grátis</span>
+      </a>
+    </div>` : '';
+  const contactHint = isNotFound
+    ? 'Se você já é nosso cliente e mesmo assim caiu aqui nesta tela, verifique se digitou corretamente o endereço da loja na barra de endereço deste navegador. Se algo parece errado, fale com o nosso suporte usando os botões abaixo.'
+    : 'Precisa de ajuda? Fale com o suporte.';
+  return `
+    ${signupSection}
+    <p class="contact-hint">${contactHint}</p>
+    <div class="contact-row">
+      <a class="contact-btn contact-btn-wa" href="${waHref}" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="wa-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#32D96A"/><stop offset="100%" stop-color="#1EAE53"/></linearGradient></defs><circle cx="12" cy="12" r="10" fill="url(#wa-grad)"/><path d="M12 5.3a6.7 6.7 0 00-5.72 10.15L5.4 18.7l3.34-.88A6.7 6.7 0 1012 5.3z" fill="#fff"/><path d="M9.06 8.4c.24-.53.49-.54.72-.55.19-.01.4-.01.58.01.2.02.47-.08.73.55.28.65.92 2.27 1 2.43.09.17.14.36.02.57-.11.22-.17.34-.33.53-.17.19-.35.42-.5.57-.17.17-.34.35-.15.68.2.34.88 1.44 1.89 2.33 1.3 1.15 2.39 1.51 2.73 1.68.34.17.54.15.74-.08.2-.24.86-1 1.09-1.34.23-.34.47-.28.78-.17.32.12 2.02.95 2.36 1.12.34.17.56.26.65.4.08.15.08.85-.2 1.66-.29.82-1.64 1.6-2.29 1.68-.58.08-1.3.11-2.1-.14-.48-.15-1.09-.35-1.88-.69-3.31-1.43-5.47-4.77-5.64-5-.17-.22-1.35-1.79-1.35-3.42 0-1.63.85-2.42 1.15-2.75z" fill="#1EAE53"/></svg>
         <span>WhatsApp</span>
       </a>
-      <a class="contact-btn" href="${mailHref}" target="_blank" rel="noopener">
-        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mail-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6EA8FF"/><stop offset="100%" stop-color="#3F7FF0"/></linearGradient></defs><rect x="2" y="4" width="20" height="16" rx="4.5" fill="url(#mail-grad)"/><path d="M2.6 6.3l8.75 6.9c.38.3.92.3 1.3 0l8.75-6.9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a class="contact-btn contact-btn-mail" href="${mailHref}" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="mail-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6EA8FF"/><stop offset="100%" stop-color="#3F7FF0"/></linearGradient></defs><rect x="2" y="4" width="20" height="16" rx="4.5" fill="url(#mail-grad)"/><path d="M2.6 6.3l8.75 6.9c.38.3.92.3 1.3 0l8.75-6.9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>E-mail</span>
       </a>
     </div>`;
@@ -240,7 +261,7 @@ function renderTenantContactButtons(message, tenant) {
 // abaixo é 100% autocontida (mesmos tokens de cor copiados de
 // public-signup/signup.css, mesmo ícone de aviso de components/icon.js)
 // — nasce e morre sem depender de nenhum outro arquivo.
-function renderTenantBlockedPage(message, tenant) {
+function renderTenantBlockedPage(message, tenant, status) {
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -285,15 +306,26 @@ function renderTenantBlockedPage(message, tenant) {
   h1 { font-size: 20px; margin: 14px 0 8px; text-wrap: balance; }
   p { color: var(--text-muted); font-size: 14px; margin: 0; line-height: 1.5; }
   .contact-hint { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--contact-border); font-size: 13px; }
-  .contact-row { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .contact-row { display: flex; gap: 12px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
   .contact-btn {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 8px 14px; border-radius: 999px;
-    background: var(--bg); border: 1px solid var(--contact-border);
-    color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600;
-    transition: background 0.15s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 999px;
+    text-decoration: none; font-size: 13px; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
-  .contact-btn:hover { background: var(--contact-hover); }
+  .contact-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16); }
+  .contact-btn-wa { background: rgba(30, 174, 83, 0.14); border: 1px solid rgba(30, 174, 83, 0.4); color: var(--text); }
+  .contact-btn-mail { background: rgba(63, 127, 240, 0.14); border: 1px solid rgba(63, 127, 240, 0.4); color: var(--text); }
+  .signup-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 999px;
+    background: var(--primary); border: 1px solid transparent;
+    color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .signup-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24); }
 </style>
 </head>
 <body>
@@ -301,7 +333,7 @@ function renderTenantBlockedPage(message, tenant) {
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
     <h1>Loja indisponível</h1>
     <p>${escapeBlockedPageHtml(message)}</p>
-    ${renderTenantContactButtons(message, tenant)}
+    ${renderTenantContactButtons(message, tenant, status)}
   </div>
 </body>
 </html>
@@ -313,7 +345,7 @@ function renderTenantBlockedPage(message, tenant) {
 // aba) usa a página estilizada acima.
 function sendTenantBlocked(req, res, status, message, tenant) {
   if (req.path.startsWith('/api/')) return res.status(status).json({ error: message });
-  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant));
+  res.status(status).type('html').send(renderTenantBlockedPage(message, tenant, status));
 }
 // Etapa 8 do roteiro multi-tenant (ver artifact "PDV Multi-Tenant"):
 // admin.<MULTI_TENANT_DOMAIN> é o subdomínio RESERVADO (RESERVED_SLUGS,
