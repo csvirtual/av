@@ -595,6 +595,30 @@ a { color: var(--primary); }
 
 .auth-card.wide { max-width: 720px; }
 
+/* Achado do usuário: botão discreto de claro/escuro na tela de login,
+ * mesmo lugar (canto da tela) e mesmo visual já usados em
+ * public-admin/admin.css e public-signup/signup.css — só faltava aqui. */
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  z-index: 900;
+}
+.theme-toggle:hover { background: var(--surface-alt); color: var(--text); }
+.theme-toggle svg { display: block; }
+
 .auth-fullscreen-btn {
   position: absolute;
   top: 28px;

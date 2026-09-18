@@ -47,7 +47,7 @@ import {
   TOPIC_DELIVERIES_CHANGED, TOPIC_CASH_CHANGED, TOPIC_CASH_CONFIG_CHANGED, TOPIC_COMPANY_CHANGED,
   TOPIC_LOYALTY_CONFIG_CHANGED, TOPIC_USERS_CHANGED, TOPIC_BACKUP_RESTORED, TOPIC_DATA_RESET,
 } from './utils/liveTopics.js';
-import { getThemePreference, applyTheme } from './theme.js';
+import { getThemePreference, applyTheme, setThemePreference } from './theme.js';
 import { icon } from './components/icon.js';
 import { closeAllModals, confirmDialog } from './components/modal.js';
 import { closeAllCustomSelects } from './components/customSelect.js';
@@ -298,6 +298,7 @@ async function fetchCurrentUser() {
 function renderLogin() {
   root.innerHTML = `
     <div class="auth-screen">
+      <button id="login-theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
       <div class="auth-card">
         <div class="auth-brand"><span class="dot"></span><span>PDV - C&amp;S Virtual (multi-terminal)</span></div>
         <h1>Entrar</h1>
@@ -317,6 +318,31 @@ function renderLogin() {
       </div>
     </div>
   `;
+  // Achado do usuário: o painel de admin e o cadastro de loja já tinham
+  // esse botão discreto de claro/escuro na tela de login deles — faltava
+  // só aqui. Reaproveita o mesmo mecanismo de 2 opções (claro/escuro) já
+  // usado nos outros dois (nenhuma tela de login tem uma seção de
+  // configurações pra abrigar as 3 opções de personalizacao.js), mas sem
+  // duplicar ícone nenhum: puxa de theme.js (mesma chave de
+  // localStorage do resto do app) e de components/icon.js (mesmos sun/moon
+  // já usados em personalizacao.js), em vez de copiar SVG cru como
+  // public-admin/admin.js e public-signup/signup.js precisam fazer (esses
+  // dois são bundles isolados de propósito, sem import nenhum entre si nem
+  // com public/js — aqui dentro do próprio app dá pra ser DRY de verdade).
+  const loginThemeToggle = document.getElementById('login-theme-toggle');
+  function currentToggleTheme() {
+    const saved = localStorage.getItem('theme.preference');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function renderLoginThemeToggle() {
+    loginThemeToggle.innerHTML = icon(currentToggleTheme() === 'dark' ? 'sun' : 'moon', { size: 16 });
+  }
+  loginThemeToggle.addEventListener('click', async () => {
+    await setThemePreference(currentToggleTheme() === 'dark' ? 'light' : 'dark');
+    renderLoginThemeToggle();
+  });
+  renderLoginThemeToggle();
   const form = document.getElementById('login-form');
   const errBox = document.getElementById('form-error');
   const submitBtn = form.querySelector('button[type="submit"]');

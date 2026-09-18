@@ -8,10 +8,12 @@ import { escapeHtml } from '../utils/format.js';
 import { getLoginLockState, MAX_ATTEMPTS } from '../loginLockout.js';
 import { isAdmin } from '../utils/permissions.js';
 import { icon } from '../components/icon.js';
+import { setThemePreference } from '../theme.js';
 
 export function renderLogin(root, { onLogin, company }) {
   root.innerHTML = `
     <div class="auth-screen">
+      <button id="login-theme-toggle" class="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro"></button>
       <div class="auth-card">
         <button type="button" class="auth-fullscreen-btn" id="fullscreen-toggle-btn" title="Tela cheia" aria-label="Alternar tela cheia">${icon('fullscreen', { size: 16 })}</button>
         <div class="auth-brand"><span class="dot"></span><span>${escapeHtml(company?.nomeFantasia || 'PDV - C&S Virtual')}</span></div>
@@ -38,6 +40,26 @@ export function renderLogin(root, { onLogin, company }) {
   const passwordInput = document.getElementById('password');
   const submitBtn = form.querySelector('button[type="submit"]');
   const errBox = document.getElementById('form-error');
+
+  // Achado do usuário: o painel de admin e o cadastro de loja do produto
+  // irmão (pdv-servidor) já tinham esse botão discreto de claro/escuro na
+  // tela de login deles — faltava aqui também. Mesmo mecanismo de 2 opções
+  // (claro/escuro) usado nos outros dois, já que esta tela não tem uma
+  // seção de configurações pra abrigar as 3 opções de personalizacao.js.
+  const loginThemeToggle = document.getElementById('login-theme-toggle');
+  function currentToggleTheme() {
+    const saved = localStorage.getItem('theme.preference');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function renderLoginThemeToggle() {
+    loginThemeToggle.innerHTML = icon(currentToggleTheme() === 'dark' ? 'sun' : 'moon', { size: 16 });
+  }
+  loginThemeToggle.addEventListener('click', async () => {
+    await setThemePreference(currentToggleTheme() === 'dark' ? 'light' : 'dark');
+    renderLoginThemeToggle();
+  });
+  renderLoginThemeToggle();
 
   // ---------- Tela cheia opcional, sob controle da pessoa (não mais
   // automática — achado do usuário: forçar tela cheia sozinha ao abrir
