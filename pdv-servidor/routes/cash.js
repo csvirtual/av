@@ -257,7 +257,15 @@ function commitAdjustment(input, targetDb) {
     const currentEffective = input.targetType === 'abertura'
       ? effectiveAmount('abertura', session.openingAmount, currentMovements)
       : (() => {
-          const base = currentMovements.find((m) => m.id === input.targetMovementId && (m.type === 'sangria' || m.type === 'suprimento'));
+          // Achado de auditoria: faltava conferir que o lançamento
+          // encontrado é do MESMO tipo que targetType alega — sem isso,
+          // dava pra retificar uma sangria de verdade mandando
+          // targetType: 'suprimento' (ou vice-versa): a busca aceitava
+          // qualquer um dos dois tipos, mas o sinal do delta logo abaixo é
+          // decidido só pelo targetType informado pelo cliente. O lançamento
+          // original nunca é apagado, então o furo passava despercebido no
+          // log.
+          const base = currentMovements.find((m) => m.id === input.targetMovementId && m.type === input.targetType && (m.type === 'sangria' || m.type === 'suprimento'));
           if (!base) return null;
           return effectiveAmount(input.targetType, base.amount, currentMovements, input.targetMovementId);
         })();
