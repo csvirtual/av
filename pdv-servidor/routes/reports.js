@@ -53,8 +53,18 @@ router.get('/vendas', (req, res) => {
     bySellerMap[s.userId].revenue += netSaleTotalWithInterest(s);
     bySellerMap[s.userId].count += 1;
 
+    // Achado de auditoria: `ratio` existe só pra ratear o desconto GERAL do
+    // carrinho pra cada item (mesmo raciocínio de sales.js#commitRefund,
+    // `discountRatio = sale.total / lineTotalSum`) — usar `netSaleTotal(s)`
+    // (que já subtrai `refundedTotal`) aqui, JUNTO com `soldQty` (que já
+    // exclui as unidades estornadas logo abaixo), descontava o estorno
+    // DUAS vezes: uma no numerador do ratio, outra na quantidade. Numa
+    // venda de 2×R$50 sem desconto com 1 unidade estornada, o revenue por
+    // produto saía R$25 em vez dos R$50 corretos — distorcendo margem,
+    // curva ABC e a soma de byProduct.revenue (que devia bater com
+    // totalRevenue e não batia).
     const itemsLineSum = s.items.reduce((sum, i) => sum + i.lineTotal, 0);
-    const ratio = itemsLineSum > 0 ? netSaleTotal(s) / itemsLineSum : 1;
+    const ratio = itemsLineSum > 0 ? s.total / itemsLineSum : 1;
     for (const item of s.items) {
       const soldQty = item.qty - item.qtyRefunded;
       if (soldQty <= 0) continue;
