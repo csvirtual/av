@@ -1191,6 +1191,15 @@ tbody tr:hover { background: var(--surface-alt); }
   font-size: 14px;
   cursor: pointer;
   text-align: left;
+  /* Achado do usuário (Log do sistema, celular): sem isto, o botão fica
+   * do tamanho do próprio texto em vez de acompanhar a largura que
+   * .custom-select (o wrapper por fora) recebeu do flex do pai — ao lado
+   * de um filtro com texto mais curto ("Todos os perfis" x "Todos os
+   * usuários"), sobrava um vão sem borda nenhuma entre os dois, parecendo
+   * um espaçamento desproporcional. flex:1 faz o botão preencher o
+   * wrapper inteiro sempre, com ou sem o .custom-select-clear ao lado
+   * (que continua com largura fixa, 34px, sem crescer). */
+  flex: 1 1 auto;
 }
 .custom-select-trigger:focus-visible {
   outline: none;
