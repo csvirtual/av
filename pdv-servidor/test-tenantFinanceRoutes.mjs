@@ -106,7 +106,7 @@ try {
   check('cookie do tenant A enviado ao Host do tenant B não autentica (401)', getCustomerCrossCookie.status === 401, getCustomerCrossCookie.status);
 
   // --- Financeiro (contas a pagar/receber) ---
-  const createEntryA = await request(hostA, { method: 'POST', reqPath: '/api/finance', cookie: cookieA, body: { type: 'pagar', description: 'Conta Fin A', amount: 100, dueDate: Date.now() + 86400000 } });
+  const createEntryA = await request(hostA, { method: 'POST', reqPath: '/api/finance', cookie: cookieA, body: { type: 'pagar', description: 'Conta Fin A', amount: 100, dueDate: Date.now() + 86400000, dedupeKey: `dk-fin-create-${suffix}` } });
   check('conta financeira criada no tenant A', createEntryA.status === 201, createEntryA.status);
 
   const listEntriesA = await request(hostA, { reqPath: '/api/finance', cookie: cookieA });

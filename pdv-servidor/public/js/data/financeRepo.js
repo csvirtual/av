@@ -21,11 +21,11 @@ export async function listEntries() {
 /** userId/userName aceitos só pra bater a assinatura da extensão — o
  * servidor sempre resolve quem criou pela sessão de verdade (mesmo motivo
  * de auditRepo.js#logAction e purchasesRepo.js#createPurchaseOrder). */
-export async function createEntry({ type, description, amount, dueDate, category = '', supplierId = null, notes = '', userId, userName }) {
+export async function createEntry({ type, description, amount, dueDate, category = '', supplierId = null, notes = '', userId, userName, dedupeKey }) {
   void userId; void userName;
   const { entry } = await api('/api/finance', {
     method: 'POST',
-    body: JSON.stringify({ type, description, amount, dueDate, category, supplierId, notes }),
+    body: JSON.stringify({ type, description, amount, dueDate, category, supplierId, notes, dedupeKey }),
   });
   return entry;
 }

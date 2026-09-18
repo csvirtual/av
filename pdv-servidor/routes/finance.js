@@ -60,36 +60,53 @@ router.get('/', (req, res) => {
   res.json({ entries: entries.map((e) => ({ ...e, displayStatus: entryStatus(e), paidTotal: paidTotal(e), remaining: remainingAmount(e) })) });
 });
 
-router.post('/', (req, res) => {
-  try {
-    const type = req.body.type;
-    const targetDb = req.db;
-    if (type !== 'pagar' && type !== 'receber') throw new Error('Tipo de conta inválido.');
-    const description = (req.body.description || '').trim();
+// Achado de auditoria (P2, mesma classe já corrigida em
+// deliveries.js#commitDelivery e no resto do sistema): esta rota criava um
+// lançamento financeiro (dívida ou valor a receber de verdade) sem exigir
+// nenhuma dedupeKey — um duplo clique em "Salvar" (ou uma requisição
+// reenviada por instabilidade de rede) duplicava a conta inteira. Toda
+// outra rota com efeito de negócio real (venda, estorno, pagamento de
+// conta, entrega) já exige a chave; esta ficara de fora por descuido.
+function commitEntry(input, targetDb) {
+  return targetDb.transaction(() => {
+    if (input.type !== 'pagar' && input.type !== 'receber') throw new Error('Tipo de conta inválido.');
+    const description = (input.description || '').trim();
     if (!description) throw new Error('Descrição é obrigatória.');
-    const value = Number(req.body.amount);
+    const value = Number(input.amount);
     if (!Number.isFinite(value) || value <= 0) throw new Error('Informe um valor maior que zero.');
-    const dueDate = Number(req.body.dueDate);
+    const dueDate = Number(input.dueDate);
     if (!Number.isFinite(dueDate)) throw new Error('Informe a data de vencimento.');
+
+    claimIdempotencyKey(input.dedupeKey, targetDb);
 
     const entry = {
       id: crypto.randomUUID(),
-      type,
+      type: input.type,
       description,
       amount: value,
       dueDate,
-      category: (req.body.category || '').trim(),
-      supplierId: req.body.supplierId || null,
+      category: (input.category || '').trim(),
+      supplierId: input.supplierId || null,
       status: 'pendente',
       payments: [],
-      notes: (req.body.notes || '').trim(),
-      createdBy: { userId: req.userId, userName: req.userName },
+      notes: (input.notes || '').trim(),
+      createdBy: { userId: input.userId, userName: input.userName },
       createdAt: Date.now(),
     };
     targetDb.prepare(INSERT_ENTRY_SQL).run({ id: entry.id, status: entry.status, dueDate: entry.dueDate, data: JSON.stringify(entry) });
+    return entry;
+  })();
+}
+
+router.post('/', (req, res) => {
+  try {
+    const entry = commitEntry({ ...req.body, userId: req.userId, userName: req.userName }, req.db);
     broadcast(TOPIC_FINANCE_CHANGED, { reason: 'created', id: entry.id }, req.tenantId);
     res.status(201).json({ entry });
   } catch (err) {
+    if (String(err.message).includes('UNIQUE constraint failed: idempotency_keys')) {
+      return res.status(409).json({ error: 'Esta conta já foi cadastrada — evite reenviar.' });
+    }
     respondValidationError(res, err);
   }
 });

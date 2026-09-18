@@ -469,6 +469,7 @@ export async function renderFinanceiro(container, ctx) {
             supplierId: modalEl.querySelector('#f-supplier').value || null,
             notes: modalEl.querySelector('#f-notes').value,
             userId: ctx.user.id, userName: ctx.user.nome,
+            dedupeKey: crypto.randomUUID(),
           });
           await logAction({
             userId: ctx.user.id, userName: ctx.user.nome, role: ctx.user.role,
