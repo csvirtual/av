@@ -207,8 +207,8 @@ async function renderOpenSession(container, ctx, session, refresh) {
         <div class="desc">Aberto por ${escapeHtml(session.openedBy.userName)} em ${formatDateTime(session.openedAt)} — troco inicial ${formatMoney(session.openingAmount)}.</div>
       </div>
       <div class="page-actions">
-        <button class="btn btn-secondary" id="sangria-btn">− Sangria</button>
-        <button class="btn btn-secondary" id="suprimento-btn">+ Suprimento</button>
+        <button class="btn btn-secondary" id="sangria-btn"><span class="btn-sign">− </span>Sangria</button>
+        <button class="btn btn-secondary" id="suprimento-btn"><span class="btn-sign">+ </span>Suprimento</button>
         <button class="btn btn-secondary" id="adjust-btn">Retificar</button>
         <button class="btn" id="close-session-btn">Fechar caixa</button>
       </div>

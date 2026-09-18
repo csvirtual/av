@@ -2120,6 +2120,11 @@ input.customer-search-input:focus {
   .sidebar.open { transform: translateX(0); }
   .main { padding: 76px 18px 48px; }
   .page-header { margin-bottom: 18px; }
+  /* Achado do usuário: os sinais "−"/"+" na frente de "Sangria"/
+   * "Suprimento" (tela Caixa) deixavam o texto desalinhado com o botão
+   * "Retificar" ao lado, sem sinal nenhum — só incomoda no celular/tablet,
+   * onde os três botões ficam bem próximos (ver .btn-sign em caixa.js). */
+  .btn-sign { display: none; }
 }
 
 /* ---------- ~640px: formulários, modais e telas de autenticação compactos ---------- */
