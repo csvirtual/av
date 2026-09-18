@@ -274,6 +274,32 @@
     });
   }
 
+  // Mostra as credenciais resetadas só desta vez — mesmo raciocínio da tela
+  // de sucesso do cadastro (public-signup/index.html#success-card): depois
+  // de fechado, ninguém mais consegue ver a senha em texto puro de novo
+  // (só o hash fica salvo), então precisa ficar visível o suficiente pra
+  // copiar/repassar pra loja antes de fechar o modal.
+  function openResetCredentialsModal(nomeLoja, credentials) {
+    openModal({
+      title: 'Senha redefinida',
+      submitLabel: 'Fechar',
+      singleButton: true,
+      bodyHtml: `
+        <p style="margin:0 0 14px;color:var(--text-muted);font-size:13.5px;line-height:1.5;">
+          Repasse estes dados pra loja <strong>"${escapeHtml(nomeLoja)}"</strong> — ela vai precisar trocar a senha no primeiro login.
+        </p>
+        <div class="field">
+          <label>Usuário</label>
+          <input type="text" value="${escapeHtml(credentials.username)}" readonly>
+        </div>
+        <div class="field">
+          <label>Senha</label>
+          <input type="text" value="${escapeHtml(credentials.password)}" readonly>
+        </div>
+      `,
+    });
+  }
+
   function dateInputValue(expiresAt) {
     if (!expiresAt) return '';
     const d = new Date(expiresAt);
@@ -318,6 +344,25 @@
         } catch (err) {
           toast(err.message, 'error');
         }
+      });
+
+      // Achado do usuário: dono de loja esqueceu a própria senha e não tem
+      // outro admin ativo pra redefinir por dentro do sistema — sem isso,
+      // ficava sem jeito nenhum de entrar. Mesma reconfirmação de senha do
+      // botão Excluir (é a mesma classe de ação sensível: dá acesso total a
+      // uma loja de outra pessoa), mas sem apagar dado nenhum — só a conta
+      // de login volta pro usuário/senha padrão de instalação.
+      row.querySelector('.reset-password-btn').addEventListener('click', () => {
+        const nome = tenant.nomeFantasia || tenant.razaoSocial || tenant.slug;
+        openPasswordConfirmModal({
+          title: 'Redefinir senha da loja',
+          submitLabel: 'Redefinir',
+          message: `Redefinir a senha de admin da loja <strong>"${escapeHtml(nome)}"</strong> (${escapeHtml(tenant.slug)})? A conta volta pro usuário e senha padrão de instalação, sem apagar nenhum outro dado da loja.`,
+          onConfirm: async (password) => {
+            const data = await api(`/api/admin/tenants/${encodeURIComponent(tenant.slug)}/reset-admin-password`, { method: 'POST', body: JSON.stringify({ password }) });
+            openResetCredentialsModal(nome, data.credentials);
+          },
+        });
       });
 
       row.querySelector('.delete-btn').addEventListener('click', () => {

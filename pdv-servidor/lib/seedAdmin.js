@@ -51,3 +51,53 @@ export async function ensureAdminUser(targetDb = db) {
   console.log(`Usuário criado: username="${ADMIN_USERNAME}" senha="${ADMIN_PASSWORD}" (troque depois de testar).`);
   return true;
 }
+
+// Achado do usuário: o painel de Super Admin precisava de um jeito de
+// destravar uma loja cujo dono esqueceu a própria senha (e não tem outro
+// admin ativo pra redefinir por dentro do sistema, ver
+// routes/users.js#POST /:id/redefinir-senha) — sem apagar loja nenhuma e
+// sem mexer em produtos/vendas/clientes, só na conta em si. Reseta a conta
+// 'admin' (role === 'admin') de volta pro usuário/senha padrão de
+// instalação, igual a uma loja recém-criada.
+//
+// Acha o admin pelo CAMPO role, nunca pelo username — depois de logar,
+// nada impede o dono de renomear o próprio login (ver routes/users.js#PUT
+// /:id), então buscar por username_lower === 'admin' erraria o alvo (ou
+// pior, se um VENDEDOR tivesse registrado o username "admin" depois que o
+// admin de verdade se renomeou, devolveria acesso de admin pra conta
+// errada — escalonamento de privilégio). Reativa a conta (active = true)
+// e exige troca de senha no próximo login (mustChangePassword), mesmo
+// comportamento de uma instalação nova.
+export async function resetAdminPassword(targetDb) {
+  const rows = targetDb.prepare('SELECT id, data FROM users').all();
+  const users = rows.map((row) => JSON.parse(row.data));
+  const admins = users.filter((u) => u.role === 'admin').sort((a, b) => a.createdAt - b.createdAt);
+
+  if (admins.length === 0) {
+    await ensureAdminUser(targetDb);
+    return { username: ADMIN_USERNAME, password: ADMIN_PASSWORD };
+  }
+
+  const admin = admins[0];
+  const { salt, hash } = await hashPassword(ADMIN_PASSWORD);
+  admin.passwordSalt = salt;
+  admin.passwordHash = hash;
+  admin.active = true;
+  admin.mustChangePassword = true;
+
+  // Só recupera o login "admin" se ninguém MAIS estiver usando esse nome
+  // (ex: um vendedor cadastrado com esse username depois que o admin
+  // renomeou a própria conta) — nesse caso raro, mantém o username atual
+  // do admin como está e devolve ele na resposta, pra não roubar o login
+  // de outra conta nem deixar duas linhas com o mesmo username_lower.
+  const usernameTaken = users.some((u) => u.id !== admin.id && u.usernameLower === ADMIN_USERNAME);
+  if (!usernameTaken) {
+    admin.username = ADMIN_USERNAME;
+    admin.usernameLower = ADMIN_USERNAME;
+  }
+
+  targetDb.prepare('UPDATE users SET data = ?, username_lower = ? WHERE id = ?')
+    .run(JSON.stringify(admin), admin.usernameLower, admin.id);
+
+  return { username: admin.username, password: ADMIN_PASSWORD };
+}

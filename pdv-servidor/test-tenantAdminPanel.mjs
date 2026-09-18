@@ -126,6 +126,62 @@ try {
   const storeApiWithAdminCookie = await request(hostA, { reqPath: '/api/products', cookie: adminCookie });
   check('cookie de sessão do PAINEL enviado a uma loja não autentica como usuário dela (401)', storeApiWithAdminCookie.status === 401, storeApiWithAdminCookie.status);
 
+  // --- Redefinir senha da loja pelo painel (achado do usuário: dono esqueceu a senha) ---
+  const usersList = await request(hostA, { reqPath: '/api/users', cookie: storeCookie });
+  const storeAdminId = usersList.body.users?.find((u) => u.role === 'admin')?.id;
+  check('achou o id do admin da loja A pra trocar a senha antes do teste', !!storeAdminId, JSON.stringify(usersList.body.users));
+
+  const changedPassword = 'senha-trocada-pela-loja-777';
+  const changePwd = await request(hostA, { method: 'POST', reqPath: `/api/users/${storeAdminId}/redefinir-senha`, cookie: storeCookie, body: { newPassword: changedPassword } });
+  check('loja A troca a própria senha (pra depois provar que o reset do painel volta pro padrão)', changePwd.status === 200, JSON.stringify(changePwd.body));
+
+  const loginChangedPassword = await request(hostA, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: changedPassword } });
+  check('login com a senha trocada funciona antes do reset', loginChangedPassword.status === 200, loginChangedPassword.status);
+
+  const resetNoAuth = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/${slugA}/reset-admin-password` });
+  check('redefinir senha de loja sem sessão do painel retorna 401', resetNoAuth.status === 401, resetNoAuth.status);
+
+  const resetNoPassword = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/${slugA}/reset-admin-password`, cookie: adminCookie });
+  check('redefinir senha sem informar a senha do admin do painel é rejeitado (400)', resetNoPassword.status === 400, JSON.stringify(resetNoPassword.body));
+
+  const resetWrongPassword = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/${slugA}/reset-admin-password`, cookie: adminCookie, body: { password: 'senha-errada-com-certeza' } });
+  check('redefinir senha com a senha errada do admin do painel é rejeitado (400)', resetWrongPassword.status === 400, JSON.stringify(resetWrongPassword.body));
+
+  const loginStillChangedAfterFailedResets = await request(hostA, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: changedPassword } });
+  check('senha da loja continua a mesma depois das tentativas de reset com senha errada/faltando', loginStillChangedAfterFailedResets.status === 200, loginStillChangedAfterFailedResets.status);
+
+  const resetUnknownTenant = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/nao-existe-${suffix}/reset-admin-password`, cookie: adminCookie, body: { password: adminPassword } });
+  check('redefinir senha de loja inexistente (com senha certa do painel) é rejeitado (400)', resetUnknownTenant.status === 400, JSON.stringify(resetUnknownTenant.body));
+
+  const reset = await request(ADMIN_HOST, { method: 'POST', reqPath: `/api/admin/tenants/${slugA}/reset-admin-password`, cookie: adminCookie, body: { password: adminPassword } });
+  check('redefinir senha da loja A pelo painel funciona (senha certa)', reset.status === 200 && reset.body.credentials?.username === 'admin' && reset.body.credentials?.password === 'admin123', JSON.stringify(reset.body));
+
+  const loginOldChangedPasswordAfterReset = await request(hostA, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: changedPassword } });
+  check('depois do reset, a senha que a loja tinha trocado para de funcionar', loginOldChangedPasswordAfterReset.status === 401, loginOldChangedPasswordAfterReset.status);
+
+  const loginDefaultAfterReset = await request(hostA, { method: 'POST', reqPath: '/api/auth/login', body: { username: 'admin', password: 'admin123' } });
+  check('depois do reset, o usuário/senha padrão (admin/admin123) volta a funcionar', loginDefaultAfterReset.status === 200, loginDefaultAfterReset.status);
+
+  const meAfterResetLogin = await request(hostA, { reqPath: '/api/auth/me', cookie: loginDefaultAfterReset.cookie });
+  check('depois do reset, mustChangePassword volta a true (igual a uma instalação nova)', meAfterResetLogin.status === 200 && meAfterResetLogin.body.user?.mustChangePassword === true, JSON.stringify(meAfterResetLogin.body));
+
+  // mustChangePassword=true bloqueia o resto da API (mesmo gate de uma
+  // instalação nova, ver server.js) até trocar a senha padrão — não é
+  // regressão nenhuma, é o comportamento certo continuando a valer depois
+  // do reset. "Sem perder dado nenhum" é sobre PRODUTOS/VENDAS/CLIENTES
+  // (o reset só toca a linha do usuário admin em si, nunca as outras
+  // tabelas) — provado completando o fluxo normal de troca obrigatória e
+  // confirmando que a API volta a responder normalmente depois.
+  const productsBlockedByMustChange = await request(hostA, { reqPath: '/api/products', cookie: loginDefaultAfterReset.cookie });
+  check('API de loja fica bloqueada até trocar a senha padrão, igual a uma instalação nova', productsBlockedByMustChange.status === 403 && productsBlockedByMustChange.body.mustChangePassword === true, JSON.stringify(productsBlockedByMustChange.body));
+
+  const finalPassword = 'senha-definitiva-pos-reset-321';
+  const changePasswordAfterReset = await request(hostA, { method: 'POST', reqPath: '/api/auth/change-password', cookie: loginDefaultAfterReset.cookie, body: { currentPassword: 'admin123', newPassword: finalPassword } });
+  check('completar a troca obrigatória de senha depois do reset funciona', changePasswordAfterReset.status === 200, JSON.stringify(changePasswordAfterReset.body));
+
+  const productsAfterMandatoryChange = await request(hostA, { reqPath: '/api/products', cookie: loginDefaultAfterReset.cookie });
+  check('depois de trocar a senha, a API volta a responder normalmente (dado nenhum se perde)', productsAfterMandatoryChange.status === 200, productsAfterMandatoryChange.status);
+
   // --- Reaplicar o mesmo seed é idempotente (redefine senha, não duplica) ---
   await seedPlatformAdmin(adminUsername, 'outra-senha-valida-123');
   const oldPasswordLogin = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/login', body: { username: adminUsername, password: adminPassword } });

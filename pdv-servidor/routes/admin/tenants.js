@@ -7,11 +7,13 @@ import { Router } from 'express';
 import { respondValidationError } from '../../lib/httpResponses.js';
 import {
   listTenants, setTenantStatus, deleteTenant, VALID_TENANT_STATUSES,
-  listTrashedTenants, restoreTenant, purgeTrashedTenant,
+  listTrashedTenants, restoreTenant, purgeTrashedTenant, getTenantBySlug,
 } from '../../control/db.js';
 import { verifyPlatformAdminPassword } from '../../lib/platformAdminAuth.js';
 import { getTenantDb } from '../../db/index.js';
 import { restartTrial } from '../../lib/licenseState.js';
+import { resetAdminPassword } from '../../lib/seedAdmin.js';
+import { logAction } from '../../lib/audit.js';
 
 const router = Router();
 
@@ -45,6 +47,37 @@ router.post('/:slug/status', (req, res) => {
       restartTrial(getTenantDb(updated.id));
     }
     res.json({ tenant: publicTenant(updated) });
+  } catch (err) {
+    respondValidationError(res, err);
+  }
+});
+
+// Achado do usuário: dono de loja esqueceu a própria senha e não tem
+// nenhum outro admin ativo pra redefinir por dentro do sistema (a única
+// via normal, ver routes/users.js#POST /:id/redefinir-senha) — fica sem
+// jeito nenhum de entrar. Este botão do painel devolve a conta 'admin' pro
+// usuário/senha padrão de instalação (lib/seedAdmin.js#resetAdminPassword),
+// sem tocar em produto/venda/cliente/estoque — só a conta de login em si.
+// Mesma reconfirmação de senha (e mesmo namespace de bloqueio por força
+// bruta) da exclusão de loja acima: é a mesma classe de ação sensível,
+// dá acesso total a uma loja de outra pessoa.
+router.post('/:slug/reset-admin-password', async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (!password) throw new Error('Informe sua senha pra confirmar a redefinição.');
+    const confirmed = await verifyPlatformAdminPassword(req.platformAdmin?.username_lower, password);
+    if (!confirmed) throw new Error('Senha incorreta.');
+    const tenant = getTenantBySlug(req.params.slug);
+    if (!tenant) throw new Error('Loja não encontrada.');
+    const targetDb = getTenantDb(tenant.id);
+    const credentials = await resetAdminPassword(targetDb);
+    logAction({
+      userId: null, userName: `Suporte (${req.platformAdmin?.username_lower})`, role: 'platform-admin',
+      action: 'Redefinição de senha (via Super Admin)',
+      details: `Senha da conta "${credentials.username}" redefinida pro padrão de instalação pelo painel de Super Admin.`,
+      entity: 'user',
+    }, targetDb);
+    res.json({ credentials });
   } catch (err) {
     respondValidationError(res, err);
   }

@@ -264,6 +264,19 @@ function renderTenantContactButtons(message, tenant, status) {
 // aqui (BLOCKED_PAGE_STYLE) porque as duas páginas (tenant bloqueado e
 // caminho inexistente, ver renderNotFoundRedirectPage mais abaixo)
 // compartilham o mesmo cartão/tema, só o conteúdo de dentro muda.
+// Achado do usuário: essas páginas (assim como a tela de login do painel de
+// Super Admin, antes de ganhar o próprio <link rel="icon">) ficavam sem
+// ícone na aba do navegador — o padrão de favicon.png por arquivo estático
+// (usado em public/, public-admin/, public-signup/) não se aplica aqui:
+// esta página nasce ANTES de qualquer middleware de arquivo estático (ver
+// comentário logo abaixo sobre por que ela é 100% autocontida), então um
+// <link rel="icon" href="/icons/..."> apontaria pra um caminho que talvez
+// nem exista pra esse Host (ex: um subdomínio de loja desconhecida). Mesmo
+// PNG de 32×32 usado nos três bundles (public/icons/favicon-32.png,
+// idêntico byte a byte nos três — conferido via md5sum), embutido como
+// data URI pra continuar autocontida.
+const BLOCKED_PAGE_FAVICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACMUlEQVR4nOyXT2gTQRTGv5nddv1LSLBoCkXIobWFtNg1EKhildKgEUSbiqJYlSK99CSIIIJHL+LVk3jzItKTehTEUgI10WrTorQV0yZtTBO12FjdGWdGIiKmpzRz2R/sMvPesN+3M4c3z8RfePttj+HgCsBDAOkAgR/VgCMjXq9AePynw+8UR5LFcoqUB76Y3UsZ7ldNtJIXzhcY44OFkcSTPwZ8fZ0RCvIUNcRx2FFpgniiQW+dVf92o//8X+RO/DBKQdOw6gZqLS4hhDTWM+uUSYEwNMFBw5RrNCDOodsUW7EbmpDaJjRjbGlrvFkp2dTgx7HwYUzMTqN33wF0tdlgnKtcuHUvZrMfcb7nBDZbm1BY+YwjoW5Mp2dwcn8EoeZ2fPm2go5AK/y+BqQ/Zf+rQbEO7YE9uDV4VY2Hjw/g9tB19HR2IeBvwuXoGRWXsf6DUXi3eXDt9JCK3Tg3rOJ2cxAXIzGVr4T2I3ANuAZcA64B18C6xai09h3v5udUMcp/LWD0zThGJ18incuKJ6OK0eJyDs8n4viwNI+F/JIqRrliHs+SYxhLJcSaNF7PpCoWI7Kjz+bQiPYjoOJitghdCG1xJ+RJaEJqiwsJ0WZAalOHOXdFk1BEjZGaUpuKRnFOzC+h1nB2QWobcryaykxZLbvihOCQuCpvx0YiOmVGEVt+lHgsp0Y5XprKvrdadt6jFGti0ao4n62iZauOmd/t+QvxzQeOgbOFh+OT5dQvAAAA//8999ckAAAABklEQVQDANoE1EPyA4p+AAAAAElFTkSuQmCC';
+
 const BLOCKED_PAGE_STYLE = `
   :root {
     --bg: #f4f6f5; --surface: #ffffff; --text: #1c2523; --text-muted: #62716d;
@@ -331,6 +344,7 @@ function renderTenantBlockedPage(message, tenant, status) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDV - C&amp;S Virtual: Loja indisponível</title>
+<link rel="icon" href="${BLOCKED_PAGE_FAVICON}">
 <style>${BLOCKED_PAGE_STYLE}</style>
 </head>
 <body>
@@ -364,6 +378,7 @@ function renderNotFoundRedirectPage(redirectSeconds = 7) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDV - C&amp;S Virtual: Página não encontrada</title>
+<link rel="icon" href="${BLOCKED_PAGE_FAVICON}">
 <style>${BLOCKED_PAGE_STYLE}</style>
 </head>
 <body>
