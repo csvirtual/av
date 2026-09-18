@@ -440,6 +440,7 @@
   // desce de verdade, um segundo por vez, e reabilita o botão sozinho
   // quando chega a zero.
   const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
+  const loginPasswordInput = document.getElementById('login-password');
   let lockoutTimer = null;
   // Achado do usuário: proteção contra força bruta — cada novo bloqueio
   // (lib/loginLockout.js#PROGRESSIVE_NAMESPACES) dobra de duração a partir
@@ -451,10 +452,16 @@
     const sec = seconds % 60;
     return sec > 0 ? `${min}min ${sec}s` : `${min}min`;
   }
+  // Achado do usuário: mesmo raciocínio do login da loja (ver
+  // public/js/app.js#startLockoutCountdown) — só o botão ficava bloqueado
+  // contra clique, o campo de senha continuava digitável. Bloqueio é por
+  // usuário (lib/loginLockout.js#keyFor), então o campo de usuário
+  // continua editável de propósito.
   function startLockoutCountdown(remainingMs) {
     if (lockoutTimer) clearInterval(lockoutTimer);
     let remaining = Math.ceil(remainingMs / 1000);
     loginSubmitBtn.disabled = true;
+    loginPasswordInput.disabled = true;
     const render = () => { loginError.textContent = `Muitas tentativas incorretas. Aguarde ${formatCountdown(remaining)} antes de tentar de novo.`; };
     render();
     lockoutTimer = setInterval(() => {
@@ -464,6 +471,7 @@
         lockoutTimer = null;
         loginError.textContent = '';
         loginSubmitBtn.disabled = false;
+        loginPasswordInput.disabled = false;
         return;
       }
       render();

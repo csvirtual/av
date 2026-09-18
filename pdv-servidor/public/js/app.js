@@ -320,16 +320,26 @@ function renderLogin() {
   const form = document.getElementById('login-form');
   const errBox = document.getElementById('form-error');
   const submitBtn = form.querySelector('button[type="submit"]');
+  const passwordInput = document.getElementById('password');
   // Achado do usuário: o aviso de bloqueio por tentativas incorretas
   // (lib/loginLockout.js, 60s a partir da 2ª tentativa errada) mostrava só
   // o segundo inicial, parado na tela, sem descer — parecia travado. Agora
   // desce de verdade, um segundo por vez, e reabilita o botão sozinho
   // quando chega a zero.
+  //
+  // Achado do usuário: só o botão ficava bloqueado contra clique — o campo
+  // de senha continuava digitável, deixando parecer que dava pra tentar de
+  // novo. Agora o campo de senha fica indisponível junto com o botão,
+  // mesmo padrão de app/js/views/login.js#lockFields da extensão (o
+  // bloqueio é por usuário — ver lib/loginLockout.js#keyFor — então o
+  // campo de usuário continua editável de propósito, pra dar pra tentar
+  // login com outra conta sem esperar).
   let lockoutTimer = null;
   function startLockoutCountdown(remainingMs) {
     if (lockoutTimer) clearInterval(lockoutTimer);
     let remaining = Math.ceil(remainingMs / 1000);
     submitBtn.disabled = true;
+    passwordInput.disabled = true;
     const render = () => { errBox.innerHTML = `<div class="form-error">Muitas tentativas incorretas. Aguarde ${remaining}s antes de tentar de novo.</div>`; };
     render();
     lockoutTimer = setInterval(() => {
@@ -339,6 +349,7 @@ function renderLogin() {
         lockoutTimer = null;
         errBox.innerHTML = '';
         submitBtn.disabled = false;
+        passwordInput.disabled = false;
         return;
       }
       render();
