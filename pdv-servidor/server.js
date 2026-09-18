@@ -280,7 +280,7 @@ const BLOCKED_PAGE_FAVICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAA
 const BLOCKED_PAGE_STYLE = `
   :root {
     --bg: #f4f6f5; --surface: #ffffff; --text: #1c2523; --text-muted: #62716d;
-    --primary: #145333; --primary-dark: #0d3b24;
+    --primary: #145333; --primary-dark: #0d3b24; --accent: #c98a2c;
     --shadow-md: 0 4px 16px rgba(20, 30, 27, 0.12);
     --contact-border: rgba(20, 83, 51, 0.15);
     --contact-hover: rgba(20, 83, 51, 0.08);
@@ -288,7 +288,7 @@ const BLOCKED_PAGE_STYLE = `
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #101613; --surface: #1a221e; --text: #e9efec; --text-muted: #93a89e;
-      --primary: #2f9d6b; --primary-dark: #0d2b1c;
+      --primary: #2f9d6b; --primary-dark: #0d2b1c; --accent: #b27c2a;
       --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
       --contact-border: rgba(233, 239, 236, 0.15);
       --contact-hover: rgba(47, 157, 107, 0.18);
@@ -312,7 +312,16 @@ const BLOCKED_PAGE_STYLE = `
     padding: 36px 40px;
     text-align: center;
   }
-  h1 { font-size: 20px; margin: 14px 0 8px; text-wrap: balance; }
+  /* Achado do usuário: faltava a mesma "faixa de marca" (pontinho +
+   * PDV - C&S Virtual) que login/cadastro/painel já têm no topo do
+   * cartão (ver .auth-brand em public/css/styles.css) — sem ela, esta
+   * página destoava do resto do produto mesmo usando os mesmos tokens de
+   * cor. Centralizada aqui (as outras ficam à esquerda) porque o resto do
+   * cartão também é centralizado, diferente das telas de formulário. */
+  .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 4px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .brand span { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+  h1 { font-size: 22px; margin: 14px 0 8px; text-wrap: balance; }
   p { color: var(--text-muted); font-size: 14px; margin: 0; line-height: 1.5; }
   .contact-hint { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--contact-border); font-size: 13px; }
   .contact-row { display: flex; gap: 12px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
@@ -349,6 +358,7 @@ function renderTenantBlockedPage(message, tenant, status) {
 </head>
 <body>
   <div class="card">
+    <div class="brand"><span class="dot"></span><span>PDV - C&amp;S Virtual</span></div>
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l10.2 18H1.8L12 2.5z" fill="#f4a428" stroke="#c9841f" stroke-width=".6" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="#2b2f36" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#2b2f36"/></svg>
     <h1>Loja indisponível</h1>
     <p>${escapeBlockedPageHtml(message)}</p>
@@ -383,6 +393,7 @@ function renderNotFoundRedirectPage(redirectSeconds = 7) {
 </head>
 <body>
   <div class="card">
+    <div class="brand"><span class="dot"></span><span>PDV - C&amp;S Virtual</span></div>
     <svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="rgba(20, 83, 51, 0.12)" stroke="var(--primary)" stroke-width="1.4"/><path d="M9.5 9.5a2.5 2.5 0 114.2 1.85c-.6.55-1.2.95-1.2 1.9" stroke="var(--primary)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="12" cy="16.3" r="1" fill="var(--primary)"/></svg>
     <h1>Erro 404</h1>
     <p>A página que você pesquisou não existe.</p>
