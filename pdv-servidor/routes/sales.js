@@ -456,6 +456,18 @@ function commitRefund(input, targetDb) {
     throw new Error('Estornar gerando crédito de troca passa do que um vendedor pode fazer sozinho — peça a autorização de um administrador.');
   }
 
+  // Achado de auditoria: `lineTotal` de cada item reflete só o desconto por
+  // item — o desconto geral do carrinho (`overallDiscountAmount` em
+  // commitSale, aplicado sobre o total da venda, não guardado por item) fica
+  // de fora dele. Sem ratear essa diferença aqui, um estorno devolveria mais
+  // do que o cliente pagou de fato numa venda com desconto geral.
+  // `discountRatio` traz o valor de cada unidade pro preço líquido realmente
+  // cobrado — mesmo raciocínio já usado em routes/reports.js (ratio de
+  // atribuição de receita) e em pdv-extension/app/js/data/salesRepo.js
+  // (mesma fórmula, `refundSaleItems`).
+  const lineTotalSum = sale.items.reduce((sum, i) => sum + i.lineTotal, 0);
+  const discountRatio = lineTotalSum > 0 ? sale.total / lineTotalSum : 1;
+
   let totalRefunded = 0;
   const refundedItems = [];
   for (const reqItem of input.items) {
@@ -467,7 +479,7 @@ function commitRefund(input, targetDb) {
       throw new Error(`Quantidade de estorno inválida para "${item.name}" (disponível: ${available}).`);
     }
     item.qtyRefunded += qty;
-    totalRefunded += (item.lineTotal / item.qty) * qty;
+    totalRefunded += (item.lineTotal / item.qty) * discountRatio * qty;
     refundedItems.push({ productId: item.productId, name: item.name, qty });
 
     const prodRow = targetDb.prepare(GET_PRODUCT_SQL).get(item.productId);
