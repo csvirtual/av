@@ -2137,7 +2137,15 @@ input.customer-search-input:focus {
     box-shadow: var(--shadow-md);
   }
   .sidebar.open { transform: translateX(0); }
-  .main { padding: 76px 18px 48px; }
+  /* Achado do usuário: o botão flutuante "voltar ao topo" (.scroll-top-btn,
+   * position:fixed, bottom:22px, 44px de altura aqui — só encolhe pra 42px/
+   * 14px dentro do @media 600px mais abaixo) ocupa a faixa de 22px a 66px
+   * contados do fim da tela. Com só 48px de padding embaixo, o rodapé do
+   * último card da página ficava DENTRO dessa faixa (48 < 66) — o botão
+   * parecia "grudado" no cartão ao rolar até o final. 78px garante folga
+   * (66px do botão + ~12px de respiro) acima do último card, em qualquer
+   * tela deste breakpoint. */
+  .main { padding: 76px 18px 78px; }
   .page-header { margin-bottom: 18px; }
   /* Achado do usuário: os sinais "−"/"+" na frente de "Sangria"/
    * "Suprimento" (tela Caixa) deixavam o texto desalinhado com o botão
@@ -2149,7 +2157,13 @@ input.customer-search-input:focus {
 /* ---------- ~640px: formulários, modais e telas de autenticação compactos ---------- */
 @media (max-width: 640px) {
   html, body { font-size: 14px; }
-  .main { padding: 72px 12px 40px; }
+  /* Mesmo achado do @media 900px acima (.scroll-top-btn "grudado" no
+   * último card) — 78px cobre a folga necessária tanto pro tamanho do
+   * botão deste breakpoint (600-640px: ainda 44px/bottom 22px, igual
+   * desktop) quanto pro tamanho menor dele abaixo de 600px (42px/bottom
+   * 14px, que precisa de bem menos: sobra folga de propósito, sem
+   * problema nenhum). */
+  .main { padding: 72px 12px 78px; }
 
   .form-row { flex-direction: column; gap: 0; }
   /* Achado do usuário (Dados da loja, celular): campos como Número/UF/CEP
