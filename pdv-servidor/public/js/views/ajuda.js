@@ -198,7 +198,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: '"CNPJ já cadastrado e travado..."',
-        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes: depois do primeiro salvamento, o campo trava de propósito (ver tópico "Licença e ativação"). Clique em "Desbloquear edição" e cole o código de liberação, pedindo ao suporte (o mesmo contato que fornece a chave de ativação, veja o tópico "Licença e ativação").',
+        a: 'Aparece ao tentar mudar um CNPJ que já foi salvo antes: depois do primeiro salvamento, o campo trava de propósito. Clique em "Desbloquear edição" e cole o código de liberação, pedindo ao suporte (o mesmo contato que fornece a chave de ativação, veja o tópico "Licença e ativação").',
       },
       {
         q: '"Esse código não é uma chave de ativação" / "...não é um código de liberação de CNPJ" / "Chave inválida" / "Chave em formato inválido" / "Essa chave já expirou"',
