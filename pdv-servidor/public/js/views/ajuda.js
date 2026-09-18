@@ -639,7 +639,7 @@ ${linhaEncarregado}</div>
       <div class="tip"><strong>Dica:</strong> depois de fechado, o caixa não pode ser reaberto. Se precisar continuar vendendo, é só abrir um novo.</div>
 
       <h3>Confirmação por senha e backup automático</h3>
-      <p>Antes de confirmar o fechamento, o sistema pede pra digitar <strong>usuário e senha de qualquer conta ativa</strong>: não precisa ser administrador, nem precisa ser a mesma pessoa que está logada na aba. É só uma confirmação de que alguém autorizado está de fato fechando o caixa naquele momento.</p>
+      <p>Antes de confirmar o fechamento, o sistema pede pra digitar usuário e senha: <strong>tem que ser a sua própria senha</strong>, a mesma conta que está logada na aba. Um administrador pode confirmar o fechamento de qualquer caixa (inclusive de outra pessoa), mas sempre com a senha dele mesmo, nunca com a de quem abriu.</p>
       <p>Assim que a senha é aceita, o sistema já <strong>gera e baixa sozinho um backup completo e atualizado</strong> de tudo (a mesma senha digitada criptografa o arquivo, sem pedir uma segunda), uma segurança extra de fim de turno, sem precisar lembrar de ir na tela <strong>Backup</strong> fazer isso à parte. Se por algum motivo o backup não puder ser gerado, o caixa fecha normalmente do mesmo jeito, só aparece um aviso pra gerar um backup manual depois.</p>
 
       <h3>Caixa obrigatório (opcional, configurável)</h3>
