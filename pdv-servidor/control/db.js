@@ -157,23 +157,6 @@ export function deleteTenant(slug) {
   return tenant;
 }
 
-/** Lista o que está na "lixeira" (tenants/_lixeira/<slug>-<timestamp>/),
- * mais recente primeiro — usado pelo painel de Super Admin pra oferecer
- * restaurar uma loja excluída. `entry` é o nome da pasta em si (chave
- * usada por restoreTenant abaixo); `slug`/`deletedAt` são derivados do
- * próprio nome, sem precisar abrir o banco de cada loja só pra listar. */
-export function listTrashedTenants() {
-  const trashDir = path.join(TENANTS_DIR, '_lixeira');
-  if (!fs.existsSync(trashDir)) return [];
-  return fs.readdirSync(trashDir)
-    .filter((name) => fs.statSync(path.join(trashDir, name)).isDirectory())
-    .map((entry) => {
-      const match = entry.match(/^(.*)-(\d+)$/);
-      return { entry, slug: match ? match[1] : entry, deletedAt: match ? Number(match[2]) : null };
-    })
-    .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
-}
-
 // Achado do usuário: sem isto, a lixeira só cresce pra sempre — cada
 // exclusão deixa uma pasta inteira (banco .sqlite3 da loja incluído) em
 // tenants/_lixeira/, nunca apagada sozinha. 90 dias é folga suficiente pra
@@ -181,8 +164,31 @@ export function listTrashedTenants() {
 // engano), sem deixar disco se enchendo de lojas que ninguém mais vai
 // recuperar. Mesmo raciocínio/padrão de db/index.js#sweepOldIdempotencyKeys
 // e lib/session.js#sweepExpiredSessions — chamado pelo mesmo `setInterval`
-// periódico em server.js.
+// periódico em server.js. Definida ANTES de listTrashedTenants (que a usa
+// pra calcular `purgeAt` de cada entrada) de propósito.
 const TRASH_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Lista o que está na "lixeira" (tenants/_lixeira/<slug>-<timestamp>/),
+ * mais recente primeiro — usado pelo painel de Super Admin pra oferecer
+ * restaurar uma loja excluída. `entry` é o nome da pasta em si (chave
+ * usada por restoreTenant abaixo); `slug`/`deletedAt` são derivados do
+ * próprio nome, sem precisar abrir o banco de cada loja só pra listar.
+ * `purgeAt` (achado do usuário: contador de dias até a exclusão automática
+ * na tela) é sempre `deletedAt + TRASH_RETENTION_MS` — mesma conta que
+ * purgeExpiredTrashedTenants usa pra decidir o que apagar, então a tela
+ * nunca mostra uma contagem diferente do que realmente vai acontecer. */
+export function listTrashedTenants() {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  if (!fs.existsSync(trashDir)) return [];
+  return fs.readdirSync(trashDir)
+    .filter((name) => fs.statSync(path.join(trashDir, name)).isDirectory())
+    .map((entry) => {
+      const match = entry.match(/^(.*)-(\d+)$/);
+      const deletedAt = match ? Number(match[2]) : null;
+      return { entry, slug: match ? match[1] : entry, deletedAt, purgeAt: deletedAt !== null ? deletedAt + TRASH_RETENTION_MS : null };
+    })
+    .sort((a, b) => (b.deletedAt || 0) - (a.deletedAt || 0));
+}
 
 /** Apaga DEFINITIVAMENTE (mesma operação de purgeTrashedTenant abaixo) toda
  * entrada da lixeira mais velha que TRASH_RETENTION_MS — chamado
@@ -201,6 +207,22 @@ export function purgeExpiredTrashedTenants() {
       fs.rmSync(path.join(trashDir, entry), { recursive: true, force: true });
       purged += 1;
     }
+  }
+  return purged;
+}
+
+// Achado do usuário: botão pra esvaziar a lixeira inteira de uma vez, sem
+// precisar restaurar/excluir uma por uma — mesma reconfirmação de senha
+// das outras exclusões definitivas (ver routes/admin/tenants.js), porque é
+// exatamente a mesma classe de ação: apaga o .sqlite3 de cada loja de
+// verdade, sem volta nenhuma pra TODAS as entradas de uma vez.
+export function purgeAllTrashedTenants() {
+  const trashDir = path.join(TENANTS_DIR, '_lixeira');
+  if (!fs.existsSync(trashDir)) return 0;
+  let purged = 0;
+  for (const { entry } of listTrashedTenants()) {
+    fs.rmSync(path.join(trashDir, entry), { recursive: true, force: true });
+    purged += 1;
   }
   return purged;
 }

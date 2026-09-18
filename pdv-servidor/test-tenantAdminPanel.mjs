@@ -61,6 +61,11 @@ await seedPlatformAdmin(adminUsername, adminPassword);
 let finalAdminUsername = adminUsername;
 
 const slugA = `panel-a-${suffix}`;
+// Achado do usuário: segunda loja criada/excluída só pra testar "esvaziar a
+// lixeira inteira" com mais de uma entrada — declarada fora do try (`let`,
+// não `const`) porque o finally também precisa dela pra limpar, mesmo que
+// o try pare antes de chegar lá.
+let slugB = null;
 const tenantA = await createNewTenant(slugA, 'Painel Tenant A', 'Painel Tenant A');
 {
   const tdb = new Database(tenantA.dbPath);
@@ -286,6 +291,51 @@ try {
   const purgeAlreadyGone = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/lixeira/${encodeURIComponent(trashEntry2.entry)}`, cookie: adminCookie, body: { password: currentAdminPassword } });
   check('excluir definitivamente uma entrada que já não existe mais é rejeitado (400)', purgeAlreadyGone.status === 400, JSON.stringify(purgeAlreadyGone.body));
 
+  // --- Esvaziar a lixeira inteira de uma vez (achado do usuário) ---
+  // Recria a loja A e exclui de novo, mais uma segunda loja, pra ter DUAS
+  // entradas na lixeira antes de esvaziar tudo de uma vez.
+  const recreateA = await createNewTenant(slugA, 'Painel Tenant A', 'Painel Tenant A');
+  slugB = `panel-b-${suffix}`;
+  const tenantB = await createNewTenant(slugB, 'Painel Tenant B', 'Painel Tenant B');
+  const delA3 = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugA}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir loja A de novo (pra testar esvaziar a lixeira)', delA3.status === 200, JSON.stringify(delA3.body));
+  const delB = await request(ADMIN_HOST, { method: 'DELETE', reqPath: `/api/admin/tenants/${slugB}`, cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('excluir loja B (pra testar esvaziar a lixeira)', delB.status === 200, JSON.stringify(delB.body));
+
+  const lixeiraBeforeEmptyAll = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  check('as duas lojas estão na lixeira antes de esvaziar tudo', lixeiraBeforeEmptyAll.body.trashed?.length === 2, JSON.stringify(lixeiraBeforeEmptyAll.body.trashed?.map((t) => t.slug)));
+
+  // Achado do usuário: contador de dias até a exclusão automática na tela
+  // do painel usa `purgeAt`, que a API já precisa devolver por entrada.
+  check('cada entrada da lixeira já vem com purgeAt (pro contador de dias na tela)', lixeiraBeforeEmptyAll.body.trashed?.every((t) => typeof t.purgeAt === 'number' && t.purgeAt > Date.now()), JSON.stringify(lixeiraBeforeEmptyAll.body.trashed));
+
+  const emptyAllNoAuth = await request(ADMIN_HOST, { method: 'DELETE', reqPath: '/api/admin/tenants/lixeira' });
+  check('esvaziar a lixeira sem sessão retorna 401', emptyAllNoAuth.status === 401, emptyAllNoAuth.status);
+
+  const emptyAllNoPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  // Achado do usuário: confere a MENSAGEM, não só o status — um bug de
+  // ordenação de rota (DELETE /:slug interceptando "lixeira" como slug
+  // ANTES de chegar na rota certa) devolvia 400 também, só que com uma
+  // mensagem diferente ("...confirmar a exclusão." em vez de
+  // "...esvaziamento da lixeira."). Só o status não pegaria essa classe de
+  // bug — foi exatamente assim que ele escapou na primeira rodada.
+  check('esvaziar a lixeira sem senha é rejeitado (400) com a mensagem certa (não a de excluir UMA loja)', emptyAllNoPassword.status === 400 && /esvaziamento da lixeira/i.test(emptyAllNoPassword.body?.error || ''), JSON.stringify(emptyAllNoPassword.body));
+
+  const emptyAllWrongPassword = await request(ADMIN_HOST, { method: 'DELETE', reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie, body: { password: 'senha-errada-com-certeza' } });
+  check('esvaziar a lixeira com senha errada é rejeitado (400)', emptyAllWrongPassword.status === 400, JSON.stringify(emptyAllWrongPassword.body));
+
+  const lixeiraStillFullAfterFailedEmptyAll = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  check('as duas entradas continuam na lixeira depois das tentativas com senha errada/faltando', lixeiraStillFullAfterFailedEmptyAll.body.trashed?.length === 2, JSON.stringify(lixeiraStillFullAfterFailedEmptyAll.body.trashed?.map((t) => t.slug)));
+
+  const emptyAll = await request(ADMIN_HOST, { method: 'DELETE', reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('esvaziar a lixeira com senha certa funciona e reporta 2 purgadas', emptyAll.status === 200 && emptyAll.body.ok === true && emptyAll.body.purged === 2, JSON.stringify(emptyAll.body));
+
+  const lixeiraAfterEmptyAll = await request(ADMIN_HOST, { reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie });
+  check('lixeira fica vazia depois de esvaziar tudo', (lixeiraAfterEmptyAll.body.trashed || []).length === 0, JSON.stringify(lixeiraAfterEmptyAll.body.trashed));
+
+  const emptyAllOnEmpty = await request(ADMIN_HOST, { method: 'DELETE', reqPath: '/api/admin/tenants/lixeira', cookie: adminCookie, body: { password: currentAdminPassword } });
+  check('esvaziar uma lixeira já vazia não dá erro e reporta 0 purgadas', emptyAllOnEmpty.status === 200 && emptyAllOnEmpty.body.purged === 0, JSON.stringify(emptyAllOnEmpty.body));
+
   // --- Trocar o próprio usuário/senha (clique no nome, no painel) ---
   const accountNoAuth = await request(ADMIN_HOST, { method: 'POST', reqPath: '/api/admin/account', body: { currentPassword: currentAdminPassword, newPassword: 'nao-importa-123456' } });
   check('trocar usuário/senha sem sessão retorna 401', accountNoAuth.status === 401, accountNoAuth.status);
@@ -326,13 +376,17 @@ try {
   controlDb.prepare('DELETE FROM platform_admins WHERE username_lower = ?').run(finalAdminUsername.toLowerCase());
   controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugA);
   fs.rmSync(path.join(__dirname, 'tenants', slugA), { recursive: true, force: true });
+  if (slugB) {
+    controlDb.prepare('DELETE FROM tenants WHERE slug = ?').run(slugB);
+    fs.rmSync(path.join(__dirname, 'tenants', slugB), { recursive: true, force: true });
+  }
   // A exclusão pelo painel move a pasta pra tenants/_lixeira/<slug>-<ts> em
   // vez de apagar (ver control/db.js#deleteTenant) — limpa também esses
   // restos daqui, senão a lixeira acumula lixo de teste a cada rodada.
   const lixeiraDir = path.join(__dirname, 'tenants', '_lixeira');
   if (fs.existsSync(lixeiraDir)) {
     for (const name of fs.readdirSync(lixeiraDir)) {
-      if (name.startsWith(`${slugA}-`)) fs.rmSync(path.join(lixeiraDir, name), { recursive: true, force: true });
+      if (name.startsWith(`${slugA}-`) || (slugB && name.startsWith(`${slugB}-`))) fs.rmSync(path.join(lixeiraDir, name), { recursive: true, force: true });
     }
   }
 }

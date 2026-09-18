@@ -423,8 +423,14 @@ select, input[type="date"] {
 }
 .lixeira-slug { font-size: 14px; font-weight: 600; }
 .lixeira-date { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+/* Achado do usuário: contador de dias até a exclusão automática definitiva
+ * (90 dias de retenção, ver control/db.js#purgeExpiredTrashedTenants) —
+ * destaque em --warning nos últimos 7 dias, mesmo raciocínio de
+ * company.js#badge-gold pra licença perto de vencer. */
+.lixeira-countdown { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.lixeira-countdown-soon { color: var(--warning); font-weight: 600; }
 .lixeira-row-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.restore-btn, .purge-btn {
+.restore-btn, .purge-btn, .empty-trash-btn {
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -436,8 +442,12 @@ select, input[type="date"] {
 }
 .restore-btn { border: 1px solid var(--primary); color: var(--primary); }
 .restore-btn:hover { background: var(--primary); color: #fff; }
-.purge-btn { border: 1px solid var(--danger); color: var(--danger); }
-.purge-btn:hover { background: var(--danger); color: #fff; }
+.purge-btn, .empty-trash-btn { border: 1px solid var(--danger); color: var(--danger); }
+.purge-btn:hover, .empty-trash-btn:hover { background: var(--danger); color: #fff; }
+
+/* Achado do usuário: botão pra esvaziar a lixeira inteira de uma vez, sem
+ * precisar restaurar/excluir cada loja uma a uma. */
+.lixeira-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
 /* Paginação da lixeira (achado do usuário: sem limite, a lista só cresceria
  * pra sempre) — versão mínima da barra de paginação usada no resto do PDV

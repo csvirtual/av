@@ -403,6 +403,28 @@
     return ts ? new Date(ts).toLocaleString('pt-BR') : '-';
   }
 
+  // Achado do usuário: contador de dias até a exclusão automática de cada
+  // entrada (control/db.js#purgeExpiredTrashedTenants, 90 dias de
+  // retenção) — `purgeAt` vem pronto da API (mesma conta que o purge
+  // periódico usa pra decidir, nunca um número recalculado aqui que
+  // pudesse divergir). Math.ceil (não floor/round) pra nunca mostrar "0
+  // dias" enquanto ainda falta uma fração de dia — a entrada continua
+  // válida até o instante exato de `purgeAt`, só o ARREDONDAMENTO pra
+  // baixo mentiria sobre esse instante.
+  function formatTrashCountdown(purgeAt) {
+    if (!purgeAt) return '';
+    const daysLeft = Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000));
+    if (daysLeft <= 0) return 'Exclusão automática definitiva a qualquer momento';
+    if (daysLeft === 1) return 'Exclusão automática definitiva em 1 dia';
+    return `Exclusão automática definitiva em ${daysLeft} dias`;
+  }
+  // Últimos 7 dias antes da exclusão automática — destaque visual (mesmo
+  // raciocínio de company.js#badge-gold pra licença perto de vencer).
+  function trashCountdownIsSoon(purgeAt) {
+    if (!purgeAt) return false;
+    return purgeAt - Date.now() <= 7 * 24 * 60 * 60 * 1000;
+  }
+
   // Achado do usuário: excluir precisa ter pra onde voltar — a lixeira
   // (control/db.js#listTrashedTenants/restoreTenant) já guardava a pasta
   // desde a primeira versão do botão Excluir, só faltava um jeito de ver e
@@ -433,6 +455,7 @@
         <div>
           <div class="lixeira-slug">${escapeHtml(item.slug)}</div>
           <div class="lixeira-date">Excluída em ${escapeHtml(formatTrashDate(item.deletedAt))}</div>
+          <div class="lixeira-countdown${trashCountdownIsSoon(item.purgeAt) ? ' lixeira-countdown-soon' : ''}">${escapeHtml(formatTrashCountdown(item.purgeAt))}</div>
         </div>
         <div class="lixeira-row-actions">
           <button type="button" class="restore-btn">Restaurar</button>
@@ -515,12 +538,35 @@
       submitLabel: 'Fechar',
       singleButton: true,
       wide: true,
-      bodyHtml: '<div class="lixeira-list"></div><div class="lixeira-pagination"></div>',
+      bodyHtml: `
+        <div class="lixeira-toolbar">
+          <button type="button" class="empty-trash-btn">Esvaziar lixeira</button>
+        </div>
+        <div class="lixeira-list"></div>
+        <div class="lixeira-pagination"></div>
+      `,
       onMount: (modalEl) => {
         listEl = modalEl.querySelector('.lixeira-list');
         pagerEl = modalEl.querySelector('.lixeira-pagination');
         page = 1;
         refresh();
+        // Achado do usuário: esvaziar a lixeira inteira de uma vez, sem
+        // precisar restaurar/excluir uma por uma — mesma reconfirmação de
+        // senha da exclusão definitiva de UMA entrada (é a mesma classe de
+        // ação: apaga o .sqlite3 de cada loja de verdade, sem volta).
+        modalEl.querySelector('.empty-trash-btn').addEventListener('click', () => {
+          if (!allItems.length) { toast('A lixeira já está vazia.', 'error'); return; }
+          openPasswordConfirmModal({
+            title: 'Esvaziar lixeira',
+            submitLabel: 'Esvaziar lixeira',
+            message: `Excluir definitivamente as <strong>${allItems.length}</strong> loja(s) na lixeira? Isto apaga os dados de todas elas de vez. Depois disso não tem como desfazer.`,
+            onConfirm: async (password) => {
+              const data = await api('/api/admin/tenants/lixeira', { method: 'DELETE', body: JSON.stringify({ password }) });
+              toast(`${data.purged} loja(s) excluída(s) definitivamente.`, 'success');
+              refresh();
+            },
+          });
+        });
       },
     });
   }
