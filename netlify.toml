@@ -1,9 +1,0 @@
-# O site em si é servido pelo GitHub Pages agora — este projeto Netlify
-# existe só pra rodar netlify/functions/proxy.js (a função de proxy usada
-# pelo app Navegador pra abrir sites que bloqueiam ser exibidos em iframe;
-# Pages não executa código de servidor, então essa parte precisa continuar
-# em algum lugar que rode funções). Os cabeçalhos de segurança do site
-# (CSP etc.) ficaram só na <meta> de desktop/index.html, já que aqui não
-# tem mais página nenhuma sendo servida pra aplicar cabeçalho HTTP.
-[build]
-  functions = "netlify/functions"
